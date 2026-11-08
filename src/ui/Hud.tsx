@@ -1,3 +1,4 @@
+import { MAX_QUESTIONS, QUESTIONS, QUESTION_NAME, type Question } from '../sim/interrogation';
 import { flowLine } from '../sim/flow';
 import { PlansOrderButton } from './hud/SpendConfirm';
 import { useEffect, useRef, useState } from 'react';
@@ -578,6 +579,7 @@ export function Hud() {
               {game.gate.prisoners!.map(p => (
                 <div key={p.id} style={{ marginBottom: 6 }}>
                   <Row label={p.name} value={`${pluralize(Math.floor(game.clock.t) - p.since, 'day')}`} title={`Wound ${Math.round(p.sev)} · trust ${Math.round(p.trust)}${p.talked ? ' · has talked' : ''}`} />
+                  <Questioning id={p.id} asked={p.asked ?? []} hurt={!!p.hurtTwice} />
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button style={{ ...btn(), flex: 1 }} onClick={() => g.releasePrisoner(p.id)}>Let him go</button>
                     <button style={{ ...btn(), flex: 1, opacity: canJoin(game, p) ? 1 : 0.4 }} disabled={!canJoin(game, p)} title="After a month, healed, and once he trusts you (70+)" onClick={() => g.joinPrisoner(p.id)}>Let him join</button>
@@ -826,4 +828,19 @@ function Chronicle() {
       </div>)}
     </Section>
   </>;
+}
+
+/** Questioning a prisoner (sim/interrogation.ts): three questions, kindly or harshly. The answer shows under the buttons and is in the log. */
+function Questioning({ id, asked, hurt }: { id: string; asked: readonly Question[]; hurt: boolean }) {
+  const ask = useGameStore(s => s.askPrisoner);
+  const [harsh, setHarsh] = useState(false);
+  const [said, setSaid] = useState<string[]>([]);
+  if (asked.length >= MAX_QUESTIONS || hurt) return said.length ? <div style={{ fontSize: 11.5, opacity: 0.8, margin: '3px 0' }}>{said.join(' ')}</div> : null;
+  return <div style={{ margin: '3px 0' }} data-testid={`questioning-${id}`}>
+    <div style={{ display: 'flex', gap: 4, marginBottom: 3 }}>
+      {QUESTIONS.map(q => <button key={q} style={{ ...btn(), flex: 1, fontSize: 11, opacity: asked.includes(q) ? 0.4 : 1 }} disabled={asked.includes(q)} title={harsh ? 'Harsh: he talks more, half of it is what you want to hear. Humanity -4.' : 'Kind: he talks less, and it is true. Humanity +1.'} onClick={() => setSaid(ask(id, q, harsh ? 'harsh' : 'kind'))}>{QUESTION_NAME[q]}</button>)}
+    </div>
+    <label style={{ fontSize: 11, opacity: 0.8 }}><input type="checkbox" checked={harsh} onChange={e => setHarsh(e.target.checked)} /> Harsh (rope and cold): more answers, less true, -4 humanity</label>
+    {said.length > 0 && <div style={{ fontSize: 11.5, opacity: 0.85, marginTop: 3 }}>{said.join(' ')}</div>}
+  </div>;
 }

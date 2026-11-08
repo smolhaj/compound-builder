@@ -101,10 +101,16 @@ describe('a whole simulated cutscene', () => {
     expect([ctxAt(ph, 3), ctxAt(ph, 12), ctxAt(ph, 20), ctxAt(ph, 41), ctxAt(ph, 51), ctxAt(ph, 61)]).toEqual(['approach', 'first_shots', 'fight', 'breach', 'retreat', 'aftermath']);
   });
   it('voicing is idempotent in length of play and leaves a parley alone', () => {
-    const g = base(2); g.gate.pending = enc('looters', { stances: ['parley', 'defend'] });
-    const st = stageRaid(g, 'parley');
-    const b: Battle = st.battles[0];
-    if (b.events.some(e => e.kind === 'end' && (e.result === 'breached' || e.result === 'overrun'))) return;   // (a lost fight's wake lengthens the scene after it is voiced)
-    expect(voiceCutscene([b], { seed: 1, temper: 'desperate', scenes: [{}] })[0].events.filter(e => e.kind === 'say').map(e => (e as { text: string }).text)).toEqual(b.events.filter(e => e.kind === 'say').map(e => (e as { text: string }).text));
+    // (a fight with a death or a lost line has a wake / assault written after it is voiced; look for a scene without one)
+    let checked = 0;
+    for (let seed = 2; seed <= 14 && checked < 2; seed++) {
+      const g = base(seed); g.gate.pending = enc('looters', { stances: ['parley', 'defend'] });
+      const st = stageRaid(g, 'parley');
+      const b: Battle = st.battles[0];
+      if (st.drama || b.events.some(e => e.kind === 'end' && (e.result === 'breached' || e.result === 'overrun'))) continue;
+      checked++;
+      expect(voiceCutscene([b], { seed: 1, temper: 'desperate', scenes: [{}] })[0].events.filter(e => e.kind === 'say').map(e => (e as { text: string }).text)).toEqual(b.events.filter(e => e.kind === 'say').map(e => (e as { text: string }).text));
+    }
+    expect(checked).toBeGreaterThan(0);
   });
 });

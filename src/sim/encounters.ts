@@ -14,7 +14,10 @@
  * ever reaches the family through it. Pure and seeded.
  */
 import { withKnownWalls } from './perimeter';
-import { planOpener } from './raidOpeners';
+import { planOpener, scoutSpotted } from './raidOpeners';
+import { raiderName } from './raiderStory';
+import { captureOdds, driveOffDeters, type ScoutPlan } from './scoutPlans';
+import { SHOOT_ENVOY_HUMANITY, asksPassage, bluffOdds, refusedAngry, shootEnvoy } from './parleyChoices';
 import { crewKindOf } from './surrender';
 import { nobodyHome } from './orphans';
 import { ringPoints } from './rings';
@@ -47,7 +50,7 @@ import { isTalk, talkRoll } from './negotiation';
 import { addBurnScar, applyRaidDamage, damagePenalty } from './raidDamage';
 import { contagion, infect } from './effects';
 import type { Person, SkillId } from './family';
-import { dayIndex, type GameState } from './state';
+import { dayIndex, hourOf, type GameState } from './state';
 import type { Stock } from './materials';
 import type { Battle } from './battleTypes';
 import { gateLead, isAway, recordBattle, resolveRansom, type RansomTerms } from './rescue';
@@ -196,7 +199,7 @@ export function postureOf(s: GameState): Posture {
 // ─────────────────────────────────────────────────────────────────────────
 
 export type EncounterKind = 'insider' | 'guard_stay' | 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'shelter' | 'move_in' | 'stranded';
-export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first' | 'move_sell' | 'move_keep' | 'move_lease' | 'hold_on' | 'drive_now' | 'back_roads' | 'resupply' | 'dismiss' | 'neg_toll' | 'neg_aid' | 'neg_redirect' | 'flag_pay';
+export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first' | 'move_sell' | 'move_keep' | 'move_lease' | 'hold_on' | 'drive_now' | 'back_roads' | 'resupply' | 'dismiss' | 'neg_toll' | 'neg_aid' | 'neg_redirect' | 'flag_pay' | 'flag_pass' | 'flag_bluff' | 'flag_shoot';
 
 export interface Encounter {
   id: string;
@@ -222,6 +225,8 @@ export interface Encounter {
   temper?: RaiderTemper;
   /** How the raid begins (sim/raidOpeners.ts: scouts, a white-flag demand, an ambush of the people at work outside, a diversion). Rolled once when the raid is made; save v88. Absent: the plain way. */
   opener?: import('./raidOpeners').Opener;
+  /** The plan chosen for scouts the watch spotted (sim/scoutPlans.ts). Set on the staged copy by the cutscene; read and cleared by `resolve`: never saved. */
+  scoutPlan?: import('./scoutPlans').ScoutPlan;
   /** A crew's terms for a taken child (sim/rescue.ts). */
   ransom?: RansomTerms;
   /** The end of a month's trial: which camp (sim/trial.ts). */
@@ -381,7 +386,7 @@ export function strengthOf(s: GameState, p: Posture = postureOf(s)): number {
 }
 
 /** What the battle sim is told about a crew: how they fight and how well they have learned this place. */
-const battleOpts = (e: Encounter, extra: { insideBreach?: boolean; orders?: import('./raidOrders').RaidOrder[] } = {}) => ({ armed: e.armed, temper: e.temper, kind: e.kind, organized: ORGANIZED.has(e.kind), ...(e.opener ? { opener: e.opener } : {}), ...(e.adapt ? { adapt: e.adapt } : {}), ...extra });
+const battleOpts = (e: Encounter, extra: { insideBreach?: boolean; angry?: boolean; scoutPlan?: import('./scoutPlans').ScoutPlan; orders?: import('./raidOrders').RaidOrder[] } = {}) => ({ armed: e.armed, temper: e.temper, kind: e.kind, organized: ORGANIZED.has(e.kind), ...(e.opener ? { opener: e.opener } : {}), ...(extra.angry ? { angry: true } : {}), ...(extra.scoutPlan ? { scoutPlan: extra.scoutPlan } : {}), ...(e.adapt ? { adapt: e.adapt } : {}), ...extra });
 
 /**
  * The threat matrix: who comes. Opportunists (looters) are put off by a
@@ -585,9 +590,12 @@ export function gateDay(s: GameState): Encounter | null {
       e.opener = op;
       if (op.kind === 'demand') {
         e.wants = e.wants && Object.keys(e.wants).length ? e.wants : { canned: Math.max(3, e.size), fuel: 1 };
-        e.stances = [...e.stances.filter(st => st !== 'flag_pay'), 'flag_pay'];
+        e.stances = [...e.stances.filter(st => !st.startsWith('flag_')), 'flag_pay', ...(asksPassage(crewKindOf(e.kind)) ? ['flag_pass' as const] : []), 'flag_bluff', 'flag_shoot'];
         e.dossier = [...e.dossier, 'A man walks up the drive alone with a white rag on a stick. He wants a toll, and says nobody has to get hurt.'];
-      } else if (op.kind === 'scouts') e.dossier = [...e.dossier, 'Two men were seen on the ridge, glassing the place, a while before the rest came.'];
+      } else if (op.kind === 'scouts') {
+        op.spotted = mulberry32(s.seed * 4057 + day * 11 + 3)() < scoutSpotted(p.detection, hourOf(s.clock.t) < 6 || hourOf(s.clock.t) >= 20);
+        if (op.spotted) e.dossier = [...e.dossier, 'Two men were seen on the ridge, glassing the place, a while before the rest came.'];
+      }
     }
   }
   // an alarm: the passage hatches bolt themselves
@@ -831,6 +839,46 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         lines.push(`${o.title}. ${o.text}`);
       }
     }
+    // the man under the white flag (sim/parleyChoices.ts) and the scouts the watch spotted (sim/scoutPlans.ts)
+    let angry = false, skipFight = false;
+    const bestTalker = Math.max(0, ...s.people.filter((x, i) => !x.kid && s.personState[i]?.needs.died == null).map(x => x.skills.negotiator));
+    const crewK = crewKindOf(e.kind), tmp = e.temper ?? 'desperate';
+    if (stance === 'flag_pass') {
+      title = 'They passed through'; text = 'The man with the white rag asked only for the road. You let them by; they walked the drive in file, eyes front, and were gone.'; tone = 'good';
+      g.respect = Math.max(0, (g.respect ?? 0) - 0.05);
+    }
+    if (stance === 'flag_bluff') {
+      const o = bluffOdds({ negotiator: bestTalker, fortress: p.fortress, fighters: p.fighters, armed: p.armed, kind: crewK, temper: tmp, talk: diffOf(s.disaster).talk });
+      if (r() < o) { title = 'They backed off'; text = 'You told the man under the flag how many guns were behind the wall and where. He looked at the wall a long time, then went back down the drive.'; tone = 'good'; g.respect = Math.min(1, (g.respect ?? 0) + 0.1); skipFight = true; if (r() < 0.3) { g.comeBack = { kind: e.kind, size: e.size, armed: e.armed, temper: e.temper, until: e.day + 30 }; g.next = Math.min(g.next < 0 ? e.day + 12 : g.next, e.day + 10 + Math.floor(r() * 8)); } }
+      else { lines.push('He did not believe a word of it. He walked back down the drive and the crew came on, angrier.'); stance = 'defend'; angry = true; }
+    }
+    if (stance === 'flag_shoot') {
+      g.humanity = Math.max(0, g.humanity - SHOOT_ENVOY_HUMANITY);
+      e.size = Math.max(1, e.size - 1);
+      const o = shootEnvoy({ kind: crewK, temper: tmp, fortress: p.fortress }, r);
+      lines.push('Someone shot the man under the white flag on the drive. It will be talked about.');
+      if (o.flees) { title = 'They ran'; text = 'The man with the rag went down in the gravel. The rest scattered for the trees and did not come back that day.'; tone = 'mixed'; skipFight = true; g.respect = Math.min(1, (g.respect ?? 0) + 0.1); }
+      else { stance = 'defend'; angry = o.enraged; if (o.enraged) lines.push('They came up the drive screaming.'); }
+    }
+    if (stance === 'defend' && e.opener?.kind === 'demand' && !angry && refusedAngry(tmp, mulberry32(s.seed * 733 + e.day * 5 + 1))) { angry = true; lines.push('You sent the man back with nothing. The crew that came after him was angrier.'); }
+    // scouts the watch spotted: the plan chosen on the card
+    let scoutPlan: ScoutPlan | undefined;
+    if ((stance === 'defend' || stance === 'warn') && e.opener?.kind === 'scouts' && e.opener.spotted && e.scoutPlan) {
+      scoutPlan = e.scoutPlan; delete e.scoutPlan;
+      const sc = { fortress: p.fortress, fighters: p.fighters, armed: p.armed, kind: crewK, temper: tmp, night: night0(s) };
+      if (scoutPlan === 'drive_off') {
+        const cal = (Object.keys(s.armory.ammo) as Array<keyof typeof s.armory.ammo>).sort((a, b) => (s.armory.ammo[b] ?? 0) - (s.armory.ammo[a] ?? 0))[0];
+        if (cal && (s.armory.ammo[cal] ?? 0) >= 6) { s.armory.ammo[cal] = (s.armory.ammo[cal] ?? 0) - 6; lines.push('Six rounds over their heads. The scouts ran.'); } else lines.push('You shouted and waved. The scouts ran.');
+        if (r() < driveOffDeters(sc)) { title = 'They thought better of it'; text = 'A shot over the ridge and two men running. The crew behind them turned round in the road.'; tone = 'good'; skipFight = true; g.respect = Math.min(1, (g.respect ?? 0) + 0.15); }
+      } else if (scoutPlan === 'capture') {
+        if (r() < captureOdds(sc)) {
+          (g.prisoners ??= []).push({ id: `pr${s.nextId++}`, name: raiderName(s.seed + e.day), since: e.day, sev: Math.round(r() * 12), talked: false, trust: 10 });
+          e.size = Math.max(3, e.size - 2); e.opener = undefined; scoutPlan = undefined;
+          lines.push('You took one of the scouts alive. The other got away to tell the crew, which is two men short now. He is in the shop, zip-tied.');
+        } else { lines.push(wound(s, r, 25, 'hurt in a scuffle with a scout') || 'The grab failed.'); angry = true; lines.push('The scouts got away, and the crew knows you are watching.'); }
+      } else if (scoutPlan === 'prepare') lines.push('The defenders shifted to the near side and the gates were chained before the crew came up.');
+      else lines.push('You let them look.');
+    }
     if (stance === 'flag_pay') {
       // the man under the white flag is paid what he asked: certain, and the crew goes (it knows the place pays)
       const paid = take(s, e.wants ?? {}, 1);
@@ -875,7 +923,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       if (deterred) { title = 'They thought better of it'; text = 'A shot over the truck and the walls behind it. They turn around in the road.'; tone = 'good'; if (e.kind === 'refugees') g.humanity = Math.max(0, g.humanity - 5); }
       else stance = 'defend';
     }
-    if (stance === 'defend') {
+    if (stance === 'defend' && !skipFight) {
       // the fight itself, second by second (sim/battle.ts); the world can play it back from g.battle
       // a crew up inside the wall (tunnelers), or one that finds a hatch outside it (an underground passage's way in): no wall to get over
       boltPassages(s);
@@ -884,7 +932,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       if (via) lines.push(via.forced ? 'They found a steel hatch in the leaf litter out in the trees and blew the blast door. They are in the passage.' : 'They found a steel hatch out in the trees, left unbolted. They are in the passage.');
       const raiders = via ? Math.min(raidersAfterHelp(e, help), 4 + Math.floor(e.size / 4)) : raidersAfterHelp(e, help);
       const orders = g.orders; delete g.orders;
-      const b = planBattle(s, raiders, s.seed * 131 + e.day * 7 + 1, battleOpts(e, { ...(e.dig || via || e.insiderHelp || talkAmbush ? { insideBreach: true } : {}), ...(orders?.length ? { orders } : {}) }));
+      const b = planBattle(s, raiders, s.seed * 131 + e.day * 7 + 1, battleOpts(e, { ...(e.dig || via || e.insiderHelp || talkAmbush ? { insideBreach: true } : {}), ...(orders?.length ? { orders } : {}), ...(angry ? { angry: true } : {}), ...(scoutPlan ? { scoutPlan } : {}) }));
       if (via) { const run = s.perimeter.find(x => x.id === via.runId); if (run) run.revealed = true; }
       g.battle = b;
       const stockBefore = stockTotal(s);
@@ -940,6 +988,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   return out;
 }
 
+const night0 = (s: GameState): boolean => { const h = hourOf(s.clock.t); return h < 6 || h >= 20; };
 const stockTotal = (s: GameState): number => Object.values(s.stock).reduce((a: number, v) => a + (typeof v === 'number' ? v : 0), 0);
 
 /** The aftermath line of a raid that got in, tied to what actually happened (stores / tools / vehicles gone, people hurt or taken). */

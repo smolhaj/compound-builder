@@ -288,6 +288,8 @@ function voiceScene(b: Battle, ph: Phases, sc: VoiceScene, temper: RaiderTemper,
   // 1. the sim's own lines: keep the fit and the new, re-pick the rest
   for (const e of b.events) {
     if (e.kind !== 'say') { events.push(e); continue; }
+    // a dying person's last words (sim/defenderTraits.ts) are the sim's own and are kept as they are: they name the people they love
+    if (e.ctx === 'last_words') { dir.note(e.text, e.who); spoke.push(e.t); events.push(e); continue; }
     const side = sideOf(b, e.who);
     if (!side) { dir.note(e.text); events.push({ ...e, ctx: ctxAt(ph, e.t) }); continue; }   // narration
     const ctx = ctxAt(ph, e.t);
