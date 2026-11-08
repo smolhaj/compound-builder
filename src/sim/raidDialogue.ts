@@ -19,11 +19,12 @@ import type { Battle, BattleEvent } from './battleTypes';
 import type { RaiderTemper } from './battle';
 import type { CrewStyle } from './raiderKinds';
 import { mulberry32 } from './rng';
+import { INTERIOR_LINES, type InteriorCtx } from './raidLinesInterior';
 
 export type Ctx = 'approach' | 'first_shots' | 'fight' | 'defender_hit' | 'mate_down' | 'raider_down' | 'retreat' | 'fire' | 'breach' | 'aftermath'
   | 'grief' | 'tend' | 'tended' | 'prisoner' | 'prisoner_reply' | 'looting' | 'held'
   // the invasion (sim/breach.ts, sim/houseAssault.ts): the truck, the charge, the door, the rooms, the dragging, the search, the leaving
-  | 'ram_run' | 'ram_hit' | 'charge_set' | 'charge_call' | 'stack_door' | 'clear_room' | 'hold_room' | 'drag' | 'search' | 'leaving';
+  | 'ram_run' | 'ram_hit' | 'charge_set' | 'charge_call' | 'stack_door' | 'clear_room' | 'hold_room' | 'drag' | 'search' | 'leaving' | InteriorCtx;
 export type Role = 'raider' | 'defender';
 export const RETREAT_CTX: ReadonlySet<Ctx> = new Set<Ctx>(['retreat', 'aftermath']);
 
@@ -68,7 +69,7 @@ export const LINES: Record<Role, Partial<Record<Ctx, Variants>>> = {
       any: ['Light it up! Let them watch it burn!', 'Keep them looking at the barn!', 'That got their attention.', 'More fuel on it. Make it big.', 'While they are busy, go along the east side.'],
     },
     looting: { any: ['Hands up! Stay where you are!', 'Nobody moves. Nobody gets hurt.', 'Check the house. Find the food.', 'Grab the cans and the fuel. Fast.', 'Load it up. Move!', 'That is all we need. Let us go.'] },
-    breach: { any: ['We are through! Go, go, go!', 'The wall is down! Everybody in!', 'Inside the fence! Push!', 'Get to the house!'] },
+    breach: { any: ['We are through! Go, go, go!', 'The wall is down! Everybody in!', 'Inside the fence! Push!', 'Get to the house!', 'Fan out across the yard!', 'Keep moving, do not stop in the open!', 'Get to the porch!', 'Go, go, do not stop!'] },
     ram_run: { any: ['Foot to the floor! Through the wall!', 'Hit it! Hit the wall, go, go!', 'Take it down. Put the truck right through it!', 'Do not slow down! Straight in!', 'Keep your foot down. Do not lift!'] },
     ram_hit: { any: ['Go, go, go! Inside!', 'It is open. Push through, push!', 'Through the gap! Spread out!', 'Move up! Take the yard!', 'Fan out. Cover the house!'] },
     charge_set: { any: ['Cover me. Setting the charge.', 'Stay low. I am planting it now.', 'Give me ten seconds on the wall.', 'Bag is on the wall. Wire it.'] },
@@ -97,7 +98,7 @@ export const LINES: Record<Role, Partial<Record<Ctx, Variants>>> = {
     defender_hit: { any: ['I am hit! I am hit!', 'Ah! My arm!', 'Got me in the leg. I can still shoot.', 'It is bad. I need help.', 'Just a graze. Keep firing.', 'I cannot feel my hand...', 'Somebody help me, I am hit.'] },
     retreat: { any: ['They are pulling back!', 'They are running! Hold your fire, hold your spots.', 'They are leaving. Do not follow them.', 'That is the last of them going down the road.', 'Stay up. It could be a trick.', 'They broke. Watch the road.'] },
     fire: { any: ['Fire! Fire behind the barn!', 'Somebody get water on that!', 'Do not leave your posts. That is what they want.', 'Watch the other side! It is a distraction!', 'Keep your eyes on the fence, not the flames.'] },
-    breach: { any: ['They are through the fence! Fall back to the house!', 'The wall is gone! Back, back!', 'Get the kids to the shelter!', 'Hold the door! Hold the door!'] },
+    breach: { any: ['They are through the fence! Fall back to the house!', 'The wall is gone! Back, back!', 'Get the kids to the shelter!', 'Hold the door! Hold the door!', 'Inside, everybody inside, lock the door!', 'The yard is lost. Get in the house!', 'They are in the yard! Move!', 'Bar the door, bar it now!', 'Get away from the windows!', 'Wounded first. Get them in!', 'Into the house, the house!', 'Kids to the back room, go!'] },
     ram_run: { any: ['Truck! They are driving at the wall. Get back!', 'That truck is not stopping. Move, move!', 'Headlights! They are coming through the wall!', 'Everybody off the fence line, now!'] },
     charge_set: { any: ['What was that? Somebody is at the wall!', 'Somebody is at the wall with a bag. Down!', 'Get away from the fence. They are going to blow it!'] },
     hold_room: { any: ['Hold the doorway. Shoot anything that comes through!', 'Stay down behind the couch!', 'Keep them out of the hall!', 'Cover the stairs. I have the door!', 'I am reloading. Cover me!', 'Do not cross the doorway. Let them come to you!', 'Keep low. They can only come one at a time!', 'Watch the corner by the kitchen!', 'Get the kids into the back room!', 'Steady. They have to come through that door!'] },
@@ -119,6 +120,28 @@ export const LINES: Record<Role, Partial<Record<Ctx, Variants>>> = {
   },
 };
 
+// the interior fight and the aftermath pools join the rest (a context both files define keeps both pools' keys)
+for (const role of ['raider', 'defender'] as const) {
+  for (const [ctx, pool] of Object.entries(INTERIOR_LINES[role])) {
+    const have = (LINES[role] as Record<string, Variants | undefined>)[ctx] ?? {};
+    const merged: Record<string, string[]> = {};
+    for (const [k, v] of [...Object.entries(have), ...Object.entries(pool as Variants)]) merged[k] = [...new Set([...(merged[k] ?? []), ...(v ?? [])])];
+    (LINES[role] as Record<string, Variants>)[ctx] = merged;
+  }
+}
+
+/**
+ * What the last raid(s) said, so back-to-back raids do not open with the same words (user: no repeats within a scene or across consecutive raids).
+ * Module memory only (never saved): `rotateRaidMemory` is called once per new raid; every director built after it shares the raid's set.
+ */
+const RECENT: { key: number | null; current: Set<string>; previous: Set<string> } = { key: null, current: new Set(), previous: new Set() };
+export function rotateRaidMemory(key: number): void {
+  if (RECENT.key === key) return;
+  RECENT.previous = RECENT.current; RECENT.current = new Set(); RECENT.key = key;
+}
+/** Test hook. */
+export function resetRaidMemory(): void { RECENT.key = null; RECENT.current = new Set(); RECENT.previous = new Set(); }
+
 /** Phrases that are a retreat, when the crew speaks them and when the family describes them. A crew still creeping up never says these. */
 export const RETREAT_RE = /fall back to the road|pull back|pulling back|pulling out|not worth it|get out of here|outta here|back in the truck|back to the (road|trucks)|break contact|withdraw|disengage|they(?:'|’)?re (?:running|leaving|breaking)|they are (?:running|leaving|pulling)|giving up|they broke|floor it|run! everybody|forget the cans/i;
 /** Lines of the line giving way (the family falling back, the crew pouring in). */
@@ -136,7 +159,9 @@ export class LineDirector {
   isUsed(text: string): boolean { return this.used.has(text); }
   lastOf(speaker: string): string | undefined { return this.last.get(speaker); }
   /** Register a line that is spoken (kept from the sim, or just picked). */
-  note(text: string, speaker?: string): void { this.used.add(text); if (speaker) this.last.set(speaker, text); }
+  note(text: string, speaker?: string): void { this.used.add(text); RECENT.current.add(text); if (speaker) this.last.set(speaker, text); }
+  /** Count the lines already in a battle as said (so the planners that add lines later never repeat them). */
+  noteAll(b: Battle): void { for (const e of b.events) if (e.kind === 'say') this.note(e.text, e.who); }
   /**
    * A line for the moment: the crew's own variant first (and the temper's, for a prisoner), then the common ones; never the speaker's last line;
    * unused ones first, and only when every line of the pool has been used does it start over (still never the same line back to back).
@@ -147,10 +172,14 @@ export class LineDirector {
     const vs = o.variants ?? [];
     const mine = vs.flatMap(v => pool[v] ?? []);
     const all = [...new Set([...mine, ...(pool.any ?? []), ...(vs.length ? [] : Object.values(pool).flatMap(x => x ?? []))])];
-    const sub = (t: string) => t.replace(/\{n\}/g, o.vars?.n ?? 'them');
-    const need = (t: string) => !t.includes('{n}') || !!o.vars?.n;
+    const vars = o.vars ?? {};
+    const sub = (t: string) => t.replace(/\{(\w+)\}/g, (_m, k: string) => vars[k] ?? (k === 'n' ? 'them' : k === 'item' ? 'supplies' : k));
+    const need = (t: string) => [...t.matchAll(/\{(\w+)\}/g)].every(m => !!vars[m[1]]);
     const cand = all.filter(need).filter(t => t !== (o.speaker ? this.last.get(o.speaker) : undefined));
+    // never a line this scene used; then not one the previous raid used; only when the pool is spent does it start over
     let fresh = cand.filter(t => !this.used.has(sub(t)));
+    const unseen = fresh.filter(t => !RECENT.previous.has(sub(t)));
+    if (unseen.length) fresh = unseen;
     // the crew's own lines are the voice of the scene: favor them while any is unused
     const mineFresh = fresh.filter(t => mine.includes(t));
     if (mineFresh.length && this.r() < 0.7) fresh = mineFresh;
@@ -301,6 +330,23 @@ function voiceScene(b: Battle, ph: Phases, sc: VoiceScene, temper: RaiderTemper,
   if (ph.fire) { add(4, 'raider', 'fire'); add(7, 'home', 'fire'); }
   if (ph.breachAt < Infinity) { add(ph.breachAt + 0.4, 'raider', 'breach'); if (!hasSay('home', ph.breachAt - 1, ph.breachAt + 4)) add(ph.breachAt + 1.8, 'home', 'breach'); }
   if (ph.endAt < Infinity && !hasSay('home', ph.endAt, ph.endAt + 6)) add(ph.endAt + 1.2, 'home', 'aftermath');
+  // no long quiet in the fight itself: a line whenever seven seconds pass between the first shot and the end without one
+  if (ph.firstShot < Infinity) {
+    const stop = Math.min(ph.endAt, b.duration) - 1.5;
+    for (let guard = 0; guard < 40; guard++) {
+      const ts = events.filter(e => e.kind === 'say' && e.who && e.t >= ph.firstShot - 1).map(e => e.t).sort((x, y) => x - y);
+      let prev = ph.firstShot - 1, gapAt = -1;
+      for (const t of [...ts, stop]) { if (t - prev > 7 && t > prev) { gapAt = prev + 3.5; break; } prev = t; }
+      if (gapAt < 0 || gapAt >= stop) break;
+      const before = events.length;
+      const side: 'home' | 'raider' = guard % 2 ? 'raider' : 'home';
+      const c = ctxAt(ph, gapAt);
+      if (c === 'approach') break;
+      add(gapAt, side, c);
+      if (events.length === before) add(gapAt + 0.2, side === 'home' ? 'raider' : 'home', c);
+      if (events.length === before) break;
+    }
+  }
   void temper;
   events.sort((a, c) => a.t - c.t);
   return { ...b, events };

@@ -16,7 +16,7 @@ import { newDamage } from './raidDamage';
 import { decorateDefenders } from './defenderMoments';
 import { ASSAULT_EXTRA } from './houseAssault';
 import { decorateRaiders } from './raiderKinds';
-import { LineDirector, voiceCutscene } from './raidDialogue';
+import { LineDirector, voiceCutscene, rotateRaidMemory } from './raidDialogue';
 import { dramatize, type DramaInfo } from './raidDrama';
 import { endPoses } from './raidEnding';
 import { dragTheWounded } from './fightPoses';
@@ -92,6 +92,7 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedR
   const outcome = resolve(g, stance);
   const battle = (g.gate.battle as Battle | undefined) ?? null;
   const seed = game.seed * 131 + e.day * 7 + 1;
+  rotateRaidMemory(seed);   // (this raid's words count against the next raid's)
   const played: Stance = battle ? 'defend' : stance;
   const fresh = planSiege({ kind: e.kind, size: e.size, temper: e.temper ?? 'desperate', hour, seed, fought: !!battle, fightSeconds: battle?.duration ?? null, armed: e.armed });
   const finalScene = fresh.scenes[fresh.scenes.length - 1];
@@ -141,6 +142,8 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedR
     const crewWon = ep.ending === 'breached' || ep.ending === 'overrun';
     const d = dramatize({ before: game, after: g, battles, house: { x: home.x, z: home.z }, raidersWounded: g.gate.aftermath?.wounded ?? 0, temper, style: fresh.style ?? undefined, dir, seed, skipWake: crewWon });
     battles = d.battles; drama = d.info;
+    // the ending beats the sim's own result supports (real data): the stock the crew took, a fire it set, the family it led away
+    if (crewWon) battles = battles.map((b, i) => (i === last ? { ...b, aftermath: aftermathOf(game, g, b) } : b));
     scenes = scenes.map((sc, i) => (i === last && ep.ending ? { ...sc, ending: ep.ending, ...(ep.wake > 0 ? { wake: ep.wake } : {}) } : sc));
     if (drama) scenes = scenes.map((sc, i) => (i === drama!.scene ? { ...sc, wake: drama!.wake } : sc));
   }
@@ -179,6 +182,19 @@ export function restageRaid(game: GameState, prev: StagedRaid, played: number, s
 /** Put the staged result on the clock: the siege's length, once. */
 export function commitRaid(st: Pick<StagedRaid, 'staged' | 'plan'>): GameState {
   return step(st.staged, commitDays(st.plan));
+}
+
+/** The ending beats a lost fight shows, read off what the sim really took: stock, new burn damage, people led away. */
+export function aftermathOf(before: GameState, after: GameState, b: Battle): NonNullable<Battle['aftermath']> {
+  const item: Record<(typeof STOCK_LOSSES)[number], string> = { fresh: 'food', frozen: 'food', canned: 'food', staples: 'food', fuel: 'fuel', meds: 'meds', ifak: 'meds' };
+  const loot: string[] = [];
+  for (const k of STOCK_LOSSES) if ((before.stock[k] ?? 0) - (after.stock[k] ?? 0) >= 1 && !loot.includes(item[k])) loot.push(item[k]);
+  const had = new Set((before.raidDamage ?? []).map(d => d.id));
+  const burns = (after.raidDamage ?? []).filter(d => d.kind === 'burn' && !had.has(d.id));
+  const arson = burns.length ? (burns.some(d => /house|cabin|home|farmhouse/i.test(d.what ?? '')) ? (burns.length > 1 ? 'both' : 'house') : 'barn') as 'house' | 'barn' | 'both' : undefined;
+  const captives: string[] = [];
+  after.people.forEach((p, i) => { const n = after.personState[i]?.needs, was = before.personState.find(x => x.id === p.id)?.needs; if (n?.taken && was && was.died == null) { const u = b.units.find(x => x.personId === p.id); if (u) captives.push(u.id); } });
+  return { ...(loot.length ? { loot } : {}), ...(arson ? { arson } : {}), ...(captives.length ? { captives } : {}) };
 }
 
 /** What changed for the family and the stores between `before` and `after`, in the card's words. */
