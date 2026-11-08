@@ -72,6 +72,7 @@ import { reputationDay } from './reputation';
 import { minesDay } from './battle';
 import { legalDay } from './breakins';
 import { prisonersDay } from './aftermath';
+import { storyDay } from './raiderStory';
 import { isAway, rescueDay } from './rescue';
 import { falloutDay, isNuclear, SHELTER_DAYS, strike } from './nuclear';
 import { tallyDay } from './report';
@@ -239,6 +240,7 @@ function subStep(s: GameState): void {
     for (const line of minesDay(s)) log(s, line);
     for (const line of legalDay(s)) log(s, line);
     prisonersDay(s);   // (it logs its own lines)
+    storyDay(s);   // the raider with a story comes back (sim/raiderStory.ts; it logs its own lines)
     for (const line of weatherDay(s)) log(s, line);
     for (const line of fogLog(s)) log(s, line);   // valley fog and cloud: this morning, and the forecast for the next (sim/fog.ts)
     for (const line of slumpDay(s, rainStormOn(s))) log(s, line);   // a tall retaining wall with no drainage behind it can let go (sim/retaining.ts)

@@ -70,6 +70,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 85 → 86: surrender and the fates at a breach (sim/surrender.ts, sim/breachFates.ts). The raiders held at the gate are `gate.aftermath.surrendered`; an old aftermath has none
   85: s => { const g = s.gate as { aftermath?: { surrendered?: number } | null }; return { ...s, version: 86, gate: { ...(g as object), ...(g.aftermath ? { aftermath: { surrendered: 0, ...g.aftermath } } : {}) } }; },
   // 86 → 87: raid depth (sim/breachMeans.ts, crewMercy.ts, raidOrders.ts, raidOutcomes.ts, raidFire.ts). `raidFires` (fires a raid set) is optional and absent on an old save; the bollards are a new shop good (zero stock)
+  // 87 → 88: raid openers and the raider's story (sim/raidOpeners.ts, sim/raiderStory.ts). `Encounter.opener` and `raiderStories` are optional and absent on an old save
+  87: s => ({ ...s, version: 88 }),
   86: s => ({ ...s, version: 87 }),
   84: s => ({ ...s, version: 85, raidDamage: [], gate: { ...(s.gate as object), talks: { held: 0, settled: 0, ambushed: 0, refused: 0 } } }),
   83: s => ({ ...s, version: 84 }),

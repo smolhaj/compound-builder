@@ -20,6 +20,8 @@ import { askRansom, giveUp, startRescue, startTrip } from '../sim/rescue';
 import { hasCutscene, promptNarration } from '../sim/siege';
 import { commitRaid, restageRaid, stageRaid, type RaidReport, type StagedRaid } from '../sim/raidCutscene';
 import type { RaidOrder } from '../sim/raidOrders';
+import { fightClock } from '../sim/siege';
+import { useCutsceneView } from './cutsceneStore';
 import type { RaidOrderKind } from '../sim/battleTypes';
 import { setAllHands } from '../sim/raidFire';
 import type { SiegePlan } from '../sim/siege';
@@ -92,6 +94,8 @@ export interface CutsceneState {
   changed?: boolean;
   /** The family's orders for the fight (sim/raidOrders.ts); empty: hold the line. */
   orders?: RaidOrder[];
+  /** An order was given on the live playhead: the player swaps in the replanned battle of this scene and seeks to `t` (battle seconds), then clears it. */
+  swap?: { scene: number; t: number } | null;
 }
 
 /** The mirrored fields of a staged raid. */
@@ -152,6 +156,9 @@ export interface GameStore {
   setRaidOrder: (order: RaidOrderKind) => void;
   /** Fire fighting (sim/raidFire.ts): all hands on the fires a raid set, or back to the usual share. */
   fireAllHands: (on: boolean) => void;
+  /** An order on the live playhead (sim/raidOrders.ts, sim/siege.ts `fightClock`): replans the fight from this second on with the same seeded stream. */
+  giveRaidOrderNow: (order: RaidOrderKind) => void;
+  clearSwap: () => void;
   /** The player (or the siege timeline) reached the gap after scene `scene`: put the stance card up. */
   offerChange: (scene: number) => void;
   /** Answer the card between scenes: a new stance (once), or null to carry on as you are. */
@@ -371,6 +378,16 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (c.phase === 'playing' && c.raid && c.stance) { const next = restageRaid(g, c.raid, (c.offer ?? 0) + 1, c.stance, orders); set({ cutscene: { ...c, ...fromRaid(next), orders, offer: null } }); return; }
     set({ cutscene: { ...c, orders } });
   },
+  giveRaidOrderNow: (order) => {
+    const c = get().cutscene, g = get().game, v = useCutsceneView.getState().view;
+    if (c?.phase !== 'playing' || !c.raid || !c.plan || !c.stance || !v || v.seg !== 'fight' || c.offer != null) return;
+    const fc = fightClock(c.plan, v.game);
+    if (!fc || fc.scene !== c.plan.scenes.length - 1 || !c.raid.staged.gate.battle) return;   // only the last scene is the real fight
+    const orders = [...(c.orders ?? []).filter(o => o.t < fc.t - 0.5), { t: fc.t, order }];
+    const next = restageRaid(g, c.raid, fc.scene, c.stance, orders);
+    set({ cutscene: { ...c, ...fromRaid(next), orders, swap: { scene: fc.scene, t: fc.t } } });
+  },
+  clearSwap: () => { const c = get().cutscene; if (c?.swap) set({ cutscene: { ...c, swap: null } }); },
   fireAllHands: (on) => { const g = structuredClone(get().game); setAllHands(g, on); set({ game: g }); },
   offerChange: (scene) => { const c = get().cutscene; if (c?.phase === 'playing' && !c.changed) set({ cutscene: { ...c, offer: scene } }); },
   midStance: (stance) => {

@@ -63,6 +63,9 @@ import { breachFates, takeCap, type Fate } from './breachFates';
 import { crewKindOf, crewSurrenders, downedSurrenderOdds, type CrewKind } from './surrender';
 import { FUSE_S, blastOdds, chooseHow, countersOf, crewMeans, ramOdds, truckSeconds, wallTarget, whyRamFailed, type BreachHow, type CrewMeans } from './breachMeans';
 import { nervesAim, woundFx } from './lingering';
+import { WALL_RESIST } from './breachMeans';
+import { envOf, FLARE, SMOKE_ACC } from './raidConditions';
+import { scoutSpotted, weakestApproach, workerAmbush, OUTDOOR_TASKS } from './raidOpeners';
 import { dispositionOf, doorSeconds, hidingFate, snapOdds, temperamentOf } from './crewMercy';
 import { ORDER_FX, STAGE_COVER, STAGE_HOLD, nextStage, orderAt, stageRadius, type RaidOrder } from './raidOrders';
 import { arsonOdds, holdingsOf, parleyAccepted, parleyOffer, planLoot, FIREPROOF, type LootItem } from './raidOutcomes';
@@ -72,6 +75,7 @@ import { TRIBUTE_SHARE } from './raidOutcomes';
 import { startFires } from './raidFire';
 import { exposedBeyond } from './raidOrders';
 import { shock } from './mind';
+import { addStory, makeStory, raiderName } from './raiderStory';
 
 type Post = NonNullable<BattleUnit['post']>;
 interface PostSpot {
@@ -171,6 +175,8 @@ export interface BattleOptions {
    * already at its posts, waiting).
    */
   ambush?: number;
+  /** How the raid begins (sim/raidOpeners.ts). */
+  opener?: import('./raidOpeners').Opener;
   /** The family's orders as a timeline (sim/raidOrders.ts); none: hold the line. A standing order is one at t 0. */
   orders?: RaidOrder[];
   /** QA: force what the crew brought (never saved). */
@@ -229,7 +235,7 @@ interface Fighter {
   /** Raid depth (save v87): the one at the wheel of the truck (in the cab until it arrives), the one carrying a satchel (charge > 0 until planted), a raider carried off by his own side, one stopped to loot. */
   /** A wound from an earlier fight that has not healed: the time to a post is multiplied by this (sim/lingering.ts). */
   limp?: number;
-  veh?: boolean; charge?: number; carriedOff?: boolean; lootingUntil?: number;
+  decoy?: boolean; veh?: boolean; charge?: number; carriedOff?: boolean; lootingUntil?: number;
   movedAt?: number; aided?: boolean; taken?: boolean; bleedAt?: number; bleedPart?: 'head' | 'torso' | 'arm' | 'leg' | 'frag'; saidAt?: number;
 }
 
@@ -319,16 +325,6 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   const fin = s.structures.filter(isFinished);
   const home = fin.find(st => isHome(st.kind)) ?? fin[0] ?? { x: 0, z: 0 };
   const C = { x: home.x, z: home.z };
-  // the road side: raiders come up from +z, give or take; a way in that is much easier than the road (terrain: sim/terrainFx.ts) draws them round to it
-  const lane = opts.terrain === false ? null : raidAngle(s, r);
-  const ang = lane ? lane.ang : Math.PI / 2 + (r() - 0.5) * 0.8;
-  const ax = Math.cos(ang), az = Math.sin(ang);       // unit vector from the house toward the raiders
-  const lx = -az, lz = ax;                            // lateral
-  const at = (d: number, lat: number) => ({ x: C.x + ax * d + lx * lat, z: C.z + az * d + lz * lat });
-  // the crew walks the lane's own path (round the cliffs, water and walls the terrain pass found), at the pace of the going (sim/laneWalk.ts)
-  const route = lane && lane.lane.path.length > 1 && !lane.via ? lane.lane.path : null;
-  const pace = lane ? lanePace(lane.lane.hardness, lane.lane.cliff, lane.lane.fords) : 1;
-  const onRoute = (rd: number, lat: number) => { const q = routeAt(route!, rd); return { x: q.x - q.dz * lat, z: q.z + q.dx * lat }; };
   const alive = s.people.map((p, i) => ({ p, i })).filter(({ i }) => s.personState[i]?.needs.died == null && s.personState[i]?.task !== 'gone' && s.personState[i]?.task !== 'town' && !s.rescue?.raid?.team.includes(s.personState[i]?.id ?? ''));
   // the adults fight; kids hide (and get out through the tunnel if it comes to that); a teenager picks up a gun only if there aren't two adults who can
   const adultsN = alive.filter(({ p }) => !p.kid).length;
@@ -352,6 +348,33 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   const lightsOn = night && ((n('floodlights') > 0 && floodlightLit(s, ARMORY_LIGHTS, true)) || mast);
   const mount = mountReady(s);
   const tw = towerPosture(s);
+  const detection = Math.min(100, 25 + (s.gate.forewarned ? 20 : 0) + g.detection + tw.detection + watchDetection(s) + Math.max(0, ...fightersP.map(({ p }) => p.skills.hunter)) * 4);
+  const env = envOf(s);
+  // ── how the raid begins (sim/raidOpeners.ts): scouts who are or are not spotted, a diversion, an ambush of the people at work outside ──
+  const opener = peace || opts.insideBreach || opts.ambush !== undefined || !armedR ? undefined : opts.opener;
+  const scoutsSeen = opener?.kind === 'scouts' ? mulberry32(seed * 3301 + 17)() < scoutSpotted(detection, night) : false;
+  // the road side: raiders come up from +z, give or take; a way in that is much easier than the road (terrain: sim/terrainFx.ts) draws them round to it
+  const lane = opts.terrain === false ? null : raidAngle(s, r);
+  const ang0 = lane ? lane.ang : Math.PI / 2 + (r() - 0.5) * 0.8;
+  // scouts the watch did not see: the crew knows how the place lies and comes at its weakest wall or its gate, not the near side
+  let ang = ang0;
+  if (opener?.kind === 'scouts' && !scoutsSeen && !lane?.via) {
+    const cand: Array<{ ang: number; score: number }> = [];
+    for (let k = -3; k <= 4; k++) {
+      const a = ang0 + k * Math.PI / 4, w = wallTarget(s.perimeter, C, { x: Math.cos(a), z: Math.sin(a) }, { width: 0.7, preferGate: true });
+      cand.push({ ang: a, score: w ? (w.gate ? 0.4 : (WALL_RESIST[w.kind as keyof typeof WALL_RESIST]?.ram ?? 0.4) * 0.5 + (WALL_RESIST[w.kind as keyof typeof WALL_RESIST]?.blast ?? 0.6) * 0.5) : 1 });
+    }
+    const best = weakestApproach(cand), base = cand.find(c => c.ang === ang0)!.score, bs = cand.find(c => c.ang === best)!.score;
+    if (best !== null && bs < base - 0.05) ang = best;
+  }
+    const intel = ang !== ang0;
+  const ax = Math.cos(ang), az = Math.sin(ang);       // unit vector from the house toward the raiders
+  const lx = -az, lz = ax;                            // lateral
+  const at = (d: number, lat: number) => ({ x: C.x + ax * d + lx * lat, z: C.z + az * d + lz * lat });
+  // the crew walks the lane's own path (round the cliffs, water and walls the terrain pass found), at the pace of the going (sim/laneWalk.ts)
+  const route = lane && lane.lane.path.length > 1 && !lane.via && !intel ? lane.lane.path : null;
+  const pace = lane ? lanePace(lane.lane.hardness, lane.lane.cliff, lane.lane.fords) : 1;
+  const onRoute = (rd: number, lat: number) => { const q = routeAt(route!, rd); return { x: q.x - q.dz * lat, z: q.z + q.dx * lat }; };
 
   // ── posts ──
   // cover (the share of hits that still land): a prepared position beats what a raider finds in a ditch or behind a tree (0.4).
@@ -388,6 +411,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   const ramBest = tGate && tGate.gate && ramAt(tGate) > ramAt(tWall) ? tGate : tWall;
   const how: BreachHow = noWall || !tWall ? 'climb' : chooseHow(means, ramAt(ramBest), blastAt(tWall));
   const target: BreachWhere | null = how === 'ram' ? ramBest : tWall;
+  const farR = wallR;   // the old measure of the wall's size (its farthest corner, capped at 30): how far out the crew stages
   if (target) {
     wallR = Math.max(4, Math.min(45, target.dist)); wallKind = target.kind;
     wallRun = s.perimeter.find(x => x.id === target.runId) ?? wallRun;
@@ -496,19 +520,27 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   const kit = extraKit(raiders, opts.adapt ?? 0, organized);
   if (armedR && !peace) { gLeft += kit.grenades; if (kit.rocket && daysAfter > 120) rLeft = Math.max(rLeft, 1); }
   // they come up from out of sight, well beyond the line (round 4: they used to start 30–34 out whatever the wall, so a wide palisade had them at it before anyone was up)
-  const start = Math.max(30, lineR + 22) + (opts.terrain === false || lane ? 0 : roadStart(s));   // up the road: single file at a bridge, a bore or a ford, they dismount further out (sim/roadFx.ts)
+  const start = Math.max(30, Math.max(lineR, farR) + 22) + (opts.terrain === false || lane ? 0 : roadStart(s));   // up the road: single file at a bridge, a bore or a ford, they dismount further out (sim/roadFx.ts)
+  // openers that change where the crew starts and when the main body moves (sim/raidOpeners.ts)
+  const decoyN = opener?.kind === 'diversion' && raiders >= 5 ? Math.max(2, Math.round(raiders * (opener.decoy?.share ?? 0.3))) : 0;
+  raiders += decoyN;   // the decoys are extra men: the main body is as strong as the crew on the card
+  const angD = ang + 2.2, atD = (d: number, lat: number) => ({ x: C.x + Math.cos(angD) * d - Math.sin(angD) * lat, z: C.z + Math.sin(angD) * d + Math.cos(angD) * lat });
+  const mainDelay = decoyN ? opener?.decoy?.delay ?? 16 : 0;   // (scouts do not delay the main body: they are only two men a little ahead of it, who wait for it at the wall)
   for (let i = 0; i < raiders; i++) {
-    const arc0 = route && !peace && !opts.insideBreach && opts.ambush === undefined ? spawnArc(route, [C.x, C.z], start + r() * 4) : undefined;
+    const isScout = opener?.kind === 'scouts' && raiders >= 4 && (i === 1 || i === 2), isDecoy = decoyN > 0 && i > 0 && i >= raiders - decoyN;
+    const arc0 = route && !isScout && !isDecoy && !peace && !opts.insideBreach && opts.ambush === undefined ? spawnArc(route, [C.x, C.z], start + r() * 4) : undefined;
     const p = peace ? at(1.5 + r() * 2, (r() - 0.5) * 3)
       : opts.insideBreach ? at(Math.max(1.5, lineR * 0.55) + r() * 1.5, (r() - 0.5) * 2.5)
       : opts.ambush !== undefined ? at(lineR + 0.8 + r() * 0.8, (r() - 0.5) * 1.2)
+      : isScout ? at(start - 6 + r() * 3, (r() - 0.5) * 6)
+      : isDecoy ? atD(start - 4 + r() * 4, (r() - 0.5) * 8)
       : arc0 !== undefined ? onRoute(arc0, (r() - 0.5) * 8)
       : at(start + r() * 4, (r() - 0.5) * 8);
     const autoR = armedR && late > 0.5 && r() < 0.3 + kit.auto;
     const arm: Arm = !armedR ? FISTS : peace ? { ...ARMS.pistol, cal: null } : { ...(autoR ? ARMS.auto_rifle : r() < 0.55 ? ARMS.semi_rifle : r() < 0.6 ? ARMS.pump : ARMS.pistol), cal: null };
     const gr = gLeft > 0 ? 1 : 0; gLeft -= gr;
     const rk = rLeft > 0 && i > 0 ? 1 : 0; rLeft -= rk;
-    const f: Fighter = { id: `r${i}`, side: 'raider', ...p, ...(arc0 !== undefined ? { rd: arc0 } : {}), y: 0, hp: 100, out: false, dead: false, arm, skill: 3 + Math.floor(r() * 4), readyAt: opts.ambush ?? (lane?.via ? DOOR_DELAY : 0), post: null, cover: 1, moving: true, nextMove: 0, shelter: false, grenades: gr, rockets: rk, leader: i === 0, armor: { plate: armedR && !peace && r() < late * 0.35 + kit.plate, soft: armedR && !peace && r() < 0.15 + late * 0.2, helmet: armedR && !peace && r() < late * 0.3 }, inGun: arm.mag, spare: 2 + Math.round(late * 3), bleed: 0, supp: 0, nvg: armedR && !peace && late > 0.6 && r() < 0.25, wear: 0.5 + r() * 0.4 };
+    const f: Fighter = { id: `r${i}`, side: 'raider', ...p, ...(arc0 !== undefined ? { rd: arc0 } : {}), y: 0, hp: 100, out: false, dead: false, arm, skill: 3 + Math.floor(r() * 4), readyAt: opts.ambush ?? (lane?.via ? DOOR_DELAY : isScout ? 7 : isDecoy ? 0 : mainDelay), ...(isDecoy ? { decoy: true } : {}), post: null, cover: 1, moving: true, nextMove: 0, shelter: false, grenades: gr, rockets: rk, leader: i === 0, armor: { plate: armedR && !peace && r() < late * 0.35 + kit.plate, soft: armedR && !peace && r() < 0.15 + late * 0.2, helmet: armedR && !peace && r() < late * 0.3 }, inGun: arm.mag, spare: 2 + Math.round(late * 3), bleed: 0, supp: 0, nvg: armedR && !peace && late > 0.6 && r() < 0.25, wear: 0.5 + r() * 0.4 };
     F.push(f); units.push({ id: f.id, side: 'raider', x: r2(p.x), z: r2(p.z), post: 'open' });
   }
   const H = F.filter(f => f.side === 'home'), R = F.filter(f => f.side === 'raider');
@@ -527,6 +559,8 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     const un = units.find(u => u.id === sapper!.id); if (un) un.job = 'sapper';
   }
   { const un = units.find(u => u.id === 'r0'); if (un && !peace) un.leader = true; }
+  if (opener?.kind === 'scouts' && raiders >= 4) ev.push({ t: 0, kind: 'scout', units: ['r1', 'r2'], spotted: scoutsSeen, intel });
+  const decoys = R.filter(f => f.decoy);
   const charges0 = R.reduce((a, f) => a + f.grenades + f.rockets * 2, 0);      // (what the crew carries in: sim/corridors `sapperBreach`)
   // automated turrets (towers.ts): powered, fed from the armory, nobody on them; never in F (they are not people, nobody hits back at them)
   const T: Fighter[] = [];
@@ -560,9 +594,10 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     f.saidAt = t; say(t, v(f, civ, vet), f);
   };
   let ifaks = n('ifak');
+  let flareFrom = Infinity, flareUntil = -1, smokeFrom = Infinity, flaresUsed = 0;
+  const fireList: RaidFacts['fires'] = [];
 
   // ── detection, alarm, lights ──
-  const detection = Math.min(100, 25 + (s.gate.forewarned ? 20 : 0) + g.detection + tw.detection + watchDetection(s) + Math.max(0, ...fightersP.map(({ p }) => p.skills.hunter)) * 4);
   // a moat across the way they come (sim/waterWorks.ts): held at the water, or filed across the covered bridge; only ever adds time and hurt
   const moat = opts.terrain === false || opts.insideBreach ? null : moatFx(s, [C.x, C.z], ang, night, detection);
   // the tunnel-bridge's doors lock at night and on the alarm (a watch good enough to call it before they arrive); by day, unwarned, they stand open
@@ -588,7 +623,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   // (round 4: measured from the line, where the watch stands and the sensors are, not from the house)
   // fog (sim/fog.ts): the towers and the people on watch see a crew a fraction as far out in dense fog (thermal gear keeps its reach, and it is in `detection`)
   const fogEye = fogSightK(s, 'eye');
-  const detectAt = lineR + towerReach(s, night, lightsOn) * fogEye + Math.max(2, (6 + detection * 0.24) * (darkBlind ? 0.7 : 1), night ? 0 : (16 + detection * 0.06) * fogEye);
+  const detectAt = lineR + (towerReach(s, night, lightsOn) * fogEye + Math.max(2, (6 + detection * 0.24) * (darkBlind ? 0.7 : 1), night ? 0 : (16 + detection * 0.06) * fogEye)) * env.detect + env.animalNoise;   // (storms deaden the sound, the livestock in the yard add to it: sim/raidConditions.ts)
   const what: 'dog' | 'sensor' | 'tripwire' | 'camera' | 'watch' = dogCount(s) ? 'dog' : n('driveway_alarm') ? 'sensor' : n('tripwire') ? 'tripwire' : powered && (n('cameras') || n('thermal_cam')) ? 'camera' : 'watch';
   let alarmed = false;
   const mines = Math.min(n('mines'), 12);
@@ -674,7 +709,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       hurt(u, (60 + r() * 50) * (1 - d / radius * 0.6) * (u.side === 'home' && u.shelter ? 0.35 : 1) * (u.post === wreck ? 1 : Math.max(0.4, u.cover)) * (u.armor.plate || u.armor.soft ? 0.7 : 1) * (u.armor.helmet ? 0.85 : 1), t);   // armor takes some of the fragments
     }
     let wrecks: 'post' | 'wall' | undefined;
-    if (wreck && wreck.kind !== 'open') { wreck.wrecked = true; wrecks = wreck.kind === 'wall' ? 'wall' : 'post'; if (wreck.kind === 'wall') wallDown = true; }
+    if (wreck && wreck.kind !== 'open') { wreck.wrecked = true; smokeFrom = Math.min(smokeFrom, t); wrecks = wreck.kind === 'wall' ? 'wall' : 'post'; if (wreck.kind === 'wall') wallDown = true; }
     ev.push({ t: r2(t), kind: 'explosion', x: r2(x), z: r2(z), radius, hits, ...(wrecks ? { wrecks } : {}) });
   };
   // how organized they are: later in the collapse, armored, more of them carry rifles
@@ -760,7 +795,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     const rangeF = Math.max(0.15, 1 - d / (reachOf(a) * 1.2));
     const tgtCover = b.veh ? 0.75 : b.side === 'raider' ? (b.moving ? 1.3 : b.cover) : b.cover;
     // the dark: half the hits, unless they have night vision; rounds snapping past spoil the aim (less so for those who served)
-    const see = night && !lightsOn ? (a.nvg ? 0.9 : 0.5) : 1;
+    const see = night && !lightsOn && !(t >= flareFrom && t < flareUntil) ? (a.nvg ? 0.9 : 0.5) : 1;
     const steady = 1 / (1 + a.supp * (a.vet ? 0.07 : 0.16));
     let p = (0.06 + 0.025 * a.skill) * a.arm.acc * rangeF * tgtCover * see * steady * (a.side === 'home' ? a.post?.acc ?? 1 : 1);
     if (a.side === 'home' && a.moving) p *= 0.5;
@@ -768,6 +803,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     if (sortie > 1 && a.side === 'home' && b.side === 'raider' && dist(b, C) <= lineR + 2) p *= sortie;
     if (a.side === 'home') p *= ordFx.acc; else if (b.side === 'home' && !b.machine) p *= ordFx.hit * STAGE_COVER[stage];
     if (a.arm.auto) p *= 1.6;
+    p *= env.acc * (t >= smokeFrom ? SMOKE_ACC : 1);   // a storm on the place; smoke from what is burning (sim/raidConditions.ts)
     p *= eff(a);                                   // a wounded shooter shoots worse
     if (sg === 'partial') p *= PARTIAL_HIT;        // only the head shows over the wall
     const hit = r() < Math.min(0.9, p);
@@ -821,6 +857,18 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     breachInfo = { method: hw, where: w, t };
     ev.push({ t, kind: 'breach', x: r2(p.x), z: r2(p.z), method: hw, ...(w ? { where: { ...w, x: r2(w.x), z: r2(w.z) } } : {}) });
     reachedStage = 'yard';
+    // arson, first half: hostile crews burn what they can reach in the yard (sheds, coops, barns); the smoke is in the fight
+    if (!peace && crewKind !== 'horde') {
+      for (const st of fin) {
+        if (fireList.length >= 3 || FIREPROOF.test(st.kind) || isPostKind(st.kind) || dist(st, C) > 28 || isHome(st.kind)) continue;
+        if (mr() >= arsonOdds(disposition, temper, false, false)) continue;
+        const tf = t + 5 + fireList.length * 3.5;
+        fireList.push({ structure: st.id, x: r2(st.x), z: r2(st.z) });
+        const by = [...rUp].sort((a, b) => Math.hypot(a.x - st.x, a.z - st.z) - Math.hypot(b.x - st.x, b.z - st.z))[0];
+        ev.push({ t: r2(tf), kind: 'fire', structure: st.id, x: r2(st.x), z: r2(st.z), ...(by ? { by: by.id } : {}) });
+        smokeFrom = Math.min(smokeFrom, tf);
+      }
+    }
       // the dogs posted inside at the inner gate go for the first men through (sim/laneWalk.ts)
       const gd = guardDogs(livingDogs(s));
       if (gd.n) for (const f of rUp.sort((a, b) => dist(a, C) - dist(b, C)).slice(0, gd.n)) {
@@ -938,6 +986,25 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     }
     for (const f of H) if (!f.out && !f.shelter) { assignPost(f, t + 1); f.readyAt = Math.max(f.readyAt, t + ORDER_FX.fallback.move); }
   };
+  // the people at work outside the wall when the crew arrives (sim/raidOpeners.ts): the ones who are not warned are caught first, and the shooting is the alarm
+  let ambushAt = Infinity;
+  const ambushVictims: NonNullable<NonNullable<RaidFacts['opener']>['victims']> = [];
+  if (opener?.kind === 'worker_ambush' && R.length >= 2) {
+    const outside = alive.filter(({ p, i }) => OUTDOOR_TASKS.has(s.personState[i]?.task ?? '') && (!p.kid || p.age >= 12)).map(({ p }) => ({ id: p.id, kid: p.kid, age: p.age }));
+    workerAmbush(outside, { detection, hostile: disposition === 'hostile', night }, mr).forEach((x, k) => {
+      const f = H.find(h => h.pid === x.id);
+      if (!f) return;
+      const by = R[1 + (k % Math.max(1, R.length - 1))], tt = 0.8 + k * 1.1;
+      ambushVictims.push({ unit: f.id, fate: x.fate });
+      ev.push({ t: r2(tt), kind: 'ambush', unit: f.id, by: by.id, fate: x.fate });
+      if (x.fate === 'ran') { ev.push({ t: r2(tt + 1), kind: 'move', unit: f.id, x: r2(C.x), z: r2(C.z) }); return; }
+      ev.push({ t: r2(tt), kind: 'shot', from: by.id, to: f.id, hit: true });
+      if (x.fate === 'taken') { f.taken = true; f.escaped = true; f.out = true; ev.push({ t: r2(tt + 0.3), kind: 'taken', unit: f.id, by: by.id }); ev.push({ t: r2(tt + 0.31), kind: 'hostage', unit: f.id, by: by.id }); }
+      else hurt(f, x.fate === 'killed' ? 400 : 28 + mr() * 35, tt, by, mr() < 0.5 ? 'arm' : 'leg');
+    });
+    ambushAt = 2.5;
+  }
+  let pulled: Fighter[] = [], pulledBack = false, mainSeenT = -1, decoysGone = false;
   for (let t = 0; t < 300 && !end; t++) {
     const hUp = H.filter(f => !f.out && !f.shelter), rUp = R.filter(f => !f.out && !f.fled);
     // ── the truck and the satchel: kill the driver or the carrier first and the attempt fails ──
@@ -999,13 +1066,42 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       }
       if (curOrder === 'fallback' && alarmed && !breached && stage !== 'house' && t >= Math.max(fbFrom, 0) && t - stageT >= 10) fallToStage(t, nextStage(stage));
     }
+    // ── the diversion runs its course: the decoys give up the noise, the defenders who ran to it run back ──
+    if (decoyN) {
+      if (!decoysGone && t >= (opener?.decoy?.until ?? 30)) {
+        decoysGone = true;
+        for (const f of decoys) if (!f.out && !f.fled) { f.fled = true; const q = atD(36, (mr() - 0.5) * 8); ev.push({ t: r2(t + mr()), kind: 'flee', unit: f.id }); ev.push({ t: r2(t + 1), kind: 'move', unit: f.id, x: r2(q.x), z: r2(q.z) }); }
+      }
+      if (pulled.length && !pulledBack) {
+        // (the pulled defenders are looking the wrong way: they notice the main body only when it is close, unless a tower sees both sides)
+        const noticeAt = towerPosts(s).length ? detectAt : lineR + Math.max(4, 12 - detection * 0.08);
+        if (mainSeenT < 0 && rUp.some(f => !f.decoy && dist(f, C) <= noticeAt)) mainSeenT = t;
+        if ((mainSeenT >= 0 && t >= mainSeenT + 3) || t >= (opener?.decoy?.until ?? 30) + 25) {   // (the noise stopped, but they only know it was a feint when the main body shows)
+          pulledBack = true;
+          for (const f of pulled) if (!f.out && !f.shelter) { assignPost(f, t + 1); f.readyAt = Math.max(f.readyAt, t + 9); }
+          say(t, v(lead(), ['It was a feint — they\'re coming from the road! Back, BACK!', 'The shooting was a decoy — get back to the front!'], ['Feint. Main body from the front. Everybody back to your lanes.']), lead());
+        }
+      }
+    }
     // alarm
     const nearest = Math.min(...rUp.map(f => dist(f, C)));
     const doorNoise = !!door && !door.gaveUp && t >= door.noiseAt && door.noiseAt < Infinity;   // the work on the door carries (a ram, a sledge, a charge going off)
     const truckNoise = !!truck && !truck.done && dist(truck.driver, C) <= detectAt + 10;   // an engine at speed carries
-    if (!alarmed && (nearest <= detectAt || doorNoise || truckNoise || t > 0 && rUp.length === 0)) {
+    if (!alarmed && (nearest <= detectAt || doorNoise || truckNoise || t >= ambushAt || t > 0 && rUp.length === 0)) {
       alarmed = true;
       ev.push({ t, kind: 'alarm', what });
+      // a dark yard: the family sends up a flare if it has one; an organized crew may send up its own (sim/raidConditions.ts)
+      if (night && !lightsOn && !peace) {
+        const fam = lead(), ours = fam && env.flares > 0, theirs = !ours && organized && mr() < 0.1;
+        const by = ours ? fam : theirs ? R[0] : undefined;
+        if (by) {
+          const fp = at(lineR + 6, 0);
+          flareFrom = t + 2; flareUntil = t + 2 + FLARE.secs;
+          if (ours) flaresUsed++;
+          ev.push({ t: r2(t + 2), kind: 'flare', x: r2(fp.x), z: r2(fp.z), by: by.id, secs: FLARE.secs });
+          say(t + 2, ours ? v(by, ['Flare! Everybody look — there they are!', 'Lighting it up — flare going up!'], ['Flare up. Sectors.']) : pick(['Flare — light \'em up!', 'Put one up so we can see!']), by);
+        }
+      }
       if (doorNoise && nearest > detectAt) say(t + 0.4, v(lead(), ['That noise — the door! Somebody\'s at the door!', 'Oh God, that banging — they\'re on the gate!'], ['Contact at the tunnel door. Everyone up.']), lead());
       if (lightsOn) {
         const masts = mast ? towerPosts(s).filter(x => x.def?.flood && mastIds.includes(x.st.id)).slice(0, 3).map(x => ({ x: r2(x.st.x), z: r2(x.st.z), y: x.post.y + 0.1 })) : [];
@@ -1031,6 +1127,18 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         return raidDelta({ at: st ? { x: st.x, z: st.z } : null, role: st ? (s.quarters?.roles[st.id] ?? null) : null, tower: false, house: C, gate: gateAt, night });
       };
       for (const f of H) if (f.shelter) toShelter(f, t + Math.max(0, qDelta(f))); else { assignPost(f, t); if (!f.vet && opts.ambush === undefined) f.readyAt += 1 + r() * 3 + (f.pid ? fightNerves(s, s.people.find(q => q.id === f.pid)!).freeze : 0); if (opts.ambush === undefined && f.readyAt < Infinity) f.readyAt = Math.max(t, f.readyAt + qDelta(f)); }   // civilians freeze a moment; those who served go straight to it
+      // scouts the watch saw: the family is warned and stands ready sooner
+      if (scoutsSeen) for (const f of H) if (!f.shelter && f.readyAt < Infinity) f.readyAt = Math.max(t, f.readyAt - 2);
+      // a diversion: half the defenders run to the noise on the wrong side (sim/raidOpeners.ts)
+      if (decoyN && decoys.length) {
+        const cand = H.filter(f => !f.shelter && !f.out && f.arm !== FISTS && f.post?.kind !== 'tower'), k = Math.ceil(cand.length * 0.6);
+        const dp: PostSpot[] = [0, 1, 2].map(j2 => { const q = atD(Math.max(1.5, lineR - 0.4), (j2 - 1) * 2.5); return { kind: 'wall' as const, x: q.x, z: q.z, y: 0, cover: 0.22, value: 2, cap: 1, wrecked: false, fire: 0 }; });
+        pulled = cand.slice(0, k);
+        pulled.forEach((f, j2) => takePost(f, t, dp[j2 % 3]));
+        const from = atD(lineR + 6, 0);
+        ev.push({ t: r2(t + 0.5), kind: 'diversion', decoys: decoys.map(d => d.id), from: { x: r2(from.x), z: r2(from.z) }, until: opener?.decoy?.until ?? 30, pulled: pulled.map(f => f.id) });
+        if (pulled.length) say(t + 1, v(lead(), ['They\'re on the other side — go, go, GO!', 'That\'s the east fence! Everybody to the east!'], ['Contact east. Shift two to the east wall.']), lead());
+      }
     }
     for (const p of posts) p.fire *= 0.7;
     for (const f of F) {
@@ -1269,7 +1377,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       }
     }
     // the line: a breach when they're at it and the defense is down, outnumbered, or the wall is blown
-    const atLine = rUp.filter(f => !f.out && dist(f, C) <= lineR + 0.8);
+    const atLine = rUp.filter(f => !f.out && !f.decoy && dist(f, C) <= lineR + 0.8);
     if (atLine.length && lineSince < 0) lineSince = t;
     const hNow = H.filter(f => !f.out && !f.shelter && f.arm !== FISTS).length;
     // a wall takes time to get over (a ladder, bolt cutters, a truck): ~10 s at it, exposed, before the first are across
@@ -1390,7 +1498,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     for (const f of R) if (f.out && !f.dead && !f.fled && !f.surrendered && !peace && r() < downedSurrenderOdds(temper, crewKind, 100 - f.hp)) markSurrender(f, Math.max(0, endT - 2.2 + 0.3 * k++));
   }
   // ── what the crew took, burned and carried off (sim/raidOutcomes.ts) ──
-  const lootList: LootItem[] = [], fireList: RaidFacts['fires'] = [];
+  const lootList: LootItem[] = [];
   const crewIn = R.filter(f => !f.out && !f.dead && !f.fled && !f.surrendered);
   if ((end === 'breached' || end === 'overrun') && !peace && crewKind !== 'horde') {
     const savageNight = fates.some(f => (f.fate === 'finished') || (f.fate === 'taken' && !!H.find(h => h.id === f.unit)?.kid));
@@ -1400,14 +1508,13 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     const near = (x: number, z: number) => [...(crewIn.length ? crewIn : R)].sort((a, b) => Math.hypot(a.x - x, a.z - z) - Math.hypot(b.x - x, b.z - z))[0];
     const t1 = breachT + 3, t2 = Math.max(t1 + 1, endT - 3);
     lootList.forEach((it, i) => { const by = near(C.x, C.z); if (by) ev.push({ t: r2(t1 + (t2 - t1) * (i + 1) / (lootList.length + 1)), kind: 'loot', by: by.id, what: it.what, n: it.n, from: it.from }); });
-    // arson: hostile crews burn what they can reach (a house only when it has fallen)
+    // arson, second half: a house burns only when it has fallen (the yard's buildings were rolled when the line broke)
     for (const st of fin) {
-      if (fireList.length >= 3 || FIREPROOF.test(st.kind) || isPostKind(st.kind) || dist(st, C) > 28) continue;
-      const isH = isHome(st.kind);
-      if (mr() >= arsonOdds(disposition, temper, isH, end === 'overrun')) continue;
+      if (fireList.length >= 3 || FIREPROOF.test(st.kind) || isPostKind(st.kind) || dist(st, C) > 28 || !isHome(st.kind) || fireList.some(f => f.structure === st.id)) continue;
+      if (end !== 'overrun' || mr() >= arsonOdds(disposition, temper, true, true)) continue;
       fireList.push({ structure: st.id, x: r2(st.x), z: r2(st.z) });
       const by = near(st.x, st.z);
-      ev.push({ t: r2(Math.min(endT - 1, breachT + 5 + fireList.length * 3.5)), kind: 'fire', structure: st.id, x: r2(st.x), z: r2(st.z), ...(by ? { by: by.id } : {}) });
+      ev.push({ t: r2(Math.min(endT - 1, breachT + 8 + fireList.length * 3.5)), kind: 'fire', structure: st.id, x: r2(st.x), z: r2(st.z), ...(by ? { by: by.id } : {}) });
     }
   }
   if (!alarmed) ev.push({ t: 0, kind: 'alarm', what });
@@ -1434,7 +1541,11 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     const bi = breachInfo as { method: BreachHow; where: BreachWhere | null; t: number } | null;
     const partial = { result: end, linePassed, beatenBack: beatenBack && (end === 'fled' || end === 'repelled'), reached, breach: bi ? { method: bi.method, where: bi.where, t: bi.t, attempts, crewHad: { truck: means.truck, satchels: means.satchels } } : attempts.length ? { method: 'climb' as const, where: target, t: -1, attempts, crewHad: { truck: means.truck, satchels: means.satchels } } : undefined, ending: parleyEnd, loot: lootList, fires: fireList, hostages, disposition };
     raid = {
-      ...partial, orders: orderLog, stage, temper, wallR: r2(wallR0),
+      ...partial,
+      ...(opener || opts.opener ? { opener: { kind: (opener ?? opts.opener)!.kind, ...(opener?.kind === 'scouts' ? { spotted: scoutsSeen, intel } : {}), ...(ambushVictims.length ? { victims: ambushVictims } : {}), ...(decoys.length ? { decoys: decoys.map(d => d.id), pulled: pulled.map(f => f.id) } : {}) } } : {}),
+      crew: crewKind,
+      env: { storm: env.storm, flares: flaresUsed, smoke: smokeFrom < Infinity },
+      orders: orderLog, stage, temper, wallR: r2(wallR0),
       leader: { unit: 'r0', name: leaderNameOf(seed, opts.kind), down: R[0].out || R[0].dead, ...(R[0].out ? { downAt: ev.find(e => (e.kind === 'death' || e.kind === 'wound') && e.unit === 'r0')?.t } : {}) },
       snaps,
       loss: {
@@ -1479,12 +1590,18 @@ export function applyBattle(s: GameState, b: Battle): string[] {
     for (const gun of s.armory.guns) { gun.fired += Math.round(rounds / Math.max(1, s.armory.guns.length)); gun.condition = Math.max(0, gun.condition - 0.01); }
   }
   if (pb.minesUsed) { s.stock.mines = Math.max(0, (s.stock.mines ?? 0) - pb.minesUsed); out.push(`${pb.minesUsed} mine${pb.minesUsed > 1 ? 's' : ''} went off.`); }
+  const flared = b.events.filter(e => e.kind === 'flare' && e.by.startsWith('h_')).length;
+  if (flared) s.stock.flares = Math.max(0, (s.stock.flares ?? 0) - flared);
   const thrown = b.events.filter(e => e.kind === 'throw' && e.from.startsWith('h_')).length;
   if (thrown) s.stock.grenades = Math.max(0, (s.stock.grenades ?? 0) - thrown);
   // a crew that came by a tunnel and got in may have brought its portal down behind it (sappers: sim/corridors)
   if (pb.via && (result === 'breached' || result === 'overrun')) out.push(...sapperBreach(s, pb.via, pb.charges ?? 0, result));
   // what stands in a vehicle yard outside the walls is taken whether or not the line held (sim/vehicleYard.ts)
   out.push(...raidYardLosses(s, result, !!pb.organized, pb.duration ? Math.round(pb.duration) : 0));
+  // the crew's leader got away alive: he is a man with a story and he will be back (sim/raiderStory.ts)
+  if (pb.raid?.leader && !pb.raid.leader.down && (result === 'repelled' || result === 'fled') && pb.raid.crew && !['horde', 'refugees'].includes(pb.raid.crew)) {
+    addStory(s, makeStory(s, { treated: 'escaped', crew: crewKindOf(pb.raid.crew), name: `${pb.raid.leader.name.split(' (')[0]} ${raiderName(s.seed + 5).split(' ')[1]}`, men: b.units.filter(u => u.side === 'raider').length }, 3));
+  }
   if (result === 'breached' || result === 'overrun') {
     s.gate.raidsLost++;
     const kidOf = (unit: string) => s.people.find(p => p.id === b.units.find(u => u.id === unit)?.personId)?.kid;

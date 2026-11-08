@@ -114,6 +114,14 @@ export type BattleEvent =
   | { t: number; kind: 'parley'; offer: 'tribute' | 'passage'; accepted: boolean; what?: string }
   | { t: number; kind: 'withdraw'; units: string[]; carrying: string[]; why: 'leader_down' | 'greed' | 'losses' | 'tribute' }
   | { t: number; kind: 'rally'; unit: string }
+  /** Raid openers (sim/raidOpeners.ts, save v88). `scout`: two men go ahead of the crew (`spotted`: the watch saw them; otherwise `intel`: the crew knows its weakest way in). */
+  | { t: number; kind: 'scout'; units: string[]; spotted: boolean; intel: boolean }
+  /** A diversion: the `decoys` shoot and make noise from `from` until `until` s, while the rest come at another side; `pulled` are the defenders who ran to the noise. */
+  | { t: number; kind: 'diversion'; decoys: string[]; from: { x: number; z: number }; until: number; pulled: string[] }
+  /** The crew takes a person at work outside the wall: `ran` got in, the others were hurt, taken or killed. */
+  | { t: number; kind: 'ambush'; unit: string; by: string; fate: 'ran' | 'hurt' | 'taken' | 'killed' }
+  /** A flare goes up and lights the yard for `secs`. */
+  | { t: number; kind: 'flare'; x: number; z: number; by: string; secs: number }
   | { t: number; kind: 'end'; result: 'repelled' | 'fled' | 'breached' | 'overrun' };
 
 export type RaidOrderKind = 'hold' | 'fallback' | 'counter';
@@ -180,6 +188,8 @@ export interface RaidFacts {
   /** The crew's temper, its disposition (`hostile` kills everyone it finds and sometimes takes captives; `merciful` spares children and the unarmed who comply) and its leader. */
   temper: 'desperate' | 'hard' | 'savage';
   disposition: 'hostile' | 'merciful';
+  /** The kind of crew (looters, gang, militia, patrol, requisition, ...). */
+  crew?: string;
   leader: { unit: string; name: string; down: boolean; downAt?: number } | null;
   /** The outer wall's distance from the house (world units), for what stands beyond each stage. */
   wallR: number;
@@ -190,6 +200,9 @@ export interface RaidFacts {
   loot: Array<{ what: string; n: number; from: 'yard' | 'house' }>;
   hostages: Array<{ unit: string; by: string; demand?: string }>;
   fires: Array<{ structure: string; x: number; z: number }>;
+  /** How the raid began and the air it was fought in (sim/raidOpeners.ts, sim/raidConditions.ts). */
+  opener?: { kind: 'scouts' | 'demand' | 'worker_ambush' | 'diversion'; spotted?: boolean; intel?: boolean; victims?: Array<{ unit: string; fate: 'ran' | 'hurt' | 'taken' | 'killed' }>; decoys?: string[]; pulled?: string[] };
+  env?: { storm: string | null; flares: number; smoke: boolean };
   /** A talked end in the middle of the fight, or a part of the crew pulling out. */
   ending?: { kind: 'tribute' | 'passage' | 'partial_retreat' | 'rout'; at: number; what?: string; units?: string[] };
   /** The result in plain words, for the card. */

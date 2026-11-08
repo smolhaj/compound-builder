@@ -271,7 +271,7 @@ describe('the battle at the compound', () => {
 
   it('night vision gives back the dark: more hits at night without lights', () => {
     let blind = 0, nv = 0;
-    for (let seed = 1; seed <= 20; seed++) {
+    for (let seed = 1; seed <= 80; seed++) {
       const g = fortify(afterHit(seed)); g.clock.t = Math.floor(g.clock.t) + 0.8;   // ~1 a.m.
       const h = (b: PlannedBattle) => b.events.filter(e => e.kind === 'shot' && e.from.startsWith('h_') && e.hit).length / Math.max(1, b.events.filter(e => e.kind === 'shot' && e.from.startsWith('h_')).length);
       blind += h(planBattle(g, 6, seed, { grenades: 0, rockets: 0 }));

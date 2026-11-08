@@ -28,6 +28,7 @@ export const STANCE: Record<Stance, [string, string]> = {
   back_roads: ['Take the back roads', 'Slower, and it uses more fuel, but fewer checkpoints and fewer people with the same idea.'],
   resupply: ['Fill up and shop first', 'Fuel, food and a few things from the shelves before they empty. Adds a day, and a day in a city that is coming apart.'],
   dismiss: ['Let him go', 'Pay him off and send him down the road. He cannot sell what he no longer sees.'],
+  flag_pay: ['Pay what they ask', 'Hand the man under the white flag exactly what he asked for. Nobody is hurt; word gets round that this place pays.'],
   neg_toll: TALK_TEXT.neg_toll,
   neg_aid: TALK_TEXT.neg_aid,
   neg_redirect: TALK_TEXT.neg_redirect,
