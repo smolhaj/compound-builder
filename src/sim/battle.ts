@@ -1269,6 +1269,8 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       const carried: string[] = [];
       for (const f of hurtOnes) if (rUp.length > carried.length && mr() < carryP) { f.carriedOff = true; carried.push(f.id); }
       if (carried.length) ev.push({ t: r2(t + 1), kind: 'withdraw', units: rUp.map(f => f.id), carrying: carried, why: leaderBreak ? 'leader_down' : 'losses' });
+      // each hurt man leaves with the crew, on a mate's shoulder (the `withdraw` event says who carries whom; the picture runs them off with the others)
+      carried.forEach((id, i) => ev.push({ t: r2(t + 1 + i * 0.2), kind: 'flee', unit: id }));
       if (breached) beatenBack = true;
       end = 'fled'; endT = t + 8; break;
     }
