@@ -319,6 +319,8 @@ export interface GateState {
   talks?: { held: number; settled: number; ambushed: number; refused: number };
   /** The last fight at the compound, for playback (optional; not migrated). */
   battle?: Battle;
+  /** The family's standing and timed orders for the fight being staged (sim/raidOrders.ts). Set on the staged copy by the cutscene, read and cleared by `resolve`: never saved. */
+  orders?: import('./raidOrders').RaidOrder[];
   /** Where the guards look arrivals over when the household holds several rings (sim/gateVetting.ts); absent: nowhere. */
   vet?: import('./gateVetting').VetPolicy;
   /** The looks made on this day (they tie up the guards: sim/gateVetting `vetAttention`). */
@@ -374,7 +376,7 @@ export function strengthOf(s: GameState, p: Posture = postureOf(s)): number {
 }
 
 /** What the battle sim is told about a crew: how they fight and how well they have learned this place. */
-const battleOpts = (e: Encounter, extra: { insideBreach?: boolean } = {}) => ({ armed: e.armed, temper: e.temper, kind: e.kind, organized: ORGANIZED.has(e.kind), ...(e.adapt ? { adapt: e.adapt } : {}), ...extra });
+const battleOpts = (e: Encounter, extra: { insideBreach?: boolean; orders?: import('./raidOrders').RaidOrder[] } = {}) => ({ armed: e.armed, temper: e.temper, kind: e.kind, organized: ORGANIZED.has(e.kind), ...(e.adapt ? { adapt: e.adapt } : {}), ...extra });
 
 /**
  * The threat matrix: who comes. Opportunists (looters) are put off by a
@@ -855,7 +857,8 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       if (via && e.scouted) lines.push(`${e.scouted} had marked the hatch on the way in.`);
       if (via) lines.push(via.forced ? 'They found a steel hatch in the leaf litter out in the trees and blew the blast door. They are in the passage.' : 'They found a steel hatch out in the trees, left unbolted. They are in the passage.');
       const raiders = via ? Math.min(raidersAfterHelp(e, help), 4 + Math.floor(e.size / 4)) : raidersAfterHelp(e, help);
-      const b = planBattle(s, raiders, s.seed * 131 + e.day * 7 + 1, battleOpts(e, e.dig || via || e.insiderHelp || talkAmbush ? { insideBreach: true } : {}));
+      const orders = g.orders; delete g.orders;
+      const b = planBattle(s, raiders, s.seed * 131 + e.day * 7 + 1, battleOpts(e, { ...(e.dig || via || e.insiderHelp || talkAmbush ? { insideBreach: true } : {}), ...(orders?.length ? { orders } : {}) }));
       if (via) { const run = s.perimeter.find(x => x.id === via.runId); if (run) run.revealed = true; }
       g.battle = b;
       const stockBefore = stockTotal(s);
@@ -867,6 +870,9 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         // honest about the cost: the fence held, but not everyone on the place walked away whole
         const hurtNew = s.personState.filter(ps => ps.needs.died == null && ps.needs.hurt.length > 0 && !hurtBefore.has(ps.id)).length;
         title = hurtNew > 0 ? `The fence held, but ${hurtNew} hurt` : 'The fence held'; text = `${help ? `${allies.map(a => a.name).join(' and ')} came over the ridge when they heard the shooting. ` : ''}${b.result === 'fled' ? 'They broke off and ran.' : 'None of them got past the fence.'}${hurtNew > 0 ? ` ${pluralize(hurtNew, 'person', 'people')} on the place ${hurtNew === 1 ? 'was' : 'were'} hurt in the fight.` : ''}`; tone = hurtNew > 0 ? 'mixed' : 'good';
+        if (b.raid?.linePassed) lines.push(...applyRaidDamage(s, b, false, r));   // they were in the yard once: the gap stays in the wall
+        if (b.raid?.ending) { title = b.raid.ending.kind === 'tribute' ? 'They took terms' : 'They passed through'; text = b.raid.text; tone = 'mixed'; }
+        else if (b.raid?.beatenBack) { title = 'Driven back out'; text = b.raid.text; tone = 'mixed'; }
         for (const n of allies) n.disposition = Math.min(100, n.disposition + 5);
         // word gets around: this place shoots back (more so if they left people on the drive)
         const downed = (b.leftBehind?.wounded ?? 0) + (b.leftBehind?.dead ?? 0) + (b.leftBehind?.surrendered ?? 0);
@@ -879,8 +885,9 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         extra.push(...raidTakesVehicles(s, ORGANIZED.has(e.kind)));
         lines.push(...extra);
         lines.push(...applyRaidDamage(s, b, b.result === 'overrun', r));
-        title = 'They got in';
+        title = b.result === 'overrun' ? 'They overran the place' : b.raid?.reached === 'yard' || b.raid?.reached === 'house' ? 'They broke through' : 'They got in';
         text = breachText(b.result === 'overrun', { lostStock: stockBefore - stockTotal(s) > 0 || extra.length > 0, harmed: b.events.some(x => x.kind === 'wound' || x.kind === 'death' || x.kind === 'taken'), fought: battleLines.some(l => /rounds fired/.test(l)) });
+        if (b.raid) text = b.raid.text;
         tone = 'bad';
         // picked over: for a while there's not much left worth coming for; but the place is known to be soft
         g.respect = Math.max(0, (g.respect ?? 0) - 0.3);

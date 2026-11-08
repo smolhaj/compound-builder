@@ -46,7 +46,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 86;
+export const SAVE_VERSION = 87;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -310,6 +310,8 @@ export interface GameState {
   dogs: Dog[];
   /** Breaks a raid left that are still to be mended: fence gaps, a broken gate, burned wrecks (sim/raidDamage.ts; save v85). Absent: none. */
   raidDamage?: import('./raidDamage').RaidDamage[];
+  /** Fires a raid set that are still burning (sim/raidFire.ts; save v87). Absent: none. */
+  raidFires?: import('./raidFire').RaidFire[];
   /** Extended family: relatives in town, asking to join, waiting for a place, turned away (sim/kin.ts). Save v53; `kinOf` makes it lazily. */
   kin?: Kin;
   /** Neighbors and strangers who joined: loyalty, hidden character, guests sheltering, who left (sim/newcomers.ts). Save v60; `newcomersOf` makes it lazily. */

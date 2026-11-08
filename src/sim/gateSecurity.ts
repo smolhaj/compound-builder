@@ -18,7 +18,7 @@ import { mulberry32 } from './rng';
 import { dayIndex, type GameState } from './state';
 import type { MaterialId } from './materials';
 
-export const GATE_GOODS = ['gate_intercom', 'gate_motor', 'sally_gate'] as const satisfies readonly MaterialId[];
+export const GATE_GOODS = ['gate_intercom', 'gate_motor', 'sally_gate', 'bollards'] as const satisfies readonly MaterialId[];
 export type GateGood = typeof GATE_GOODS[number];
 
 export const GATE_SEC = {

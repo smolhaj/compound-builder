@@ -18,6 +18,7 @@ import { StayPicker } from './StayPicker';
 import { defaultStay, kitDetail, kitLine } from '../sim/joinerHome';
 import { pluralize } from '../sim/words';
 import { isTalk, talkOffer } from '../sim/negotiation';
+import { ORDERS, ORDER_HINT, ORDER_NAME } from '../sim/raidOrders';
 
 
 /** The end of a month's trial. */
@@ -179,6 +180,7 @@ export function GateCard() {
             </button>
           ))}
         </div>
+        {cut && picked === 'defend' && <RaidOrders />}
         {cut && <button style={{ ...button(true), position: 'sticky', bottom: 0, marginTop: 12, width: '100%', textAlign: 'center', fontSize: 15, padding: '10px 12px', fontWeight: 700, letterSpacing: 0.5 }} onClick={g.watchRaid}>Watch</button>}
       </div>
     );
@@ -224,4 +226,18 @@ export function GateCard() {
       </div>
     </div>
   );
+}
+
+/** Orders for the fight (sim/raidOrders.ts): what the family does when the line is pressed. One tap each; hold is the default. */
+export function RaidOrders() {
+  const cut = useGameStore(s => s.cutscene);
+  const set = useGameStore(s => s.setRaidOrder);
+  const now = cut?.orders?.[0]?.order ?? 'hold';
+  return <div style={{ marginTop: 10 }} data-testid="raid-orders">
+    <div style={{ fontSize: 11, letterSpacing: 1.6, textTransform: 'uppercase', opacity: 0.6, marginBottom: 4 }}>Orders for the fight</div>
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+      {ORDERS.map(o => <button key={o} data-testid={`order-${o}`} title={ORDER_HINT[o]} onClick={() => set(o)} style={{ flex: '1 1 30%', padding: '6px 8px', borderRadius: 4, cursor: 'pointer', font: '12.5px system-ui, sans-serif', border: '1px solid rgba(239,230,212,0.3)', background: o === now ? '#4a4a3c' : '#2e302a', color: '#eee', outline: o === now ? '2px solid #d8c9a0' : undefined }}>{ORDER_NAME[o]}</button>)}
+    </div>
+    <div style={{ fontSize: 11.5, opacity: 0.75, marginTop: 4 }}>{ORDER_HINT[now]}</div>
+  </div>;
 }

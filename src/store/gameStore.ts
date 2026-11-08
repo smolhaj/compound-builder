@@ -19,6 +19,9 @@ import { stockUpRx } from '../sim/body';
 import { askRansom, giveUp, startRescue, startTrip } from '../sim/rescue';
 import { hasCutscene, promptNarration } from '../sim/siege';
 import { commitRaid, restageRaid, stageRaid, type RaidReport, type StagedRaid } from '../sim/raidCutscene';
+import type { RaidOrder } from '../sim/raidOrders';
+import type { RaidOrderKind } from '../sim/battleTypes';
+import { setAllHands } from '../sim/raidFire';
 import type { SiegePlan } from '../sim/siege';
 import type { Battle } from '../sim/battleTypes';
 import { create } from 'zustand';
@@ -87,6 +90,8 @@ export interface CutsceneState {
   offer?: number | null;
   /** The one change of stance has been used. */
   changed?: boolean;
+  /** The family's orders for the fight (sim/raidOrders.ts); empty: hold the line. */
+  orders?: RaidOrder[];
 }
 
 /** The mirrored fields of a staged raid. */
@@ -143,6 +148,10 @@ export interface GameStore {
   /** Pick the stance on the gate card (the cutscene's prompt); Watch then plays it. */
   chooseStance: (s: Stance | null) => void;
   watchRaid: () => void;
+  /** The family's standing order for the fight (sim/raidOrders.ts): hold the line, fall back to the house, counterattack. Taken at the gate card and between scenes. */
+  setRaidOrder: (order: RaidOrderKind) => void;
+  /** Fire fighting (sim/raidFire.ts): all hands on the fires a raid set, or back to the usual share. */
+  fireAllHands: (on: boolean) => void;
   /** The player (or the siege timeline) reached the gap after scene `scene`: put the stance card up. */
   offerChange: (scene: number) => void;
   /** Answer the card between scenes: a new stance (once), or null to carry on as you are. */
@@ -351,15 +360,24 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const c = get().cutscene, g = get().game;
     if (c?.phase !== 'prompt' || !g.gate.pending) return;
     const stance = c.stance ?? g.gate.pending.stances[0];
-    const st = stageRaid(g, stance);
+    const st = stageRaid(g, stance, undefined, c.orders);
     set({ tool: null, toolProblem: null, shopOpen: false, selected: null, cutscene: { ...c, phase: 'playing', stance, ...fromRaid(st), offer: null, changed: false } });
   },
+  setRaidOrder: (order) => {
+    const c = get().cutscene, g = get().game;
+    if (!c || (c.phase !== 'prompt' && !(c.phase === 'playing' && c.offer != null))) return;
+    const orders: RaidOrder[] = order === 'hold' ? [] : [{ t: 0, order }];
+    // between scenes: the new order replays the rest of the siege (the scenes already shown stay as they were)
+    if (c.phase === 'playing' && c.raid && c.stance) { const next = restageRaid(g, c.raid, (c.offer ?? 0) + 1, c.stance, orders); set({ cutscene: { ...c, ...fromRaid(next), orders, offer: null } }); return; }
+    set({ cutscene: { ...c, orders } });
+  },
+  fireAllHands: (on) => { const g = structuredClone(get().game); setAllHands(g, on); set({ game: g }); },
   offerChange: (scene) => { const c = get().cutscene; if (c?.phase === 'playing' && !c.changed) set({ cutscene: { ...c, offer: scene } }); },
   midStance: (stance) => {
     const c = get().cutscene, g = get().game;
     if (c?.phase !== 'playing' || c.offer == null || !c.raid) return;
     if (!stance || stance === c.stance || c.changed) { set({ cutscene: { ...c, offer: null } }); return; }
-    const next = restageRaid(g, c.raid, c.offer + 1, stance);
+    const next = restageRaid(g, c.raid, c.offer + 1, stance, c.orders);
     set({ cutscene: { ...c, ...fromRaid(next), stance, changed: true, offer: null } });
   },
   commitCutscene: () => {

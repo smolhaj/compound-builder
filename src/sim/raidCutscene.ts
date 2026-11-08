@@ -10,7 +10,8 @@
  *  raidReport  what the aftermath card says: who was hurt, killed or taken, what
  *              was lost, how many raiders are left on the drive.
  */
-import type { Battle } from './battleTypes';
+import type { Battle, RaidFacts } from './battleTypes';
+import type { RaidOrder } from './raidOrders';
 import { resolve, type Outcome, type Stance } from './encounters';
 import { newDamage } from './raidDamage';
 import { decorateDefenders } from './defenderMoments';
@@ -57,6 +58,8 @@ export interface RaidReport {
   /** Raiders left on the drive after a fight the family won. */
   raidersWounded: number;
   raidersDead: number;
+  /** The explicit data of the fight (sim/battleTypes.ts `RaidFacts`): how the wall fell, the stage reached, fates, loot, fires, hostages, the leader. Absent when there was no fight or on a report from before save v87. */
+  facts?: RaidFacts;
   /** Raiders who gave up and are held at the gate (sim/surrender.ts). Absent in a report from before save v86. */
   raidersSurrendered?: number;
   /** Family members the crew disarmed and held at gunpoint when it broke the line, then left standing in the yard (sim/breachFates.ts). */
@@ -83,13 +86,15 @@ const LOSS_WORDS: Record<(typeof STOCK_LOSSES)[number], readonly [string, string
 interface Keep { prev: StagedRaid; played: number }
 
 /** Resolve the player's stance on a copy and lay out the cutscene. */
-export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedRaid {
+export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?: readonly RaidOrder[]): StagedRaid {
   const e = game.gate.pending;
   if (!e) throw new Error('no one at the gate');
   const g = structuredClone(game);
   const t0 = g.clock.t, hour = hourOf(t0);
   g.gate.battle = undefined;
+  if (orders?.length) g.gate.orders = orders.map(o => ({ ...o }));   // (the family's orders for the fight; `resolve` reads them and clears them, so they are never saved)
   const outcome = resolve(g, stance);
+  delete g.gate.orders;
   const battle = (g.gate.battle as Battle | undefined) ?? null;
   const seed = game.seed * 131 + e.day * 7 + 1;
   const played: Stance = battle ? 'defend' : stance;
@@ -172,8 +177,8 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep): StagedR
  * if the new stance is still a fight, the cosmetic scenes still to come). The clock timeline up
  * to now is identical, so the virtual clock does not jump; only what follows changes.
  */
-export function restageRaid(game: GameState, prev: StagedRaid, played: number, stance: Stance): StagedRaid {
-  return stageRaid(game, stance, { prev, played });
+export function restageRaid(game: GameState, prev: StagedRaid, played: number, stance: Stance, orders?: readonly RaidOrder[]): StagedRaid {
+  return stageRaid(game, stance, { prev, played }, orders);
 }
 
 /** Put the staged result on the clock: the siege's length, once. */
@@ -198,6 +203,6 @@ export function raidReport(before: GameState, after: GameState, outcome: Outcome
   const rounds = (b ? b.events.filter(e => e.kind === 'shot' && e.from.startsWith('h_')).length : 0) + extraRounds;
   return {
     title: outcome.title, text: outcome.text, tone: outcome.tone, killed, wounded, taken, lost,
-    damage: newDamage(before, after), raidersWounded: am?.wounded ?? 0, raidersDead: am?.dead ?? 0, raidersSurrendered: am?.surrendered ?? 0, held, rounds, lines: outcome.lines, aftermath: !!am,
+    ...(b?.raid ? { facts: b.raid } : {}), damage: newDamage(before, after), raidersWounded: am?.wounded ?? 0, raidersDead: am?.dead ?? 0, raidersSurrendered: am?.surrendered ?? 0, held, rounds, lines: outcome.lines, aftermath: !!am,
   };
 }

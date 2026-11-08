@@ -89,8 +89,12 @@ export function breachMethod(units: readonly Pick<BattleUnit, 'side' | 'look'>[]
 export function decorateBreach(b: Battle, runs: readonly PerimeterRun[], home: { x: number; z: number }, seed: number, carriesCharges = false, dir: LineDirector = new LineDirector(seed)): Battle {
   const br = b.events.find(e => e.kind === 'breach') as Extract<BattleEvent, { kind: 'breach' }> | undefined;
   if (!br || b.invasion) { breachOptions.note = br ? 'already decorated' : 'no breach event'; return b; }
-  const method = breachMethod(b.units, seed, carriesCharges);
-  const spot = breachSpot(runs, br.x, br.z, home, method);
+  // a battle made by the sim of save v87 or later says HOW the wall fell and WHERE (the drawn wall segment or gate), and already carries the truck / charge / gap
+  // events: this only adds the voices, the lane clearing and the camera's meta on top of what the sim decided. A climbed wall is not decorated (no truck, no blast).
+  const simShown = br.method !== undefined;
+  if (simShown && (br.method === 'climb' || !br.where)) { breachOptions.note = `sim breach by ${br.method}${br.where ? '' : ' (no drawn wall)'}: nothing to decorate`; return b; }
+  const method: BreachMethod = simShown ? (br.method as BreachMethod) : breachMethod(b.units, seed, carriesCharges);
+  const spot = simShown ? { runId: br.where!.runId, x: br.where!.x, z: br.where!.z, at: br.where!.at, w: br.where!.w, heading: br.where!.heading, out: br.where!.out } : breachSpot(runs, br.x, br.z, home, method);
   if (!spot) { breachOptions.note = `no wall spot near the breach at ${br.x},${br.z} (runs ${runs.map(r => r.kind + ':' + (runFinished(r) ? 'done' : 'open')).join(',')})`; return b; }
   breachOptions.note = `${method} at ${spot.x.toFixed(1)},${spot.z.toFixed(1)} on ${spot.runId}`;
   const tb = br.t;
@@ -114,9 +118,9 @@ export function decorateBreach(b: Battle, runs: readonly PerimeterRun[], home: {
     for (const e of b.events) if (e.t <= t0 && (e.kind === 'move' || e.kind === 'cover')) standing.set(e.unit, { x: e.x, z: e.z });
     for (const u of raiders) { const p = standing.get(u.id) ?? u; if (lane(p.x, p.z)) ev.push({ t: Math.round((t0 - 0.8) * 100) / 100, kind: 'move', unit: u.id, ...aside(p.x, p.z) }); }
     if (lead) say(t0 - 1.6, 'raider', 'ram_run', lead);
-    ev.push({ t: t0, kind: 'ram', fromX: Math.round(from.x * 100) / 100, fromZ: Math.round(from.z * 100) / 100, x: Math.round(spot.x * 100) / 100, z: Math.round(spot.z * 100) / 100, secs });
+    if (!simShown) ev.push({ t: t0, kind: 'ram', fromX: Math.round(from.x * 100) / 100, fromZ: Math.round(from.z * 100) / 100, x: Math.round(spot.x * 100) / 100, z: Math.round(spot.z * 100) / 100, secs });
     if (guard) say(t0 + 0.7, 'defender', 'ram_run', guard);
-    ev.push({ t: tb, kind: 'gap', runId: spot.runId, at: spot.at, w: spot.w, x: spot.x, z: spot.z });
+    if (!simShown) ev.push({ t: tb, kind: 'gap', runId: spot.runId, at: spot.at, w: spot.w, x: spot.x, z: spot.z });
     if (lead) say(tb + 0.9, 'raider', 'ram_hit', nearest(spot, raiders) ?? lead);
     if (guard) say(tb + 2.2, 'defender', 'breach', guard);
   } else {
@@ -124,6 +128,7 @@ export function decorateBreach(b: Battle, runs: readonly PerimeterRun[], home: {
     const sapper = nearest(spot, raiders) ?? lead;
     const tp = tb - fuse - 3.2;
     const pad = drop(0.12), back = drop(1.4);
+    if (!simShown) {
     if (sapper) {
       ev.push({ t: Math.round(tp * 100) / 100, kind: 'move', unit: sapper.id, x: Math.round(pad.x * 100) / 100, z: Math.round(pad.z * 100) / 100 });
       say(tp + 0.4, 'raider', 'charge_set', sapper);
@@ -132,9 +137,12 @@ export function decorateBreach(b: Battle, runs: readonly PerimeterRun[], home: {
     if (sapper) { say(tb - fuse + 0.3, 'raider', 'charge_call', sapper); ev.push({ t: Math.round((tb - fuse + 0.6) * 100) / 100, kind: 'cover', unit: sapper.id, x: Math.round(back.x * 100) / 100, z: Math.round(back.z * 100) / 100 }); }
     // the others back off the wall for the blast
     raiders.filter(u => u !== sapper).slice(0, 5).forEach((u, i) => { const p = drop(2.2 + i * 0.35); ev.push({ t: Math.round((tb - fuse + 0.9 + i * 0.15) * 100) / 100, kind: 'cover', unit: u.id, x: Math.round((p.x + -spot.out.z * (i - 2) * 0.35) * 100) / 100, z: Math.round((p.z + spot.out.x * (i - 2) * 0.35) * 100) / 100 }); });
+    }
     if (guard) say(tb - fuse + 1.4, 'defender', 'charge_set', guard);
-    ev.push({ t: tb, kind: 'explosion', x: Math.round(spot.x * 100) / 100, z: Math.round(spot.z * 100) / 100, radius: 0.8, hits: [], wrecks: 'wall' });
-    ev.push({ t: tb, kind: 'gap', runId: spot.runId, at: spot.at, w: spot.w, x: spot.x, z: spot.z });
+    if (!simShown) {
+      ev.push({ t: tb, kind: 'explosion', x: Math.round(spot.x * 100) / 100, z: Math.round(spot.z * 100) / 100, radius: 0.8, hits: [], wrecks: 'wall' });
+      ev.push({ t: tb, kind: 'gap', runId: spot.runId, at: spot.at, w: spot.w, x: spot.x, z: spot.z });
+    }
     if (lead) say(tb + 1.2, 'raider', 'ram_hit', nearest(spot, raiders) ?? lead);
     if (guard) say(tb + 2.6, 'defender', 'breach', guard);
   }

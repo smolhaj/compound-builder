@@ -8,6 +8,8 @@ import type { Battle } from '../sim/battleTypes';
 import { STANCE } from './stanceText';
 import { pluralize } from '../sim/words';
 import { lightLabel } from '../game/battle/lightLabel';
+import { RaidOrders } from './GateCard';
+import { lootLines } from '../sim/raidFacts';
 
 const BAR = 'clamp(54px, 12vh, 120px)';
 const FONT = '"Iowan Old Style", "Palatino Linotype", Georgia, serif';
@@ -109,6 +111,7 @@ function Offer() {
         <div style={{ fontWeight: 700 }}>Continue as you are</div>
         <div style={{ fontSize: 11.5, opacity: 0.75 }}>{STANCE[c.stance ?? 'defend'][0]}: {STANCE[c.stance ?? 'defend'][1]}</div>
       </button>
+      <RaidOrders />
       {others.map(st => (
         <button key={st} style={{ ...btn, width: '100%', textAlign: 'left', padding: '8px 12px', marginBottom: 6 }} onClick={() => mid(st)}>
           <div style={{ fontWeight: 600 }}>Change to: {STANCE[st][0]}</div>
@@ -149,6 +152,13 @@ function Report() {
       {row('Lost from your supplies', r.lost.length ? r.lost.map(([k, n]) => `${n} ${k}`).join(', ') : 'nothing')}
       {(r.damage?.length ?? 0) > 0 && row('Broken', r.damage.join(', '), true)}
       {(r.held?.length ?? 0) > 0 && row('Held at gunpoint', r.held!.join(', '))}
+      {r.facts && r.facts.result !== 'repelled' && r.facts.result !== 'fled' && row('How far they got', r.facts.result === 'overrun' ? 'the houses fell' : 'the yard (the houses held)', true)}
+      {r.facts?.breach && r.facts.linePassed && row('The line broke', `${r.facts.breach.method === 'ram' ? 'a truck' : r.facts.breach.method === 'charge' ? 'a charge' : 'a ladder'} at ${r.facts.breach.where ? (r.facts.breach.where.gate ? 'the gate' : 'the ' + r.facts.breach.where.kind.replace(/_/g, ' ')) : 'the line'}`)}
+      {r.facts && r.facts.loot.length > 0 && row('Carried off', lootLines(r.facts.loot).join(', '), true)}
+      {r.facts && r.facts.fires.length > 0 && row('Fires set', pluralize(r.facts.fires.length, 'fire'), true)}
+      {r.facts && r.facts.fires.length > 0 && <FireButton />}
+      {r.facts && r.facts.loss.people.spared > 0 && row('Spared', pluralize(r.facts.loss.people.spared, 'person', 'people'))}
+      {r.facts?.hostages.length ? row('Hostages', pluralize(r.facts.hostages.length, 'person', 'people') + ' (you can get them back: radio, ransom or a rescue)', true) : null}
       {row('Raiders on the drive', r.raidersWounded + r.raidersDead + (r.raidersSurrendered ?? 0) ? [(r.raidersSurrendered ?? 0) > 0 ? `${r.raidersSurrendered} surrendered` : '', r.raidersWounded > 0 ? `${r.raidersWounded} wounded` : '', r.raidersDead > 0 ? `${r.raidersDead} dead` : ''].filter(Boolean).join(', ') : 'none left')}
       <MoreLines rounds={r.rounds} lines={r.lines.filter(l => !/^Lost:|rounds fired\.$|more rounds went out/.test(l))} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
@@ -156,4 +166,13 @@ function Report() {
       </div>
     </div>
   );
+}
+
+/** All hands on the fires the raid set (sim/raidFire.ts). */
+function FireButton() {
+  const fires = useGameStore(s => s.game.raidFires?.length ?? 0);
+  const all = useGameStore(s => !!s.game.raidFires?.[0]?.allHands);
+  const set = useGameStore(s => s.fireAllHands);
+  if (!fires) return null;
+  return <button style={{ ...btn, width: '100%', margin: '6px 0' }} data-testid="fire-all-hands" onClick={() => set(!all)}>{all ? 'Back to the usual share' : 'All hands on the fire'}</button>;
 }
