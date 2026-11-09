@@ -45,6 +45,8 @@ type Raw = Record<string, unknown> & { version?: number };
 
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
+  // 89 → 90: survival realism (sim/radiation.ts, thirst.ts, cold.ts): `Needs.rad / dry / chill` are optional and made on first use, the hand pump, iodide and radiation meter are stock goods that read as zero. Nothing to back-fill.
+  89: s => ({ ...s, version: 90 }),
   // 78 → 79: Cozy starvation (sim/starvation.ts): `Needs.starved` counts consecutive starving days; old saves start at 0, and a runaway `hunger` is clamped
   78: s => ({ ...s, version: 79, personState: ((s.personState as Array<{ needs?: { hunger?: number; starved?: number } }>) ?? []).map(ps => ps?.needs ? { ...ps, needs: { ...ps.needs, starved: ps.needs.starved ?? 0, hunger: Math.min(ps.needs.hunger ?? 0, 400_000) } } : ps) }),
   // 77 → 78: per-ring gate vetting (sim/gateVetting.ts): no one is checked at the gates until the household chooses

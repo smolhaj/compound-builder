@@ -208,6 +208,8 @@ export interface Heat {
   burned: number;
   /** Day index of the last "out of firewood" warning. */
   warned: number;
+  /** Day a cold spell in the house began (no heat, under 10 °C), or −1 (sim/cold.ts). */
+  cold?: number;
 }
 
 export interface LogEntry { t: number; text: string }
@@ -429,7 +431,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     personState: people.map(p => ({ id: p.id, task: 'idle', target: null, needs: freshNeeds(), fatigue: 0, ...(setup.dayJobs && p.job ? { employed: true } : {}) })),
     structures: [],
     forestry: { jobs: [], cleared: [] },
-    heat: { burned: 0, warned: -1 },
+    heat: { burned: 0, warned: -1, cold: -1 },
     perimeter: [],
     utilities: { ...emptyUtilities(), grid: (setup.grid ?? false) && site.improvements.power },
     hardenJobs: [],

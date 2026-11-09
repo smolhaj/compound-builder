@@ -118,7 +118,7 @@ export type ChoreId = 'weeds' | 'sowing' | 'bees' | 'sugaring' | 'haying' | 'har
 export const CHORES: readonly ChoreId[] = ['weeds', 'sowing', 'bees', 'sugaring', 'haying', 'harvest', 'animals', 'pets', 'hauling', 'filters', 'woodpile', 'kitchen', 'house', 'laundry', 'fences', 'gear', 'orchard', 'greenhouse', 'pond', 'plant'];
 
 export const CHORE_NAME: Record<ChoreId, string> = {
-  weeds: 'Garden weeding', sowing: 'Spring sowing and soil work', bees: 'Looking after the bees', sugaring: 'Gathering sap and boiling syrup', haying: 'Cutting and baling hay', harvest: 'Harvest in the fields', animals: 'Feeding the animals', pets: 'Caring for the dogs', hauling: 'Hauling water', filters: 'Water filters',
+  weeds: 'Garden weeding', sowing: 'Spring sowing and soil work', bees: 'Looking after the bees', sugaring: 'Gathering sap and boiling syrup', haying: 'Cutting and baling hay', harvest: 'Harvest in the fields', animals: 'Feeding the animals', pets: 'Caring for the dogs', hauling: 'Hauling and pumping water', filters: 'Water filters',
   woodpile: 'Splitting and stacking', kitchen: 'Cooking and washing up', house: 'Cleaning the house', laundry: 'Laundry', fences: 'Fences and roofs', gear: 'Guns, tools, the generator', orchard: 'Pruning and picking the orchard', greenhouse: 'Tending the greenhouses', pond: 'Feeding the fish', plant: 'Intake screen, turbine and tower',
 };
 /** What happens when it falls behind (the UI's tooltip). */
@@ -183,7 +183,8 @@ export function choreRates(s: GameState): Record<ChoreId, number> {
     harvest: doy >= H[0] && doy < H[1] ? HARVEST_RATE * count('field') : 0,
     animals: animals > 0 ? 50 * Math.min(4, animals) : 0,
     pets: petDogs(s) > 0 ? Math.min(100, 40 * petDogs(s)) : 0,
-    hauling: s.utilities.hauling ? (s.utilities.haulFar ? 60 : 35) : 0,
+    // (the hand pump's hours come out of the same water chore: a full backlog is 3 person-hours, sim/water.ts handPumpHours caps the day's pumping)
+    hauling: Math.min(100, (s.utilities.hauling ? (s.utilities.haulFar ? 60 : 35) : 0) + (s.utilities.report.handH ?? 0) * 100 / CLEAR_HOURS.hauling),
     filters: filters > 0 ? 4 : 0,
     woodpile: greenRicks(s) > 0.2 ? 8 : 0,
     kitchen: 30 * heads / 4,

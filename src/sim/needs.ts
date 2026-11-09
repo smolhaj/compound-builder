@@ -49,6 +49,10 @@ import { regionFor } from './climate';
 import { healthFloor, HUNGER_MAX, nextStarved, starveWarning, STARVE_WARN, STARVE_GRACE } from './starvation';
 import { harvestShare } from './sharedHarvest';
 import { caloriesText } from './units';
+import { isRadiationHurt, radiationDay, type RadState } from './radiation';
+import { drinkShare, dryWork, heatFactor, isThirstHurt, thirstDay } from './thirst';
+import { coldDay, isColdHurt, propaneDay } from './cold';
+import { treated } from './water';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 /** Food is kept in the stockpile in these units; kcal in one unit. */
@@ -69,8 +73,14 @@ export interface Needs {
   hunger: number;
   /** Consecutive days starving (hungry past STARVE_LEVEL and eating under half the need); Cozy lets this kill slowly (sim/starvation.ts). Absent = 0. */
   starved?: number;
-  /** Radiation dose (sieverts). */
+  /** Radiation dose (sieverts), lifetime total. */
   dose: number;
+  /** Radiation: the dose not yet repaired, acute sickness, the cancer risk (sim/radiation.ts). */
+  rad?: RadState;
+  /** Dehydration: body weight lost to it, % (sim/thirst.ts). */
+  dry?: number;
+  /** Cold strain toward hypothermia (sim/cold.ts). */
+  chill?: number;
   /** Wounds / illness being treated: severity 0–100, what it is. */
   /** `trauma`: a wound from a fight (gunshot, shrapnel) that needs treating: meds, a medic or a medical bay. Untreated it barely heals and can go septic. */
   hurt: Array<{ what: string; sev: number; trauma?: boolean; /** A case in a treatment chain (sim/medical.ts runs its course). */ med?: import('./medical').MedCase }>;
@@ -89,7 +99,7 @@ export interface Needs {
   lasting?: number;
 }
 
-export const freshNeeds = (): Needs => ({ health: 100, morale: 70, hunger: 0, dose: 0, hurt: [], died: null });
+export const freshNeeds = (): Needs => ({ health: 100, morale: 70, hunger: 0, dose: 0, rad: { seen: 0, rep: 0, risk: 0 }, dry: 0, chill: 0, hurt: [], died: null });
 
 /**
  * A quarter-acre field: potatoes, dry beans and wheat, ≈ 700,000 kcal a
@@ -306,6 +316,11 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
   const bay = medicalBay(s);
   // where everybody slept and how well (sim/housing.ts): bed, couch, floor, tent, nowhere
   const slept = sleepEffects(s);
+  // radiation care, the day's drinking water, tonight's shelter (sim/radiation.ts, thirst.ts, cold.ts)
+  const said: string[] = [];
+  const radCare = { medic, meds: s.stock.meds >= 0.1 || (s.stock.antibiotics ?? 0) >= 0.1, bay, cleanWater: !s.utilities.hauling || treated(s) || s.stock.water_filter >= 0.01 };
+  const share = drinkShare(s), heat = heatFactor(s);
+  propaneDay(s);
   // gatherings' afterglow and grief (sim/gatherings.ts: a funeral eases it)
   const social = socialMorale(s);
   s.people.forEach((p, i) => {
@@ -319,6 +334,8 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     // health: hunger, wounds and radiation take it; rest and food bring it back
     let dh = n.hunger > 15000 ? -1.5 : n.hunger > 5000 ? -0.5 : 0.6;
     n.hurt.forEach((h, k) => {
+      // radiation sickness, thirst and hypothermia run their own course (below)
+      if (isRadiationHurt(h.what) || isThirstHurt(h.what) || isColdHurt(h.what)) return;
       // (a broken bone or a baby's recovery does not wear the body down like an infection does)
       dh -= h.sev / 60 * (h.med && (h.med.kind === 'fracture' || h.med.kind === 'postpartum' || h.med.kind === 'frostbite' || h.med.kind === 'abscess') ? 0.25 : 1);
       if (h.med) return;   // its course is run by sim/medical.ts
@@ -338,8 +355,8 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
       h.sev = Math.max(0, h.sev - (1 + 0.5 * medic + (bay ? 2.5 : 0) + (meds ? 1.5 : 0)));
     });
     n.hurt = n.hurt.filter(h => h.sev > 0);
-    if (n.dose > 1) dh -= (n.dose - 1) * 2;           // radiation sickness above ~1 Sv
-    if (s.utilities.report.shortL > s.utilities.report.useL * 0.5) dh -= 2;   // not enough to drink
+    // radiation (repair, acute sickness, a cancer years on), thirst, the cold
+    dh += radiationDay(s, i, p, n, { ...radCare, fed: n.hunger < 5000 }, said) + thirstDay(p, n, share, heat, cozy, said) + coldDay(p, n, sl?.effF, cozy, said);
     // a diet short of fat or protein (or salt, working hard) keeps health from coming all the way back
     if (n.health + dh > diet.healthCap) dh = Math.min(dh, n.health > diet.healthCap ? -0.2 : diet.healthCap - n.health);
     if (sl) dh -= sl.harm;
@@ -359,6 +376,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
       log(s, `${p.first} ${p.last} has died.`);
     }
   });
+  for (const line of said) log(s, line);
   // people taken in who are going hungry may move on rather than starve at your table
   if (short > need * 0.3 && !fromStores) {
     const family = s.people[0]?.last;
@@ -379,5 +397,5 @@ export function workFactor(n: Needs | undefined): number {
   if (n.hurt.some(h => h.trauma && h.sev >= 50)) return 0.1;
   const h = n.health >= 60 ? 1 : 0.35 + 0.65 * n.health / 60;
   const m = n.morale >= 35 ? 1 : 0.6 + 0.4 * n.morale / 35;
-  return h * m * (1 - Math.min(0.35, (n.tired ?? 0) * 0.05)) * (n.coping ?? 1) * (n.lasting ?? 1);
+  return h * m * (1 - Math.min(0.35, (n.tired ?? 0) * 0.05)) * (n.coping ?? 1) * (n.lasting ?? 1) * dryWork(n);
 }

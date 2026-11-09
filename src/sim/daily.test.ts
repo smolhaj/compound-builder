@@ -116,7 +116,8 @@ describe('the roster and the night', () => {
       // run to 02:15 of the next night
       let h = (g.clock.ticks * 0.25 + 6) % 24;
       while (Math.abs(h - 2.25) > 1e-6) { g = step(g, 0.25 / 24); h = (g.clock.ticks * 0.25 + 6) % 24; g.gate.pending = null; g.gate.incoming = null; }
-      const tasks = g.personState.map(p => p.task);
+      // (the living: an idle camp's first winter can kill someone sleeping in a tent, sim/cold.ts)
+      const tasks = g.personState.filter(p => p.needs.died == null).map(p => p.task);
       expect(tasks.filter(t => t === 'watch').length, tasks.join()).toBeGreaterThanOrEqual(1);
       expect(tasks.filter(t => t !== 'watch' && t !== 'sleep'), tasks.join()).toEqual([]);
       g = step(g, 1);

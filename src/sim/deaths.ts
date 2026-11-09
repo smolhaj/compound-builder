@@ -30,7 +30,10 @@ const ILLNESS = /flu|dysentery|infection|abscess|fever|poison|giardia|botulism|i
 /** The cause of a death worked out from the body (see above). `thirsty`: the household was short of water. */
 export function inferCause(n: Pick<Needs, 'hurt' | 'hunger' | 'dose' | 'starved' | 'cause'>, thirsty = false): DeathCause {
   if (n.cause) return n.cause;
-  if (n.dose >= 4) return 'radiation';
+  // (the body repairs most radiation damage, sim/radiation.ts: a big lifetime dose alone is not the cause; the sickness it left is)
+  if (n.hurt.some(h => /^radiation sickness/.test(h.what) && h.sev >= 30) || (!n.hurt.length && n.dose >= 4)) return 'radiation';
+  if (n.hurt.some(h => /dehydrated/.test(h.what))) return 'thirst';
+  if (n.hurt.some(h => /^hypothermia/.test(h.what))) return 'cold';
   const worst = [...n.hurt].sort((a, b) => b.sev - a.sev)[0];
   const hurtCause = (): DeathCause => {
     if (!worst) return 'unknown';
