@@ -532,7 +532,8 @@ const boreDark = (): THREE.MeshStandardMaterial => (_boreDark ??= new THREE.Mesh
 
 /** The road's two ends of a bore: where the plan's stations meet the face, with the ground the portals are set into (the road's own height at each end). */
 export function borePortals(plan: RoadPlan, a: number, b: number, ground: Ground): { pts: Array<[number, number]>; ground: Ground } {
-  const A = plan.pts[a], B = plan.pts[b];
+  // the faces stand one station (0.5 u) out in the cutting, clear of the wall where the cut ends: a mesh cell cannot make a vertical step, so the ramp up to the hill would otherwise lie over the face
+  const A = plan.pts[Math.max(0, a - 1)], B = plan.pts[Math.min(plan.pts.length - 1, b + 1)];
   return { pts: [[A.x, A.z], [B.x, B.z]], ground: (x, z) => (Math.hypot(x - A.x, z - A.z) < 1e-4 ? A.y : Math.hypot(x - B.x, z - B.z) < 1e-4 ? B.y : ground(x, z)) };
 }
 

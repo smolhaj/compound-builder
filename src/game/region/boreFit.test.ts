@@ -29,9 +29,9 @@ describe('the planned road bore is set into the hill', () => {
     const [A, B] = pts, L = Math.hypot(B[0] - A[0], B[1] - A[1]), dx = (B[0] - A[0]) / L, dz = (B[1] - A[1]) / L, nx = dz, nz = -dx;
     const yA = ground(A[0], A[1]), yB = ground(B[0], B[1]);
     // (3) the road continues past each portal: stations before the bore and after it, level with the portal (the road does not run into rock)
-    expect(a).toBeGreaterThan(0); expect(b).toBeLessThan(c.plan.pts.length - 1);
-    for (const [i, y] of [[a - 1, yA], [b + 1, yB]] as const) { expect(Math.abs(c.plan.pts[i].y - y)).toBeLessThan(0.9); }
-    const out0 = c.plan.pts[a - 1], out1 = c.plan.pts[b + 1];
+    expect(a).toBeGreaterThan(1); expect(b).toBeLessThan(c.plan.pts.length - 2);
+    for (const [i, y] of [[a - 2, yA], [b + 2, yB]] as const) { expect(Math.abs(c.plan.pts[i].y - y)).toBeLessThan(0.9); }
+    const out0 = c.plan.pts[a - 2], out1 = c.plan.pts[b + 2];
     expect(Math.hypot(out0.x - A[0], out0.z - A[1])).toBeGreaterThan(0.1);
     expect(Math.hypot(out1.x - B[0], out1.z - B[1])).toBeGreaterThan(0.1);
     // the road is on its own floor in the bore, under the hilltop
