@@ -59,6 +59,8 @@ export interface Kitchen {
   dishes: string[];
   /** Fresh food that rotted yesterday and the day before (kcal), for the Food plan. */
   rotted: number;
+  /** Reusable-lid wear: a sleeve's rings are spent every 16 cases (sums up to 1). */
+  lidWear?: number;
 }
 export const newKitchen = (): Kitchen => ({ off: [], day: -1, today: {}, year: 0, yearKcal: {}, hours: 0, hoursYesterday: 0, heat: 0, quality: 0.4, dishes: [], rotted: 0 });
 export const kitchenOf = (s: GameState): Kitchen => (farmOf(s).kitchen ??= newKitchen());
@@ -97,6 +99,27 @@ export function toggleMethod(s: GameState, m: Method): void {
 }
 /** Share of summer days dry and sunny enough to dry on screens (wetter climates fewer). */
 export const sunShare = (s: GameState): number => Math.max(0.25, Math.min(0.92, 1 - regionFor(s.site).rainMm / 1800));
+
+/** Reusable lids: a sleeve is one case of quarts a day, its rings give out about one use in sixteen, and 4 % of jars fail to seal (single-use lids are counted as sealing). */
+export const REUSE_WEAR = 1 / 16, SEAL_REUSE = 0.96, SEAL_SINGLE = 1;
+/** Cases of jars the lids on hand can close: single-use lids, then the sleeves of reusable ones. */
+export const lidCases = (s: GameState): number => Math.floor(stock(s, 'lids')) + Math.floor(stock(s, 'lids_reuse'));
+/**
+ * Close `cases` of jars: single-use lids go first (they are cheap and seal best), then the reusable sleeves,
+ * which wear. Returns the share of the food that sealed.
+ */
+export function spendLids(s: GameState, cases: number): number {
+  const st = s.stock as unknown as Record<string, number>, k = kitchenOf(s);
+  const single = Math.min(cases, st.lids ?? 0);
+  st.lids = (st.lids ?? 0) - single;
+  const reuse = cases - single;
+  if (reuse > 0) {
+    k.lidWear = (k.lidWear ?? 0) + reuse * REUSE_WEAR;
+    while (k.lidWear >= 1 && (st.lids_reuse ?? 0) >= 1) { k.lidWear -= 1; st.lids_reuse -= 1; }
+    if ((st.lids_reuse ?? 0) < 1 && k.lidWear >= 1) k.lidWear = 0;
+  }
+  return cases > 0 ? (single * SEAL_SINGLE + reuse * SEAL_REUSE) / cases : 1;
+}
 /** Is there fuel for the cookstove (or power)? */
 export const canHeat = (s: GameState): boolean => kitchenPowered(s) || stock(s, 'firewood') >= 1 || greenRicks(s) >= 1.5;
 
@@ -133,7 +156,7 @@ function tally(k: Kitchen, m: Method, kcal: number, hours = 0): void {
 /** What can be done with the day's glut: for the Farm tab ("canning: 2 cases a day"). */
 export interface Capacity { method: Method; per: number; unit: string; why: string | null }
 export function capacities(s: GameState, ratio: number): Capacity[] {
-  const lids = Math.floor(stock(s, 'lids'));
+  const lids = lidCases(s);
   const cook = (n: number) => Math.floor(n * ratio + 1e-9);
   const heat = canHeat(s);
   return [
@@ -157,13 +180,13 @@ export function putByDay(s: GameState, need: number, ratio: number): void {
   const take = (kcal: number) => { s.stock.fresh -= kcal / BASKET; surplus -= kcal; };
   // 1. jars: a pressure canner takes it all; a water bath only the high-acid part
   const pressure = hasCanner(s), wb = !pressure && !isOff(s, 'waterbath');
-  if (((pressure && !isOff(s, 'canning')) || wb) && stock(s, 'lids') >= 1 && surplus > CASE && canHeat(s)) {
+  if (((pressure && !isOff(s, 'canning')) || wb) && lidCases(s) >= 1 && surplus > CASE && canHeat(s)) {
     const base = pressure ? surplus : surplus * HIGH_ACID;
-    const cases = Math.min(Math.floor(base / CASE), cook(pressure ? PRESSURE_CASES : WATERBATH_CASES), Math.floor(stock(s, 'lids')));
+    const cases = Math.min(Math.floor(base / CASE), cook(pressure ? PRESSURE_CASES : WATERBATH_CASES), lidCases(s));
     if (cases > 0) {
-      (s.stock as unknown as Record<string, number>).lids -= cases;
+      const seal = spendLids(s, cases);
       take(cases * CASE);
-      addFood(s, 'home_canned', cases * KEEP.canned);
+      addFood(s, 'home_canned', cases * KEEP.canned * seal);
       heatFor(s, cases * STOVE_RICK);
       tally(k, pressure ? 'canning' : 'waterbath', cases * CASE, cases * HOURS.case);
     }
@@ -222,9 +245,9 @@ export function putUpMeat(s: GameState, kcal: number, o: { pork?: boolean; freez
     }
   }
   const units = kcal * KEEP.canMeat / CASE;
-  if (hasCanner(s) && kcal > 8000 && !isOff(s, 'canning') && stock(s, 'lids') >= units && canHeat(s)) {
-    (s.stock as unknown as Record<string, number>).lids -= units;
-    addFood(s, 'home_canned', units);
+  if (hasCanner(s) && kcal > 8000 && !isOff(s, 'canning') && stock(s, 'lids') + stock(s, 'lids_reuse') >= units && canHeat(s)) {
+    const seal = spendLids(s, units);
+    addFood(s, 'home_canned', units * seal);
     heatFor(s, units * STOVE_RICK);
     tally(k, 'canning', kcal, units * HOURS.case);
     return { kept: kcal * KEEP.canMeat, where: 'canned' };

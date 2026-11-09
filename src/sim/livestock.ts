@@ -37,6 +37,7 @@ import { butcherKids, COW_MILK_KCAL, cowInMilk, dairyDay, GOAT_MILK_KCAL, grazeS
 import { cookRatio } from './daily';
 import { MEAT_WHERE, putUpMeat, renderLard } from './kitchen';
 import { regionFor } from './climate';
+import { swineDay, swineFeedLb, hasSwine, swineOf } from './swine';
 
 export type Animal = 'goat' | 'pig' | 'steer' | 'rabbit' | 'sheep' | 'cow';
 export const ANIMALS: Animal[] = ['goat', 'cow', 'pig', 'steer', 'rabbit', 'sheep'];
@@ -91,6 +92,7 @@ export function feedDemand(s: GameState): { hay: number; feed: number } {
   const hayShare = grazing(s) ? grazeShare(s, GRAZE) : winterHayScale(s);
   let hay = 0, feed = 0;
   for (const a of ANIMALS) { const n = head(s, a) * (a === 'rabbit' ? 2 : 1); hay += n * EAT[a].hay * hayShare / BALE_LB; feed += n * EAT[a].feed / BAG_LB; }
+  feed += swineFeedLb(s) / BAG_LB;
   return { hay, feed };
 }
 
@@ -103,7 +105,7 @@ export function winterHay(s: GameState): number {
 
 /** Once a day (from the eating step): feeding, hunger, milk, litters, the November butchering. Returns kcal brought in. */
 export function livestockDay(s: GameState, freezer: boolean): number {
-  if (!ANIMALS.some(a => head(s, a) > 0)) return 0;
+  if (!ANIMALS.some(a => head(s, a) > 0) && !hasSwine(s) && swineOf(s).litters.length === 0) return 0;
   const l = (s.livestock ??= newLivestock());
   l.condition.sheep ??= 1; l.condition.cow ??= 1;
   const day = Math.floor(s.clock.t + 0.25), { doy, year } = calendarOf(s.clock);
@@ -126,9 +128,12 @@ export function livestockDay(s: GameState, freezer: boolean): number {
     if (before >= 0.5 && l.condition[a] < 0.5) log(s, `The ${a === 'steer' ? 'steer is' : a + 's are'} short of feed and losing condition.`);
     if (l.condition[a] <= 0) { s.stock[a] = head(s, a) - 1; l.condition[a] = 0.4; log(s, `A ${a} died: starved for lack of ${EAT[a].hay > 0 ? 'hay' : 'feed'}.`); }
   }
+  // the breeding swine (sim/swine.ts): fed from the same bags, farrowing, weaning into the feeders
+  const sw = swineDay(s, feedFed, freezer);
+  for (const line of sw.lines) log(s, line);
   // the barn pile: what the animals leave in the stalls (less on pasture) for the fields (sim/crops.ts)
   { const pile = ANIMALS.reduce((a, an) => a + head(s, an) * (MANURE[an] ?? 0), 0) * (grazing(s) ? 0.55 : 1); s.stock.manure = Math.min(PILE_MAX, (s.stock.manure ?? 0) + pile); }
-  let kcal = 0;
+  let kcal = sw.kcal;
   const meat = (k: number, what: string, pork = false) => {
     const put = putUpMeat(s, k, { freezer, pork });
     kcal += put.kept;
