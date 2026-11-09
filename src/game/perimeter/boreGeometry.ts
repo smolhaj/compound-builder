@@ -164,7 +164,7 @@ export function boreParts(pts: readonly Pt[], ground: Ground, built: number, fin
     add('fieldstone', place(new THREE.ExtrudeGeometry(shape, { depth: faceDepth, bevelEnabled: false, curveSegments: 10 })));
     // a dark plug filling the arch just behind the face, facing into the hill (seen from outside by the tube's inside-out material): wherever the ground's own ramp
     // lies across the opening (a mesh cell cannot make a vertical step) the eye finds the dark of a tunnel, never grass; a vehicle goes into it and is gone
-    if (finished) { const pg = new THREE.ShapeGeometry(archShape(0.985)).toNonIndexed(); plugs.push(place(pg, 0, 0.004, Math.min(0.3, faceDepth - 0.02))); }
+    if (finished) { const pg = new THREE.ShapeGeometry(archShape(0.985)).toNonIndexed(); plugs.push(place(pg, 0, 0.004, Math.min(0.06, faceDepth - 0.02))); }
     // a concrete cap over it
     add('concrete', place(new THREE.BoxGeometry(PW + 0.08, 0.05, 0.38), 0, PH + 0.025, 0.15));
     // voussoirs: rough stones round the arch, proud of the face

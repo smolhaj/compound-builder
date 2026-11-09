@@ -51,10 +51,10 @@ const info = await page.evaluate(async () => {
   g.add(road);
   const spans = [bore];
   const mk = (obj, s, off = 0) => { const p = plan.pts.find(q => q.s >= s) ?? plan.pts[plan.pts.length - 1], q = plan.pts[Math.min(plan.pts.length - 1, plan.pts.indexOf(p) + 1)] ?? p, r = plan.pts[Math.max(0, plan.pts.indexOf(p) - 1)];
-    const rot = Math.atan2(q.x - r.x, q.z - r.z), y = roadYAlong(plan.pts, spans, p.x, p.z) ?? spur(p.x, p.z);
+    const rot = Math.atan2(q.x - r.x, q.z - r.z), y = roadYAlong(plan.pts, spans, p.x, p.z) ?? p.y;
     obj.position.set(p.x + Math.cos(rot) * off, y, p.z - Math.sin(rot) * off); obj.rotation.order = 'YXZ'; obj.rotation.set(-surfacePitch((x, z) => roadYAlong(plan.pts, spans, x, z) ?? spur(x, z), p.x, p.z, rot), rot, 0); g.add(obj); return { x: p.x, z: p.z, y, rot }; };
   const truck = buildTruck(), car = buildVehicle('suv');
-  const ptsAt = s => { const p = plan.pts.find(q => q.s >= s) ?? plan.pts[plan.pts.length - 1]; return new THREE.Vector3(p.x, roadYAlong(plan.pts, spans, p.x, p.z) ?? spur(p.x, p.z), p.z); };
+  const ptsAt = s => { const p = plan.pts.find(q => q.s >= s) ?? plan.pts[plan.pts.length - 1]; return new THREE.Vector3(p.x, roadYAlong(plan.pts, spans, p.x, p.z) ?? p.y, p.z); };
   const sMid = (bore.s0 + bore.s1) / 2;
   const inBore = mk(truck, sMid - 0.3, -0.12), mouth = mk(car, bore.s1 + 0.9, 0.12);
   const a = plan.pts.find(q => q.s >= bore.s0 - 1.8);
