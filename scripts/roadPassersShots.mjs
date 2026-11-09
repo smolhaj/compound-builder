@@ -58,7 +58,7 @@ try {
     await page.waitForTimeout(1200);
     await page.evaluate(async ([aim]) => { const { world, cam } = window.__cb, gz = world.access.drive[0][1], z = gz + aim, x = world.county.x(z); cam.target.set(x, world.groundAt(x, z), z); cam.radius = 22; cam.pitch = 0.7; cam.yaw = 2.4; }, [aim]);
     await shot(name + '-aerial');
-    await page.evaluate(async ([aim]) => { const { world, cam } = window.__cb, gz = world.access.drive[0][1] + aim, xp = world.county.x(gz), ze = gz - 7, xe = world.county.x(ze); world.qaFigure(world.county.x(gz - 2) + 0.9, gz - 2); cam.placeEye(xe + 0.9, ze, xp, gz, 0.3); }, [aim]);
+    await page.evaluate(async ([aim]) => { const { world, cam } = window.__cb, gz = world.access.drive[0][1] + aim, xp = world.county.x(gz), ze = gz + 8, xe = world.county.x(ze); world.qaFigure(world.county.x(gz + 3) + 0.9, gz + 3); cam.placeEye(xe + 0.9, ze, xp, gz, 0.3); }, [aim]);
     await shot(name + '-eye');
   };
   const want = n => !only.length || only.includes(n);
