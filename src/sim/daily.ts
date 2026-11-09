@@ -38,6 +38,7 @@ import { kinPersonal } from './kin';
 import { sowingRate, weedFactor } from './crops';
 import { beeRate } from './bees';
 import { sugaringRate } from './maple';
+import { hayingRate } from './haying';
 import { putByHours } from './kitchen';
 import { wearTools, workSpeed } from './tools';
 import { absentIdx, jobDayOf } from './weekender';
@@ -113,11 +114,11 @@ export function canDo(p: Person, d: Duty): boolean {
 // Chores
 // ─────────────────────────────────────────────────────────────────────────
 
-export type ChoreId = 'weeds' | 'sowing' | 'bees' | 'sugaring' | 'harvest' | 'animals' | 'pets' | 'hauling' | 'filters' | 'woodpile' | 'kitchen' | 'house' | 'laundry' | 'fences' | 'gear' | 'orchard' | 'greenhouse' | 'pond' | 'plant';
-export const CHORES: readonly ChoreId[] = ['weeds', 'sowing', 'bees', 'sugaring', 'harvest', 'animals', 'pets', 'hauling', 'filters', 'woodpile', 'kitchen', 'house', 'laundry', 'fences', 'gear', 'orchard', 'greenhouse', 'pond', 'plant'];
+export type ChoreId = 'weeds' | 'sowing' | 'bees' | 'sugaring' | 'haying' | 'harvest' | 'animals' | 'pets' | 'hauling' | 'filters' | 'woodpile' | 'kitchen' | 'house' | 'laundry' | 'fences' | 'gear' | 'orchard' | 'greenhouse' | 'pond' | 'plant';
+export const CHORES: readonly ChoreId[] = ['weeds', 'sowing', 'bees', 'sugaring', 'haying', 'harvest', 'animals', 'pets', 'hauling', 'filters', 'woodpile', 'kitchen', 'house', 'laundry', 'fences', 'gear', 'orchard', 'greenhouse', 'pond', 'plant'];
 
 export const CHORE_NAME: Record<ChoreId, string> = {
-  weeds: 'Garden weeding', sowing: 'Spring sowing and soil work', bees: 'Looking after the bees', sugaring: 'Gathering sap and boiling syrup', harvest: 'Harvest in the fields', animals: 'Feeding the animals', pets: 'Caring for the dogs', hauling: 'Hauling and pumping water', filters: 'Water filters',
+  weeds: 'Garden weeding', sowing: 'Spring sowing and soil work', bees: 'Looking after the bees', sugaring: 'Gathering sap and boiling syrup', haying: 'Cutting and baling hay', harvest: 'Harvest in the fields', animals: 'Feeding the animals', pets: 'Caring for the dogs', hauling: 'Hauling and pumping water', filters: 'Water filters',
   woodpile: 'Splitting and stacking', kitchen: 'Cooking and washing up', house: 'Cleaning the house', laundry: 'Laundry', fences: 'Fences and roofs', gear: 'Guns, tools, the generator', orchard: 'Pruning and picking the orchard', greenhouse: 'Tending the greenhouses', pond: 'Feeding the fish', plant: 'Intake screen, turbine and tower',
 };
 /** What happens when it falls behind (the UI's tooltip). */
@@ -126,6 +127,7 @@ export const CHORE_WHY: Record<ChoreId, string> = {
   sowing: 'The spring work falls behind: the fields go in late and make a shorter crop (up to 40% less).',
   bees: 'Uninspected hives swarm more, the mites build faster and less honey is made.',
   sugaring: 'Sap left in the buckets and the tank sours; the boil falls behind and less syrup is made.',
+  haying: 'Hay left standing in the meadow spoils: fewer bales for the winter.',
   harvest: 'The crop stands in the field and spoils: less of it comes in.',
   animals: 'The hens go off lay and the animals suffer: fewer eggs, lower morale.',
   pets: 'Hungry, unwalked dogs are a poor alarm and a sad sight: their warning and deterrence slip, and the kids mind.',
@@ -144,11 +146,11 @@ export const CHORE_WHY: Record<ChoreId, string> = {
 };
 /** Which duty works which chores (first one that needs it). */
 export const DUTY_CHORES: Partial<Record<Duty, ChoreId[]>> = {
-  garden: ['weeds', 'greenhouse', 'orchard', 'bees'], fields: ['harvest', 'sowing', 'weeds', 'orchard'], livestock: ['animals', 'pond'], pets: ['pets'], water: ['hauling', 'filters'], wood: ['woodpile', 'sugaring'],
+  garden: ['weeds', 'greenhouse', 'orchard', 'bees'], fields: ['haying', 'harvest', 'sowing', 'weeds', 'orchard'], livestock: ['animals', 'pond'], pets: ['pets'], water: ['hauling', 'filters'], wood: ['woodpile', 'sugaring'],
   kitchen: ['kitchen'], cleaning: ['house'], laundry: ['laundry'], repairs: ['fences', 'gear', 'plant'],
 };
 /** Person-hours to clear a full backlog (100). */
-export const CLEAR_HOURS: Record<ChoreId, number> = { weeds: 10, sowing: 8, bees: 4, sugaring: 14, harvest: 8, animals: 2, pets: 2.5, hauling: 3, filters: 2, woodpile: 8, kitchen: 3, house: 4, laundry: 5, fences: 10, gear: 6, orchard: 12, greenhouse: 6, pond: 3, plant: 4 };
+export const CLEAR_HOURS: Record<ChoreId, number> = { weeds: 10, sowing: 8, bees: 4, sugaring: 14, haying: 20, harvest: 8, animals: 2, pets: 2.5, hauling: 3, filters: 2, woodpile: 8, kitchen: 3, house: 4, laundry: 5, fences: 10, gear: 6, orchard: 12, greenhouse: 6, pond: 3, plant: 4 };
 
 export interface ChoreState { levels: Record<ChoreId, number> }
 
@@ -177,6 +179,7 @@ export function choreRates(s: GameState): Record<ChoreId, number> {
     sowing: sowingRate(s),
     bees: beeRate(s),
     sugaring: sugaringRate(s),
+    haying: hayingRate(s),
     harvest: doy >= H[0] && doy < H[1] ? HARVEST_RATE * count('field') : 0,
     animals: animals > 0 ? 50 * Math.min(4, animals) : 0,
     pets: petDogs(s) > 0 ? Math.min(100, 40 * petDogs(s)) : 0,
@@ -1063,6 +1066,7 @@ const BEHIND_LINE: Record<ChoreId, string> = {
   sowing: 'The fields are still not sown and the window is closing. Every week of delay costs crop.',
   bees: 'The hives have not been looked at in weeks. A strong colony in May is a swarm in the woods.',
   sugaring: 'Sap is standing in the buckets and the boil is behind. Every day it sits it sours.',
+  haying: 'The hay is down in the meadow and not going up. Every dry day it waits is a day nearer rain.',
   harvest: 'The harvest is standing in the field. "If we don\'t get it in this week, we lose it."',
   animals: 'The hens are off lay and the animals are bawling. Who was supposed to feed them?',
   pets: 'The dogs have been hanging around the empty bowl. Somebody needs to feed and walk them.',
