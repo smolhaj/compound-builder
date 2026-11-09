@@ -46,7 +46,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 89;
+export const SAVE_VERSION = 90;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -318,6 +318,8 @@ export interface GameState {
   kin?: Kin;
   /** Neighbors and strangers who joined: loyalty, hidden character, guests sheltering, who left (sim/newcomers.ts). Save v60; `newcomersOf` makes it lazily. */
   newcomers?: NewcomerState;
+  /** House rules the grown residents voted on, from the hamlet stage (sim/rules.ts; save v90; `rulesOf` makes it lazily). */
+  rules?: import('./rules').RulesState;
   /** Joiners' own homes: rigs, modular homes and cabins being built for them, rigs waiting for a pad (sim/joinerHome.ts). Save v77; `joinersOf` makes it lazily. */
   joiners?: JoinerState;
   /** Pet care settings, the family's grief for lost pets, yesterday's care (sim/pets.ts; save v43; `??=` for safety). */

@@ -53,6 +53,7 @@ import type { Person, SkillId } from './family';
 import { dayIndex, hourOf, type GameState } from './state';
 import type { Stock } from './materials';
 import type { Battle } from './battleTypes';
+import { ruleWatch } from './rules';
 import { gateLead, isAway, recordBattle, resolveRansom, type RansomTerms } from './rescue';
 import { defenders } from './pact';
 import { genSound, glowFactor } from './blackout';
@@ -190,7 +191,7 @@ export function postureOf(s: GameState): Posture {
   const tw = towerPosture(s);
   // fog (sim/fog.ts) takes what the eyes add: the watch's own score, the towers' view and the posted guard (the gear's share is already in gear.detection)
   const kEye = fogSightK(s, 'eye');
-  const detection = Math.min(100, 25 + (watch * 5 + tw.detection + watchDetection(s)) * kEye + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + guards.detection + forewarned(s) + villageWatch(s));
+  const detection = Math.min(100, 25 + (watch * 5 + tw.detection + watchDetection(s)) * kEye + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + guards.detection + forewarned(s) + villageWatch(s) + ruleWatch(s));
   return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, signs: gear.signs, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
 }
 

@@ -14,6 +14,7 @@ import { claimForWaiting, claimWaitingRig, isRig, type StayKind } from '../sim/j
 import { kinOf } from '../sim/kin';
 import { setEntrance as chooseEntrance } from '../sim/roadEntrance';
 import { applyForPermit } from '../sim/paperwork';
+import { callVote, voteProblem } from '../sim/rules';
 import { permitAffordable } from '../sim/spendGuard';
 import { sweepChimney } from '../sim/upkeep';
 import { stockUpRx } from '../sim/body';
@@ -294,6 +295,10 @@ export interface GameStore {
   setEntrance: (z: number) => string | null;
   /** Paperwork switches: pull permits for new builds; keep the insurance. */
   setPaper: (k: 'permits' | 'insured', on: boolean) => void;
+  /** Comfort tier (Cozy; sim/estate.ts): a tier, or null to let the savings decide. */
+  setComfort: (tier: import('../sim/estate').ComfortTier | null) => void;
+  /** Put a house rule to a vote (sim/rules.ts); returns the result line, or why not. */
+  callRuleVote: (rule: import('../sim/rules').RuleId, option: string) => string;
   /** Sweep the chimney. */
   sweep: () => void;
   /** Eat what you store (rotate the pantry). */
@@ -821,6 +826,22 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     g.paper[k] = on;
     log(g, k === 'permits' ? (on ? 'From now on: permits for everything that needs one.' : 'From now on: no permits. Hope the inspector doesn\'t drive by.') : (on ? 'Took out insurance on the place.' : 'Dropped the insurance.'));
     set({ game: g });
+  },
+  setComfort: (tier) => {
+    if (locked()) return;
+    const g = structuredClone(get().game);
+    if (tier) g.paper.comfort = tier; else delete g.paper.comfort;
+    log(g, tier ? `The household will live ${tier === 'plain' ? 'plainly' : tier === 'comfortable' ? 'comfortably' : 'graciously'} from now on.` : 'The household will live as the savings allow.');
+    set({ game: g });
+  },
+  callRuleVote: (rule, option) => {
+    if (locked()) return LOCKED_WHY;
+    const g = structuredClone(get().game);
+    const why = voteProblem(g, rule, option);
+    if (why) return why;
+    const r = callVote(g, rule, option)!;
+    set({ game: g });
+    return r.line;
   },
   hookup: (what) => {
     if (locked()) return LOCKED_WHY;

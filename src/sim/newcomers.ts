@@ -50,6 +50,7 @@ import type { Character } from './trial';
 import { lifeOf, plural, surname } from './neighborLife';
 import { joinersDay, kitLine, pool, rigLeaves, rollKit, settleStay, type StayKind } from './joinerHome';
 import { pluralize } from './words';
+import { noteAdmission, ruleLoyalty } from './rules';
 import { caloriesText } from './units';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -450,6 +451,7 @@ export function admitNewcomers(s: GameState, people: readonly Person[], o: Admit
   }
   if (secret === 'sick' && !o.known && r() < 0.35) { const l = infect(s, r, 'they brought it in'); if (l) lines.push(l); }
   g.tookIn += people.length;
+  { const broke = noteAdmission(s, people.length, [o.kind]); if (broke) lines.push(broke); }
   return lines;
 }
 
@@ -789,7 +791,7 @@ export function newcomersDay(s: GameState): string[] {
     if (i < 0) continue;
     const p = s.people[i], ps = s.personState[i];
     const sl = plan?.sleepers.find(x => x.id === p.id);
-    b.loyalty = Math.max(0, Math.min(100, b.loyalty + loyaltyDelta({ hunger: ps.needs.hunger, over, spot: sl?.spot.kind ?? null, own: !!sl?.own, privacy: sl?.privacy ?? 1, stormy, humanity: g.humanity, neighbor: b.kind !== 'stranger' })));
+    b.loyalty = Math.max(0, Math.min(100, b.loyalty + loyaltyDelta({ hunger: ps.needs.hunger, over, spot: sl?.spot.kind ?? null, own: !!sl?.own, privacy: sl?.privacy ?? 1, stormy, humanity: g.humanity, neighbor: b.kind !== 'stranger' }) + ruleLoyalty(s, false)));
     b.low = b.loyalty < 15 ? b.low + 1 : 0;
 
     // hints before the secret shows (a stranger taken in without a month's trial)

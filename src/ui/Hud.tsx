@@ -21,6 +21,8 @@ import { WaveChip } from './WaveClock';
 import { CollapseChip } from './CollapseChip';
 import { KinPanel } from './KinPanel';
 import { NewcomersPanel } from './NewcomersPanel';
+import { HouseRulesPanel } from './HouseRulesPanel';
+import { COMFORT, comfortMonthly, comfortTier, hasEstate } from '../sim/estate';
 import { originLabel } from '../sim/newcomers';
 import { WeekenderPanel } from './WeekenderPanel';
 import { isAbsent, whereIs, WHERE_TEXT } from '../sim/weekender';
@@ -302,6 +304,7 @@ export function Hud() {
             <DogsPanel game={game} />
             <KinPanel />
             <NewcomersPanel />
+            <HouseRulesPanel />
             <HousingPanel />
             <QuartersPanel />
             <PeopleSection />
@@ -501,6 +504,10 @@ export function Hud() {
             <Section title="Paperwork">
               {countyWorks(game) ? <>
                 <Row label="Property tax" value={`${usd(yearlyTax(game))}/yr`} />
+                {hasEstate(game) && <div data-testid="comfort-tier" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                  <span style={{ color: DIM }} title={COMFORT[comfortTier(game)].blurb}>Comfort: {COMFORT[comfortTier(game)].name}{game.paper.comfort ? '' : ' (by savings)'}{comfortMonthly(game) ? `, ${usd(comfortMonthly(game))}/mo` : ''}</span>
+                  <button style={btn()} title="Plain, Comfortable or Gracious: morale for money" onClick={() => g.setComfort(game.paper.comfort ? ({ plain: 'comfortable', comfortable: 'gracious', gracious: null } as const)[game.paper.comfort] : 'plain')}>Change</button>
+                </div>}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
                   <span style={{ color: DIM }}>Insurance: {game.paper.insured ? (premium(game) ? `${usd(premium(game))}/yr` : 'nothing to insure yet') : <span style={{ color: TONE.warn }}>none</span>}</span>
                   <button style={btn()} title={game.paper.insured ? 'Save the premium; a fire or a collapsed roof comes out of your pocket' : 'Buildings lost to fire or ash are paid out while the banks work'} onClick={() => g.setPaper('insured', !game.paper.insured)}>{game.paper.insured ? 'Drop' : 'Insure'}</button>
