@@ -73,6 +73,10 @@ interface U {
   hands?: boolean;
   /** Gone to ground in a closet or the cellar (not drawn until found), and who leads this unit by the arm (a hostage). */
   hidden?: boolean; hideHow?: string; ledBy?: string;
+  /** Lasting wounds (drawn for the rest of the scene): a limp (a hit leg), a crawl (a leg gone or a bad hit), an arm held to the chest (a hit arm). */
+  limp?: boolean; crawl?: boolean; sling?: boolean;
+  /** Frozen with fear until this time (sim `panic`), and the one who stands over a fallen friend (sim `heroic`). */
+  frozenUntil?: number;
   /** Behind cover: which way they lean out round it (-1, +1; 0 none), when cover was last chosen, and until when they are flat on the ground under fire. */
   lean?: number; coverAt?: number; proneUntil?: number; /** Heads down while rounds crack past (suppression). */ duckUntil?: number;
   /** Drawn size this frame (the figure grows with the camera's distance). */
@@ -483,6 +487,12 @@ export class BattleRenderer {
       case 'found': { const u = U_(e.unit); if (u && !u.dead) { u.hidden = false; u.hideHow = undefined; u.hands = true; u.crouch = false; u.tx = u.x; u.tz = u.z; } break; }
       case 'hostage': { const u = U_(e.unit); if (u && !u.dead) { u.ledBy = e.by; u.hands = true; u.crouch = false; u.hidden = false; u.hideHow = undefined; } break; }
       case 'spare': { const u = U_(e.unit); if (u && !u.dead) { u.hidden = false; u.hideHow = undefined; u.hands = true; u.crouch = false; u.tx = u.x; u.tz = u.z; } break; }
+      case 'scout': { for (const id of e.units) { const u = U_(id); if (u && !u.dead) { u.crouch = true; u.tx = u.x; u.tz = u.z; } } break; }   // (two men at the edge of the light, down on a knee, watching the place)
+      case 'panic': {
+        const u = U_(e.unit);
+        if (u && !u.dead && e.how === 'freeze') { u.frozenUntil = this.time + e.secs; u.tx = u.x; u.tz = u.z; u.hands = true; u.crouch = false; }
+        break;
+      }
       case 'lift': { const v = U_(e.unit), c = U_(e.by); if (v && c) { v.carriedBy = c.def.id; v.crouch = false; } break; }
       case 'lower': { const v = U_(e.unit); if (v?.carriedBy) { const c = U_(v.carriedBy); if (c) { v.x = v.tx = c.x + Math.sin(c.rot) * 0.1; v.z = v.tz = c.z + Math.cos(c.rot) * 0.1; v.rot = c.rot + Math.PI / 2; } v.carriedBy = undefined; if (!v.dead) v.crouch = true; } break; }
       case 'shot': {
@@ -538,7 +548,7 @@ export class BattleRenderer {
         break;
       }
       case 'ram': case 'charge': case 'gap': this.invasion.onEvent(e); break;
-      case 'house_door': case 'loot': case 'fire': case 'ladder': this.props.onEvent(e); break;
+      case 'house_door': case 'loot': case 'fire': case 'ladder': case 'flare': case 'flag': this.props.onEvent(e); break;
       case 'breach': this._boom(e.x, this._ground(e.x, e.z), e.z, 0.5, true); break;
       case 'door': this.onDoor?.(e.open, e.x, e.z, e.what); break;      // the crew at the tunnel's steel door: shut while they work at it, forced when they are through
       case 'fallback': this.shake = Math.max(this.shake, 0.15); break;
@@ -547,7 +557,8 @@ export class BattleRenderer {
         const u = U_(e.unit);
         if (u && !e.stopped) {
           u.wound = Math.min(1, u.wound + Math.max(0.3, e.sev)); this._tint(u, e.part);
-          if (!u.dead) u.duckUntil = Math.max(u.duckUntil ?? 0, this.time + 1.6);   // (a hit is felt: down on a knee, a hand to it, whatever else he is doing)
+          if (!u.dead) u.duckUntil = Math.max(u.duckUntil ?? 0, this.time + 1.6);
+          if (e.part === 'leg') { if (u.limp || e.sev >= 45) u.crawl = true; u.limp = true; } else if (e.part === 'arm') u.sling = true; else if (e.part === 'torso' && e.sev >= 60) u.crawl = true;   // (a hit is felt: down on a knee, a hand to it, whatever else he is doing)
           if (this._graphic) {
             (u.marks ??= []).push({ part: e.part, sev: e.sev }); if (u.marks.length > 2) u.marks.shift();
             this._stain({ x: u.x, y: this._ground(u.x, u.z) + 0.006, z: u.z, r: 0.008 + 0.012 * Math.min(1, e.sev / 60), stretch: 1.3, rot: u.rot, color: 0x5e0d0b });
@@ -699,6 +710,8 @@ export class BattleRenderer {
     for (const u of this._units.values()) {
       if (u.gone || u.def.machine) continue;
       let moving = false;
+      if (u.frozenUntil != null && this.time >= u.frozenUntil) { u.frozenUntil = undefined; u.hands = false; }
+      if (u.frozenUntil != null) { u.tx = u.x; u.tz = u.z; }   // (rooted to the spot, hands to the face, until the fear lets go)
       // (someone who has gone to ground is crouched where they hide, in plain sight of the camera: nobody blinks out of the picture)
       if (u.ledBy && !u.dead) {
         // led by the arm: a step behind the captor, wherever they go
@@ -711,7 +724,7 @@ export class BattleRenderer {
       } else if (!u.dead && u.layAt == null) {
         const dx = u.tx - u.x, dz = u.tz - u.z, d = Math.hypot(dx, dz);
         if (d > 0.02) {
-          const step = Math.min(d, u.speed * (u.wound > 0.5 ? 0.6 : 1) * dt);
+          const step = Math.min(d, u.speed * (u.wound > 0.5 ? 0.6 : 1) * (u.crawl ? 0.4 : u.limp ? 0.8 : 1) * dt);
           u.x += dx / d * step; u.z += dz / d * step; moving = true;
           let dr = Math.atan2(dx, dz) - u.rot; dr = Math.atan2(Math.sin(dr), Math.cos(dr));
           u.rot += dr * Math.min(1, dt * 10);
@@ -720,7 +733,7 @@ export class BattleRenderer {
         } else u.y += (u.ty - u.y) * Math.min(1, dt * 4);
         if (u.speed === FLEE && Math.hypot(u.x - this._center.x, u.z - this._center.z) > 50) { u.gone = true; continue; }
       }
-      u.phase += dt * (moving ? 12 : 0);
+      u.phase += dt * (moving ? (u.limp ? 6 : 12) : 0);
       if (n >= this._layer.capacity) break;
       this._layer.setWear(n, u.wear);
       const gy = this._ground(u.x, u.z) + u.y;
@@ -728,10 +741,10 @@ export class BattleRenderer {
       const dv = this.viewer ? Math.hypot(u.x - this.viewer.x, gy - this.viewer.y, u.z - this.viewer.z) : 0;
       const gs = u.scale * Math.min(2.4, Math.max(1, dv / 16));
       this._layer.setPose(n, { x: u.x, y: gy, z: u.z, rot: u.rot, scale: gs,
-        pose: u.hands && !moving ? FIG_POSE.REACH : (u.crouch || (u.duckUntil != null && this.time < u.duckUntil)) && !moving ? FIG_POSE.KNEEL : FIG_POSE.STAND, phase: u.phase, amp: moving ? 0.6 : 0 });
+        pose: u.hands && !moving ? FIG_POSE.REACH : (u.crouch || (u.duckUntil != null && this.time < u.duckUntil)) && !moving ? FIG_POSE.KNEEL : u.sling && !u.dead ? FIG_POSE.CROSS : FIG_POSE.STAND, phase: u.phase, amp: moving ? (u.limp ? 0.3 : 0.6) : 0 });
       u.gs = gs;
       const down = u.carriedBy ? 1 : u.dead ? Math.max(0, Math.min(1, (this.time - (u.fallAt ?? 0)) / 0.95)) : u.layAt != null ? Math.max(0, Math.min(1, (this.time - u.layAt) / 0.7)) : -1;
-      const flat = u.proneUntil != null && this.time < u.proneUntil && !u.dead && u.layAt == null && !u.carriedBy && !moving && !u.hands;
+      const flat = ((u.proneUntil != null && this.time < u.proneUntil && !moving) || !!u.crawl) && !u.dead && u.layAt == null && !u.carriedBy && !u.hands && u.frozenUntil == null;
       if (flat) {
         // flat on the ground under fire: chest down, head toward the threat
         this._e.set(Math.PI / 2, u.rot + Math.PI, 0, 'YXZ');

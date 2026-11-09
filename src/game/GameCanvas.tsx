@@ -50,6 +50,7 @@ import { liveBreach } from './battle/liveBreach';
 import { decorateBreach } from '../sim/breach';
 import { planHouseAssault } from '../sim/houseAssault';
 import { routeScene } from '../sim/cutLive';
+import { voiceMoments } from '../sim/momentVoices';
 import { stepSegments } from '../sim/standingSurfaces';
 import { LineDirector } from '../sim/raidDialogue';
 import { fireBoxesOf } from './battle/lineOfFire';
@@ -398,6 +399,10 @@ export function GameCanvas() {
             const nameOf = (id: string) => { const pid = b0.units.find(u => u.id === id)?.personId; const p = pid ? g.people.find(q => q.id === pid) : undefined; return (p as { first?: string } | undefined)?.first; };
             if (home) b = planHouseAssault(b, { box: footprint(KIT[home.kind], home.x, home.z, home.rot, false), blocked: solid, seed, dir, nameOf });
           }
+          // the human moments the sim marks (a reload, a man frozen with fear, a flare, a friend dragged in) get a voice where the sim wrote none
+          const g2 = useGameStore.getState().game, d2 = new LineDirector(g2.seed * 977 + Math.round(b0.duration * 5));
+          for (const other of useGameStore.getState().cutscene?.battles ?? []) if (other !== b0) d2.noteAll(other);
+          b = voiceMoments(b, d2, id => { const pid = b0.units.find(u => u.id === id)?.personId; const p = pid ? g2.people.find(q => q.id === pid) : undefined; return (p as { first?: string } | undefined)?.first; });
         } catch (err) { console.warn('cutscene staging failed; playing the plain scene', err); b = b0; }
         return routeScene(b, solid, undefined, stepSegments(useGameStore.getState().game.perimeter)).battle;
       },
