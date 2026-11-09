@@ -83,9 +83,9 @@ describe('the road, drawn', () => {
     expect(t).toBeTruthy();
     const g = buildRoadWorks(p, spur.h, opts(spur));
     expect(finite(g)).toBe(true);
-    let extruded = 0;
-    g.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh && m.geometry.type === 'ExtrudeGeometry') extruded++; });
-    expect(extruded).toBe(1);                                  // the dark tube (the faces are merged into the stone and earth meshes)
+    let tubes = 0;
+    g.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh && (m.material as THREE.Material).side === THREE.BackSide) tubes++; });
+    expect(tubes).toBe(1);                                     // the dark tube with a dark plug at each mouth (the faces are merged into the stone and earth meshes)
     expect(meshes(g)).toBeGreaterThan(3);
     // the surface ribbon is not drawn through the bore
     const b = bounds(g);

@@ -10,6 +10,7 @@
  * end to the ground at the other (the grade the sim priced), the arch 4.4 m wide with its crown 4.8 m over the deck.
  */
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { KitMaterialId } from '../buildkit/materials';
 import { BORE } from '../../sim/terrain';
 import type { Pt } from '../../sim/perimeter';
@@ -147,6 +148,7 @@ export function boreParts(pts: readonly Pt[], ground: Ground, built: number, fin
     }
   }
 
+  const plugs: THREE.BufferGeometry[] = [];
   // a portal at one end: its face outward, the arch, the voussoirs, wing walls, the door and the lamp. `into` points into the hill.
   const portal = (s: number, into: 1 | -1, withDoor: boolean, end: 0 | 1) => {
     const [x, z] = at(s), y = deckAt(s), fx = dx * into, fz = dz * into;
@@ -160,6 +162,9 @@ export function boreParts(pts: readonly Pt[], ground: Ground, built: number, fin
     for (let k = prof.length - 1; k >= 0; k--) shape.lineTo(prof[k][0], prof[k][1]);
     shape.holes.push(archHole());
     add('fieldstone', place(new THREE.ExtrudeGeometry(shape, { depth: faceDepth, bevelEnabled: false, curveSegments: 10 })));
+    // a dark plug filling the arch just behind the face, facing into the hill (seen from outside by the tube's inside-out material): wherever the ground's own ramp
+    // lies across the opening (a mesh cell cannot make a vertical step) the eye finds the dark of a tunnel, never grass; a vehicle goes into it and is gone
+    if (finished) { const pg = new THREE.ShapeGeometry(archShape(0.985)).toNonIndexed(); plugs.push(place(pg, 0, 0.004, Math.min(0.3, faceDepth - 0.02))); }
     // a concrete cap over it
     add('concrete', place(new THREE.BoxGeometry(PW + 0.08, 0.05, 0.38), 0, PH + 0.025, 0.15));
     // voussoirs: rough stones round the arch, proud of the face
@@ -191,6 +196,10 @@ export function boreParts(pts: readonly Pt[], ground: Ground, built: number, fin
   };
   portal(0, 1, true, 0);
   if (finished) portal(L, -1, true, 1);
+  if (out.tube && plugs.length) {
+    const strip = (g: THREE.BufferGeometry): THREE.BufferGeometry => { const n = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(n.attributes)) if (k !== 'position' && k !== 'normal') n.deleteAttribute(k); return n; };
+    out.tube = mergeGeometries([strip(out.tube), ...plugs.map(strip)]) ?? out.tube;
+  }
   return out;
 }
 
