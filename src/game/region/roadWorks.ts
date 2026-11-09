@@ -13,6 +13,7 @@
  * Draw calls: one ribbon per run of surface plus one merged mesh per material
  * (about 8 in all), however long the road. Procedural only.
  */
+import { boreTube } from '../paths/driveHeight';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { buildRibbon } from '../../engine/world/roads/RoadRibbon';
@@ -534,16 +535,16 @@ function portals(group: THREE.Group, stone: Parts, fr: readonly Frame[], a: numb
   prof.moveTo(-ARCH_W / 2, 0); prof.lineTo(-ARCH_W / 2, ARCH_H);
   prof.absarc(0, ARCH_H, ARCH_W / 2, Math.PI, 0, true);
   prof.lineTo(ARCH_W / 2, 0); prof.lineTo(-ARCH_W / 2, 0);
-  const len = Math.hypot(B.x - A.x, B.z - A.z) + 0.2;
+  const bt = boreTube(A, B), len = bt.len + 0.2;
   const tube = new THREE.ExtrudeGeometry(prof, { depth: len, bevelEnabled: false, curveSegments: 10 });
-  const rot = Math.atan2(B.x - A.x, B.z - A.z), mid = new THREE.Mesh(tube, new THREE.MeshStandardMaterial({ color: 0x2a2520, roughness: 1, side: THREE.BackSide }));
+  const rot = bt.rot, mid = new THREE.Mesh(tube, new THREE.MeshStandardMaterial({ color: 0x2a2520, roughness: 1, side: THREE.BackSide }));
   mid.position.set(A.x - Math.sin(rot) * 0.1, A.y - 0.0, A.z - Math.cos(rot) * 0.1);
-  mid.rotation.y = rot;
+  mid.rotation.order = 'YXZ'; mid.rotation.set(-bt.pitch, rot, 0);       // (the tube climbs with the road, so a car driving the bore stays inside it)
   // (the road inside: a dark floor)
   group.add(mid);
   // lights inside so the bore reads as a tunnel, not a hole
   const dark = new THREE.Mesh(new THREE.PlaneGeometry(ARCH_W * 0.98, len).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x5a5148, roughness: 1 }));
-  dark.position.set((A.x + B.x) / 2, (A.y + B.y) / 2 + 0.004, (A.z + B.z) / 2); dark.rotation.y = rot;
+  dark.position.set((A.x + B.x) / 2, (A.y + B.y) / 2 + 0.004, (A.z + B.z) / 2); dark.rotation.order = 'YXZ'; dark.rotation.set(-bt.pitch, rot, 0);
   group.add(dark);
   // the two faces
   for (const [f, out] of [[A, -1], [B, 1]] as const) portalFace(group, stone, f, out, ground);

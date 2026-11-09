@@ -31,6 +31,7 @@ import { lightsOutNow } from '../sim/blackout';
 import type { NetWorld } from './paths/pathNet';
 import { WALK_CLIFF, entryRampHeight, walkRoute } from './paths/walkRoute';
 import { CorridorNet } from './paths/CorridorNet';
+import { roadYAlong } from './paths/driveHeight';
 import { animalRoute, climbLimit } from './paths/groundMovers';
 import { LANE } from '../sim/laneWalk';
 import type { Wp } from './paths/linkRoute';
@@ -414,20 +415,14 @@ export class HomesteadWorld {
     if (this._quality) this._buildRoads();
   }
 
-  /** The road's own height where it leaves the ground: on a bridge deck (null elsewhere, and while there is no drive). */
+  /** The road's own height where it leaves the ground: on a bridge deck, or inside a rock bore under the hill (null elsewhere, and while there is no drive). */
   private _driveY(x: number, z: number): number | null {
-    if (!this._drive || this._bridgeDown) return null;
-    let best = 0.32 * 0.32, y: number | null = null;
-    for (const sx of this.plan.structures) {
-      if (sx.kind !== 'bridge1' && sx.kind !== 'bridge') continue;
-      for (const p of this.plan.pts) {
-        if (p.s < sx.s0 - 1e-6 || p.s > sx.s1 + 1e-6) continue;
-        const d = (p.x - x) ** 2 + (p.z - z) ** 2;
-        if (d < best) { best = d; y = p.y; }
-      }
-    }
-    return y;
+    if (!this._drive) return null;
+    const spans = this.plan.structures.filter(sx => sx.kind === 'tunnel' || (!this._bridgeDown && (sx.kind === 'bridge1' || sx.kind === 'bridge')));
+    return spans.length ? roadYAlong(this.plan.pts, spans, x, z) : null;
   }
+  /** Ground height for anything that drives the access road: the deck or the bore floor where the road leaves the ground. */
+  private readonly _roadGround = (x: number, z: number): number => this._driveY(x, z) ?? this.groundAt(x, z);
 
   /** The family chose another entrance (before the drive): plan the road from it, redraw it and send the truck the new way. */
   replan(site: LandSite): void {
@@ -2212,7 +2207,7 @@ export class HomesteadWorld {
       host: id => { const b = this._built.get(id); return b ? { x: b.placed.x, z: b.placed.z, rot: b.placed.rot, kind: b.placed.kind } : null; },
       yard: this.camp,
       drive: this.access.drive,
-      ground: this.groundAt,
+      ground: this._roadGround,
       route: this.vehicleRoute,
       groundRoute: (a, b) => this.vehicleGroundRoute(a, b),
       hardWinter: seasonState.params.snow > 0.25,
