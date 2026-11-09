@@ -6,6 +6,8 @@ import { BORN, PIG_CAP, sireFor, swineDay, swineFeedLb, swineOf, WEANED, STUD_FE
 import { balesPerAcre, cuttingBales, cuttingWindows, hayingDay, hayingOf, hayingRate, meadowAcres, openCutting } from './haying';
 import { feedDemand, livestockDay } from './livestock';
 import { choreRates } from './daily';
+import { poultryDay, poultryOf, flockFactor } from './poultry';
+import { sellFeeders, sellFeederProblem, FEEDER_USD } from './swine';
 import { SAVE_VERSION } from './state';
 
 const built = (g: GameState, id: string, kind: string): Structure => {
@@ -116,3 +118,41 @@ describe('haying', () => {
 });
 
 it('the save version moved', () => { expect(SAVE_VERSION).toBe(91); });
+
+describe('the flock', () => {
+  const coop = () => { const g = newGame(4); built(g, 'c', 'chicken_coop'); return g; };
+  const at = (g: GameState, d: number) => { g.clock.startDoy = 0; g.clock.t = d + 0.3; return poultryDay(g); };
+  it('a spring hatch with a rooster raises chicks; cockerels go in the pot, old hens are culled in October', () => {
+    const g = coop(); const before = g.stock.fresh + g.stock.frozen + g.stock.canned;
+    at(g, 105);
+    expect(poultryOf(g).hatchedN).toBe(6);
+    for (let d = 106; d < 310; d++) at(g, d);
+    expect(poultryOf(g).potted).toBe(3);
+    expect(poultryOf(g).cullN).toBe(3);
+    expect(g.stock.fresh + g.stock.frozen + g.stock.canned).toBeGreaterThan(before);
+    expect(poultryOf(g).age).toBeLessThan(1.4);
+  });
+  it('no rooster, no chicks; the flock ages and lays less', () => {
+    const g = coop(); poultryOf(g).rooster = false;
+    const lines = at(g, 105);
+    expect(poultryOf(g).hatchedN).toBe(0);
+    expect(lines.join(' ')).toMatch(/no rooster/);
+    expect(flockFactor(g)).toBeGreaterThan(0.999);
+    poultryOf(g).age = 3;
+    expect(flockFactor(g)).toBeCloseTo(0.7, 2);
+    poultryOf(g).age = 9;
+    expect(flockFactor(g)).toBe(0.55);
+  });
+});
+
+describe('selling live feeders', () => {
+  it('pays in peacetime, refuses after', () => {
+    const g = newGame(6); sk(g).pig = 3; g.disaster.tracks = { ...g.disaster.tracks, stores: 1, banks: 1 }; g.money = 0;
+    expect(sellFeeders(g, 2)).toBeNull();
+    expect(sk(g).pig).toBe(1);
+    expect(g.money).toBe(2 * FEEDER_USD);
+    g.disaster.tracks = { ...g.disaster.tracks, stores: 0 };
+    expect(sellFeederProblem(g, 1)).toMatch(/nobody/);
+    expect(sellFeederProblem(g, 5)).toMatch(/not 5/);
+  });
+});

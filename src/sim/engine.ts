@@ -45,6 +45,7 @@ import { cropsDay } from './crops';
 import { beesDay } from './bees';
 import { mapleDay } from './maple';
 import { hayingDay } from './haying';
+import { poultryDay } from './poultry';
 import { cellarDay, crowdDay } from './storage';
 import { vehiclesDay } from './vehicles';
 import { kinDay } from './kin';
@@ -260,6 +261,7 @@ function subStep(s: GameState): void {
     for (const line of beesDay(s)) log(s, line);
     for (const line of mapleDay(s)) log(s, line);
     for (const line of hayingDay(s)) log(s, line);
+    for (const line of poultryDay(s)) log(s, line);
     for (const line of cellarDay(s)) log(s, line);
     for (const line of crowdDay(s)) log(s, line);
     const e = gateDay(s);

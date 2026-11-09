@@ -16,7 +16,8 @@ import { ANIMALS, feedDemand, sheepRoom, sheepSheltered, winterHay, type Animal 
 
 import { apiaries, apiaryReport, harvestHoney, harvestProblem, HIVES, stockApiary, stockProblem as bStockProblem } from '../sim/bees';
 import { expectedSyrup, hasMaples, hasShack, mapleOf, sapSeason, setTaps, tapsOut, woodsTaps } from '../sim/maple';
-import { boars, nursing, sireFor, sows, swineOf, STUD_FEE } from '../sim/swine';
+import { poultryOf, coopCount } from '../sim/poultry';
+import { sellFeederProblem, sellFeeders, boars, nursing, sireFor, sows, swineOf, STUD_FEE } from '../sim/swine';
 import { cuttingBales, cuttingWindows, hasHerd, hayingOf, meadowAcres } from '../sim/haying';
 import { butcher, butcherProblem, feedBudget, herdOf, sheltered } from '../sim/herd';
 import { MATERIALS } from '../sim/materials';
@@ -142,6 +143,7 @@ function FieldsView({ game }: { game: GameState }) {
         {swineOf(game).weaned > 0 && <Row label="Piglets this year" value={`${swineOf(game).weaned} weaned${swineOf(game).surplus > 0 ? `, ${swineOf(game).surplus} past the pen` : ''}`} />}
         {sows(game) > 0 && sireFor(game) === null && <Note tone="warn">The sows have no sire: buy a boar, or have the breeder out (${STUD_FEE} a sow while the banks are open).</Note>}
       </>}
+      {coopCount(game) > 0 && <Row label="Flock" value={`${poultryOf(game).age.toFixed(1)} years old${poultryOf(game).rooster ? '' : ' · no rooster'}${poultryOf(game).pullets.length + poultryOf(game).cockerels.length > 0 ? ' · chicks growing' : ''}`} title="Hens lay less each year past the first; a spring hatch (needs a rooster) raises pullets to replace the old hens culled in October, and cockerels for the pot" />}
       {hasHerd(game) && meadowAcres(game) >= 0.5 && <>
         <Row label="Hay meadow" value={`${meadowAcres(game).toFixed(1)} acres · about ${cuttingBales(game)} bales a cutting`} title="Two cuttings a year; the Fields duty puts them up (a quarter hour a bale by hand, a running tractor is four times faster)" />
         <Row label="Cuttings" value={cuttingWindows(game).map(([a, b]) => `${dateText(a)} to ${dateText(b)}`).join(' · ')} />
@@ -231,6 +233,7 @@ function AnimalsView({ game }: { game: GameState }) {
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ color: c < 0.5 ? TONE.bad : c < 0.9 ? TONE.warn : undefined }}>{Math.floor(game.stock[a])} head, {Math.round(c * 100)}%</span>
             {sick > 0 && <span style={{ color: TONE.bad, fontSize: 11 }}>{sick} sick</span>}
+            {a === 'pig' && act('Sell one', sellFeederProblem(game, 1), () => g.money(d => sellFeeders(d, 1)), 'Sell a feeder pig live (peacetime): about $120')}
             {BUTCHERABLE.includes(a) && act('Butcher', butcherProblem(game, a, 1), () => g.money(d => butcher(d, a, 1)), `Butcher one ${a}: the meat is preserved (freezer, smoker, salt, canner); a pig gives lard`)}
           </span>
         </div>;

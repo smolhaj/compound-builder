@@ -118,3 +118,19 @@ export function swineDay(s: GameState, fed: number, freezer: boolean): { kcal: n
   w.litters = still;
   return { kcal, lines };
 }
+
+/** A grown feeder sold live (peacetime): the price of a feeder pig less the dealer's cut, by condition. */
+export const FEEDER_USD = 120;
+export function sellFeederProblem(s: GameState, n: number): string | null {
+  if (n < 1 || st(s, 'pig') < n) return `not ${n} feeders on the place`;
+  if (!peacetime(s)) return 'nobody is buying live hogs now';
+  return null;
+}
+export function sellFeeders(s: GameState, n: number): string | null {
+  const why = sellFeederProblem(s, n);
+  if (why) return why;
+  (s.stock as unknown as Record<string, number>).pig = st(s, 'pig') - n;
+  const usd = Math.round(n * FEEDER_USD * (0.5 + 0.5 * (s.livestock?.condition.pig ?? 1)));
+  s.money += usd;
+  return null;
+}
