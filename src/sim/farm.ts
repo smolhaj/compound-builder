@@ -17,6 +17,8 @@ import type { Plot, Seeds } from './crops';
 import type { Kitchen } from './kitchen';
 import type { Apiary } from './bees';
 import type { Maple } from './maple';
+import type { Swine } from './swine';
+import type { Haying } from './haying';
 import type { Herd } from './herd';
 
 export type HeatMode = 'electric' | 'wood';
@@ -86,6 +88,10 @@ export interface Farm {
   apiaries?: Record<string, Apiary>;
   /** The sugar bush: taps, the sap tank, the season's syrup (sim/maple.ts). */
   maple?: Maple;
+  /** Breeding swine: litters, piglets, the herd's condition (sim/swine.ts). */
+  swine?: Swine;
+  /** The hay meadow: this year's cuttings (sim/haying.ts). */
+  haying?: Haying;
   /** The barnyard: sickness, the herd's breeding, the dairy (sim/herd.ts). */
   herd?: Herd;
 }

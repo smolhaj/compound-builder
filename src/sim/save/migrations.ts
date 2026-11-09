@@ -72,6 +72,7 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 86 → 87: raid depth (sim/breachMeans.ts, crewMercy.ts, raidOrders.ts, raidOutcomes.ts, raidFire.ts). `raidFires` (fires a raid set) is optional and absent on an old save; the bollards are a new shop good (zero stock)
   // 87 → 88: raid openers and the raider's story (sim/raidOpeners.ts, sim/raiderStory.ts). `Encounter.opener` and `raiderStories` are optional and absent on an old save
   // 88 → 89: questioning prisoners and the plans for scouts (sim/interrogation.ts, sim/scoutPlans.ts, sim/parleyChoices.ts). `Prisoner.asked`, `Opener.spotted` are optional and absent on an old save
+  89: s => ({ ...s, version: 90 }),
   88: s => ({ ...s, version: 89 }),
   87: s => ({ ...s, version: 88 }),
   86: s => ({ ...s, version: 87 }),

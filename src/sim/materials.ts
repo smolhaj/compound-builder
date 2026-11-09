@@ -35,7 +35,9 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   // medical depth (sim/medical.ts)
   | 'antibiotics' | 'splints' | 'ors' | 'dental_kit' | 'midwife_kit' | 'medical_books'
   // the herd, the bees and the sugar bush (sim/herd.ts, sim/bees.ts, sim/maple.ts)
-  | 'cow' | 'cheese_kit' | 'vet_kit' | 'bee_nuc' | 'hive_supplies' | 'beeswax' | 'maple_taps';
+  | 'cow' | 'cheese_kit' | 'vet_kit' | 'bee_nuc' | 'hive_supplies' | 'beeswax' | 'maple_taps'
+  // breeding swine and reusable canning lids (sim/swine.ts, sim/kitchen.ts)
+  | 'sow' | 'boar' | 'lids_reuse';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -228,6 +230,9 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   gun_cleaning: { id: 'gun_cleaning', name: 'Gun cleaning kit', unit: 'rods, brushes, solvent, oil, patches: about a year', price: 60 },
   traps: { id: 'traps', name: 'Traps & bait stations', unit: 'snap traps, bait stations and bait: about two months', price: 35 },
   plow: { id: 'plow', name: 'Plow blade', unit: 'a snowplow blade for the truck (keep the drive open)', price: 3500 },
+  sow: { id: 'sow', name: 'Bred sow', unit: 'a bred gilt: eight or so piglets a litter, two litters a year with a boar on the place (feed, a pen)', price: 450 },
+  boar: { id: 'boar', name: 'Boar', unit: 'a breeding boar: sires every sow on the place (feed, a stout pen)', price: 400 },
+  lids_reuse: { id: 'lids_reuse', name: 'Reusable canning lids', unit: 'sleeve of 12 Tattler-style lids and rubber rings (one case of quarts a day; the rings wear out about every 16 uses; 4% of jars fail to seal)', price: 32 },
   lids: { id: 'lids', name: 'Canning lids', unit: 'sleeve of 12 lids (one case of quarts filled; the jars come back, the lids don\'t)', price: 6 },
   filter_set: { id: 'filter_set', name: 'HEPA filter set', unit: 'HEPA cartridges + hand-crank blower', price: 1100 },
 };
