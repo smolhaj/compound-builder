@@ -12,6 +12,7 @@
  * plumbed), rain into the cisterns. Batteries fade, pumps fail and need
  * repair. Shortages are logged. Pure (tested).
  */
+import { lakeIntakeL } from './waterfront';
 import { pumpDrawFactor, sunFactor } from './terrainFx';
 import { orchardWaterL } from './orchard';
 import { solarFogK } from './fogFx';
@@ -512,7 +513,9 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   // the garden and the orchard drink from the pond first: irrigation is what it is for
   const fromPond = Math.min(u.pondL ?? 0, gardenUse + orchardUse);
   u.pondL = (u.pondL ?? 0) - fromPond;
-  const use = people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (gardenUse + orchardUse - fromPond) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0);
+  // a dock's intake line pumps the lake for what the pond did not cover (sim/waterfront.ts)
+  const fromLake = Math.min(lakeIntakeL(s), gardenUse + orchardUse - fromPond);
+  const use = people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (gardenUse + orchardUse - fromPond - fromLake) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0);
   // no power for the well pump (or it's dead): the hand pump down the same casing, as much as the day needs and arms allow
   let handL = 0, handH = 0;
   if (supply < use && handPumpReady(s)) {

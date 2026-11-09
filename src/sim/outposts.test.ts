@@ -47,6 +47,21 @@ describe('the helipad', () => {
     expect(airliftReady(g)).toBe(false);
   });
 
+  it('a bug-out can charter three helicopter seats off the pad, for a bill, only while the county works', async () => {
+    const { charterSeats, CHARTER } = await import('./outposts');
+    const { bugOutPlan, bugOut } = await import('./bugout');
+    const g = game(); g.disaster.tracks.medical = 1; g.disaster.tracks.banks = 1; g.disaster.tracks.law = 1; g.money = 50_000;
+    expect(charterSeats(g)).toBe(0);
+    built(g, 'h', 'helipad');
+    expect(charterSeats(g)).toBe(CHARTER.seats);
+    const plan = bugOutPlan(g);
+    expect(plan.air).toBe(CHARTER.seats);
+    expect(plan.airUsd).toBe(CHARTER.usd);
+    g.money = CHARTER.usd - 1; expect(charterSeats(g)).toBe(0);
+    g.money = 50_000; g.disaster.tracks.banks = 0.1; expect(charterSeats(g)).toBe(0);
+    void bugOut;
+  });
+
   it('a deep wound is flown out and closed; without the pad it stays with the family', () => {
     const run = (pad: boolean) => {
       const g = game(); g.disaster.tracks.medical = 1; g.disaster.tracks.banks = 1; g.disaster.tracks.law = 1; g.money = 200_000;
