@@ -111,8 +111,8 @@ describe('the headwall follows the hill', () => {
     // a hill that climbs 0.8 u for each unit across to the right and falls away to the left
     const slope = (l: number) => Math.max(0, 0.9 + 0.8 * l);
     const p = headwallProfile(1.6, 1.3, slope);
-    for (const [l, h] of p) expect(h, `at ${l.toFixed(2)} the wall stands clear of the ground`).toBeLessThanOrEqual(Math.max(1.3, slope(l) + 0.07) + 1e-6);
-    for (const [l, h] of p) if (Math.abs(l) > 1.2) expect(h, `at ${l.toFixed(2)} the wall is lower than the hill`).toBeGreaterThanOrEqual(Math.min(HEAD_MAX.high, slope(l) + 0.06) - 1e-6);
+    for (const [l, h] of p) expect(h, `at ${l.toFixed(2)} the wall stands clear of the ground`).toBeLessThanOrEqual(Math.max(1.3, slope(l) - 0.07) + 1e-6);
+    for (const [l, h] of p) if (Math.abs(l) > 1.2) expect(h, `at ${l.toFixed(2)} the wall is lower than the hill`).toBeGreaterThanOrEqual(Math.min(HEAD_MAX.high, slope(l) - 0.08) - 1e-6);
     expect(p[0][1]).toBeLessThan(0.15);                                    // the low side ends on the ground
   });
   it('never spreads past its caps', () => {

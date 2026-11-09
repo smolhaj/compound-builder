@@ -36,7 +36,7 @@ export const HEAD_MAX = { half: 3, high: 2.5 } as const;
 export function headwallProfile(pw: number, ph: number, rise: (lat: number) => number, step = 0.1): Array<[number, number]> {
   const top = (l: number): number => {
     const block = ph * Math.max(0, Math.min(1, (pw / 2 + 0.3 - Math.abs(l)) / 0.3));
-    return Math.min(HEAD_MAX.high, Math.max(block, rise(l) + 0.06));
+    return Math.min(HEAD_MAX.high, Math.max(block, rise(l) - 0.08));   // (a hair under the ground it climbs, so no strip stands clear of the hill)
   };
   const edge = (sg: 1 | -1): number => {
     let l = pw / 2;
@@ -86,12 +86,13 @@ function frame(x: number, y: number, z: number, fwd: THREE.Vector3): THREE.Matri
 }
 
 /**
+ * `mound`: bank earth over the tube where the hill has not closed over it (a road bore's faces stand in a cutting where it has: none needed).
  * `faceDepth`: how thick the headwall block is (a face on a rock cliff is 0.3 u; where the road comes in by a cutting the face stands out in it and is a deep block, so the step
  * where the cut ends is buried in the stone).
  * `built`: how much of the tunnel is built, 0 to 1 (a portal stands from 5 %, the second, the mound and the tube when it is finished).
  * `lit`: the lamps are on. `pts`: the run (its first and last points are the two portals).
  */
-export function boreParts(pts: readonly Pt[], ground: Ground, built: number, finished: boolean, lit: boolean, collapsed = false, faceDepth = 0.3): BoreParts {
+export function boreParts(pts: readonly Pt[], ground: Ground, built: number, finished: boolean, lit: boolean, collapsed = false, faceDepth = 0.3, mound = true): BoreParts {
   const out: BoreParts = { parts: [], doors: [], tube: null };
   if (pts.length < 2 || built <= 0.05) return out;
   const add = (m: KitMaterialId, g: THREE.BufferGeometry) => out.parts.push([m, g]);
@@ -114,7 +115,7 @@ export function boreParts(pts: readonly Pt[], ground: Ground, built: number, fin
   }
 
   // earth banked over the tube where the hill has not closed over it: a mound with its sides sloped down to the ground
-  if (finished) {
+  if (finished && mound) {
     const N = Math.max(2, Math.ceil(L / 0.5)), top = (s: number) => deckAt(s) + ARCH.crown + MOUND.over;
     const rows: Array<{ l: THREE.Vector3; lt: THREE.Vector3; rt: THREE.Vector3; r: THREE.Vector3 } | null> = [];
     for (let i = 0; i <= N; i++) {

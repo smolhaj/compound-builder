@@ -540,7 +540,7 @@ export function borePortals(plan: RoadPlan, a: number, b: number, ground: Ground
 }
 
 function portals(group: THREE.Group, parts: Parts, plan: RoadPlan, a: number, b: number, ground: Ground): void {
-  const bp = borePortals(plan, a, b, ground), bore = boreParts(bp.pts, bp.ground, 1, true, false, false, FACE_DEPTH);
+  const bp = borePortals(plan, a, b, ground), bore = boreParts(bp.pts, bp.ground, 1, true, false, false, FACE_DEPTH, false);
   for (const [m, g] of bore.parts) parts.add(m, worldUV(g));
   if (bore.tube) { const t = new THREE.Mesh(bore.tube, boreDark()); t.receiveShadow = false; group.add(t); }
 }

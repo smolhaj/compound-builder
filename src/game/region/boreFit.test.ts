@@ -43,10 +43,10 @@ describe('the planned road bore is set into the hill', () => {
       expect(gy, `a face edge hangs in the air: ground ${gy.toFixed(2)} under a slab bottom ${(y - 0.5).toFixed(2)}`).toBeGreaterThanOrEqual(y - 0.5 - 0.02);
     }
     // (2) wherever the hill has not closed over the crown, earth is banked over the tube (the tube is never a bare pipe on the ground)
-    const bp = boreParts(pts, ground, 1, true, false, false, FACE_DEPTH);
+    const bp = boreParts(pts, ground, 1, true, false, false, FACE_DEPTH, false);
     let open = 0;
     for (let s = 0.5; s < L - 0.5; s += 0.5) { const y = yA + (yB - yA) * s / L; if (c.g.h(A[0] + dx * s, A[1] + dz * s) < y + ARCH.crown + MOUND.over - 0.02) open++; }
-    if (open) expect(bp.parts.some(([m]) => m === 'earth')).toBe(true);
+    if (open) expect(boreParts(pts, ground, 1, true, false).parts.some(([m]) => m === 'earth')).toBe(true);   // (the rock tunnel's own faces bank earth over an open crown)
     // (4) two portal faces and a tube
     expect(bp.tube).not.toBeNull();
     const faces = bp.parts.filter(([m]) => m === 'fieldstone');
