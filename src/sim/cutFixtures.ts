@@ -13,6 +13,7 @@ import { decorateBreach } from './breach';
 import { planHouseAssault } from './houseAssault';
 import { LineDirector } from './raidDialogue';
 import { routeScene } from './cutLive';
+import { stepSegments } from './standingSurfaces';
 import { KIT, footprint } from '../game/buildkit/kit';
 
 const T = 0.1;
@@ -49,13 +50,13 @@ export function yardSolid(g: Pick<GameState, 'structures' | 'perimeter'>, houses
 export type FixtureCase = [string, number, Encounter['kind'], number, Encounter['temper']];
 export const HOUSE: HouseBox = (() => { const f = footprint(KIT.farmhouse, 0, 0, 0, false); return { x0: f.x0, z0: f.z0, x1: f.x1, z1: f.z1 }; })();
 
-export function game(seed: number, hour: number): GameState {
+export function game(seed: number, hour: number, wall: string = 'container_wall'): GameState {
   const g = newGame(seed, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down' });
   const day = Math.floor(g.disaster.hitAt + 20), SUB = 0.25 / 24;
   g.clock.t = Math.round((day + hour / 24) / SUB) * SUB; g.clock.ticks = Math.round(g.clock.t / SUB);
   g.stock.canned = 40; g.stock.fuel = 20; g.stock.meds = 3; g.stock.lumber = 20; g.stock.hardware = 20;
   g.structures.push({ id: 'house', kind: 'farmhouse', x: 0, z: 0, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 });
-  const r = planRun(g, 'container_wall', [[-10, -10], [10, -10], [10, 10], [-10, 10], [-10, -10]], [{ at: 15, w: 2 }]);
+  const r = planRun(g, wall as never, [[-10, -10], [10, -10], [10, 10], [-10, 10], [-10, -10]], [{ at: 15, w: 2 }]);
   r.done = r.hours; r.supplied = true; r.finishedAt = 0;
   for (const [i, p] of g.people.entries()) if (!p.kid || p.age >= 15) {
     g.armory.guns.push({ id: `g${i}`, model: 'sw_mp15', condition: 1, fired: 0, where: 'house', carrier: p.id });
@@ -75,13 +76,13 @@ export function prepared(b: Battle, g: GameState, seed: number): Battle {
     out = decorateBreach(b, g.perimeter, { x: 0, z: 0 }, seed, b.events.some(e => e.kind === 'rocket' || e.kind === 'throw'), dir);
     out = planHouseAssault(out, { box: HOUSE, blocked: solid, seed, dir, nameOf: id => id });
   }
-  const r = routeScene(out, solid);
+  const r = routeScene(out, solid, undefined, stepSegments(g.perimeter));
   if (!r.ok || r.unrouted) throw new Error(`routing failed: ok ${r.ok}, unrouted ${r.unrouted} ${JSON.stringify(r.lost.slice(0, 3))}`);
   return r.battle;
 }
 
-export function scenes(seed: number, hour: number, kind: Encounter['kind'], size: number, temper: Encounter['temper']): { g: GameState; battles: Battle[] } {
-  const g = game(seed, hour);
+export function scenes(seed: number, hour: number, kind: Encounter['kind'], size: number, temper: Encounter['temper'], wall = 'container_wall'): { g: GameState; battles: Battle[] } {
+  const g = game(seed, hour, wall);
   g.gate.pending = enc(kind, size, temper, Math.floor(g.clock.t));
   const st = stageRaid(g, 'defend');
   return { g, battles: st.battles };

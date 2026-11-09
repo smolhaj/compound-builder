@@ -21,6 +21,9 @@ const scan = args.includes('--scan'), wantDay = Number(opt('--day', 0));
 const lowrender = args.includes('--lowrender'), sparse = Number(opt('--sparse', 3)), fromS = Number(opt('--from', 0));
 const dr = (opt('--dense', '') || '').split(',').filter(Boolean).map(x => x.split(':').map(Number));
 const afterSecs = Number(opt('--after', 4));
+// --dbt a:b captures every pump while the BATTLE clock is between a and b seconds (the beat you want to see: a door kicked, a room cleared)
+const dbts = (opt('--dbt', '') || '').split(',').filter(Boolean).map(x => x.split(':').map(Number));
+let prevBt = null;
 mkdirSync(outDir, { recursive: true });
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise((ok, fail) => { vite.stdout.on('data', d => { if (/localhost:\d+/.test(String(d).replace(/\x1b\[[0-9;]*m/g, ''))) ok(); }); vite.on('exit', c => fail(new Error('vite exited ' + c))); });
@@ -122,7 +125,7 @@ try {
     // dense windows are captured every pump; the rest every `sparse`-th (a time-lapse); before --from nothing is drawn at all
     const secs = p / FPS;
     const dense = dr.length > 0 && dr.some(([a, b]) => secs >= a && secs < b);
-    const grab = secs >= fromS && (dense || p % sparse === 0);
+    const grab = secs >= fromS && (dense || p % sparse === 0 || (prevBt != null && dbts.some(([a, b]) => prevBt >= a && prevBt < b)));
     const st = await page.evaluate(async ([q0, FPS, grab, lowrender]) => {
       const cb = window.__cb, gs = cb.game.getState();
       cb.qa.skipDraw = !grab;   // (normal drawing, but a frame nobody captures is not drawn: skipping ahead and time-lapse cost almost nothing)
@@ -136,7 +139,7 @@ try {
       const note = window.__breach?.note;
       return { note, phase: c?.phase, offer: c?.offer ?? null, bt: b?.playing ? +b.time.toFixed(2) : null, ev: b?.playing ? b.battle.events.filter(e => ['ram', 'charge', 'gap', 'breach', 'end', 'down'].includes(e.kind)).map(e => e.kind + '@' + e.t) : null };
     }, [q0, FPS, grab, lowrender]);
-    p++;
+    p++; prevBt = st.bt;
     if (st.bt != null && Math.round(st.bt * 10) % 50 === 0) tl.push(`p${p} t${(p / FPS).toFixed(1)} bt${st.bt}`);
     if (st.ev && st.bt < 0.5 && st.note) console.log('breach note:', st.note);
     if (st.ev && st.bt < 0.5 && tl.evAt !== st.ev.join()) { tl.evAt = st.ev.join(); console.log('events', st.ev.join(' ')); }

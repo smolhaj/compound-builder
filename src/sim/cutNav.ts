@@ -43,19 +43,23 @@ export function blockedAt(w: NavWorld, x: number, z: number, t: number): boolean
 // the renderer's speeds (BattleRenderer.ts)
 export const RUN = 1.1, WALK = 0.8, FLEE = 1.6, WOUND_SLOW = 0.6;
 const STEP = 0.05, SUB = 0.04;
+/** People keep this far apart at rest (a body is about 0.05 wide). */
+const SEP = 0.09;
 
 export interface Pt { x: number; z: number }
 export interface Clip { unit: string; t: number; from: Pt; to: Pt }
 
-interface K { id: string; x: number; z: number; tx: number; tz: number; speed: number; wound: number; dead: boolean; frozen: boolean; carriedBy?: string; queue: Array<{ x: number; z: number; kind: 'move' | 'cover' | 'hide'; walk?: boolean; how?: string } | { flee: BattleEvent }> ; fleeing: boolean; moved: boolean; heldFor?: object }
+interface K { id: string; x: number; z: number; tx: number; tz: number; speed: number; wound: number; dead: boolean; frozen: boolean; carriedBy?: string; y: number; ty: number; queue: Array<{ x: number; z: number; kind: 'move' | 'cover' | 'hide'; walk?: boolean; how?: string; ty?: number } | { flee: BattleEvent }> ; fleeing: boolean; moved: boolean; heldFor?: object; settleAt?: number; lastKind?: string; /** The foot of the ladder he is up (he goes back down it before going anywhere else). */ foot?: Pt; /** Where he is finally going (the end of the chain of legs). */ dest?: Pt }
 
 export interface WalkOpts {
   /** Rewrite legs through openings. */
   route: boolean;
   /** Where "away" is for a flee (the renderer runs a fleeing unit 60 units from the scene center; routed, they leave by an opening to a point this far out). */
   center?: Pt;
+  /** Defenders who go down on a knee a moment after they stop in the middle of the fight (ids, and the stretch of the scene it applies to). */
+  settle?: { ids: ReadonlySet<string>; from: number; to: number };
   /** Called after every step for every unit that moved: previous and new position. */
-  onStep?: (id: string, t: number, a: Pt, b: Pt) => void;
+  onStep?: (id: string, t: number, a: Pt, b: Pt, y: number) => void;
 }
 export interface WalkResult { events: BattleEvent[]; units: Battle['units']; /** Legs that had no way through (left straight). */ unrouted: number; /** Which ones (for the tests' messages). */ lost: Array<{ unit: string; t: number; from: Pt; to: Pt }>; /** Units that started inside something solid (moved to the nearest free spot when routing). */ nudged: string[] }
 
@@ -192,8 +196,39 @@ function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[]
   return null;
 }
 
-/** Is the leg shut right now by something that will open (a door, a breach not yet through), as opposed to blocked for good? */
-const shutNow = (w: NavWorld, a: Pt, b: Pt, t: number, speed: number): boolean => !lineClear(w, a, b, t, speed) && lineClear(w, a, b, 1e9, speed);
+/** Is the leg shut right now by something timed that will open (a door that is barred, a breach not yet through)? Judged on the timed layers alone: a leg that grazes a jamb is not "shut". */
+const shutNow = (w: NavWorld, a: Pt, b: Pt, t: number, speed: number): boolean => {
+  if (!w.barriers.length && !w.carves.length) return false;
+  const d = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(1, Math.ceil(d / 0.01));
+  for (let i = 0; i <= n; i++) {
+    const f = i / n, x = a.x + (b.x - a.x) * f, z = a.z + (b.z - a.z) * f, te = t + d * f / speed;
+    for (const bar of w.barriers) if (te < bar.openAt + SLACK && te >= (bar.from ?? -1) && inRect(bar, x, z)) return true;
+    if (w.solid(x, z)) for (const c of w.carves) if (te < c.from + SLACK && inRect(c, x, z) && !w.carves.some(c2 => te >= c2.from + SLACK && inRect(c2, x, z))) return true;
+  }
+  return false;
+};
+
+/**
+ * A leg that crosses a door or a breach is cut just before it, so the unit is made to check, when it gets there, that the way is open then (a wounded man is
+ * slower than the plan, and the door may have been shut behind the family in the meantime).
+ */
+function splitAtTimed(w: NavWorld, from: Pt, path: Pt[]): Pt[] {
+  const timed: Rect[] = [...w.barriers, ...w.carves];
+  if (!timed.length) return path;
+  const out: Pt[] = [];
+  let a = from;
+  for (const b of path) {
+    const d = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(1, Math.ceil(d / 0.02));
+    let prev = a, cut = false;
+    for (let i = 1; i <= n && !cut; i++) {
+      const q = { x: a.x + (b.x - a.x) * i / n, z: a.z + (b.z - a.z) * i / n };
+      if (!timed.some(r => inRect(r, prev.x, prev.z)) && timed.some(r => inRect(r, q.x, q.z)) && Math.hypot(prev.x - a.x, prev.z - a.z) > 0.03) { out.push({ x: prev.x, z: prev.z }); cut = true; }
+      prev = q;
+    }
+    out.push(b); a = b;
+  }
+  return out;
+}
 
 // ─── the replay ──────────────────────────────────────────────────────────
 
@@ -212,7 +247,7 @@ export function walkBattle(b: Battle, w: NavWorld, o: WalkOpts): WalkResult {
     if (u.machine) return u;
     let { x, z } = u;
     if (o.route && blockedAt(w, x, z, 0)) { const f = nearestFree(w, x, z, 0, 2.5); if (f) { x = r2(f.x); z = r2(f.z); nudged.push(u.id); } }
-    ks.set(u.id, { id: u.id, x, z, tx: x, tz: z, speed: RUN, wound: 0, dead: false, frozen: false, queue: [], fleeing: false, moved: false });
+    ks.set(u.id, { id: u.id, x, z, y: u.y ?? 0, ty: u.y ?? 0, tx: x, tz: z, speed: RUN, wound: 0, dead: false, frozen: false, queue: [], fleeing: false, moved: false });
     return x === u.x && z === u.z ? u : { ...u, x, z };
   });
   const out: BattleEvent[] = [];
@@ -226,16 +261,38 @@ export function walkBattle(b: Battle, w: NavWorld, o: WalkOpts): WalkResult {
   /** Send a unit toward (x, z): straight when that is clear, else through the openings. */
   const lifts: Array<{ e: Extract<BattleEvent, { kind: 'lift' | 'hostage' }>; v: K; c: K; until: number }> = [];
   const pending: Array<{ at: number; k: K; x: number; z: number; kind: 'move' | 'cover' | 'hide'; walk?: boolean; y?: number; how?: string }> = [];
-  const issue = (k: K, t: number, x: number, z: number, kind: 'move' | 'cover' | 'hide', walk: boolean | undefined, y?: number, how?: string) => {
-    k.queue = []; k.heldFor = undefined;
+  const issue = (k: K, t: number, x: number, z: number, kind: 'move' | 'cover' | 'hide', walk: boolean | undefined, y?: number, how?: string, vias?: Pt[]) => {
+    k.queue = []; k.heldFor = undefined; k.settleAt = undefined; k.lastKind = kind; k.ty = kind === 'move' ? (y ?? 0) : 0;
     if (!o.route) { k.tx = x; k.tz = z; if (walk) k.speed = WALK; out.push({ t: r2(t), kind, unit: k.id, x, z, ...(walk ? { walk: true } : {}), ...(y ? { y } : {}), ...(how ? { how } : {}) } as BattleEvent); return; }
     if (walk) k.speed = WALK;
     const speed = k.speed * (k.wound > 0.5 ? WOUND_SLOW : 1);
     let goal: Pt = { x, z };
     const free = nearestFree(w, x, z, t + 0.1, 1.0);
     if (free) goal = free;
+    // two people never stand in the same spot: a goal within a hand of someone else's is moved to the nearest open spot beside it
+    const taken = (p: Pt) => { for (const o2 of ks.values()) { if (o2 === k || o2.dead || o2.carriedBy) continue; const d2 = o2.dest ?? { x: o2.tx, z: o2.tz }; if (Math.hypot(d2.x - p.x, d2.z - p.z) < SEP || (o2.queue.length === 0 && Math.hypot(o2.x - p.x, o2.z - p.z) < SEP)) return true; } return false; };
+    k.dest = goal;
+    if (!(y && y > 0.05) && taken(goal)) {
+      outer: for (let ring = 1; ring <= 8; ring++) for (let j = 0; j < 8 + ring * 3; j++) {
+        const a = (j / (8 + ring * 3)) * Math.PI * 2, c = { x: goal.x + Math.cos(a) * ring * 0.05, z: goal.z + Math.sin(a) * ring * 0.05 };
+        if (!blockedAt(w, c.x, c.z, t + 0.1) && !taken(c)) { goal = c; break outer; }
+      }
+    }
+    k.dest = goal;
     const here = { x: k.x, z: k.z };
-    const path = findPath(w, here, goal, t, speed)?.map(p => ({ x: r2(p.x), z: r2(p.z) })) ?? null;
+    let path: Pt[] | null;
+    if (vias && vias.length) {
+      // up or down a ladder: to its foot first (and down the one he is on before that), then on (the height rides on the last leg only)
+      let cur = here, acc: Pt[] | null = [];
+      for (const v0 of [...vias, goal]) {
+        const v = v0 === goal ? goal : nearestFree(w, v0.x, v0.z, t + 0.1, 0.6) ?? v0;
+        const seg: Pt[] | null = acc ? findPath(w, cur, v, t, speed) : null;
+        if (!seg) { acc = null; break; }
+        acc = [...acc!, ...seg]; cur = seg[seg.length - 1];
+      }
+      path = acc ? acc.map(p => ({ x: r2(p.x), z: r2(p.z) })) : null;
+    } else path = findPath(w, here, goal, t, speed)?.map(p => ({ x: r2(p.x), z: r2(p.z) })) ?? null;
+    if (path) path = splitAtTimed(w, here, path);
     if (!path) {
       // shut doors in the way: wait where he stands until the first one that gives a way opens, then go
       const opens = [...new Set(w.barriers.map(b2 => b2.openAt).filter(a => a > t))].sort((p, q) => p - q);
@@ -253,13 +310,13 @@ export function walkBattle(b: Battle, w: NavWorld, o: WalkOpts): WalkResult {
     if (shutNow(w, here, path[0], t, speed)) {
       k.tx = k.x; k.tz = k.z;
       out.push({ t: r2(t), kind: 'move', unit: k.id, x: r2(k.x), z: r2(k.z) });
-      k.queue = path.map((p, i) => ({ x: p.x, z: p.z, kind: i === path.length - 1 ? kind : 'move' as const, walk, how: i === path.length - 1 ? how : undefined }));
+      k.queue = path.map((p, i) => ({ x: p.x, z: p.z, kind: i === path.length - 1 ? kind : 'move' as const, walk, how: i === path.length - 1 ? how : undefined, ty: i === path.length - 1 && kind === 'move' ? y ?? 0 : 0 }));
       return;
     }
     path.forEach((p, i) => {
       const last = i === path.length - 1;
-      if (i === 0) { k.tx = p.x; k.tz = p.z; out.push({ t: r2(t), kind: last ? kind : 'move', unit: k.id, x: r2(p.x), z: r2(p.z), ...(walk ? { walk: true } : {}), ...(last && y ? { y } : {}), ...(last && how ? { how } : {}) } as BattleEvent); }
-      else k.queue.push({ x: p.x, z: p.z, kind: last ? kind : 'move', walk, how: last ? how : undefined });
+      if (i === 0) { k.tx = p.x; k.tz = p.z; k.ty = last && kind === 'move' ? y ?? 0 : 0; out.push({ t: r2(t), kind: last ? kind : 'move', unit: k.id, x: r2(p.x), z: r2(p.z), ...(walk ? { walk: true } : {}), ...(last && y ? { y } : {}), ...(last && how ? { how } : {}) } as BattleEvent); }
+      else k.queue.push({ x: p.x, z: p.z, kind: last ? kind : 'move', walk, how: last ? how : undefined, ty: last && kind === 'move' ? y ?? 0 : 0 });
     });
   };
 
@@ -281,7 +338,13 @@ export function walkBattle(b: Battle, w: NavWorld, o: WalkOpts): WalkResult {
           let x = e.x, z = e.z;
           if ('near' in e && e.near) { const o2 = ks.get(e.near.unit); if (o2) { x = o2.x + Math.cos(e.near.a) * e.near.r; z = o2.z + Math.sin(e.near.a) * e.near.r; } }
           k.fleeing = false;
-          issue(k, e.t, x, z, e.kind, 'walk' in e ? e.walk : undefined, e.kind === 'move' ? e.y : undefined, e.kind === 'hide' ? e.how : undefined);
+          const own = e.kind === 'move' ? e.via : undefined;
+          const vias: Pt[] = [];
+          if (k.foot && k.y > 0.04) vias.push(k.foot);   // (up a ladder: down it first)
+          if (own) vias.push({ x: r2(own.x), z: r2(own.z) });
+          if (own) k.foot = { x: r2(own.x), z: r2(own.z) };
+          else if (!(e.kind === 'move' && (e.y ?? 0) > 0.05) && k.y <= 0.04) k.foot = undefined;
+          issue(k, e.t, x, z, e.kind, 'walk' in e ? e.walk : undefined, e.kind === 'move' ? e.y : undefined, e.kind === 'hide' ? e.how : undefined, vias);
           break;
         }
         case 'flee': case 'taken': {
@@ -290,7 +353,11 @@ export function walkBattle(b: Battle, w: NavWorld, o: WalkOpts): WalkResult {
           // out through an opening to a point well beyond the walls, then the usual run away
           const dx = k.x - center.x, dz = k.z - center.z, d = Math.hypot(dx, dz) || 1;
           const goal = nearestFree(w, k.x + dx / d * 40, k.z + dz / d * 40, e.t, 6) ?? { x: k.x, z: k.z };
-          const path = findPath(w, { x: k.x, z: k.z }, goal, e.t, RUN)?.map(p => ({ x: r2(p.x), z: r2(p.z) })) ?? null;
+          let path: Pt[] | null;
+          if (k.foot && k.y > 0.04) {
+            const p1 = findPath(w, { x: k.x, z: k.z }, k.foot, e.t, RUN), p2 = p1 ? findPath(w, p1[p1.length - 1], goal, e.t, RUN) : null;
+            path = p1 && p2 ? [...p1, ...p2].map(p => ({ x: r2(p.x), z: r2(p.z) })) : null;
+          } else path = findPath(w, { x: k.x, z: k.z }, goal, e.t, RUN)?.map(p => ({ x: r2(p.x), z: r2(p.z) })) ?? null;
           if (!path || path.length === 1 && Math.hypot(path[0].x - k.x, path[0].z - k.z) < 0.5) { if (!path) unrouted++; out.push(e); k.tx = k.x + dx / d * 60; k.tz = k.z + dz / d * 60; k.speed = FLEE; k.fleeing = true; break; }
           k.queue = path.slice(1).map(p => ({ x: p.x, z: p.z, kind: 'move' as const }));
           k.queue.push({ flee: e });
@@ -298,7 +365,7 @@ export function walkBattle(b: Battle, w: NavWorld, o: WalkOpts): WalkResult {
           out.push({ t: r2(e.t), kind: 'move', unit: k.id, x: r2(path[0].x), z: r2(path[0].z) });
           break;
         }
-        case 'death': if (k) { k.dead = true; k.queue = []; } out.push(e); break;
+        case 'death': if (k) { k.dead = true; k.queue = []; k.y = 0; } out.push(e); break;
         case 'lay': case 'surrender': if (k) { k.tx = k.x; k.tz = k.z; k.queue = []; if (e.kind === 'lay') k.frozen = true; } out.push(e); break;
         case 'hostage': {
           const c = ks.get(e.by), v = ks.get(e.unit);
@@ -339,7 +406,7 @@ export function walkBattle(b: Battle, w: NavWorld, o: WalkOpts): WalkResult {
     }
     for (const k of ks.values()) {
       if (k.dead || k.frozen) continue;
-      const a = { x: k.x, z: k.z };
+      const a = { x: k.x, z: k.z }, ya = k.y;
       if (k.carriedBy) {
         const c = ks.get(k.carriedBy);
         if (c) { k.x = c.x; k.z = c.z; k.tx = k.x; k.tz = k.z; }
@@ -348,18 +415,25 @@ export function walkBattle(b: Battle, w: NavWorld, o: WalkOpts): WalkResult {
         // (the next leg waits while something timed - a door, a breach - still shuts it)
         if (d <= 0.02 && k.queue.length && o.route && !('flee' in k.queue[0]) && shutNow(w, { x: k.x, z: k.z }, k.queue[0] as Pt, t, k.speed * (k.wound > 0.5 ? WOUND_SLOW : 1))) {
           // hold
+        } else if (d <= 0.02 && k.queue.length && o.route && Math.abs(k.y - k.ty) > 0.02) {
+          // (he is still coming down the last rung: the next leg waits until his feet are on the ground)
         } else if (d <= 0.02 && k.queue.length) {
           const nx = k.queue.shift()!;
           if ('flee' in nx) { out.push({ ...nx.flee, t: r2(t) }); const fx = k.x - center.x, fz = k.z - center.z, fd = Math.hypot(fx, fz) || 1; k.tx = k.x + fx / fd * 60; k.tz = k.z + fz / fd * 60; k.speed = FLEE; k.fleeing = true; }
-          else { k.tx = nx.x; k.tz = nx.z; if (nx.walk) k.speed = WALK; out.push({ t: r2(t), kind: nx.kind, unit: k.id, x: r2(nx.x), z: r2(nx.z), ...(nx.walk ? { walk: true } : {}), ...(nx.how ? { how: nx.how } : {}) } as BattleEvent); }
+          else { k.tx = nx.x; k.tz = nx.z; k.ty = nx.ty ?? 0; if (nx.walk) k.speed = WALK; out.push({ t: r2(t), kind: nx.kind, unit: k.id, x: r2(nx.x), z: r2(nx.z), ...(nx.walk ? { walk: true } : {}), ...(nx.ty ? { y: r2(nx.ty) } : {}), ...(nx.how ? { how: nx.how } : {}) } as BattleEvent); }
           dx = k.tx - k.x; dz = k.tz - k.z; d = Math.hypot(dx, dz);
         }
         if (d > 0.02) {
           const step = Math.min(d, k.speed * (k.wound > 0.5 ? WOUND_SLOW : 1) * STEP);
           k.x += dx / d * step; k.z += dz / d * step; k.moved = true;
-        }
+          k.y += (k.ty - k.y) * Math.min(1, step / Math.max(d, d <= 0.3 ? 0.02 : 0.3));   // (the renderer's rule: the height follows the remaining distance, and lands exactly when he arrives)
+        } else k.y += (k.ty - k.y) * Math.min(1, STEP * 4);
       }
-      if (k.x !== a.x || k.z !== a.z) o.onStep?.(k.id, t, a, { x: k.x, z: k.z });
+      if (o.settle && o.route && !k.carriedBy && k.queue.length === 0 && Math.hypot(k.tx - k.x, k.tz - k.z) <= 0.02 && o.settle.ids.has(k.id) && t >= o.settle.from && t <= o.settle.to) {
+        if (k.settleAt === undefined && k.lastKind === 'move') k.settleAt = t + 1.4;
+        else if (k.settleAt !== undefined && t >= k.settleAt) { k.settleAt = undefined; k.lastKind = 'cover'; out.push({ t: r2(t), kind: 'cover', unit: k.id, x: r2(k.x), z: r2(k.z) }); }
+      }
+      if (k.x !== a.x || k.z !== a.z || Math.abs(k.y - ya) > 1e-6) o.onStep?.(k.id, t, a, { x: k.x, z: k.z }, k.y);
     }
   }
   void side;
@@ -368,8 +442,8 @@ export function walkBattle(b: Battle, w: NavWorld, o: WalkOpts): WalkResult {
 }
 
 /** Rewrite a battle so that every leg goes through openings. */
-export function routeBattle(b: Battle, w: NavWorld, center?: Pt): { battle: Battle; unrouted: number; lost: WalkResult['lost']; nudged: string[] } {
-  const r = walkBattle(b, w, { route: true, center });
+export function routeBattle(b: Battle, w: NavWorld, center?: Pt, settle?: WalkOpts['settle']): { battle: Battle; unrouted: number; lost: WalkResult['lost']; nudged: string[] } {
+  const r = walkBattle(b, w, { route: true, center, settle });
   return { battle: { ...b, units: r.units, events: r.events }, unrouted: r.unrouted, lost: r.lost, nudged: r.nudged };
 }
 

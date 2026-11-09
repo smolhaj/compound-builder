@@ -53,7 +53,7 @@ export type BattleEvent =
   /** `masts`: floodlights on towers (sim/towers.ts), aimed at `aim`; absent, the yard lights come on round the house. */
   | { t: number; kind: 'lights'; masts?: Array<{ x: number; z: number; y: number }>; aim?: { x: number; z: number } }
   /** `walk`: at a walking pace (the wake). `near`: go to the point `r` away from another unit's place now, at angle `a` (a body that fell where it fell). */
-  | { t: number; kind: 'move'; unit: string; x: number; z: number; y?: number; walk?: boolean; near?: { unit: string; r: number; a: number } }
+  | { t: number; kind: 'move'; unit: string; x: number; z: number; y?: number; /** Go to this point first (the foot of a ladder), then on to (x, z): the climb (sim/cutLive.ts). */ via?: { x: number; z: number }; walk?: boolean; near?: { unit: string; r: number; a: number } }
   | { t: number; kind: 'shot'; from: string; to: string; hit: boolean; auto?: boolean }
   | { t: number; kind: 'mine'; x: number; z: number; hits: string[] }
   /** A raider hurt getting over the wall (the wire, the thorns, the ditch, the sharpened logs): `what` is what caught him. */
@@ -111,6 +111,11 @@ export type BattleEvent =
    * (x, z) is the doorway and (nx, nz) the way out of the house through it. Closed means nobody passes (sim/cutNav.ts barriers).
    */
   | { t: number; kind: 'house_door'; x: number; z: number; nx: number; nz: number; action: 'open' | 'close' | 'kick' | 'shoot' | 'charge'; ok: boolean; by?: string }
+  /**
+   * A ladder stands from the ground at (fx, fz) up to (x, z) at height `h` (cutscene only): the climbers' prop. Nobody is above the ground except on a real
+   * surface (a roof, a tower, a built deck or fighting step) or on a ladder like this one (sim/standingSurfaces.ts, sim/cutLive.ts `elevateOnProps`).
+   */
+  | { t: number; kind: 'ladder'; x: number; z: number; h: number; fx: number; fz: number }
   /** Goes to ground at (x, z): a closet or the cellar hatch (not drawn until found), a corner, under a bed. */
   | { t: number; kind: 'hide'; unit: string; x: number; z: number; how: 'closet' | 'cellar' | 'corner' | 'under_bed' }
   /** Rooted to the spot, hands to the face. */

@@ -103,7 +103,7 @@ export function planInterior(a: InteriorArgs): InteriorOut | null {
     let walls = 0; for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (!H.free(at.x + dx * 0.08, at.z + dz * 0.08)) walls++;
     const how = shielding ? 'corner' : walls >= 3 ? 'closet' : i % 2 ? 'under_bed' : 'corner';
     const t0 = tI - 3.6 + i * 0.35, p0 = a.pos.get(u.id) ?? u;
-    const arrive = t0 + (near(p0, a.out) + near(a.door, at) + 0.3) / RUN;
+    const arrive = t0 + (near(p0, a.out) + near(a.door, at) + 0.3) / (RUN * (a.hurtT.has(u.id) ? 0.55 : 1)) + 0.4;
     strip.add(u.id);
     // (the router walks the path through the door; the door stands open until the last one is in)
     ev.push({ t: r2(t0), kind: 'hide', unit: u.id, x: r2(at.x), z: r2(at.z), how });
@@ -114,8 +114,8 @@ export function planInterior(a: InteriorArgs): InteriorOut | null {
     const slot = dEntryHold[i % Math.max(1, dEntryHold.length)] ?? nearestInRoom(H, entry, a.door);
     const t0 = tI - 3.0 + i * 0.4, p0 = a.pos.get(u.id) ?? u;
     strip.add(u.id);
-    ev.push({ t: r2(t0), kind: 'move', unit: u.id, x: r2(slot.x), z: r2(slot.z) });
-    inHouse.push({ u, arrive: t0 + (near(p0, a.out) + near(a.door, slot) + 0.3) / RUN });
+    ev.push({ t: r2(t0), kind: 'cover', unit: u.id, x: r2(slot.x), z: r2(slot.z) });   // (they hold from a knee behind the furniture: nobody stands in the open under fire)
+    inHouse.push({ u, arrive: t0 + (near(p0, a.out) + near(a.door, slot) + 0.3) / (RUN * (a.hurtT.has(u.id) ? 0.55 : 1)) + 0.4 });
   });
   const tShut = Math.max(tI - 1.2, ...inHouse.map(x => x.arrive)) + 0.5;
   if (lead) say(tI - 3.2, 'defender', 'breach', lead);
@@ -209,7 +209,7 @@ export function planInterior(a: InteriorArgs): InteriorOut | null {
       crew.slice(0, 6).forEach((u, i) => {
         const hit = hurtRaider.get(u.id);
         if (hit !== undefined && hit >= sk - 1 && hit <= sk + stageLen) ev.push({ t: r2(Math.max(sk, hit - 1.1)), kind: 'move', unit: u.id, x: r2(dk.at.x + dk.pass.x * (Math.sign((rc.x - dk.at.x) * dk.pass.x + (rc.z - dk.at.z) * dk.pass.z) || 1) * 0.06), z: r2(dk.at.z + dk.pass.z * (Math.sign((rc.x - dk.at.x) * dk.pass.x + (rc.z - dk.at.z) * dk.pass.z) || 1) * 0.06) });
-        else ev.push({ t: r2(sk + 0.2 + i * 0.28), kind: 'move', unit: u.id, x: r2(cell(room, i, 6).x), z: r2(cell(room, i, 6).z) });
+        else ev.push({ t: r2(sk + 0.2 + i * 0.4), kind: 'cover', unit: u.id, x: r2(cell(room, i, 6).x), z: r2(cell(room, i, 6).z) });   // (one at a time through the door, then down behind whatever is there)
       });
       say(sk + 0.2, 'raider', 'funnel', insideCrew[0]);
       say(sk + 0.8, 'defender', 'funnel', holders[0]);

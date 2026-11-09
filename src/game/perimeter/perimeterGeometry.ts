@@ -16,6 +16,8 @@ import { boreParts } from './boreGeometry';
 import { WALL_TOP } from '../../sim/wallTops';
 import { hashStr } from '../buildkit/clutter';
 import { KIT, driveCrossing, gateKitLayout } from './gateKitLayout';
+import { STEP_FAR, STEP_NEAR, stepSide } from '../../sim/standingSurfaces';
+import { FIRING_STEP, stepHeight } from '../../sim/lineOfFire';
 import { PERIMETER, RAZOR, isContainerKind, footingOf, hasSkirt, runGrowth, runProgress, wallLength, type PerimeterKind, type PerimeterRun, type Pt } from '../../sim/perimeter';
 
 const M = 1 / 6;
@@ -142,6 +144,24 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
   };
   const spanEnds = () => spans.flatMap(([a, b]) => [along(run.pts, a), along(run.pts, b)]);
 
+  /**
+   * The fighting step behind a palisade, a stone wall or a container wall (sim/standingSurfaces.ts): where the battle sim puts a defender up so a rifle clears
+   * the wall, so it is drawn. A plank platform on posts (a stone wall gets a solid ledge of fieldstone), on the inside, a little over a meter wide.
+   */
+  const drawStep = () => {
+    const side = stepSide(run.pts), y = stepHeight(run.kind, def.height);
+    if (y <= 0) return;
+    const mid = (STEP_NEAR + STEP_FAR) / 2, w = STEP_FAR - STEP_NEAR;
+    bays(1.2, (a, b) => {
+      const pa = { x: a.x - a.dz * side * mid, z: a.z + a.dx * side * mid }, pb = { x: b.x - b.dz * side * mid, z: b.z + b.dx * side * mid };
+      if (run.kind === 'stone_wall') { beam(pa.x, pa.z, pb.x, pb.z, 0, y, w, 'fieldstone'); return; }
+      beam(pa.x, pa.z, pb.x, pb.z, y - 0.03, 0.03, w, 'wood_mid');
+      // posts under the planks at the front edge, and a rail along it
+      const fx = (p: typeof pa, q: { dz: number }) => p.x - q.dz * side * (w / 2 - 0.015), fz = (p: typeof pa, q: { dx: number }) => p.z + q.dx * side * (w / 2 - 0.015);
+      post(fx(pa, a), fz(pa, a), y - 0.03, 0.012, 'wood_dark');
+      post(fx(pb, b), fz(pb, b), y - 0.03, 0.012, 'wood_dark');
+    });
+  };
   switch (run.kind) {
     case 'split_rail':
       bays(2.4 * M, (a, b) => {
@@ -1000,6 +1020,7 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       else leaf(p0.x, p0.z, g.w * 0.96, openFor(outYaw, ang, 1.35, 1), 1);
     }
   }
+  if (FIRING_STEP.has(run.kind as never)) drawStep();
 
   const group = new THREE.Group();
   for (const [m, list] of bits) {

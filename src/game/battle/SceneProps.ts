@@ -5,6 +5,7 @@
  * Scale: 1 unit = 6 m; a door is 0.17 wide and 0.37 tall.
  */
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { BattleEvent } from '../../sim/battleTypes';
 
 export interface PropHooks {
@@ -15,7 +16,7 @@ export interface PropHooks {
 }
 export interface UnitAt { x: number; y: number; z: number; rot: number; dead: boolean; gone: boolean }
 
-const MAX_PACKS = 12, MAX_FIRES = 4;
+const MAX_PACKS = 12, MAX_FIRES = 4, MAX_LADDERS = 10;
 const DOOR_W = 0.17, DOOR_H = 0.37;
 /** What a pack looks like by item (colors only: one box shape). */
 const ITEM_COLOR: Record<string, number> = { food: 0x8a6a3a, canned: 0x7a5a2c, fuel: 0xa8321e, meds: 0xd9d9d0, ammo: 0x3d4a2a, tools: 0x555a60, guns: 0x222426, radio: 0x2c3a44, bedding: 0x6a5a7a, default: 0x6a5238 };
@@ -31,6 +32,8 @@ export class SceneProps {
   private _packs: THREE.InstancedMesh | null = null;
   private _packOf: Array<{ unit: string; color: number }> = [];
   private _fires: Fire[] = [];
+  private _ladders: { x: number; z: number; h: number; fx: number; fz: number }[] = [];
+  private _ladderMesh: THREE.InstancedMesh | null = null;
   private readonly _m = new THREE.Matrix4();
   private readonly _q = new THREE.Quaternion();
   private readonly _e = new THREE.Euler();
@@ -42,11 +45,13 @@ export class SceneProps {
   constructor(group: THREE.Group, hooks: PropHooks) { this._group = group; this._h = hooks; }
 
   /** Counts for the leak test. */
-  get live(): { door: boolean; packs: number; fires: number } { return { door: !!this._door, packs: this._packOf.length, fires: this._fires.length }; }
+  get live(): { door: boolean; packs: number; fires: number; ladders: number } { return { door: !!this._door, packs: this._packOf.length, fires: this._fires.length, ladders: this._ladders.length }; }
 
   end(): void {
     if (this._door) this._group.remove(this._door.pivot);
     if (this._packs) this._group.remove(this._packs);
+    if (this._ladderMesh) this._group.remove(this._ladderMesh);
+    this._ladderMesh = null; this._ladders = [];
     this._door = null; this._packs = null; this._packOf = []; this._fires = [];
     for (const g of this._geo) g.dispose();
     for (const m of this._mat) m.dispose();
@@ -55,12 +60,39 @@ export class SceneProps {
 
   onEvent(e: BattleEvent): void {
     if (e.kind === 'house_door') this._doorEvent(e);
+    else if (e.kind === 'ladder') this._addLadder(e);
     else if (e.kind === 'loot') {
       if (this._packOf.length < MAX_PACKS && !this._packOf.some(p => p.unit === e.by)) this._packOf.push({ unit: e.by, color: itemColor(lootKind(e.what)) });
       this._ensurePacks();
     } else if (e.kind === 'fire') {
       if (this._fires.length < MAX_FIRES) this._fires.push({ x: e.x, z: e.z, big: true, age: 0, acc: 0 });
     }
+  }
+
+  /** One instanced mesh for every ladder of the scene (two rails and six rungs, stretched to length). */
+  private _addLadder(e: Extract<BattleEvent, { kind: 'ladder' }>): void {
+    if (this._ladders.length >= MAX_LADDERS || this._ladders.some(l => Math.hypot(l.x - e.x, l.z - e.z) < 0.05 && Math.hypot(l.fx - e.fx, l.fz - e.fz) < 0.05)) return;
+    if (!this._ladderMesh) {
+      const parts: THREE.BufferGeometry[] = [];
+      for (const sx of [-0.028, 0.028]) parts.push(new THREE.BoxGeometry(0.014, 1, 0.014).translate(sx, 0.5, 0));
+      for (let i = 0; i < 7; i++) parts.push(new THREE.BoxGeometry(0.06, 0.012, 0.012).translate(0, 0.07 + i * 0.14, 0));
+      const geo = mergeGeometries(parts)!;
+      for (const p of parts) p.dispose();
+      const mat = new THREE.MeshStandardMaterial({ color: 0x6b4d2c, roughness: 0.9 });
+      this._geo.push(geo); this._mat.push(mat);
+      this._ladderMesh = new THREE.InstancedMesh(geo, mat, MAX_LADDERS);
+      this._ladderMesh.count = 0; this._ladderMesh.frustumCulled = false; this._ladderMesh.userData = { noSSAO: true };
+      this._group.add(this._ladderMesh);
+    }
+    this._ladders.push({ x: e.x, z: e.z, h: e.h, fx: e.fx, fz: e.fz });
+    const h = this._h, m = this._ladderMesh;
+    const top = new THREE.Vector3(e.x, h.ground(e.x, e.z) + e.h, e.z), foot = new THREE.Vector3(e.fx, h.ground(e.fx, e.fz), e.fz);
+    const d = top.clone().sub(foot), L = d.length(), y = d.clone().normalize();
+    const hz = new THREE.Vector3(d.x, 0, d.z).normalize(), x = new THREE.Vector3(-hz.z, 0, hz.x), z = new THREE.Vector3().crossVectors(x, y).normalize();
+    this._m.makeBasis(x, y.clone().multiplyScalar(L), z).setPosition(foot);
+    m.setMatrixAt(this._ladders.length - 1, this._m);
+    m.count = this._ladders.length;
+    m.instanceMatrix.needsUpdate = true;
   }
 
   private _ensurePacks(): void {
