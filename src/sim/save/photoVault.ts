@@ -71,6 +71,9 @@ export async function syncVault(keep: readonly string[]): Promise<void> {
   bump();
 }
 
+/** QA / tests: forget the in-memory copies (the disk keeps them) so a reload from IndexedDB can be checked. */
+export function forgetMemory(): void { mem.clear(); bump(); }
+
 /** The pixels of the named photos, for a JSON export. */
 export function exportVault(ids: readonly string[]): Record<string, string> {
   const out: Record<string, string> = {};
