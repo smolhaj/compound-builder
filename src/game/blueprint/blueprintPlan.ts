@@ -16,6 +16,7 @@ import { sensorSightM, fogReadout } from '../../sim/fog';
 import { SALLY } from '../../sim/rings';
 import type { GameState } from '../../sim/state';
 import { lengthText } from '../../sim/units';
+import { radiationKnown, radiationSub, radiationSummary, shelterRows, type RadTone } from '../../sim/shelterView';
 
 export type MarkCat = 'home' | 'work' | 'food' | 'water' | 'power' | 'bunker' | 'tower' | 'gate' | 'ring' | 'tunnel' | 'bridge' | 'wall';
 
@@ -27,6 +28,8 @@ export interface BpMark {
   /** The name (short), and one line under it (role / state). */
   label: string;
   sub?: string;
+  /** Radiation view (nuclear run, warning out): colors the sub line by the dose a shelter here allows. */
+  tone?: RadTone;
   /** Higher wins when labels crowd. */
   prio: number;
   /** Lift above the ground, world units, so a label floats clear of the roof. */
@@ -58,6 +61,8 @@ export interface BpReadout {
   /** How far each sensor sees in today's fog (m). */
   sight: { eye: number; camera: number; nvg: number; thermal: number };
   fogLabel: string;
+  /** Nuclear run with the warning out: the shelter summary line (sim/radiation.ts). */
+  radiation?: string;
 }
 
 export interface BlueprintPlan { marks: BpMark[]; outlines: BpOutline[]; readout: BpReadout }
@@ -85,6 +90,7 @@ const TUNNEL_NAME: Record<string, string> = { rock_tunnel: 'Rock tunnel', tunnel
 export function blueprintPlan(s: GameState): BlueprintPlan {
   const marks: BpMark[] = [], outlines: BpOutline[] = [];
   let towerNo = 0;
+  const rad = radiationKnown(s) ? new Map(shelterRows(s).map(r => [r.id, r])) : null;
 
   // buildings
   for (const st of s.structures) {
@@ -101,7 +107,8 @@ export function blueprintPlan(s: GameState): BlueprintPlan {
     const fp = footprint(def, st.x, st.z, st.rot, false);
     outlines.push({ id: st.id, cat, pts: corners(fp), closed: true, under: def.level === 'underground' });
     const role = def.sleeps > 0 ? `sleeps ${def.sleeps}` : def.shelters ? `shelters ${def.shelters}` : def.category === 'defense' ? 'defense and vehicles' : def.category === 'work' ? 'work' : def.category;
-    marks.push({ id: st.id, cat: def.level === 'underground' ? 'bunker' : cat, x: st.x, z: st.z, label: def.name, sub: isFinished(st) ? role : 'being built', prio: PRIO[cat] + (def.sleeps > 0 ? 1 : 0), lift: 1.2 });
+    const rr = rad?.get(st.id);
+    marks.push({ id: st.id, cat: def.level === 'underground' ? 'bunker' : cat, x: st.x, z: st.z, label: def.name, sub: rr ? `${role} · ${radiationSub(rr)}` : isFinished(st) ? role : 'being built', tone: rr?.tone, prio: PRIO[cat] + (def.sleeps > 0 ? 1 : 0), lift: 1.2 });
   }
 
   // rings, gates, tunnels, bridges, long walls
@@ -149,7 +156,7 @@ export function blueprintPlan(s: GameState): BlueprintPlan {
     marks, outlines,
     readout: {
       score: rep.score, label: rep.label, barrierPct: Math.round(rep.barrier), detectionPct: Math.round(rep.detection), rings: rings.length, gates, towers,
-      lanes: lanes.length, laneHardness: hardness === null ? null : Math.round(hardness * 10) / 10, chokeHeld: td.held, terrainScore: Math.round(td.score * 100), sight, fogLabel: fogReadout(fog),
+      lanes: lanes.length, laneHardness: hardness === null ? null : Math.round(hardness * 10) / 10, chokeHeld: td.held, terrainScore: Math.round(td.score * 100), sight, fogLabel: fogReadout(fog), radiation: rad ? radiationSummary(s) : undefined,
     },
   };
 }

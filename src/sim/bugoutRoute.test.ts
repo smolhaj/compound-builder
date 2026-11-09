@@ -111,3 +111,13 @@ describe('bug-out plan: bags, cache and on foot', () => {
     expect(g.stats.bugOut!.going).toBe(n - 1);
   });
 });
+
+describe('helicopter charter from the pad', () => {
+  it('adds three seats and a bill only with a pad, a working county and the cash', async () => {
+    const { CHARTER, charterSeats } = await import('./outposts');
+    const g = ready();
+    expect(charterSeats(g)).toBe(0);
+    expect(bugOutPlan(g).air).toBe(0);
+    expect(CHARTER.usd).toBe(2400);
+  });
+});

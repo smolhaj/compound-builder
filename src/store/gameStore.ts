@@ -49,6 +49,8 @@ import { addRazor } from '../sim/razor';
 import { addElectric, addBackup, trimAll, trimRun } from '../sim/wallTops';
 import { cancelResponse, subscribe as subscribeResponse } from '../sim/armedResponse';
 import { foundWatch, leaveWatch } from '../sim/watch';
+import { answerHail, buildBlock, hailPass, removeBlock, setBlockPolicy, type BlockKind, type BlockPolicy, type HailAnswer } from '../sim/roadPassers';
+import { prepare, type PrepKind } from '../sim/roadWarn';
 import { layPaths, pickUpPath, type LaidKind, type LayEdge } from '../sim/paths';
 import { compoundRegion, layFortress, planFortress, type FortressOptions } from '../sim/fortress';
 import type { RingShape } from '../sim/ringShape';
@@ -216,6 +218,12 @@ export interface GameStore {
   subscribeArmedResponse: () => string | null;
   cancelArmedResponse: () => string | null;
   foundRoadWatch: () => string | null;
+  prepareForVisitors: (kind: PrepKind) => string | null;
+  hailPasser: (id: string) => string | null;
+  answerRoadHail: (how: HailAnswer) => string | null;
+  buildRoadBlock: (kind: BlockKind) => string | null;
+  setRoadBlockPolicy: (p: BlockPolicy) => string | null;
+  removeRoadBlock: () => string | null;
   leaveRoadWatch: () => string | null;
   /** Fit an electric fence on outriggers along a finished wall (sim/wallTops.ts); `backup` adds the sealed battery. */
   addElectric: (id: string, backup: boolean) => string | null;
@@ -614,6 +622,12 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   },
   subscribeArmedResponse: () => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = subscribeResponse(g); if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); } return why; },
   cancelArmedResponse: () => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = cancelResponse(g); if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); } return why; },
+  prepareForVisitors: (kind: PrepKind) => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = prepare(g, kind); if (!why) set({ game: g }); return why; },
+  hailPasser: (id: string) => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = hailPass(g, id); if (!why) set({ game: g }); return why; },
+  answerRoadHail: (how: HailAnswer) => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = answerHail(g, how); if (!why) set({ game: g }); return why; },
+  buildRoadBlock: (kind: BlockKind) => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = buildBlock(g, kind); if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); } return why; },
+  setRoadBlockPolicy: (p: BlockPolicy) => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = setBlockPolicy(g, p); if (!why) set({ game: g }); return why; },
+  removeRoadBlock: () => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = removeBlock(g); if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); } return why; },
   foundRoadWatch: () => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = foundWatch(g); if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); } return why; },
   leaveRoadWatch: () => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = leaveWatch(g); if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); } return why; },
   addElectric: (id, backup) => {
