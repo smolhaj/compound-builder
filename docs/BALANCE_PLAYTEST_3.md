@@ -16,9 +16,9 @@ Scripted bots (`scripts/playtest.test.ts`), seeds fixed by table position. "Befo
 
 No outcome changed in any row (ending, grade, alive, lost-to are identical row by row): the sinks cost money and give morale, nothing else.
 
-Where the county is still up, the sinks bite. Rows that moved (end cash, before to after): drought/idle $187k to $94k, drought/homestead $167k to $116k, drought/fortress $339k to $170k, grid_down/prepper $736k to $722k, pandemic/fortress $638k to $613k, ash_winter/homestead $489k to $480k, financial/homestead $925k to $911k.
+Only 9 of 36 rows moved at all (the county, banks and stores were up for some of the horizon). End cash, before to after: drought/idle $187k to $94k, drought/homestead $167k to $116k, drought/fortress $339k to $170k, grid_down/prepper $736k to $722k, pandemic/fortress $638k to $613k, pandemic/prepper $306k to $301k, ash_winter/homestead $489k to $480k, financial/homestead $925k to $911k, solar_flare/homestead $426,748 to $426,680.
 
-**Finding: most Cozy cash is idle after the collapse, and no peacetime sink can reach it.** In 25 of 36 rows the world falls and the county, banks and stores stay down for the rest of the horizon, so the property tax, the insurance and the comfort tier (all paid only while those services run) do nothing there; the 1M+ rows are all of that kind (grid_down/idle $1.02M, zombies/idle $1.13M, financial/homestead $0.91M). Post-collapse cash only spends at the black market, in barter and on the richSinks goods; the bots do not buy those. See the design questions in the PR.
+**Finding: most Cozy cash is idle after the collapse, and no peacetime sink can reach it.** In the other 27 rows the county, banks and stores are down for the rest of the horizon, so the property tax, the insurance and the comfort tier (all paid only while those services run) do nothing; both $1M+ rows (grid_down/idle $1.02M, zombies/idle $1.13M) are of that kind. Post-collapse cash only spends at the black market, in barter and on the richSinks goods, and the bots do not buy those. See the design questions in the PR.
 
 ## 2. Standard and Hardcore are unchanged
 
