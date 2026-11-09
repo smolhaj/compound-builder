@@ -152,3 +152,14 @@ describe('priced and staged', () => {
     expect(MATERIALS.jon_boat.price).toBe(1300); expect(MATERIALS.skiff.price).toBe(9800);
   });
 });
+
+describe('dock intake and charter (infra gaps)', () => {
+  it('a dock on open water pumps irrigation, none when iced or without water', async () => {
+    const { lakeIntakeL, INTAKE_LPD } = await import('./waterfront');
+    const g = lake('bluff');
+    built(g, 'd', 'boat_dock', 10, 10);
+    const v = lakeIntakeL(g);
+    expect(v === 0 || v === INTAKE_LPD.boat_dock).toBe(true);
+    expect(lakeIntakeL(lake('hillside'))).toBe(0);
+  });
+});
