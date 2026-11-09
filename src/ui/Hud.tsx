@@ -1,3 +1,4 @@
+import { interrogationScene, raiderFace, type Exchange, type Face } from '../sim/aftermathScenes';
 import { MAX_QUESTIONS, QUESTIONS, QUESTION_NAME, type Question } from '../sim/interrogation';
 import { flowLine } from '../sim/flow';
 import { PlansOrderButton } from './hud/SpendConfirm';
@@ -585,7 +586,7 @@ export function Hud() {
               {game.gate.prisoners!.map(p => (
                 <div key={p.id} style={{ marginBottom: 6 }}>
                   <Row label={p.name} value={`${pluralize(Math.floor(game.clock.t) - p.since, 'day')}`} title={`Wound ${Math.round(p.sev)} · trust ${Math.round(p.trust)}${p.talked ? ' · has talked' : ''}`} />
-                  <Questioning id={p.id} asked={p.asked ?? []} hurt={!!p.hurtTwice} />
+                  <Questioning id={p.id} name={p.name} asked={p.asked ?? []} hurt={!!p.hurtTwice} />
                   <div style={{ display: 'flex', gap: 6 }}>
                     <button style={{ ...btn(), flex: 1 }} onClick={() => g.releasePrisoner(p.id)}>Let him go</button>
                     <button style={{ ...btn(), flex: 1, opacity: canJoin(game, p) ? 1 : 0.4 }} disabled={!canJoin(game, p)} title="After a month, healed, and once he trusts you (70+)" onClick={() => g.joinPrisoner(p.id)}>Let him join</button>
@@ -838,17 +839,39 @@ function Chronicle() {
   </>;
 }
 
+/** A drawn face for the man in the cellar (sim/aftermathScenes.ts `raiderFace`): the same man always looks the same. */
+function RaiderFace({ face }: { face: Face }) {
+  const hex = (n: number) => '#' + n.toString(16).padStart(6, '0');
+  return <svg width="44" height="52" viewBox="0 0 44 52" aria-label="prisoner's face" style={{ flex: 'none', borderRadius: 4, background: '#2a2622' }}>
+    <ellipse cx="22" cy="28" rx="12" ry="15" fill={hex(face.skin)} />
+    <path d="M9 24 Q22 2 35 24 Q30 14 22 14 Q14 14 9 24Z" fill={hex(face.hair)} />
+    {face.beard && <path d="M11 32 Q22 52 33 32 Q22 40 11 32Z" fill={hex(face.hair)} opacity="0.85" />}
+    <circle cx="17" cy="27" r="1.8" fill={hex(face.eyes)} /><circle cx="27" cy="27" r="1.8" fill={hex(face.eyes)} />
+    <path d="M18 38 Q22 36 26 38" stroke="#4a2a22" strokeWidth="1.2" fill="none" />
+    {face.scar && <path d="M13 20 L19 33" stroke="#8a4a40" strokeWidth="1.2" />}
+  </svg>;
+}
+
 /** Questioning a prisoner (sim/interrogation.ts): three questions, kindly or harshly. The answer shows under the buttons and is in the log. */
-function Questioning({ id, asked, hurt }: { id: string; asked: readonly Question[]; hurt: boolean }) {
+function Questioning({ id, name, asked, hurt }: { id: string; name: string; asked: readonly Question[]; hurt: boolean }) {
   const ask = useGameStore(s => s.askPrisoner);
   const [harsh, setHarsh] = useState(false);
-  const [said, setSaid] = useState<string[]>([]);
-  if (asked.length >= MAX_QUESTIONS || hurt) return said.length ? <div style={{ fontSize: 11.5, opacity: 0.8, margin: '3px 0' }}>{said.join(' ')}</div> : null;
+  const [talk, setTalk] = useState<Exchange[]>([]);
+  const face = raiderFace(name, 7);
+  const transcript = talk.length > 0 && <div data-testid={`conversation-${id}`} style={{ display: 'flex', gap: 8, margin: '4px 0', alignItems: 'flex-start' }}>
+    <RaiderFace face={face} />
+    <div style={{ flex: 1, fontSize: 11.5 }}>
+      {talk.map((x, i) => <div key={i} style={{ margin: '2px 0', textAlign: x.who === 'you' ? 'right' : 'left', opacity: x.who === 'you' ? 0.75 : 0.95, fontStyle: x.who === 'you' ? 'italic' : undefined }}>{x.who === 'you' ? 'You: ' : name.split(' ')[0] + ': '}{x.text}</div>)}
+    </div>
+  </div>;
+  const say = (q: Question) => { const lines = ask(id, q, harsh ? 'harsh' : 'kind'); setTalk(t => [...t, ...interrogationScene(name, q, harsh ? 'harsh' : 'kind', { ok: !lines.some(l => /said nothing|nothing more|no such|already/.test(l)), lines }, t.length + id.length)]); };
+  if (asked.length >= MAX_QUESTIONS || hurt) return talk.length ? <div style={{ margin: '3px 0' }}>{transcript}</div> : null;
   return <div style={{ margin: '3px 0' }} data-testid={`questioning-${id}`}>
     <div style={{ display: 'flex', gap: 4, marginBottom: 3 }}>
-      {QUESTIONS.map(q => <button key={q} style={{ ...btn(), flex: 1, fontSize: 11, opacity: asked.includes(q) ? 0.4 : 1 }} disabled={asked.includes(q)} title={harsh ? 'Harsh: he talks more, half of it is what you want to hear. Humanity -4.' : 'Kind: he talks less, and it is true. Humanity +1.'} onClick={() => setSaid(ask(id, q, harsh ? 'harsh' : 'kind'))}>{QUESTION_NAME[q]}</button>)}
+      {QUESTIONS.map(q => <button key={q} style={{ ...btn(), flex: 1, fontSize: 11, opacity: asked.includes(q) ? 0.4 : 1 }} disabled={asked.includes(q)} title={harsh ? 'Harsh: he talks more, half of it is what you want to hear. Humanity -4.' : 'Kind: he talks less, and it is true. Humanity +1.'} onClick={() => say(q)}>{QUESTION_NAME[q]}</button>)}
     </div>
     <label style={{ fontSize: 11, opacity: 0.8 }}><input type="checkbox" checked={harsh} onChange={e => setHarsh(e.target.checked)} /> Harsh (rope and cold): more answers, less true, -4 humanity</label>
-    {said.length > 0 && <div style={{ fontSize: 11.5, opacity: 0.85, marginTop: 3 }}>{said.join(' ')}</div>}
+    {transcript}
+    <div style={{ fontSize: 10.5, opacity: 0.65, marginTop: 2 }}>{face.story}</div>
   </div>;
 }

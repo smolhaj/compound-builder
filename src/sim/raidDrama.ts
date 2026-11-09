@@ -17,6 +17,7 @@ import type { GameState } from './state';
 import type { Person } from './family';
 import type { RaiderTemper } from './battle';
 import type { CrewStyle } from './raiderKinds';
+import { burialBeats, cleanupBeats, traumaBeats } from './aftermathScenes';
 import { LineDirector, prisonerVariants, type Role } from './raidDialogue';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -258,6 +259,23 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
       caption(ar + 5, 'What happens to him is the family\'s call.');
       end = Math.max(end, ar + 6.5);
     }
+  }
+  // 6. burial and mourning, the cleanup, and the ones who are still shaking (sim/aftermathScenes.ts): spoken and captioned, at the end of the wake
+  {
+    const nameOfUnit = (u: BattleUnit) => inp.after.people.find(p => p.id === u.personId)?.first ?? 'Someone';
+    const seed = inp.seed;
+    const bury = burialBeats({ name: victim.name, age: victim.age, kid: victim.kid, elder: victim.elder, seed, mourners: order.slice(0, 4).map(m => ({ id: m.id, name: nameOfUnit(m), kid: !!m.civilian && !!inp.after.people.find(p => p.id === m.personId)?.kid, kin: m === kin })) });
+    const B0 = end + 0.8;
+    for (const l of bury) { if (l.kind === 'say') say(B0 + l.dt, l.text, l.who, 'grief'); else caption(B0 + l.dt, l.text); }
+    let T2 = B0 + (bury[bury.length - 1]?.dt ?? 0) + 3.2;
+    const rooms = b.events.some(e => e.kind === 'breach');
+    const fires = b.events.filter(e => e.kind === 'fire').length;
+    for (const l of cleanupBeats({ breached: rooms, fires, blood: true }, seed)) caption(T2 + l.dt, l.text);
+    T2 += 3.2 * Math.max(1, 1 + Number(rooms) + Number(fires > 0)) + 0.4;
+    const shaken = living.filter(u => !u.civilian).map(u => ({ id: u.id, name: nameOfUnit(u), trauma: (inp.after.personState[inp.after.people.findIndex(p => p.id === u.personId)] as { trauma?: number } | undefined)?.trauma ?? 0 }));
+    const tb = traumaBeats(shaken, seed);
+    for (const l of tb) { caption(T2 + l.dt, l.text); events.push({ t: r2(T2 + l.dt), kind: 'panic', unit: l.who!, how: 'freeze', secs: 2.4, kin: false }); }
+    end = Math.max(end, T2 + (tb.length ? tb[tb.length - 1].dt + 3 : 0));
   }
   // the end of the scene moves to the end of the wake
   const wake = r2(end - W0 + 1);
