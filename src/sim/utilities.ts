@@ -16,7 +16,7 @@ import { pumpDrawFactor, sunFactor } from './terrainFx';
 import { orchardWaterL } from './orchard';
 import { solarFogK } from './fogFx';
 import { SPRING_LPD } from './site';
-import { toteStorage, waterPrice } from './water';
+import { handPumpHours, handPumpLph, handPumpReady, toteStorage, waterPrice } from './water';
 import { sound } from './improvements';
 
 import { log } from './economy';
@@ -149,10 +149,12 @@ export interface UtilityReport {
   /** From the grid, and what it cost; loads cut for want of power (building ids). */
   gridKwh: number; billUsd: number; shed: string[];
   waterL: number; useL: number; shortL: number; storedL: number;
+  /** Pumped by hand from the drilled well today (L), and the hours it took (sim/water.ts). */
+  handL?: number; handH?: number;
 }
 
 export function emptyUtilities(): Utilities {
-  return { fittings: [], batteryKwh: 0, batteryFade: 0, storedL: 0, fuelL: 0, broken: [], fried: [], grid: false, off: [], lit: [], lastDay: -1, report: { solarKwh: 0, drawKwh: 0, genKwh: 0, shortKwh: 0, batteryPct: 0, gridKwh: 0, billUsd: 0, shed: [], waterL: 0, useL: 0, shortL: 0, storedL: 0 } };
+  return { fittings: [], batteryKwh: 0, batteryFade: 0, storedL: 0, fuelL: 0, broken: [], fried: [], grid: false, off: [], lit: [], lastDay: -1, report: { solarKwh: 0, drawKwh: 0, genKwh: 0, shortKwh: 0, batteryPct: 0, gridKwh: 0, billUsd: 0, shed: [], waterL: 0, useL: 0, shortL: 0, storedL: 0, handL: 0, handH: 0 } };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -511,6 +513,14 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   const fromPond = Math.min(u.pondL ?? 0, gardenUse + orchardUse);
   u.pondL = (u.pondL ?? 0) - fromPond;
   const use = people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (gardenUse + orchardUse - fromPond) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0);
+  // no power for the well pump (or it's dead): the hand pump down the same casing, as much as the day needs and arms allow
+  let handL = 0, handH = 0;
+  if (supply < use && handPumpReady(s)) {
+    const lph = handPumpLph(s.site.gwDepth) * wellYield(s, 'well_drilled');
+    handL = Math.min(use - supply, lph * handPumpHours(s));
+    handH = lph > 0 ? handL / lph : 0;
+    supply += handL;
+  }
   u.storedL = Math.max(0, Math.min(store, u.storedL + rainL));
   let left = supply - use, shortL = 0;
   if (left < 0) { const take = Math.min(-left, u.storedL); u.storedL -= take; left += take; }
@@ -526,7 +536,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     else { shortL = -left; log(s, `Water ran short by ${gallonsText(shortL)}.`); }
   }
   const nameplate = fin.reduce((a, st) => a + (u.fried.includes(st.id) ? 0 : UTILITY[st.kind]?.solarKw ?? 0), 0);
-  u.report = { hydroKwh: renew.hydroKwh, windKwh: renew.windKwh, exportKwh: exported, creditUsd: credit, wastedKwh: wasted, solarKw: nameplate, storedKwh: u.batteryKwh, capKwh, solarKwh: solar, drawKwh: draw, genKwh: gen, shortKwh: short, batteryPct: capKwh > 0 ? u.batteryKwh / capKwh : 0, gridKwh, billUsd: bill, shed, waterL: supply + Math.max(0, rainL), useL: use, shortL, storedL: u.storedL };
+  u.report = { hydroKwh: renew.hydroKwh, windKwh: renew.windKwh, exportKwh: exported, creditUsd: credit, wastedKwh: wasted, solarKw: nameplate, storedKwh: u.batteryKwh, capKwh, solarKwh: solar, drawKwh: draw, genKwh: gen, shortKwh: short, batteryPct: capKwh > 0 ? u.batteryKwh / capKwh : 0, gridKwh, billUsd: bill, shed, waterL: supply + Math.max(0, rainL), useL: use, shortL, storedL: u.storedL, handL, handH };
   u.lastDay = dayIndex(s.clock.t);
 }
 

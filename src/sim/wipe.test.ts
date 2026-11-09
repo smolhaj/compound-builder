@@ -104,7 +104,7 @@ describe('the wipe ending: nobody alive on the property', () => {
     expect(r.date).toBe(`Day ${g.stats.days} after grid-down`);
     expect(g.stats.hungryDays).toBeGreaterThan(0);
     expect(r.lines.join(' ')).toMatch(new RegExp(`${g.stats.hungryDays} hungry days`));
-    expect(w.roll.every(x => x.cause === 'starvation' || x.cause === 'wild animal' || x.cause === 'radiation')).toBe(true);
+    expect(w.roll.every(x => x.cause === 'starvation' || x.cause === 'wild animal' || x.cause === 'radiation' || x.cause === 'cold')).toBe(true);
     expect(w.roll.every(x => x.day <= g.ending!.day)).toBe(true);
   }, 120_000);
 
