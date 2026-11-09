@@ -86,3 +86,18 @@ describe('house rules', () => {
     expect(voters(s).length).toBe(before - 1);
   });
 });
+
+describe('house rules in a live run', () => {
+  it('a hamlet under every rule plays on without NaN, and the rota raises the watch', async () => {
+    const { step } = await import('./engine');
+    const { postureOf } = await import('./encounters');
+    let s = hamlet(14, 5);
+    const calm = postureOf(s).detection;
+    const R = rulesOf(s);
+    R.adopted = { rations: 'tight', watch: 'rota', admission: 'kin' };
+    expect(postureOf(s).detection).toBeGreaterThan(calm);
+    s = step(s, 40);
+    for (const ps of s.personState) { expect(Number.isFinite(ps.needs.morale)).toBe(true); expect(Number.isFinite(ps.needs.hunger)).toBe(true); }
+    expect(Number.isFinite(s.money)).toBe(true);
+  });
+});

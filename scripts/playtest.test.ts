@@ -6,7 +6,7 @@
  *   PLAYTEST=1 npx vitest run scripts/playtest.test.ts
  * Report: playtest-report.md (repo root).
  * Default: each run stops at its first ending, about 400 days after the hit (the year-one measure). YEARS=6 plays on to about three years
- * after the hit (the horizon the Hardcore prepper target is measured at; docs/DECISIONS.md). Other env: SEEDS (long mode: only these seeds), STRATS, KINDS, DIFF, SEEDOFF, LIFESTYLE, WELCOME, STAY, ADMIT.
+ * after the hit (the horizon the Hardcore prepper target is measured at; docs/DECISIONS.md). Other env: SEEDS (long mode: only these seeds), STRATS, KINDS, DIFF, SEEDOFF, LIFESTYLE, WELCOME, STAY, ADMIT, STUCK_ORDERS (press the Next-step "Order it" card for a stalled project).
  */
 import { describe, expect, it } from 'vitest';
 import { appendFileSync, writeFileSync } from 'node:fs';
@@ -21,6 +21,7 @@ import { startFunds } from '../src/sim/startFunds';
 import { BLUEPRINTS, isHome } from '../src/sim/blueprints';
 import { fixBill, fixBlocked, orderHookup, pendingFixes, placeImprovements } from '../src/sim/improvements';
 import { hireCrew, hoursLeft } from '../src/sim/crews';
+import { stuckProject } from '../src/sim/stalls';
 import { applyForPermit } from '../src/sim/paperwork';
 import { sweepChimney } from '../src/sim/upkeep';
 import { stockUpRx } from '../src/sim/body';
@@ -400,6 +401,8 @@ export function play(strat: Strategy, kind: DisasterKind, seed: number, peace: '
         if (s.structures.some(x => isHome(x.kind) && isFinished(x)) && s.money > 90_000) orderNeeds(s, strat);
       } else orderNeeds(s, strat);
     }
+    // (STUCK_ORDERS=1) the Next-step card's "Order it" button, pressed: site works such as a retaining wall or a cut into the slope add materials the plans' bills do not list, and the bot never ordered them
+    if (process.env.STUCK_ORDERS && !LAZY(strat) && day % 3 === 1 && (s.clock.t < s.disaster.hitAt || payWith(s))) { const st = stuckProject(s); if (st && st.lines.length && !orderProblem(s, st.lines)) placeOrder(s, st.lines); }
     // (v2) someone taken: send word that the family will pay, whenever there's a lead to carry it
     if (!LAZY(strat) && day % 10 === 0) for (const c of openCaptives(s)) askRansom(s, c.pid);
     // (v2) a dead pump gets a hardware kit, an EMP-fried one its spare, as the HUD's buttons would
