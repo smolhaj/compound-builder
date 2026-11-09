@@ -46,7 +46,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 89;
+export const SAVE_VERSION = 90;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -346,6 +346,8 @@ export interface GameState {
   paths?: PathsState;
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
   radio?: RadioState;
+  /** Life on the county road: the day's passers-by, a hail at the line, a roadblock, a mark on the place (sim/roadPassers.ts; save v90). */
+  road?: import('./roadPassers').RoadLife;
   /** Tallies since the hit (the report card), and how the run ended (null while it goes on). */
   stats: RunStats;
   ending: Ending | null;
