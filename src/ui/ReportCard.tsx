@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { wipeSummary } from '../sim/wipe';
+import { importVault } from '../sim/save/photoVault';
 import { readSaveFile } from '../sim/save/saveFile';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
 import { reportCard } from '../sim/report';
@@ -26,6 +27,7 @@ export function ReportCard() {
     setLoadMsg(`Loading ${f.name}…`);
     const res = readSaveFile(await f.text(), f.size);
     if (!res.ok) { setLoadMsg(res.message); return; }
+    await importVault(res.photoData);
     g.load(res.state); g.openSetup(false); void saveGame(AUTOSAVE, res.state);
     setLoadMsg(null);
   };
