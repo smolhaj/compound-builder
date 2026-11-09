@@ -36,7 +36,7 @@ import { keeping, KEPT } from '../sim/shelf';
 import { CONDITION, pharmacyOpen, rxDaysOf } from '../sim/body';
 import { netWorth } from '../sim/finance';
 import { campNeed, trialCamps } from '../sim/trial';
-import { JUG_L, orderTanker } from '../sim/water';
+import { HAND_PUMP_MAX_M, JUG_L, orderTanker } from '../sim/water';
 import { FleetPanel } from './FleetPanel';
 import { buyLicense, hasLicense, inSeason, lawful, TAG_USD, type License } from '../sim/wildfood';
 import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep';
@@ -67,6 +67,8 @@ import { THREAT_NAME } from '../sim/threatState';
 import { MILESTONE_COUNT, MILESTONE_NAME, PART_LABEL, generations } from '../sim/lineage';
 import { daysOfFood, KCAL, needOf } from '../sim/needs';
 import { starveWarning } from '../sim/starvation';
+import { effectiveDose } from '../sim/radiation';
+import { drinkShare } from '../sim/thirst';
 import { barterPrices, moneyWorks, type Good } from '../sim/barter';
 import { MarketSection, NeighborsSection, RumorsSection, ScavengeSection } from './WorldPanels';
 import { alliesFor, canGo, FAR_COLD, isAway, latestFarLead, latestLead, LEAD_COLD, LEAD_WARM, leadAge, openCaptives, raidProblem, rescueOdds, tripFuel, tripProblem } from '../sim/rescue';
@@ -280,7 +282,7 @@ export function Hud() {
               const st = game.personState[i], n = st?.needs;
               if (n?.left) return null;   // moved away (sim/newcomers.ts): not on the roll, noted under Newcomers
               const bar = (v: number, c: string, t: string) => <div title={t} style={{ flex: 1, height: 4, background: '#333', borderRadius: 2 }}><div style={{ width: `${Math.max(0, v)}%`, height: '100%', background: c, borderRadius: 2 }} /></div>;
-              const notes = n && n.died == null ? [n.hunger > 5000 ? 'hungry' : '', ...n.hurt.map(h => h.med ? `${h.what} (${h.med.care})` : h.trauma ? `${h.what}: ${treating ? 'being treated' : 'needs dressings and antibiotics'}` : h.what), n.dose > 0.05 ? `${n.dose.toFixed(2)} Sv` : ''].filter(Boolean).join(', ') : '';
+              const notes = n && n.died == null ? [n.hunger > 5000 ? 'hungry' : '', ...n.hurt.map(h => h.med ? `${h.what} (${h.med.care})` : h.trauma ? `${h.what}: ${treating ? 'being treated' : 'needs dressings and antibiotics'}` : h.what), n.dose > 0.05 ? `${n.dose.toFixed(2)} Sv (${effectiveDose(n).toFixed(2)} not yet repaired)` : ''].filter(Boolean).join(', ') : '';
               return <div key={p.id} style={{ padding: '5px 0', borderBottom: `1px solid ${LINE}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
                   <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#' + p.shirt.toString(16).padStart(6, '0'), marginRight: 6 }} />{fullName(p)}, {p.age}{p.rel && <span style={{ color: DIM, fontSize: 11 }}> · {kinTitle(p, game.people)}</span>}{p.origin && <span style={{ color: DIM, fontSize: 11 }}> · {originLabel(game, p)}</span>}{backgroundOf(p) && <span style={{ color: '#c9b27a', fontSize: 11 }}> · {BACKGROUND_NAME[backgroundOf(p)!]}</span>}</span>
@@ -458,7 +460,9 @@ export function Hud() {
                 {storageCapacity(game) - r.storedL > 1000 && game.disaster.tracks.deliveries >= 0.5 && game.disaster.tracks.banks >= 0.5 && <button style={{ ...btn(), width: '100%', marginTop: 3 }} title="A tanker load from town: 3,960 gal" onClick={() => g.money(d => orderTanker(d, storageCapacity(d)))}>Order a tanker load ($450)</button>}
                 <Row label="Well depth here" value={`${feetText(game.site.gwDepth)}`} />
                 {game.utilities.hauling && <Note tone="warn">{game.utilities.haulFar ? 'Hauling water a quarter mile from the creek on the neighbor\'s land: a well or cistern would end it.' : 'Hauling water from the creek by the bucket: a well or cistern would end it.'}</Note>}
-                {r.shortL > 0 && <Note tone="bad">Water ran short.</Note>}
+                {(r.handL ?? 0) > 0 && <Row label="Pumped by hand" value={`${gallonsText(r.handL ?? 0)} in ${(r.handH ?? 0).toFixed(1)} h`} />}
+                {r.shortL > 0 && <Note tone="bad">{drinkShare(game) < 1 ? 'Water ran short: drinking water is rationed. People dehydrate within days.' : 'Water ran short: no washing, the garden goes dry. Drinking water comes first.'}</Note>}
+                {game.structures.some(x => x.kind === 'well_drilled') && game.stock.hand_pump < 1 && game.site.gwDepth <= HAND_PUMP_MAX_M && <Note>A deep-well hand pump in the drilled well would give water with the power out.</Note>}
                 {flowLine(game) && <Note>{flowLine(game)}</Note>}
                 {game.utilities.hauling && game.stock.water_filter < 0.01 && <Note tone="warn">{game.stock.firewood >= 0.05 ? 'Boiling the creek water (firewood): a filter would save the wood.' : 'Drinking the creek water untreated: giardia. Get a filter or boil it.'}</Note>}
                 {game.site.gwQuality === 'arsenic' && game.stock.ro_system < 1 && <Note tone="warn">Arsenic in the well water: get reverse osmosis for drinking water.</Note>}

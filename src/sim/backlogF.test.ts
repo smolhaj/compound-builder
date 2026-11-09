@@ -17,7 +17,8 @@ const put = (g: GameState, id: string, kind: string, x: number, z: number): Stru
   g.structures.push(st);
   return st;
 };
-const winterNight = (g: GameState) => { g.clock.startDoy = 15; g.clock.t = 0.5; };
+// (after the collapse: while the stores and the grid work nobody freezes, propane heaters or a furnace, sim/cold.ts)
+const winterNight = (g: GameState) => { g.clock.startDoy = 15; g.clock.t = 0.5; g.disaster.tracks = { ...g.disaster.tracks, grid: 0, stores: 0, deliveries: 0 }; };
 
 describe('freezing without heat', () => {
   it('no risk while the stove has wood; real risk when the woodpile is bare on a hard night', () => {

@@ -46,7 +46,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 90;
+export const SAVE_VERSION = 91;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -208,6 +208,8 @@ export interface Heat {
   burned: number;
   /** Day index of the last "out of firewood" warning. */
   warned: number;
+  /** Day a cold spell in the house began (no heat, under 10 °C), or −1 (sim/cold.ts). */
+  cold?: number;
 }
 
 export interface LogEntry { t: number; text: string }
@@ -346,7 +348,7 @@ export interface GameState {
   paths?: PathsState;
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
   radio?: RadioState;
-  /** Life on the county road: the day's passers-by, a hail at the line, a roadblock, a mark on the place (sim/roadPassers.ts; save v90). */
+  /** Life on the county road: the day's passers-by, a hail at the line, a roadblock, a mark on the place (sim/roadPassers.ts; save v91). */
   road?: import('./roadPassers').RoadLife;
   /** Tallies since the hit (the report card), and how the run ended (null while it goes on). */
   stats: RunStats;
@@ -431,7 +433,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     personState: people.map(p => ({ id: p.id, task: 'idle', target: null, needs: freshNeeds(), fatigue: 0, ...(setup.dayJobs && p.job ? { employed: true } : {}) })),
     structures: [],
     forestry: { jobs: [], cleared: [] },
-    heat: { burned: 0, warned: -1 },
+    heat: { burned: 0, warned: -1, cold: -1 },
     perimeter: [],
     utilities: { ...emptyUtilities(), grid: (setup.grid ?? false) && site.improvements.power },
     hardenJobs: [],
