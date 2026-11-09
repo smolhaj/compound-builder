@@ -20,6 +20,7 @@ import { CompoundBoardPanel } from './CompoundBoard';
 import { WaveChip } from './WaveClock';
 import { CollapseChip } from './CollapseChip';
 import { KinPanel } from './KinPanel';
+import { RoadSection } from './RoadPanel';
 import { NewcomersPanel } from './NewcomersPanel';
 import { originLabel } from '../sim/newcomers';
 import { WeekenderPanel } from './WeekenderPanel';
@@ -304,6 +305,7 @@ export function Hud() {
             <DogsPanel game={game} />
             <KinPanel />
             <NewcomersPanel />
+            <RoadSection />
             <HousingPanel />
             <QuartersPanel />
             <PeopleSection />
@@ -679,9 +681,11 @@ export function Hud() {
         <button style={btn(w.terrainMode === 'off')} title="Hide the terrain overlay" onClick={() => w.setTerrainMode('off')}>Off</button>
         {(Object.keys(TERRAIN_LEGEND) as Array<Exclude<TerrainMode, 'off'>>).map(m => <button key={m} title={TERRAIN_LEGEND[m].tip} style={btn(w.terrainMode === m)} onClick={() => w.setTerrainMode(m)}>{TERRAIN_LEGEND[m].label}</button>)}
         {w.terrainMode !== 'off' && <div style={{ flexBasis: '100%', fontSize: 11.5, opacity: 0.85 }}>{TERRAIN_LEGEND[w.terrainMode].legend}</div>}
+        {w.terrainMode === 'shade' && w.shadeReadout && <div data-testid="shade-readout" style={{ flexBasis: '100%', fontSize: 11.5, color: '#bcd', display: 'flex', flexWrap: 'wrap', gap: '2px 14px' }}>{w.shadeReadout.length ? w.shadeReadout.map(l => <span key={l}>{l}</span>) : <span>Nothing to site yet: place a solar array or a garden bed and its shade shows here.</span>}</div>}
         {(w.terrainMode !== 'off' || w.sightMode !== 'off') && (() => { const t = fogLineFor(g.game, w.dayOfYear, w.timeOfDay, w.weatherMode); return t ? <div data-testid="fog-readout" style={{ flexBasis: '100%', fontSize: 11.5, color: '#bcd' }} title="Valley fog and low cloud (sim/fog.ts): it cuts what a watch, a camera or a night-vision tube sees; thermal sees through it. The same fog is drawn in the valley.">{t}</div> : null; })()}
         <button data-testid="blueprint-toggle" style={btn(w.blueprint)} title="Blueprint view: names and roles of the buildings, rings, gates, towers and tunnels, with the defense readouts" onClick={() => w.setBlueprint(!w.blueprint)}>Blueprint</button>
         {w.blueprint && w.blueprintReadout && (() => { const r = w.blueprintReadout; return <div data-testid="blueprint-readout" style={{ flexBasis: '100%', fontSize: 11.5, color: '#bcd', display: 'flex', flexWrap: 'wrap', gap: '2px 14px' }}>
+          {r.radiation && <span data-testid="radiation-readout" style={{ flexBasis: '100%', color: '#ffd27a' }} title="Protection factor (PF) divides the dose: PF 10 means a tenth. Every building and bunker room shows its own under its name.">☢ {r.radiation}</span>}
           <span title="The Defense tab's score">Defense <b>{r.score}</b> {r.label}</span>
           <span title="How hard the walls, gates and bars stop a crew">Line holds {r.barrierPct}%</span>
           <span title="How likely it is that a crew is seen before it reaches the wall">Chance of seeing a crew coming: {r.detectionPct}%</span>

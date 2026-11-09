@@ -1,4 +1,5 @@
 import { setGroundProbe } from '../sim/towers';
+import { setRoadSightProbe } from '../sim/roadWarn';
 import { RetainWallLayer } from './terrain/RetainWalls';
 import { WALLLESS, planPad, type PadPlan } from '../sim/retainPlan';
 import * as THREE from 'three';
@@ -317,6 +318,7 @@ export class HomesteadWorld {
     this.home = { ...site.home };
     this.parcel = new ParcelTerrain(seed, { creek: site.creek, timber: site.timber, region: site.region, lot: site.lot ?? null, home: site.home });
     setGroundProbe((x, z) => this.parcel.natural(x, z).h);
+    setRoadSightProbe(() => this._roadSightK());
     this.regionWorld = this.parcel.world;
     this.climate = this.regionWorld.climate;
     this.farms = planNeighbors(this.parcel);
@@ -1078,6 +1080,16 @@ export class HomesteadWorld {
     const out = [...this._built.values()].filter(b => b.finished && KIT[b.placed.kind].light && !b.under).map(b => ({ x: b.placed.x, z: b.placed.z, h: KIT[b.placed.kind].floorY + 0.25, k: KIT[b.placed.kind].sleeps > 0 ? 1 : 0.6 }));
     if (!out.some(l => l.k === 1)) out.push({ x: this.camp.x, z: this.camp.z, h: 0.15, k: 0.8 });
     return out;
+  }
+
+  private _rsk = { n: -1, at: -1e9, v: 1 };
+  /** How clear the line from the buildings to the county road is, 0.7 (buried in trees and hills) to 1.4 (open). Measured with the sightline system, at most every 15 s and when a building appears (sim/roadWarn.ts reads it for the warning of a visitor). */
+  private _roadSightK(): number {
+    const n = this._built.size, now = performance.now();
+    if (this._rsk.n === n || now - this._rsk.at < 15000) { if (this._rsk.n >= 0 || now - this._rsk.at < 15000) return this._rsk.v; }
+    const vals = Object.values(this.buildingExposure());
+    this._rsk = { n, at: now, v: vals.length ? 0.7 + 0.7 * Math.min(1, vals.reduce((a, b) => a + b, 0) / vals.length / 0.6) : 1 };
+    return this._rsk.v;
   }
 
   /** Share of the county road that can see each building (its windows, ≈ 1.5 m up). */
@@ -2802,6 +2814,7 @@ export class HomesteadWorld {
     this._built.clear();
     this.truck.dispose();
     this.roadLife.dispose();
+    setRoadSightProbe(null);
     this.plow.dispose();
     this._ws.scene.remove(this._roads);
     this._roads.traverse(o => (o as THREE.Mesh).geometry?.dispose());
