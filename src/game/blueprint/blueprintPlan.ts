@@ -16,7 +16,7 @@ import { sensorSightM, fogReadout } from '../../sim/fog';
 import { SALLY } from '../../sim/rings';
 import type { GameState } from '../../sim/state';
 import { lengthText } from '../../sim/units';
-import { radiationKnown, radiationSub, radiationSummary, shelterRows, type RadTone } from '../../sim/radiation';
+import { radiationKnown, radiationSub, radiationSummary, shelterRows, type RadTone } from '../../sim/shelterView';
 
 export type MarkCat = 'home' | 'work' | 'food' | 'water' | 'power' | 'bunker' | 'tower' | 'gate' | 'ring' | 'tunnel' | 'bridge' | 'wall';
 

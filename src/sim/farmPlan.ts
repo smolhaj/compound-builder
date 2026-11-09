@@ -17,6 +17,7 @@ import { cookRatio } from './daily';
 import { isFinished } from './construction';
 import { apiaries, apiaryOf, colonyCount, flightDays, winterNeed } from './bees';
 import { hasMaples, sapSeason, tapsOut, woodsTaps } from './maple';
+import { cuttingWindows } from './haying';
 import { herdOf } from './herd';
 import { regionFor } from './climate';
 import { pluralize } from './words';
@@ -65,7 +66,8 @@ export function calendar(s: GameState): CalItem[] {
     { id: 'sun', group: 'preserve', label: 'Sun-drying weather', from: 140, to: 270, note: 'Screens in the sun on dry days, in jars by evening.', here: hasKitchen(s) },
     { id: 'cure', group: 'preserve', label: 'Curing weather', from: 285, to: 80, note: 'Cold enough to salt-cure pork and game safely (or any time in a cool cellar).', here: cure },
     { id: 'shear', group: 'animals', label: 'Shearing and lambing', from: 100, to: 130, note: 'A wool check, and about 1.3 lambs a ewe.', here: n('sheep') > 0 },
-    { id: 'hay', group: 'animals', label: 'Make and store hay', from: 150, to: 260, note: 'Buy the winter\'s hay at the fall cutting.', here: animals },
+    { id: 'hay', group: 'animals', label: 'Make hay (first and second cutting)', from: cuttingWindows(s)[0][0], to: cuttingWindows(s)[1][1], note: 'Two 14-day windows: the meadow is cut and baled by the Fields duty. Buy what the meadow does not make while the feed store is open.', here: animals },
+    { id: 'farrow', group: 'animals', label: 'Farrowing', from: 85, to: 105, note: 'Sows farrow in late March and again in late September: about eight weaned piglets a litter.', here: n('sow') > 0 },
     { id: 'butcher', group: 'animals', label: 'Butchering', from: 305, to: 334, note: 'Pigs, surplus lambs and the steer go to the butcher; fat is rendered into lard.', here: n('pig') + n('steer') + n('sheep') > 0 },
     { id: 'eggs', group: 'animals', label: 'Hens lay best', from: 90, to: 250, note: 'About eight eggs a day from a dozen hens; three in midwinter.', here: has('chicken_coop') },
     { id: 'sap', group: 'garden', label: 'Sap runs: tap, gather, boil', from: sapSeason(s)[0], to: sapSeason(s)[1], note: 'Freeze-thaw days: gather the buckets and boil the same day, 40 gallons of sap to one of syrup.', here: hasMaples(s) && (has('sugar_shack') || n('maple_taps') > 0) },
