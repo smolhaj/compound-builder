@@ -132,35 +132,30 @@ try {
     const st = await page.evaluate(async ([FPS]) => {
       const cb = window.__cb, gs = cb.game.getState(); cb.qa.skipDraw = true; window.__pump(1000 / FPS);
       const b = cb.battle, c = gs.cutscene;
-      return { phase: c?.phase, offer: c?.offer ?? null, bt: b?.playing ? +b.time.toFixed(2) : null, ladders: b?.playing ? b.battle.events.filter(e => e.kind === 'ladder').map(e => [e.t, e.x, e.z, e.fx, e.fz, e.h]) : [] };
+      return { phase: c?.phase, offer: c?.offer ?? null, bt: b?.playing ? +b.time.toFixed(2) : null, ladders: [], up: b?.playing ? (b.actors().filter(u => !u.dead && !u.gone && u.y > 0.12 && u.post !== 'tower' && u.post !== 'building').sort((p, q) => q.y - p.y)[0] ?? null) : null };
     }, [FPS]);
     p++;
     if (st.offer != null) { await page.evaluate(() => window.__cb.game.getState().midStance(null)); }
     if (st.phase === 'aftermath') break;
     if (st.bt == null) continue;
-    // aim at the next ladder whose moment has come (and that we have not shot): a defender's (h < 0.4 and inside) first, then a raider's
-    const L = st.ladders.find(l => !done.has(l.join()) && st.bt >= l[0] + 0.2 && st.bt <= l[0] + 9);
-    if (!L) continue;
-    const key = L.join();
-    const frameNo = shotLog.filter(x => x.key === key).length;
-    if (frameNo >= Number(opt('--per', 12))) { done.add(key); continue; }
-    const [, x, z, fx, fz, h] = L;
-    await page.evaluate(async ([x, z, fx, fz, h]) => {
+    // aim at whoever is up in the air right now (a defender up the step, a raider up a ladder): the camera 0.7 to the side of them, level with the climb
+    if (!st.up) continue;
+    const key = st.up.id;
+    const have = shotLog.filter(x => x.key === key).length;
+    if (have >= Number(opt('--per', 10))) continue;
+    await page.evaluate(async ([u]) => {
       const cb = window.__cb, g = cb.world.groundAt;
-      const dx = x - fx, dz = z - fz, l = Math.hypot(dx, dz) || 1, px = -dz / l, pz = dx / l;
-      const mx = (x + fx) / 2, mz = (z + fz) / 2;
-      const eye = { x: mx + px * 1.0 - dx / l * 0.15, y: g(mx, mz) + 0.3, z: mz + pz * 1.0 - dz / l * 0.15 };
-      window.__force = { eye, look: { x: mx, y: g(mx, mz) + h * 0.55, z: mz }, fov: 52 };
-      window.__cb.qa.skipDraw = false;
-      window.__pump(10);
-      await window.__cb.qa.renderFull?.('medium');
-    }, [x, z, fx, fz, h]);
+      // the side: perpendicular to the direction to the nearest ladder, so the ladder, the wall and the person are all in the frame
+      const eye = { x: u.x + 0.55, y: g(u.x, u.z) + 0.3, z: u.z - 0.45 };
+      window.__force = { eye, look: { x: u.x, y: g(u.x, u.z) + u.y + 0.12, z: u.z }, fov: 50 };
+      cb.qa.skipDraw = false; window.__pump(10);
+    }, [st.up]);
     await page.evaluate(() => new Promise(r => setTimeout(r, 30)));
     if (!globalThis.__cdp) globalThis.__cdp = await page.context().newCDPSession(page);
     const shot = await globalThis.__cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 88 });
-    const file = `ladder_${String(shots).padStart(2, '0')}.jpg`;
+    const file = `up_${String(shots).padStart(2, '0')}_${key}.jpg`;
     writeFileSync(`${outDir}/${file}`, Buffer.from(shot.data, 'base64'));
-    shotLog.push({ key, file, bt: st.bt, h });
+    shotLog.push({ key, file, bt: st.bt, y: +st.up.y.toFixed(2), x: +st.up.x.toFixed(2), z: +st.up.z.toFixed(2) });
     shots++;
   }
   writeFileSync(`${outDir}/shots.json`, JSON.stringify(shotLog, null, 1));
