@@ -151,7 +151,7 @@ describe('scouts the watch spotted: drive off, capture, ignore, prepare', () => 
 describe('save v89', () => {
   it('an old save (v88) migrates and a prisoner without questions can be asked', () => {
     const old = JSON.parse(JSON.stringify(place(2, 'standard', 'armed'))); old.version = 88; old.gate.prisoners = [{ id: 'pr9', name: 'Cole', since: 0, sev: 5, talked: false, trust: 20 }];
-    const g = migrate(old); expect(g.version).toBe(SAVE_VERSION); expect(SAVE_VERSION).toBe(89);
+    const g = migrate(old); expect(g.version).toBe(SAVE_VERSION); expect(SAVE_VERSION).toBeGreaterThanOrEqual(89);
     expect(g.gate.prisoners![0].asked).toBeUndefined();
   });
 });

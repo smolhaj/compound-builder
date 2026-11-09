@@ -36,6 +36,7 @@ import type { Person } from './family';
 import { regionFor } from './climate';
 import { crowdingFx, quarterHomes, quartersKey } from './quarters';
 import { pluralize } from './words';
+import { townHeat } from './cold';
 
 export type SpotKind = 'bed' | 'bunk' | 'couch' | 'floor' | 'tent' | 'outbuilding' | 'nowhere';
 export const SPOT_ORDER: readonly SpotKind[] = ['bed', 'bunk', 'couch', 'floor', 'tent', 'outbuilding', 'nowhere'];
@@ -126,7 +127,7 @@ export function nightOf(s: GameState, day = dayIndex(s.clock.t), calm = false): 
 }
 
 /** Is the stove going? (There is firewood in the shed.) */
-export const heatOn = (s: GameState): boolean => s.stock.firewood >= 0.5;
+export const heatOn = (s: GameState): boolean => s.stock.firewood >= 0.5 || townHeat(s) !== null;
 
 // ── Capacity ───────────────────────────────────────────────────────────────
 
@@ -183,6 +184,8 @@ export interface Sleeper {
   morale: number;
   /** Health lost tonight (cold, wet). */
   harm: number;
+  /** How warm it is in bed (°F): the shelter, the stove, the bedding (sim/cold.ts hypothermia reads it). */
+  effF: number;
   /** Hours of tiredness added tonight. */
   tired: number;
   hasBag: boolean;
@@ -250,7 +253,7 @@ const PRIVACY: Record<SpotKind, number> = { bed: 1, bunk: 0.5, couch: 0.3, floor
 const SHELTER: Record<SpotKind, number> = { bed: 22, bunk: 20, couch: 22, floor: 22, tent: 3, outbuilding: 12, nowhere: 5 };
 
 /** How good one night is in one place for one person. Pure. */
-export function sleepQuality(kind: SpotKind, p: Pick<Person, 'age' | 'elder' | 'kid'>, night: Night, o: { bag: boolean; stove: boolean; wall?: boolean; floorQ?: number }): { quality: number; harm: number; note: string } {
+export function sleepQuality(kind: SpotKind, p: Pick<Person, 'age' | 'elder' | 'kid'>, night: Night, o: { bag: boolean; stove: boolean; wall?: boolean; floorQ?: number }): { quality: number; harm: number; effF: number; note: string } {
   let q = o.floorQ ?? BASE[kind];
   if (kind === 'tent' && o.wall) q += 0.03;
   const bedding = kind === 'bed' || kind === 'bunk' || kind === 'couch' || o.bag;
@@ -272,7 +275,7 @@ export function sleepQuality(kind: SpotKind, p: Pick<Person, 'age' | 'elder' | '
   else if (isElder(p as Person) && kind === 'couch') q -= 0.03;
   q = Math.max(0.05, Math.min(1, q));
   const note = night.stormy && open ? 'a storm over the tent' : night.rainy && open ? 'rain' : eff < 20 ? 'bitter cold' : cold > 0.2 ? 'cold' : night.hot && open ? 'stifling' : q >= 0.7 ? 'a good night' : q >= 0.5 ? 'a rough night' : 'barely sleeping';
-  return { quality: q, harm, note };
+  return { quality: q, harm, effF: eff, note };
 }
 
 /** Morale target change, and tiredness, from a night's quality and privacy. */
@@ -353,7 +356,7 @@ export function housingPlan(s: GameState, guests: readonly Person[] = []): Housi
     const privacy = Math.max(0, PRIVACY[spot.kind] - crowd);
     const fx = effects(sq.quality, privacy, x.p);
     const own = spot.kind === 'bed' && ((wantsOwnPlace(x.p) && SEPARATE_DWELLINGS.has(kindOf.get(spot.where ?? '') ?? '')) || (!!x.p.home && spot.where === x.p.home));
-    out.push({ index: x.index, id: x.p.id, spot, quality: sq.quality, privacy, morale: fx.morale + (own ? OWN_PLACE_MORALE : 0), harm: sq.harm, tired: fx.tired, hasBag: bag, note: own ? 'a front door of their own' : sq.note, own });
+    out.push({ index: x.index, id: x.p.id, spot, quality: sq.quality, privacy, morale: fx.morale + (own ? OWN_PLACE_MORALE : 0), harm: sq.harm, effF: sq.effF, tired: fx.tired, hasBag: bag, note: own ? 'a front door of their own' : sq.note, own });
   }
   const noBed = counts.couch + counts.floor + counts.tent + counts.outbuilding + counts.nowhere;
   const used = counts.bed + counts.bunk;
@@ -388,10 +391,10 @@ export function tentsPitched(s: GameState): number {
 // ── The morale / health hook (needs.ts liveDay) ────────────────────────────
 
 /** Tonight's effect on each person by index in `s.people` (absent = no effect). */
-export function sleepEffects(s: GameState): Map<number, { morale: number; harm: number; tired: number }> {
-  const out = new Map<number, { morale: number; harm: number; tired: number }>();
+export function sleepEffects(s: GameState): Map<number, { morale: number; harm: number; tired: number; effF: number }> {
+  const out = new Map<number, { morale: number; harm: number; tired: number; effF: number }>();
   const plan = housingPlan(s);
-  for (const sl of plan.sleepers) if (sl.index >= 0) out.set(sl.index, { morale: sl.morale, harm: sl.harm, tired: sl.tired });
+  for (const sl of plan.sleepers) if (sl.index >= 0) out.set(sl.index, { morale: sl.morale, harm: sl.harm, tired: sl.tired, effF: sl.effF });
   for (const [id, fx] of quartersFx(s, plan)) { const i = s.people.findIndex(p => p.id === id); const o = i >= 0 ? out.get(i) : undefined; if (o) { o.morale += fx.morale; o.tired += fx.tired; } }
   return out;
 }
