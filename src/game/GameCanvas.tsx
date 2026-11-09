@@ -1,6 +1,7 @@
 import { moatStates } from '../sim/waterWorks';
 import { fireMarks } from '../sim/fireRisk';
 import { litTowerIds } from '../sim/towers';
+import { encodePhoto, setPhotoCapturer } from './photoCapture';
 import { shadeGrid } from '../sim/shade';
 import { shadeReadout, shadeSceneOf } from './terrain/shadeScene';
 import { TerrainOverlay } from './terrain/TerrainOverlay';
@@ -287,6 +288,7 @@ export function GameCanvas() {
       blueprintOv.set(plan); useWorldStore.getState().setBlueprintReadout(plan.readout);
     };
     const refreshBlueprint = () => { if (useWorldStore.getState().blueprint) { clearTimeout(bpTimer); bpTimer = window.setTimeout(showBlueprint, 250); } };
+    setPhotoCapturer(() => { ws.renderFrame(); return encodePhoto(ws.renderer.domElement); });
     const unsub = [
       useWorldStore.subscribe(s => s.weakView, showWeak),
       useGameStore.subscribe(s => `${s.game.structures.length}|${s.game.forestry.cleared.length}|${s.game.forestry.jobs.length}|${s.game.perimeter.map(r => r.id + (r.finishedAt === null ? 'p' : 'f') + Math.round((r.brush ?? 0) * 4)).join()}`, () => { if (useWorldStore.getState().weakView) showWeak(); }),
@@ -754,7 +756,7 @@ export function GameCanvas() {
       ws.dispose();
     };
     })();
-    return () => { cancelled = true; stop(); useWorldStore.getState().setBoot(null); };
+    return () => { cancelled = true; stop(); setPhotoCapturer(null); useWorldStore.getState().setBoot(null); };
   }, []);
 
   return <canvas ref={ref} style={{ width: '100%', height: '100%' }} />;

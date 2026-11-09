@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { useGameStore } from '../store/gameStore';
+import { exportVault, importVault } from '../sim/save/photoVault';
 import { exportJson } from '../sim/save/migrations';
 import { readSaveFile, saveFileName } from '../sim/save/saveFile';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
@@ -12,12 +13,13 @@ export function SaveMenu() {
   const [warn, setWarn] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [incoming, setIncoming] = useState<GameState | null>(null);
+  const pics = useRef<Record<string, string>>({});
   const file = useRef<HTMLInputElement>(null);
   const close = () => { setOpen(false); setMsg(null); setWarn(null); setIncoming(null); };
 
   const doExport = () => {
     const game = useGameStore.getState().game;
-    const url = URL.createObjectURL(new Blob([exportJson(game)], { type: 'application/json' }));
+    const url = URL.createObjectURL(new Blob([exportJson(game, exportVault((game.photos ?? []).map(p => p.id)))], { type: 'application/json' }));
     const a = document.createElement('a');
     a.href = url; a.download = saveFileName(game); a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -26,10 +28,11 @@ export function SaveMenu() {
   const onFile = async (f: File | undefined) => {
     if (!f) return;
     const r = readSaveFile(await f.text(), f.size);
-    if (r.ok) { setMsg(null); setWarn(r.warnings[0] ?? null); setIncoming(r.state); } else { setIncoming(null); setMsg(r.message); }
+    if (r.ok) { setMsg(null); setWarn(r.warnings[0] ?? null); pics.current = r.photoData; setIncoming(r.state); } else { setIncoming(null); setMsg(r.message); }
   };
-  const replace = () => {
+  const replace = async () => {
     if (!incoming) return;
+    await importVault(pics.current);
     const st = useGameStore.getState();
     st.load(incoming);
     st.openSetup(false);
