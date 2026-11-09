@@ -531,14 +531,16 @@ let _boreDark: THREE.MeshStandardMaterial | null = null;
 const boreDark = (): THREE.MeshStandardMaterial => (_boreDark ??= new THREE.MeshStandardMaterial({ color: 0x2a2520, roughness: 1, side: THREE.BackSide }));
 
 /** The road's two ends of a bore: where the plan's stations meet the face, with the ground the portals are set into (the road's own height at each end). */
+/** Stations (0.5 u each) the faces stand out in the cutting from where the hill closes over, and how deep the headwall block is (it buries the step where the cut ends). */
+export const FACE_OUT = 2, FACE_DEPTH = 1.15;
 export function borePortals(plan: RoadPlan, a: number, b: number, ground: Ground): { pts: Array<[number, number]>; ground: Ground } {
-  // the faces stand one station (0.5 u) out in the cutting, clear of the wall where the cut ends: a mesh cell cannot make a vertical step, so the ramp up to the hill would otherwise lie over the face
-  const A = plan.pts[Math.max(0, a - 1)], B = plan.pts[Math.min(plan.pts.length - 1, b + 1)];
+  // the faces stand `FACE_OUT` stations out in the cutting, clear of the wall where the cut ends: a mesh cell cannot make a vertical step, so the ramp up to the hill would otherwise lie over the face
+  const A = plan.pts[Math.max(0, a - FACE_OUT)], B = plan.pts[Math.min(plan.pts.length - 1, b + FACE_OUT)];
   return { pts: [[A.x, A.z], [B.x, B.z]], ground: (x, z) => (Math.hypot(x - A.x, z - A.z) < 1e-4 ? A.y : Math.hypot(x - B.x, z - B.z) < 1e-4 ? B.y : ground(x, z)) };
 }
 
 function portals(group: THREE.Group, parts: Parts, plan: RoadPlan, a: number, b: number, ground: Ground): void {
-  const bp = borePortals(plan, a, b, ground), bore = boreParts(bp.pts, bp.ground, 1, true, false);
+  const bp = borePortals(plan, a, b, ground), bore = boreParts(bp.pts, bp.ground, 1, true, false, false, FACE_DEPTH);
   for (const [m, g] of bore.parts) parts.add(m, worldUV(g));
   if (bore.tube) { const t = new THREE.Mesh(bore.tube, boreDark()); t.receiveShadow = false; group.add(t); }
 }

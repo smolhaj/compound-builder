@@ -85,10 +85,12 @@ function frame(x: number, y: number, z: number, fwd: THREE.Vector3): THREE.Matri
 }
 
 /**
+ * `faceDepth`: how thick the headwall block is (a face on a rock cliff is 0.3 u; where the road comes in by a cutting the face stands out in it and is a deep block, so the step
+ * where the cut ends is buried in the stone).
  * `built`: how much of the tunnel is built, 0 to 1 (a portal stands from 5 %, the second, the mound and the tube when it is finished).
  * `lit`: the lamps are on. `pts`: the run (its first and last points are the two portals).
  */
-export function boreParts(pts: readonly Pt[], ground: Ground, built: number, finished: boolean, lit: boolean, collapsed = false): BoreParts {
+export function boreParts(pts: readonly Pt[], ground: Ground, built: number, finished: boolean, lit: boolean, collapsed = false, faceDepth = 0.3): BoreParts {
   const out: BoreParts = { parts: [], doors: [], tube: null };
   if (pts.length < 2 || built <= 0.05) return out;
   const add = (m: KitMaterialId, g: THREE.BufferGeometry) => out.parts.push([m, g]);
@@ -157,7 +159,7 @@ export function boreParts(pts: readonly Pt[], ground: Ground, built: number, fin
     shape.moveTo(prof[0][0], -0.5); shape.lineTo(prof[prof.length - 1][0], -0.5);
     for (let k = prof.length - 1; k >= 0; k--) shape.lineTo(prof[k][0], prof[k][1]);
     shape.holes.push(archHole());
-    add('fieldstone', place(new THREE.ExtrudeGeometry(shape, { depth: 0.3, bevelEnabled: false, curveSegments: 10 })));
+    add('fieldstone', place(new THREE.ExtrudeGeometry(shape, { depth: faceDepth, bevelEnabled: false, curveSegments: 10 })));
     // a concrete cap over it
     add('concrete', place(new THREE.BoxGeometry(PW + 0.08, 0.05, 0.38), 0, PH + 0.025, 0.15));
     // voussoirs: rough stones round the arch, proud of the face
