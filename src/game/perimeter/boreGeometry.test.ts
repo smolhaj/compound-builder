@@ -101,3 +101,23 @@ describe('a portal brought down by a charge', () => {
     expect(Array.from(rubbleHeap(18)[10][1].getAttribute('position').array)).not.toEqual(Array.from(a));
   });
 });
+
+import { HEAD_MAX, headwallProfile } from './boreGeometry';
+describe('the headwall follows the hill', () => {
+  it('is a plain block on flat ground, and rises with a slope so it meets the ground at both sides', () => {
+    const flat = headwallProfile(1.6, 1.3, () => 0);
+    expect(Math.max(...flat.map(p => p[1]))).toBeCloseTo(1.3, 6);
+    expect(flat[0][0]).toBeGreaterThanOrEqual(-1.6 - 1e-6);
+    // a hill that climbs 0.8 u for each unit across to the right and falls away to the left
+    const slope = (l: number) => Math.max(0, 0.9 + 0.8 * l);
+    const p = headwallProfile(1.6, 1.3, slope);
+    for (const [l, h] of p) expect(h, `at ${l.toFixed(2)} the wall stands clear of the ground`).toBeLessThanOrEqual(Math.max(1.3, slope(l) + 0.07) + 1e-6);
+    for (const [l, h] of p) if (Math.abs(l) > 1.2) expect(h, `at ${l.toFixed(2)} the wall is lower than the hill`).toBeGreaterThanOrEqual(Math.min(HEAD_MAX.high, slope(l) + 0.06) - 1e-6);
+    expect(p[0][1]).toBeLessThan(0.15);                                    // the low side ends on the ground
+  });
+  it('never spreads past its caps', () => {
+    const p = headwallProfile(1.6, 1.3, () => 9);
+    expect(p[0][0]).toBeGreaterThanOrEqual(-HEAD_MAX.half - 0.11); expect(p[p.length - 1][0]).toBeLessThanOrEqual(HEAD_MAX.half + 0.11);
+    expect(Math.max(...p.map(q => q[1]))).toBeLessThanOrEqual(HEAD_MAX.high);
+  });
+});

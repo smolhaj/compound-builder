@@ -13,7 +13,8 @@
  * Draw calls: one ribbon per run of surface plus one merged mesh per material
  * (about 8 in all), however long the road. Procedural only.
  */
-import { boreTube } from '../paths/driveHeight';
+import { boreParts } from '../perimeter/boreGeometry';
+import { worldUV } from '../buildkit/shell';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { buildRibbon } from '../../engine/world/roads/RoadRibbon';
@@ -379,7 +380,7 @@ export function buildRoadWorks(plan: RoadPlan, ground: Ground, o: RoadWorksOpts)
       case 'culvert': case 'arch_culvert': culvert(parts, fr, a, b, ground, o.natural, sx.kind === 'arch_culvert'); break;
       case 'ford': case 'low_water': slab(parts, fr, plan, a, b, ground, sx.kind === 'low_water'); break;
       case 'bridge1': case 'bridge': bridge(parts, stone, fr, plan, a, b, ground, sx.kind === 'bridge', !!o.bridgeDown); break;
-      case 'tunnel': portals(group, stone, fr, a, b, ground); break;
+      case 'tunnel': portals(group, parts, plan, a, b, ground); break;
       case 'cattle_guard': cattleGuard(parts, fr[Math.round((a + b) / 2)]); break;
       case 'pass': cairn(stone, fr[Math.round((a + b) / 2)], ground); break;
     }
@@ -524,64 +525,21 @@ function bridge(parts: Parts, stone: Parts, fr: readonly Frame[], plan: RoadPlan
   void big;
 }
 
-// ── a rock bore: a rough stone portal at each end, a dark tube between ──
+// ── a rock bore: the same portals, wing walls, banked earth and dark tube as the rock tunnel (game/perimeter/boreGeometry.ts) ──
 
-const ARCH_W = 0.66, ARCH_H = 0.46;
+let _boreDark: THREE.MeshStandardMaterial | null = null;
+const boreDark = (): THREE.MeshStandardMaterial => (_boreDark ??= new THREE.MeshStandardMaterial({ color: 0x2a2520, roughness: 1, side: THREE.BackSide }));
 
-function portals(group: THREE.Group, stone: Parts, fr: readonly Frame[], a: number, b: number, ground: Ground): void {
-  const A = fr[a], B = fr[b];
-  // the dark tube: an arch profile extruded along the bore, seen from inside
-  const prof = new THREE.Shape();
-  prof.moveTo(-ARCH_W / 2, 0); prof.lineTo(-ARCH_W / 2, ARCH_H);
-  prof.absarc(0, ARCH_H, ARCH_W / 2, Math.PI, 0, true);
-  prof.lineTo(ARCH_W / 2, 0); prof.lineTo(-ARCH_W / 2, 0);
-  const bt = boreTube(A, B), len = bt.len + 0.2;
-  const tube = new THREE.ExtrudeGeometry(prof, { depth: len, bevelEnabled: false, curveSegments: 10 });
-  const rot = bt.rot, mid = new THREE.Mesh(tube, new THREE.MeshStandardMaterial({ color: 0x2a2520, roughness: 1, side: THREE.BackSide }));
-  mid.position.set(A.x - Math.sin(rot) * 0.1, A.y - 0.0, A.z - Math.cos(rot) * 0.1);
-  mid.rotation.order = 'YXZ'; mid.rotation.set(-bt.pitch, rot, 0);       // (the tube climbs with the road, so a car driving the bore stays inside it)
-  // (the road inside: a dark floor)
-  group.add(mid);
-  // lights inside so the bore reads as a tunnel, not a hole
-  const dark = new THREE.Mesh(new THREE.PlaneGeometry(ARCH_W * 0.98, len).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x5a5148, roughness: 1 }));
-  dark.position.set((A.x + B.x) / 2, (A.y + B.y) / 2 + 0.004, (A.z + B.z) / 2); dark.rotation.order = 'YXZ'; dark.rotation.set(-bt.pitch, rot, 0);
-  group.add(dark);
-  // the two faces
-  for (const [f, out] of [[A, -1], [B, 1]] as const) portalFace(group, stone, f, out, ground);
+/** The road's two ends of a bore: where the plan's stations meet the face, with the ground the portals are set into (the road's own height at each end). */
+export function borePortals(plan: RoadPlan, a: number, b: number, ground: Ground): { pts: Array<[number, number]>; ground: Ground } {
+  const A = plan.pts[a], B = plan.pts[b];
+  return { pts: [[A.x, A.z], [B.x, B.z]], ground: (x, z) => (Math.hypot(x - A.x, z - A.z) < 1e-4 ? A.y : Math.hypot(x - B.x, z - B.z) < 1e-4 ? B.y : ground(x, z)) };
 }
 
-function portalFace(group: THREE.Group, stone: Parts, f: Frame, out: number, ground: Ground): void {
-  // `out` is +1 where the opening looks along the road's heading (the far end of the bore), -1 at the near end.
-  // The face is a stone block with the arch cut from it, extruded 0.3 deep into the hill.
-  const W = 1.7, H = 1.0, D = 0.3;
-  const shape = new THREE.Shape();
-  shape.moveTo(-W / 2, -0.4); shape.lineTo(W / 2, -0.4); shape.lineTo(W / 2, H); shape.lineTo(-W / 2, H); shape.lineTo(-W / 2, -0.4);
-  const hole = new THREE.Path();
-  hole.moveTo(-ARCH_W / 2, 0); hole.lineTo(-ARCH_W / 2, ARCH_H);
-  hole.absarc(0, ARCH_H, ARCH_W / 2, Math.PI, 0, true);
-  hole.lineTo(ARCH_W / 2, 0); hole.lineTo(-ARCH_W / 2, 0);
-  shape.holes.push(hole);
-  const g = new THREE.ExtrudeGeometry(shape, { depth: D, bevelEnabled: false, curveSegments: 10 });
-  // world-unit UVs for the stone texture
-  const pos = g.attributes.position as THREE.BufferAttribute, uv = g.attributes.uv as THREE.BufferAttribute, nrm = g.attributes.normal as THREE.BufferAttribute;
-  for (let i = 0; i < pos.count; i++) { const side = Math.abs(nrm.getX(i)) > 0.5; uv.setXY(i, side ? pos.getZ(i) : pos.getX(i), pos.getY(i)); }
-  const m = new THREE.Mesh(g, kitMaterial('fieldstone'));
-  m.castShadow = true; m.receiveShadow = true;
-  // local +z (the extrusion) points into the hill: against the opening's outward direction
-  m.position.set(f.x, f.y, f.z);
-  m.rotation.y = f.rot + (out > 0 ? Math.PI : 0);
-  group.add(m);
-  // voussoirs: rough stones round the arch, a little proud of the face
-  for (let k = 0; k <= 14; k++) {
-    const t = Math.PI * k / 14, lat = Math.cos(t) * (ARCH_W / 2 + 0.04), up = ARCH_H + Math.sin(t) * (ARCH_W / 2 + 0.04), jit = ((k * 37) % 5) * 0.004;
-    stone.box('fieldstone', f.x + f.nx * lat + f.fx * out * (0.03 + jit), f.y + up, f.z + f.nz * lat + f.fz * out * (0.03 + jit), 0.078, 0.088, 0.07, f.rot + (k % 2 ? 0.06 : -0.06));
-  }
-  // wing walls stepping back along the cut, lower as they go
-  for (const s of [-1, 1]) for (let k = 1; k <= 3; k++) {
-    const lat = 0.85 + 0.3 * k, back = 0.12 + 0.28 * k, hgt = 0.6 - 0.14 * k;
-    stone.box('fieldstone', f.x + f.nx * s * lat - f.fx * out * back, f.y + hgt / 2 - 0.04, f.z + f.nz * s * lat - f.fz * out * back, 0.12, hgt, 0.42, f.rot + s * out * 0.55);
-  }
-  void ground;
+function portals(group: THREE.Group, parts: Parts, plan: RoadPlan, a: number, b: number, ground: Ground): void {
+  const bp = borePortals(plan, a, b, ground), bore = boreParts(bp.pts, bp.ground, 1, true, false);
+  for (const [m, g] of bore.parts) parts.add(m, worldUV(g));
+  if (bore.tube) { const t = new THREE.Mesh(bore.tube, boreDark()); t.receiveShadow = false; group.add(t); }
 }
 
 // ── a cattle guard at the gate: pit, rails, concrete ends ──

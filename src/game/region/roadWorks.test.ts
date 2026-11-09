@@ -76,7 +76,7 @@ describe('the road, drawn', () => {
     expect(finite(buildRoadWorks(q, dry.h, opts(dry)))).toBe(true);
   });
 
-  it('a rock bore: a stone portal at each end (two extruded faces) and a dark tube between', () => {
+  it('a rock bore: the same portals as the rock tunnel (headwall, wings, banked earth, merged by material) and a dark tube between', () => {
     const tight: Partial<RoadInput> = { rect: { x0: 0, z0: 22, x1: 67, z1: 42 }, frontage: { x: 67, zMin: 24, zMax: 40, band: [24, 40] }, yard: [25, 32] };
     const p = planRoad(input('mountain_west', spur, tight));
     const t = p.structures.find(s => s.kind === 'tunnel');
@@ -85,7 +85,8 @@ describe('the road, drawn', () => {
     expect(finite(g)).toBe(true);
     let extruded = 0;
     g.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh && m.geometry.type === 'ExtrudeGeometry') extruded++; });
-    expect(extruded).toBe(3);                                  // the tube and the two faces
+    expect(extruded).toBe(1);                                  // the dark tube (the faces are merged into the stone and earth meshes)
+    expect(meshes(g)).toBeGreaterThan(3);
     // the surface ribbon is not drawn through the bore
     const b = bounds(g);
     expect(b.max.y - b.min.y).toBeGreaterThan(0.5);
