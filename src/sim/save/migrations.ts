@@ -47,6 +47,8 @@ type Raw = Record<string, unknown> & { version?: number };
 const STEPS: Record<number, (s: Raw) => Raw> = {
   // 89 → 90: survival realism (sim/radiation.ts, thirst.ts, cold.ts): `Needs.rad / dry / chill` are optional and made on first use, the hand pump, iodide and radiation meter are stock goods that read as zero. Nothing to back-fill.
   // 91 → 92: life on the county road (sim/roadPassers.ts, sim/roadWarn.ts): `road` is optional and made on first use
+  // 92 → 93: the road post (sim/roadPost.ts): `RoadBlock.crew`, `Order.held`, both optional; no old-save work
+  92: s => ({ ...s, version: 93 }),
   91: s => ({ ...s, version: 92 }),
   89: s => ({ ...s, version: 90 }),
   // 78 → 79: Cozy starvation (sim/starvation.ts): `Needs.starved` counts consecutive starving days; old saves start at 0, and a runaway `hunger` is clamped

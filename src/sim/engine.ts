@@ -67,7 +67,7 @@ import { winterDay } from './adaptive';
 import { mutualAidDay } from './barter';
 import { arrivalCheck, hasCutscene, scheduleArrival } from './siege';
 import { scheduleLead } from './roadLead';
-import { passStep, roadDay } from './roadPassers';
+import { passStep, postDay, roadDay } from './roadPassers';
 import { prepLine, roadWarnStep } from './roadWarn';
 import { scavengeDay } from './scavenge';
 import { marketDay } from './market';
@@ -270,6 +270,7 @@ function subStep(s: GameState): void {
     for (const line of cellarDay(s)) log(s, line);
     for (const line of crowdDay(s)) log(s, line);
     roadDay(s);
+    postDay(s);
     const e = gateDay(s);
     for (const line of kinDay(s)) log(s, line);
     for (const line of newcomersDay(s)) log(s, line);   // neighbors and strangers who joined; neighbors asking for shelter (after the gate: a card waits its turn)

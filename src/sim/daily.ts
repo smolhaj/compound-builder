@@ -49,6 +49,7 @@ import { log } from './economy';
 import { plantChoreRate } from './renewables';
 import { regionFor } from './climate';
 import { pairNudge } from './bonds';
+import { onPost } from './roadPost';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Duties
@@ -57,7 +58,7 @@ import { pairNudge } from './bonds';
 export type Duty =
   | 'sleep' | 'meal' | 'leisure' | 'school'
   | 'build' | 'garden' | 'fields' | 'livestock' | 'pets' | 'wood' | 'water' | 'kitchen' | 'cleaning' | 'laundry' | 'repairs'
-  | 'hunt' | 'medic' | 'teach' | 'mentor' | 'radio' | 'watch' | 'study' | 'drill';
+  | 'hunt' | 'medic' | 'teach' | 'mentor' | 'radio' | 'watch' | 'study' | 'drill' | 'post';
 
 export interface DutyDef {
   name: string;
@@ -96,12 +97,14 @@ export const DUTY: Record<Duty, DutyDef> = {
   radio: { name: 'Radio', short: 'Ra', color: '#7a6aa8', work: true, tire: 1.5, kid: false, hint: 'Listening on the radio for news and the net.' },
   watch: { name: 'Watch', short: '!', color: '#c8a030', work: true, tire: 4, kid: false, hint: 'On watch: the tower, the wall (or its walkway, if there is one), the gate. Helps see trouble coming.' },
   study: { name: 'Class', short: 'Cl', color: '#8a7ab8', work: true, tire: 1.5, kid: true, hint: 'An evening class (Family tab → Classes and drills): a student with a teacher, a book set or an online course. The teacher sits in on the same hours.' },
+  post: { name: 'Road post', short: 'Rp', color: '#b08a3a', work: true, tire: 2.5, kid: false, hint: 'At the drive: the roadblock or checkpoint crew in the day, or the greeter sent down to meet a visitor. Set by the road (The county road, in the Family tab), not by the planner.' },
   drill: { name: 'Drill', short: 'Dr', color: '#a05a4a', work: true, tire: 3, kid: false, hint: 'Firearms drill at the range: spends ammunition, steadies the aim and the response at the alarm (Family tab → Classes and drills).' },
 };
 export const DUTIES = Object.keys(DUTY) as Duty[];
 
 /** Duties that are an adult's job (a teen 15+ can stand watch). */
 export function canDo(p: Person, d: Duty): boolean {
+  if (d === 'post') return false;   // the road sets it (sim/roadPost.ts)
   if (d === 'study') return p.age >= 10;
   if (d === 'drill') return !p.kid || p.age >= 15;
   if (!p.kid) return d !== 'school';
@@ -722,6 +725,8 @@ export function unlockPerson(s: GameState, personId: string): void {
 /** What a person's plan says at an hour (falls back to the old routine for anyone not on the roster). */
 export function dutyAt(s: GameState, p: Person, hour: number): Duty {
   const h = Math.floor(((hour % 24) + 24) % 24);
+  // the road post (sim/roadPost.ts): a named crew at the block in the day, a greeter at the drive
+  if (onPost(s, p.id, h)) return 'post';
   const row = s.daily?.plan.hours[p.id];
   return row?.[h] ?? baseRow(p)[h];
 }
@@ -733,7 +738,7 @@ export function dutyAt(s: GameState, p: Person, hour: number): Duty {
 /** Task kinds the renderer reads, per duty (build is decided by the engine: build or forestry). */
 export const DUTY_TASK: Record<Exclude<Duty, 'build'>, TaskKind> = {
   sleep: 'sleep', meal: 'meal', leisure: 'leisure', school: 'school', garden: 'garden', fields: 'fields', livestock: 'livestock', pets: 'pets', wood: 'wood',
-  water: 'water', kitchen: 'kitchen', cleaning: 'cleaning', laundry: 'laundry', repairs: 'repairs', hunt: 'hunt', medic: 'medic', teach: 'teach', mentor: 'teach', radio: 'radio', watch: 'watch', study: 'study', drill: 'drill',
+  water: 'water', kitchen: 'kitchen', cleaning: 'cleaning', laundry: 'laundry', repairs: 'repairs', hunt: 'hunt', medic: 'medic', teach: 'teach', mentor: 'teach', radio: 'radio', watch: 'watch', study: 'study', drill: 'drill', post: 'watch',
 };
 
 /** Restedness multiplier on work: full to fatigue 50, half at 100. */
