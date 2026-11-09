@@ -47,7 +47,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 92;
+export const SAVE_VERSION = 93;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -283,7 +283,7 @@ export interface GameState {
   wild: Wild;
   /** Native wildlife on the land: predators taken, sightings, raids (sim/wildlife.ts). Save v49; made lazily. */
   wildlife?: Wildlife;
-  /** The album: records of the photos the family took (sim/photos.ts); the pixels are in the photo vault, not here. Save v92. */
+  /** The album: records of the photos the family took (sim/photos.ts); the pixels are in the photo vault, not here. Save v93. */
   photos?: PhotoMeta[];
   /** The long game: eras, the chronicle, milestones, the dynasty score. */
   lineage: Lineage;
@@ -351,6 +351,8 @@ export interface GameState {
   paths?: PathsState;
   /** Radio and rumors after the collapse (radio.ts); made on first use. */
   radio?: RadioState;
+  /** Life on the county road: the day's passers-by, a hail at the line, a roadblock, a mark on the place (sim/roadPassers.ts; save v92). */
+  road?: import('./roadPassers').RoadLife;
   /** Tallies since the hit (the report card), and how the run ended (null while it goes on). */
   stats: RunStats;
   ending: Ending | null;

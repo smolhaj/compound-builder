@@ -50,7 +50,7 @@ Checked `COMPOUND_BUILDER_GDS.md` against the code at origin/main (save v78). Ea
 | Flow overlay | **missing** | see above |
 | Fire: spacing, firebreaks, roofing, water access | partial | `sim/effects.ts` fire front reads fuel round each building and `emberFactor`; nothing shows it before the fire |
 | Fire overlay | **missing -> built here** | `sim/fireRisk.ts`, Terrain: Fire |
-| Sun and shade overlay | partial | Terrain: Sun shows slope/aspect only; shade from trees and buildings is not drawn (Q4) |
+| Sun and shade overlay | done | Terrain: Sun shows slope/aspect; **Shade** draws noon on Dec 21 (hills, buildings, evergreens, bare broadleaves) and lists the solar arrays and beds with how much of each is shaded (`sim/shade.ts`) |
 | Comfort and beauty raise morale (gardens, views, porches, fire pit, play area) | **missing -> built here** | `sim/comfort.ts`, `sim/mind.ts` |
 | Water, food, power, heat, waste, comms, medical, security, workshop systems | done | `sim/water.ts`, `sim/farm.ts`, `sim/utilities.ts`, `sim/heating.ts`, `sim/sanitation.ts`, `sim/radio.ts`, `sim/medical.ts`, `sim/towers.ts` |
 
@@ -72,7 +72,7 @@ Checked `COMPOUND_BUILDER_GDS.md` against the code at origin/main (save v78). Ea
 | Named neighbor households, radio net, mutual aid | done | `sim/neighborLife.ts`, `sim/pact.ts` |
 | Medical dependency (insulin, oxygen, heart meds) as a story driver | partial | per-person chance of insulin, blood pressure, thyroid, asthma (`sim/body.ts`); no oxygen, no run-level "one family member depends on it" draw (Q5) |
 | Nuclear war: four tells, strike, dash, 2-week shelter, dose, PF, fallout 7-10 | done | `sim/nuclear.ts`, `sim/bunkerLife.ts` |
-| Radiation overlay (dose by room and shielding) | missing | dose is a readout (`ui/Hud.tsx`), no map layer (Q6) |
+| Radiation overlay (dose by room and shielding) | done | Blueprint view in a nuclear run once the warning is out: every shelter shows PF and its 14-day dose, colored; summary line in the readout (`sim/radiation.ts`) |
 | Government help-or-hinder roll | done | `sim/disaster.ts` |
 | Grid-down causes, water/power rules, order curve | done | `sim/blackout.ts`, `sim/utilities.ts`, `sim/disaster.ts` |
 | Grid power in peacetime | done | `sim/utilities.ts` |

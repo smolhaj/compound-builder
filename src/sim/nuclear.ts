@@ -12,7 +12,7 @@
  * costs little.
  */
 import { BUNKER_ENTRANCES } from './bunkerEntrances';
-import type { GameState } from './state';
+import type { GameState, Structure } from './state';
 import { isFinished } from './construction';
 import { hasBasement, stylePF } from './housingStyles';
 import { protectionOf } from './hardening';
@@ -45,6 +45,20 @@ export function doseBetween(variant: string, a: number, b: number): number {
   return (R1[variant] ?? 1) * 5 * (Math.pow(t0, -0.2) - Math.pow(b, -0.2));
 }
 
+/** What one building is as a fallout shelter: [protection factor, what to call it], or null when it is no better than standing outside. */
+export function shelterOf(st: Structure): [number, string] | null {
+  if (st.kind.startsWith('bunker_') && !BUNKER_ENTRANCES.includes(st.kind)) return [protectionOf(st).pf, 'the bunker'];
+  if (st.kind === 'root_cellar') return [40, 'the root cellar'];
+  if (stylePF(st.kind)) return [stylePF(st.kind), hasBasement(st.kind) ? 'the lodge basement' : `the ${st.kind.replace(/_/g, ' ')}`];
+  if (st.kind === 'farmhouse') return [10, 'the farmhouse basement'];
+  if (st.kind === 'log_house') return [8, 'the log house'];
+  if (st.kind === 'trailer' || st.kind === 'travel_trailer' || st.kind === 'rv_camper' || st.kind === 'modular_home') return [1.5, 'the trailer'];
+  if (st.kind === 'barn') return [2, 'the barn'];
+  if (st.kind === 'timber_cabin') return [3, 'the cabin'];
+  if (st.kind === 'workshop') return [2, 'the shop'];
+  return null;
+}
+
 /** With a radiation meter the family goes out only as long as the outside rate allows: no more than this many Sv a day in the open. */
 export const METER_DAILY_SV = 0.01;
 /** Hours a person spends in the open on a day h0 hours after the strikes: none the first three days, a dash for water in the shelter window, chores after; a meter caps it. */
@@ -57,20 +71,8 @@ export function hoursOutside(s: GameState, h0: number, kid: boolean): number {
 
 /** The best shelter on the place: [protection factor, what it is]. */
 export function bestShelter(s: GameState): [number, string] {
-  const fin = s.structures.filter(isFinished);
   let best: [number, string] = [1.5, 'the open camp'];
-  const consider = (pf: number, what: string) => { if (pf > best[0]) best = [pf, what]; };
-  for (const st of fin) {
-    if (st.kind.startsWith('bunker_') && !BUNKER_ENTRANCES.includes(st.kind)) consider(protectionOf(st).pf, 'the bunker');
-    else if (st.kind === 'root_cellar') consider(40, 'the root cellar');
-    else if (stylePF(st.kind)) consider(stylePF(st.kind), hasBasement(st.kind) ? 'the lodge basement' : `the ${st.kind.replace(/_/g, ' ')}`);
-    else if (st.kind === 'farmhouse') consider(10, 'the farmhouse basement');
-    else if (st.kind === 'log_house') consider(8, 'the log house');
-    else if (st.kind === 'trailer' || st.kind === 'travel_trailer' || st.kind === 'rv_camper' || st.kind === 'modular_home') consider(1.5, 'the trailer');
-    else if (st.kind === 'barn') consider(2, 'the barn');
-    else if (st.kind === 'timber_cabin') consider(3, 'the cabin');
-    else if (st.kind === 'workshop') consider(2, 'the shop');
-  }
+  for (const st of s.structures.filter(isFinished)) { const r = shelterOf(st); if (r && r[0] > best[0]) best = r; }
   return best;
 }
 

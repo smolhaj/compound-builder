@@ -67,6 +67,8 @@ import { winterDay } from './adaptive';
 import { mutualAidDay } from './barter';
 import { arrivalCheck, hasCutscene, scheduleArrival } from './siege';
 import { scheduleLead } from './roadLead';
+import { passStep, roadDay } from './roadPassers';
+import { prepLine, roadWarnStep } from './roadWarn';
 import { scavengeDay } from './scavenge';
 import { marketDay } from './market';
 import { neighborLifeDay } from './neighborLife';
@@ -113,7 +115,10 @@ function subStep(s: GameState): void {
   // animals walking past the motion lights at night (sim/wildlife.ts)
   for (const line of wildlifeNight(s)) log(s, line);
   // a raid rolled this morning reaches the gate at its hour of the night or day
-  { const arrived = arrivalCheck(s); if (arrived) log(s, `${arrived.title}.`); }
+  { const arrived = arrivalCheck(s); if (arrived) { log(s, `${arrived.title}.`); const pl = prepLine(s, arrived.id); if (pl) arrived.dossier.push(pl); } }
+  // the road: a held visitor comes into view; the day's passers-by come abreast of the gate (sim/roadWarn.ts, sim/roadPassers.ts)
+  roadWarnStep(s);
+  passStep(s);
   const h = (s.clock.ticks * 0.25 + 6) % 24;   // exact: the tick count is an integer (hourOf(t) can land a hair under the hour)
   const { target, run } = pickWork(s, { building: () => nextBuildTarget(s), line: () => nextRun(s) });
   const fit = target || run ? null : nextFit(s);
@@ -264,6 +269,7 @@ function subStep(s: GameState): void {
     for (const line of poultryDay(s)) log(s, line);
     for (const line of cellarDay(s)) log(s, line);
     for (const line of crowdDay(s)) log(s, line);
+    roadDay(s);
     const e = gateDay(s);
     for (const line of kinDay(s)) log(s, line);
     for (const line of newcomersDay(s)) log(s, line);   // neighbors and strangers who joined; neighbors asking for shelter (after the gate: a card waits its turn)

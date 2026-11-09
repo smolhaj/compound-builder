@@ -49,7 +49,7 @@ export class BlueprintOverlay {
       const c = CSS(COLOR[m.cat]);
       Object.assign(el.style, { position: 'absolute', left: '0', top: '0', transform: 'translate(-50%,-100%)', font: '600 11.5px/1.25 system-ui,sans-serif', color: '#f4f8ff', background: 'rgba(8,24,52,0.82)', border: `1px solid ${c}`, borderRadius: '4px', padding: '1px 6px', whiteSpace: 'nowrap', textShadow: '0 1px 1px #000', boxShadow: '0 1px 4px rgba(0,0,0,0.5)', visibility: 'hidden' });
       const head = document.createElement('div'); head.textContent = m.label; el.appendChild(head);
-      if (m.sub) { const sub = document.createElement('div'); sub.textContent = m.sub; Object.assign(sub.style, { font: '400 10px/1.2 system-ui,sans-serif', color: '#b8cce8' }); el.appendChild(sub); }
+      if (m.sub) { const sub = document.createElement('div'); sub.textContent = m.sub; Object.assign(sub.style, { font: '400 10px/1.2 system-ui,sans-serif', color: m.tone === 'bad' ? '#ff8f80' : m.tone === 'warn' ? '#ffd27a' : m.tone === 'good' ? '#8fe6a8' : '#b8cce8' }); el.appendChild(sub); }
       this._layer.appendChild(el);
       this._labels.push({ mark: m, el, w: 0, h: 0 });
     }

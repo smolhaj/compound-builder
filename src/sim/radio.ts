@@ -24,6 +24,7 @@ import { mulberry32 as rng } from './rng';
 import { dayIndex } from './state';
 import { fogRadioLine } from './fogFx';
 import { fogHash } from './fog';
+import { passerRumor } from './roadPassers';
 
 export interface RadioState {
   /** Day index until which the watch is up after a raider warning, and its detection bonus. */
@@ -38,7 +39,7 @@ export interface RadioState {
   scout?: { pid: string; rumor: string; back: number };
 }
 
-export type RumorKind = 'raiders' | 'service' | 'relief' | 'city' | 'checkpoint' | 'poison';
+export type RumorKind = 'raiders' | 'service' | 'relief' | 'city' | 'checkpoint' | 'poison' | 'travelers';
 export interface Heard { id: string; day: number; text: string; kind: RumorKind; truth: boolean; status: 'open' | 'confirmed' | 'false' | 'unclear' }
 
 export type RadioSet = 'ham' | 'shortwave' | 'none';
@@ -104,6 +105,9 @@ export function radioDay(s: GameState): string[] {
   // the weather loop: a fog or low-cloud forecast for tomorrow (own random stream, so the rest of the day's news is unchanged)
   if (set !== 'none') { const fl = fogRadioLine(s); if (fl && fogHash(s.seed * 6007 + day, 11) < 0.4) return say(`${src} ${fl.replace(/^Forecast: /, 'the weather: ')}`, 0); }
 
+  // what went by on the county road is what people talk about (sim/roadPassers.ts; its own random stream)
+  const pr = passerRumor(s, src, truth);
+  if (pr) { if (pr.truth) st.truths++; else st.rumors++; if (pr.warn) warn(3); return say(pr.text, pr.tone, { kind: pr.kind, truth: pr.truth }); }
   if (r() < truth) {
     st.truths++;
     // a raider warning, likelier the more the law has gone
