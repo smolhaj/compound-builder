@@ -33,6 +33,10 @@ const fin = (s: GameState, kind: string): Structure[] => s.structures.filter(st 
 export const hasHelipad = (s: GameState): boolean => fin(s, 'helipad').length > 0;
 /** A helicopter can come: the county's air ambulance works (the medical and the bank tracks) and there is a pad. */
 export const airliftReady = (s: GameState): boolean => hasHelipad(s) && s.disaster.tracks.medical >= 0.5 && s.disaster.tracks.banks >= 0.5 && countyWorks(s);
+/** Charter helicopter off the pad for a bug-out (2025 charter of an R44-class four-seater, $1,200 an hour, two hours with the positioning flight): the pilot and three seats, 25 kg of bags a seat. */
+export const CHARTER = { seats: 3, usd: 2_400, kgSeat: 25 } as const;
+/** Seats a chartered helicopter gives the plan: only while the county works (airliftReady) and the family can pay. */
+export const charterSeats = (s: GameState): number => airliftReady(s) && s.money >= CHARTER.usd ? CHARTER.seats : 0;
 /** What the flight is billed to this household. */
 export const airliftBill = (s: GameState): number => Math.round(AIRLIFT_USD * (s.paper.insured ? AIRLIFT_INSURED : 1));
 
