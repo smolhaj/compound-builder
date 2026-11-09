@@ -538,7 +538,7 @@ export class BattleRenderer {
         break;
       }
       case 'ram': case 'charge': case 'gap': this.invasion.onEvent(e); break;
-      case 'house_door': case 'loot': case 'fire': this.props.onEvent(e); break;
+      case 'house_door': case 'loot': case 'fire': case 'ladder': this.props.onEvent(e); break;
       case 'breach': this._boom(e.x, this._ground(e.x, e.z), e.z, 0.5, true); break;
       case 'door': this.onDoor?.(e.open, e.x, e.z, e.what); break;      // the crew at the tunnel's steel door: shut while they work at it, forced when they are through
       case 'fallback': this.shake = Math.max(this.shake, 0.15); break;
@@ -547,6 +547,7 @@ export class BattleRenderer {
         const u = U_(e.unit);
         if (u && !e.stopped) {
           u.wound = Math.min(1, u.wound + Math.max(0.3, e.sev)); this._tint(u, e.part);
+          if (!u.dead) u.duckUntil = Math.max(u.duckUntil ?? 0, this.time + 1.6);   // (a hit is felt: down on a knee, a hand to it, whatever else he is doing)
           if (this._graphic) {
             (u.marks ??= []).push({ part: e.part, sev: e.sev }); if (u.marks.length > 2) u.marks.shift();
             this._stain({ x: u.x, y: this._ground(u.x, u.z) + 0.006, z: u.z, r: 0.008 + 0.012 * Math.min(1, e.sev / 60), stretch: 1.3, rot: u.rot, color: 0x5e0d0b });
@@ -698,8 +699,7 @@ export class BattleRenderer {
     for (const u of this._units.values()) {
       if (u.gone || u.def.machine) continue;
       let moving = false;
-      if (u.hideHow && !u.hidden && (u.hideHow === 'closet' || u.hideHow === 'cellar') && Math.hypot(u.tx - u.x, u.tz - u.z) <= 0.03) u.hidden = true;
-      if (u.hidden) continue;
+      // (someone who has gone to ground is crouched where they hide, in plain sight of the camera: nobody blinks out of the picture)
       if (u.ledBy && !u.dead) {
         // led by the arm: a step behind the captor, wherever they go
         const c = this._units.get(u.ledBy);
@@ -716,7 +716,7 @@ export class BattleRenderer {
           let dr = Math.atan2(dx, dz) - u.rot; dr = Math.atan2(Math.sin(dr), Math.cos(dr));
           u.rot += dr * Math.min(1, dt * 10);
           // climbing to a post: the height follows the remaining distance
-          u.y += (u.ty - u.y) * Math.min(1, step / Math.max(d, 0.3));
+          u.y += (u.ty - u.y) * Math.min(1, step / Math.max(d, d <= 0.3 ? 0.02 : 0.3));   // (lands exactly on arrival: up a ladder, the last 30 cm is the climb)
         } else u.y += (u.ty - u.y) * Math.min(1, dt * 4);
         if (u.speed === FLEE && Math.hypot(u.x - this._center.x, u.z - this._center.z) > 50) { u.gone = true; continue; }
       }

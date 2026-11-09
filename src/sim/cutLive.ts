@@ -4,6 +4,7 @@
  * `house_door` shut after `close` until the next `open` / successful `kick`, `shoot` or `charge`, and a `gap` carving the wall from its moment.
  */
 import type { Battle, BattleEvent } from './battleTypes';
+import { stepHeightAt, type StepSeg } from './standingSurfaces';
 import { routeBattle, type Barrier, type Carve, type NavWorld, type Pt } from './cutNav';
 
 const DOOR_HALF = 0.12, DOOR_DEPTH = 0.08;
@@ -42,11 +43,64 @@ export function navFor(b: Battle, solid: (x: number, z: number) => boolean, pad 
 }
 
 /** Route a whole staged scene. Anything that goes wrong leaves the scene as it was (a cutscene must never take the game down). */
-export function routeScene(b: Battle, solid: (x: number, z: number) => boolean, center?: Pt): { battle: Battle; unrouted: number; lost: Array<{ unit: string; t: number; from: Pt; to: Pt }>; nudged: string[]; ok: boolean } {
+export function routeScene(b: Battle, solid: (x: number, z: number) => boolean, center?: Pt, steps: readonly StepSeg[] = []): { battle: Battle; unrouted: number; lost: Array<{ unit: string; t: number; from: Pt; to: Pt }>; nudged: string[]; ok: boolean } {
   try {
-    const r = routeBattle(b, navFor(b, solid, 0.06), center);
+    const lifted = elevateOnProps(b, steps, solid);
+    const iw = lifted.invasion?.interior;
+    const settle = iw ? { ids: new Set(lifted.units.filter(u => u.side === 'home' && !u.civilian && !u.machine && !u.bystander).map(u => u.id)), from: iw.from - 8, to: iw.to } : undefined;
+    const r = routeBattle(lifted, navFor(lifted, solid, 0.06), center, settle);
     return { ...r, ok: true };
   } catch {
     return { battle: b, unrouted: 0, lost: [], nudged: [], ok: false };
   }
+}
+
+/**
+ * Nobody is above the ground unless something real is under them. The battle sim lifts a defender to a post on a fighting step (a platform that is
+ * drawn, sim/standingSurfaces.ts) and a raider at the wall to the wall's height ("up a ladder"); neither has anything to climb. Here each such climb
+ * gets a ladder prop (a `ladder` event, drawn as one instanced mesh) and the unit walks to its foot first (`via`); the router (sim/cutNav.ts) remembers the foot and
+ * sends a unit that is up there back down it before anything else it is told to do, so nobody ever rises or drops through the air. Raiders' ladders lean on
+ * the outside of the wall, defenders' on the inside of the step. Surfaces that are real buildings (a tower's cab, a wall-top deck, an upper floor)
+ * are left as they are. Pure.
+ */
+export function elevateOnProps(b: Battle, steps: readonly StepSeg[], solid: (x: number, z: number) => boolean = () => false): Battle {
+  const homes = b.units.filter(u => u.side === 'home' && !u.bystander && !u.machine);
+  if (!homes.length) return b;
+  const C = { x: homes.reduce((s, u) => s + u.x, 0) / homes.length, z: homes.reduce((s, u) => s + u.z, 0) / homes.length };
+  const side = new Map(b.units.map(u => [u.id, u.side]));
+  const out: BattleEvent[] = [];
+  const unit = (n: number, v: { x: number; z: number }) => { const l = Math.hypot(v.x, v.z) || 1; return { x: v.x / l * n, z: v.z / l * n }; };
+  let changed = false;
+  const made: Array<{ x: number; z: number; t: number }> = [];
+  for (const e of [...b.events].sort((a, c) => a.t - c.t)) {
+    if (e.kind === 'move' && (e.y ?? 0) > 0.05 && !e.via && !e.near) {
+      const raider = side.get(e.unit) === 'raider';
+      const stepY = raider ? null : stepHeightAt(steps, e.x, e.z);
+      if (raider || (stepY !== null && Math.abs(stepY - (e.y ?? 0)) < 0.06)) {
+        // a raider's ladder leans on the OUTSIDE of the wall; a defender's on the inside of the step
+        const dir = raider ? unit(1, { x: e.x - C.x, z: e.z - C.z }) : unit(1, { x: C.x - e.x, z: C.z - e.z });
+        // (several climbers at one place get a ladder each, side by side)
+        const used = made.filter(m => Math.hypot(m.x - e.x, m.z - e.z) < 0.35 && Math.abs(m.t - e.t) < 8).length;
+        const lat = used === 0 ? 0 : 0.14 * Math.ceil(used / 2) * (used % 2 ? 1 : -1);
+        const tan = { x: -dir.z, z: dir.x };
+        const base = { x: e.x + tan.x * lat, z: e.z + tan.z * lat };
+        made.push({ x: e.x, z: e.z, t: e.t });
+        // (the ladder leans on the wall's face: from the sim's point, out until the ground is open with a hand to spare, and its foot another 30 cm on)
+        const free = (d: number) => !solid(base.x + dir.x * d, base.z + dir.z * d) && !solid(base.x + dir.x * (d + 0.06), base.z + dir.z * (d + 0.06));
+        let d0 = raider ? 0.12 : 0.04;
+        while (d0 < 1 && !free(d0)) d0 += 0.03;
+        let d1 = d0 + 0.3;
+        while (d1 < d0 + 0.9 && !free(d1)) d1 += 0.03;
+        const topAt = { x: base.x + dir.x * d0, z: base.z + dir.z * d0 };
+        const foot = { x: base.x + dir.x * d1, z: base.z + dir.z * d1 };
+        const r2 = (n: number) => Math.round(n * 100) / 100;
+        out.push({ t: Math.max(0, r2(e.t - 1.5)), kind: 'ladder', x: r2(topAt.x), z: r2(topAt.z), h: r2(e.y!), fx: r2(foot.x), fz: r2(foot.z) });
+        out.push({ ...e, x: r2(raider || lat ? topAt.x : e.x), z: r2(raider || lat ? topAt.z : e.z), via: { x: r2(foot.x), z: r2(foot.z) } });
+        changed = true;
+        continue;
+      }
+    }
+    out.push(e);
+  }
+  return changed ? { ...b, events: out.sort((a, c) => a.t - c.t) } : b;
 }

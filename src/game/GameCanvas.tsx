@@ -50,6 +50,7 @@ import { liveBreach } from './battle/liveBreach';
 import { decorateBreach } from '../sim/breach';
 import { planHouseAssault } from '../sim/houseAssault';
 import { routeScene } from '../sim/cutLive';
+import { stepSegments } from '../sim/standingSurfaces';
 import { LineDirector } from '../sim/raidDialogue';
 import { fireBoxesOf } from './battle/lineOfFire';
 import { useCutsceneView } from '../store/cutsceneStore';
@@ -398,7 +399,7 @@ export function GameCanvas() {
             if (home) b = planHouseAssault(b, { box: footprint(KIT[home.kind], home.x, home.z, home.rot, false), blocked: solid, seed, dir, nameOf });
           }
         } catch (err) { console.warn('cutscene staging failed; playing the plain scene', err); b = b0; }
-        return routeScene(b, solid).battle;
+        return routeScene(b, solid, undefined, stepSegments(useGameStore.getState().game.perimeter)).battle;
       },
       cutaway: on => { const ws2 = useWorldStore.getState(); if (on) { cutawayBefore ??= ws2.buildingView; ws2.setBuildingView('cutaway'); } else if (cutawayBefore) { ws2.setBuildingView(cutawayBefore); cutawayBefore = null; } } });
     const nameLayer = new NameLabelLayer();

@@ -236,7 +236,7 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
     rest.forEach((u, i) => {
       strip.add(u.id);
       const inside = l && crew.includes(u);
-      walk(t0 + 3.4 + i * 0.35, u, inside ? [l!.door, l!.out, gap, outward] : [gap, outward], inside ? l!.at(l!.rooms[0]) : (pos.get(u.id) ?? u));
+      walk(t0 + 3.4 + i * 0.6, u, inside ? [l!.door, l!.out, gap, outward] : [gap, outward], inside ? l!.at(l!.rooms[0]) : (pos.get(u.id) ?? u));
     });
   }
   let planned: InteriorOut | null = null;
