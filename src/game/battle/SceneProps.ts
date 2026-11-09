@@ -74,8 +74,8 @@ export class SceneProps {
     if (this._ladders.length >= MAX_LADDERS || this._ladders.some(l => Math.hypot(l.x - e.x, l.z - e.z) < 0.05 && Math.hypot(l.fx - e.fx, l.fz - e.fz) < 0.05)) return;
     if (!this._ladderMesh) {
       const parts: THREE.BufferGeometry[] = [];
-      for (const sx of [-0.028, 0.028]) parts.push(new THREE.BoxGeometry(0.009, 1, 0.009).translate(sx, 0.5, 0));
-      for (let i = 0; i < 7; i++) parts.push(new THREE.BoxGeometry(0.06, 0.006, 0.007).translate(0, 0.07 + i * 0.14, 0));
+      for (const sx of [-0.028, 0.028]) parts.push(new THREE.BoxGeometry(0.014, 1, 0.014).translate(sx, 0.5, 0));
+      for (let i = 0; i < 7; i++) parts.push(new THREE.BoxGeometry(0.06, 0.012, 0.012).translate(0, 0.07 + i * 0.14, 0));
       const geo = mergeGeometries(parts)!;
       for (const p of parts) p.dispose();
       const mat = new THREE.MeshStandardMaterial({ color: 0x6b4d2c, roughness: 0.9 });
