@@ -29,7 +29,7 @@ export function housesFor(kind: StockKind): readonly string[] {
 export function drawnHerd(stock: Readonly<Record<string, number>>, coops: number): Array<{ id: string; kind: StockKind }> {
   const out: Array<{ id: string; kind: StockKind }> = [];
   for (const kind of STOCK_KINDS) {
-    const head = kind === 'hen' ? coops * 12 : Math.floor(stock[kind] ?? 0);
+    const head = kind === 'hen' ? coops * 12 : Math.floor(stock[kind] ?? 0) + (kind === 'pig' ? Math.floor(stock.sow ?? 0) + Math.floor(stock.boar ?? 0) : 0);
     const n = Math.min(DRAW_CAP, Math.max(0, head));
     for (let i = 0; i < n; i++) out.push({ id: `${kind}${i}`, kind });
   }

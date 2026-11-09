@@ -22,6 +22,7 @@ export { winterFactor };
 import { mulberry32 } from './rng';
 import { empVehicles } from './vehicles';
 import type { Stock } from './materials';
+import { takeIodide } from './radiation';
 
 /** Dose rate at H+1 (Sv/h) at the compound, by variant, and hours until the fallout arrives. */
 const R1: Record<string, number> = { distant: 2.0, nearby: 4.0, exchange: 3.0 };
@@ -42,6 +43,16 @@ export function doseBetween(variant: string, a: number, b: number): number {
   const t0 = Math.max(a, ARRIVE_H[variant] ?? 6, 1);
   if (b <= t0) return 0;
   return (R1[variant] ?? 1) * 5 * (Math.pow(t0, -0.2) - Math.pow(b, -0.2));
+}
+
+/** With a radiation meter the family goes out only as long as the outside rate allows: no more than this many Sv a day in the open. */
+export const METER_DAILY_SV = 0.01;
+/** Hours a person spends in the open on a day h0 hours after the strikes: none the first three days, a dash for water in the shelter window, chores after; a meter caps it. */
+export function hoursOutside(s: GameState, h0: number, kid: boolean): number {
+  const base = h0 < 72 ? 0 : h0 < SHELTER_DAYS * 24 ? 0.5 : kid ? 2 : 8;
+  if ((s.stock.geiger_counter ?? 0) < 1 || base <= 0) return base;
+  const rate = doseRate(s.disaster.variant, h0 + 12);
+  return rate <= 0 ? base : Math.min(base, METER_DAILY_SV / rate);
 }
 
 /** The best shelter on the place: [protection factor, what it is]. */
@@ -106,6 +117,9 @@ export function strike(s: GameState): string[] {
   });
   const [pf, where] = bestShelter(s);
   out.push(`Everyone into ${where} (protection factor ${Math.round(pf)}).`);
+  if ((s.stock.geiger_counter ?? 0) >= 1) out.push('The radiation meter is on the shelter shelf: the family will go out only as long as the rate outside allows.');
+  const ki = takeIodide(s);
+  if (ki) out.push(ki);
   return out;
 }
 
@@ -120,14 +134,13 @@ export function falloutDay(s: GameState): string[] {
   if (h0 > 24 * 400) return [];
   const [pf] = bestShelter(s);
   const out: string[] = [];
-  const sheltering = h0 < SHELTER_DAYS * 24;
   const fin = s.structures.filter(isFinished);
   const cleanWater = !s.utilities.hauling && fin.some(st => st.kind === 'well_drilled' || st.kind === 'well_hand' || st.kind === 'cistern' || st.kind === 'water_tower');
   const day = h0 / 24;
   s.people.forEach((p, i) => {
     const n = s.personState[i]?.needs;
     if (!n || n.died != null) return;
-    const outside = h0 < 72 ? 0 : sheltering ? 0.5 : p.kid ? 2 : 8;      // hours in the open: none the first three days, a dash for water after
+    const outside = hoursOutside(s, h0, !!p.kid);   // hours in the open: none the first three days, a dash for water after (a meter keeps it to what the rate allows)
     let dose = doseBetween(v, h0, h0 + 24 - outside) / pf + doseBetween(v, h0 + 24 - outside, h0 + 24) / 1.5;
     // contaminated food and water: garden produce and creek water carry it for two months
     if (day < CONTAMINATED_DAYS) {
@@ -136,8 +149,8 @@ export function falloutDay(s: GameState): string[] {
       // (by the share of the diet that's fresh from the place, not the size of the farm: playtest round 3, a fallout over a 16-field harvest gave everyone 0.3 Sv a day)
       if (s.food.producedKcal > 0) dose += 0.002 * k * Math.min(1, s.food.producedKcal / Math.max(1, s.food.needKcal));
     }
+    // (the sickness itself, with the body's repair, is sim/radiation.ts)
     n.dose += dose;
-    if (n.dose > 1 && n.dose - dose <= 1) out.push(`${p.first} is sick: nausea, weakness. Radiation sickness.`);
   });
   return out;
 }
