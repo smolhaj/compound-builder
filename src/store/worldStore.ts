@@ -64,12 +64,15 @@ export interface WorldState {
   /** Sightline overlay: off / exposure from the road / from the ridge / night lights / viewshed from a point. */
   sightMode: 'off' | 'road' | 'ridge' | 'night' | 'viewshed';
   /** The terrain overlay (high ground, lanes, water, sun): game/terrain/TerrainOverlay.ts. */
-  terrainMode: 'off' | 'high' | 'lanes' | 'water' | 'sun' | 'fire';
+  terrainMode: 'off' | 'high' | 'lanes' | 'water' | 'sun' | 'shade' | 'fire';
   setTerrainMode: (m: WorldState['terrainMode']) => void;
   /** The blueprint view: names and roles of the buildings, rings, gates, towers and tunnels, with the defense readouts (game/blueprint). */
   blueprint: boolean;
   setBlueprint: (on: boolean) => void;
   blueprintReadout: BpReadout | null;
+  /** Shade overlay: one line per solar array / bed (sim/shade.ts). */
+  shadeReadout: string[] | null;
+  setShadeReadout: (r: string[] | null) => void;
   setBlueprintReadout: (r: BpReadout | null) => void;
   /** The property line drawn on the ground (also shown while a fence or wall is being drawn). */
   showBoundary: boolean;
@@ -169,6 +172,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   blueprint: false,
   setBlueprint: (blueprint) => set({ blueprint }),
   blueprintReadout: null,
+  shadeReadout: null,
+  setShadeReadout: (shadeReadout) => set({ shadeReadout }),
   setBlueprintReadout: (blueprintReadout) => set({ blueprintReadout }),
   showBoundary: false,
   weakView: false,
