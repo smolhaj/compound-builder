@@ -107,7 +107,7 @@ try {
         if (!p) continue;
         const d = Math.hypot(u.x - p.x, u.z - p.z); A.maxStep = Math.max(A.maxStep, d); A.steps++;
         const n = Math.max(1, Math.ceil(d / 0.04)); let was = blockedAt(A.nav, p.x, p.z, t);
-        for (let i = 1; i <= n; i++) { const x = p.x + (u.x - p.x) * i / n, z = p.z + (u.z - p.z) * i / n, now = blockedAt(A.nav, x, z, t); if (now && !was && A.clips.length < 60) { A.clips.push({ id: u.id, t: +t.toFixed(2), x: +x.toFixed(2), z: +z.toFixed(2), side: u.side }); break; } was = now; }
+        for (let i = 1; i <= n; i++) { const x = p.x + (u.x - p.x) * i / n, z = p.z + (u.z - p.z) * i / n, now = blockedAt(A.nav, x, z, t); if (now && !was && A.clips.length < 60) { { const U = b._units.get(u.id); A.clips.push({ id: u.id, t: +t.toFixed(2), x: +x.toFixed(2), z: +z.toFixed(2), y: +(U?.y ?? 0).toFixed(2), carried: !!U?.carriedBy, led: !!U?.ledBy, tx: +(U?.tx ?? 0).toFixed(2), tz: +(U?.tz ?? 0).toFixed(2), speed: U?.speed, crouch: !!U?.crouch, from: [+p.x.toFixed(2), +p.z.toFixed(2)] }); } break; } was = now; }
       }
     };
   });
