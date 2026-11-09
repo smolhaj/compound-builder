@@ -20,6 +20,7 @@ import { CompoundBoardPanel } from './CompoundBoard';
 import { WaveChip } from './WaveClock';
 import { CollapseChip } from './CollapseChip';
 import { KinPanel } from './KinPanel';
+import { RoadSection } from './RoadPanel';
 import { NewcomersPanel } from './NewcomersPanel';
 import { originLabel } from '../sim/newcomers';
 import { WeekenderPanel } from './WeekenderPanel';
@@ -304,6 +305,7 @@ export function Hud() {
             <DogsPanel game={game} />
             <KinPanel />
             <NewcomersPanel />
+            <RoadSection />
             <HousingPanel />
             <QuartersPanel />
             <PeopleSection />

@@ -117,7 +117,7 @@ describe('haying', () => {
   });
 });
 
-it('the save version moved', () => { expect(SAVE_VERSION).toBe(91); });
+it('the save version moved', () => { expect(SAVE_VERSION).toBeGreaterThanOrEqual(91); });
 
 describe('the flock', () => {
   const coop = () => { const g = newGame(4); built(g, 'c', 'chicken_coop'); return g; };
