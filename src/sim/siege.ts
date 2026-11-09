@@ -137,6 +137,8 @@ export interface Scene {
   fight: number;
   /** Game seconds of the lull after, time-lapsed. */
   tail: number;
+  /** How much the approach and the quiet after are stretched in the playback: 1 a skirmish (about a minute whole), more for a serious raid (3-4 min) and a full invasion (up to about 6; sim/raidLength.ts). */
+  pace?: number;
   /** Who is drawn and how the scene is played (sim/raiderKinds.ts); absent on a scene from before. */
   style?: CrewStyle;
   tactic?: Tactic;
@@ -179,10 +181,11 @@ export interface SiegeInput {
 
 /** How long a scene's lead-in, fight and tail take in the playback (real seconds). */
 export function playbackLengths(sc: Scene): { lead: number; fight: number; tail: number } {
+  const k = sc.pace ?? 1;
   return {
-    lead: sc.lead > 0 ? Math.min(9, Math.max(3, sc.lead / 22)) : 0,
+    lead: sc.lead > 0 ? Math.min(9 * k, Math.max(3, sc.lead / 22 * k)) : 0,
     fight: sc.fight,
-    tail: Math.max(sc.tail > 0 ? Math.min(6, Math.max(2, sc.tail / 18)) : 0, sc.wake ? sc.wake + 3 : 0),
+    tail: Math.max(sc.tail > 0 ? Math.min(6 * k, Math.max(2, sc.tail / 18 * k)) : 0, sc.wake ? sc.wake + 3 : 0),
   };
 }
 /** The card shown over a skipped gap, in playback seconds. */

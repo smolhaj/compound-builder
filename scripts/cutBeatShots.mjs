@@ -89,9 +89,8 @@ try {
   await frames(10); console.log('frames ok', new Date().toISOString());
   await page.waitForTimeout(3500);
   console.log('click defend');
-  const LABEL = { defend: /^Defend/, flag_pay: /^Pay what they ask/, flag_pass: /^Let them pass/, flag_bluff: /^Bluff/, flag_shoot: /^Shoot the envoy/ };
-  await page.getByRole('button', { name: LABEL[opt('--stance', 'defend')] }).click();
-  await page.getByRole('button', { name: 'Watch', exact: true }).click();
+  // (the store's own two actions: the stance card's buttons, then Watch)
+  await page.evaluate(st => { const g = window.__cb.game.getState(); g.chooseStance(st); g.watchRaid(); }, opt('--stance', 'defend'));
   await frames(3);
   const q0 = await page.evaluate(() => window.__cb.store.getState().quality);
   await page.evaluate(async () => {

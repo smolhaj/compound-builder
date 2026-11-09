@@ -160,7 +160,7 @@ export function planInterior(a: InteriorArgs): InteriorOut | null {
   }
   // the family waits behind the door
   if (fighters[1]) say(tS + 0.9, 'defender', 'pie_corner', fighters[1]);
-  const stageLen = Math.max(disc ? 6.5 : 3.6, Math.min(disc ? 10 : 6.2, (tI + D - 14 - s) / m));
+  const stageLen = Math.max(disc ? 6.5 : 3.6, Math.min(disc ? 15 : 8.5, (tI + D - 14 - s) / m));
   const insideCrew = crew.slice(0, 6);
 
   // ── 3. room by room ──────────────────────────────────────────────────────────────────────────

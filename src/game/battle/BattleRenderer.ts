@@ -210,6 +210,7 @@ export class BattleRenderer {
       boom: (x, y, z, r, dust) => this._boom(x, y, z, r, dust), shake: v => { this.shake = Math.max(this.shake, v); }, gap: (id, at, w) => this.onGap?.(id, at, w),
     });
     this.props = new SceneProps(this._group, { ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c), shake: v => { this.shake = Math.max(this.shake, v); } });
+    this.props.centerOf = () => ({ x: this._center.x, z: this._center.z });
     this._trGeo.setAttribute('position', new THREE.BufferAttribute(this._trPos, 3).setUsage(THREE.DynamicDrawUsage));
     this._trGeo.setDrawRange(0, 0);
     this._trLines = new THREE.LineSegments(this._trGeo, new THREE.LineBasicMaterial({ color: 0xffd27a, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
@@ -328,6 +329,7 @@ export class BattleRenderer {
     }
     this.invasion.begin(b);
     this.props.end();
+    this._floodsOutAt = -1; this._floodBase = []; this._lightsSparked = false;
     this._alarm = new THREE.PointLight(0xff2020, 0, 14, 1.6);
     this._alarm.position.set(this._center.x, this._ground(this._center.x, this._center.z) + 0.8, this._center.z);
     this._group.add(this._alarm);
@@ -463,7 +465,7 @@ export class BattleRenderer {
     if (this._fed.length < 64) this._fed.push(e);
     const U_ = (id: string) => this._units.get(id);
     switch (e.kind) {
-      case 'alarm': this._alarmOn = true; break;
+      case 'alarm': this._alarmOn = true; if (e.what === 'dog') this.props.onEvent({ ...e }); break;
       case 'lights': this._lightsOn(e.masts, e.aim); break;
       case 'move': { const u = U_(e.unit); if (u && !u.dead) { const n = this._near(e), c = u.def.side === 'raider' ? this._clearOfCover(n.x, n.z) : n; u.tx = c.x; u.tz = c.z; u.ty = e.y ?? 0; u.crouch = false; u.lean = 0; if (e.walk) u.speed = WALK; } break; }
       case 'cover': { const u = U_(e.unit); if (u && !u.dead) { const n = this._near(e), c = u.def.side === 'raider' ? this._clearOfCover(n.x, n.z) : n; u.tx = c.x; u.tz = c.z; u.ty = 0; u.crouch = true; if (e.walk) u.speed = WALK; } break; }
@@ -549,7 +551,11 @@ export class BattleRenderer {
       }
       case 'ram': case 'charge': case 'gap': this.invasion.onEvent(e); break;
       case 'house_door': case 'loot': case 'fire': case 'ladder': case 'flare': case 'flag': this.props.onEvent(e); break;
-      case 'breach': this._boom(e.x, this._ground(e.x, e.z), e.z, 0.5, true); break;
+      case 'breach':
+        this._boom(e.x, this._ground(e.x, e.z), e.z, 0.5, true);
+        // a crew that has broken the line shoots out the floodlights: the yard goes dark a moment after (night only: by day nobody needs them)
+        if (this._floods.length && (this.lightNight ?? this.battle?.night)) this._floodsOutAt = this.time + 1.4;
+        break;
       case 'door': this.onDoor?.(e.open, e.x, e.z, e.what); break;      // the crew at the tunnel's steel door: shut while they work at it, forced when they are through
       case 'fallback': this.shake = Math.max(this.shake, 0.15); break;
       case 'carry': break;   // the wounded's own move event carries them in
@@ -862,7 +868,17 @@ export class BattleRenderer {
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
   }
 
+  /** When the floodlights are shot out (a night breach), and how bright they were. */
+  private _floodsOutAt = -1;
+  private _lightsSparked = false;
+  private _floodBase: number[] = [];
   private _tickFx(dt: number): void {
+    if (this._floodsOutAt >= 0 && this.time >= this._floodsOutAt) {
+      if (!this._floodBase.length) this._floodBase = this._floods.map(f => f.intensity);
+      const k = Math.max(0, 1 - (this.time - this._floodsOutAt) / 0.5);
+      this._floods.forEach((f, i) => { f.intensity = (this._floodBase[i] ?? 0) * k; });
+      if (k <= 0 && !this._lightsSparked) { this._lightsSparked = true; for (const f of this._floods) this._puff(f.position, 0.02, 0.12, 0.4, 0.05, 0xffd890, 1, true); }
+    }
     for (let i = this._marks.length - 1; i >= 0; i--) {
       const m = this._marks[i], u = this._units.get(m.unit);
       m.ttl -= dt;
