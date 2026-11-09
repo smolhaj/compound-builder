@@ -4,6 +4,7 @@
  * Bump SAVE_VERSION and add a migration in save/migrations.ts whenever a
  * field changes (CLAUDE.md rule 5).
  */
+import type { PhotoMeta } from './photos';
 import { foundLineage, newLineage, type Lineage } from './lineage';
 import type { RadioState } from './radio';
 import { emptyStock, type Stock, type MaterialId } from './materials';
@@ -46,7 +47,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 89;
+export const SAVE_VERSION = 90;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -280,6 +281,8 @@ export interface GameState {
   wild: Wild;
   /** Native wildlife on the land: predators taken, sightings, raids (sim/wildlife.ts). Save v49; made lazily. */
   wildlife?: Wildlife;
+  /** The album: records of the photos the family took (sim/photos.ts); the pixels are in the photo vault, not here. Save v90. */
+  photos?: PhotoMeta[];
   /** The long game: eras, the chronicle, milestones, the dynasty score. */
   lineage: Lineage;
   /** Goats, pigs, the steer, rabbits (lazily made: `s.livestock ??= newLivestock()`). */

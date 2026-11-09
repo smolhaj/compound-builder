@@ -47,6 +47,7 @@ import { roadLine } from '../sim/roadFx';
 import { crossingLine } from '../sim/roadWildlife';
 import { roadPlanOf } from '../sim/roadState';
 import { SaveMenu } from './SaveMenu';
+import { Album, PhotoShutter, Thumb } from './PhotoAlbum';
 import { EntranceCard } from './hud/EntranceCard';
 import { PlowNote } from './hud/PlowNote';
 import { DRIVE_PER_FT, driveQuote, hookupProblem, POLE_PER_FT, powerQuote } from '../sim/improvements';
@@ -693,6 +694,7 @@ export function Hud() {
           <span>{dateLabel(w.dayOfYear)}</span>
           <input type="range" min={1} max={365} step={1} value={w.dayOfYear} onChange={e => w.setDayOfYear(+e.target.value)} />
         </>}
+        <PhotoShutter />
       </div>}
     </>
   );
@@ -782,7 +784,7 @@ function TakenSection() {
 }
 
 const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
-const KIND_MARK: Record<string, string> = { era: '◆', birth: '✦', death: '✝', partner: '♥', coming: '▲', milestone: '★', retire: '·', home: '⌂', threat: '▼', bond: '✧' };
+const KIND_MARK: Record<string, string> = { era: '◆', birth: '✦', death: '✝', partner: '♥', coming: '▲', milestone: '★', retire: '·', home: '⌂', threat: '▼', bond: '✧', photo: '▣' };
 
 /** The long game: the family over the years, the eras, milestones and the dynasty score. */
 function Chronicle() {
@@ -820,11 +822,12 @@ function Chronicle() {
     <Section title={`Milestones ${L.milestones.length}/${MILESTONE_COUNT}`}>
       {L.milestones.length ? L.milestones.map(m => <div key={m} style={{ padding: '1px 0' }}><span style={{ color: '#d8c08a' }}>★</span> {MILESTONE_NAME[m]}</div>) : <Note>None yet. Get through the first winter.</Note>}
     </Section>
+    <Album />
     <Section title="Chronicle">
       {L.chronicle.length === 0 && <Note>Births, deaths, weddings, the eras: it all goes here.</Note>}
       {L.chronicle.slice(-40).reverse().map((e, i) => <div key={i} style={{ display: 'flex', gap: 6, padding: '3px 0', borderBottom: `1px solid ${LINE}` }}>
         <span style={{ color: DIM, width: 32, flex: 'none', fontVariantNumeric: 'tabular-nums' }}>{e.year}</span>
-        <span style={{ color: e.kind === 'death' ? '#b8a8a0' : e.kind === 'era' ? '#d8c08a' : undefined }}>{KIND_MARK[e.kind]} {e.text}</span>
+        <span style={{ color: e.kind === 'death' ? '#b8a8a0' : e.kind === 'era' ? '#d8c08a' : undefined }}>{KIND_MARK[e.kind]} {e.text}{e.photo && <Thumb id={e.photo} width={150} />}</span>
       </div>)}
     </Section>
   </>;

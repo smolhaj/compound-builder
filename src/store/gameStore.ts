@@ -1,3 +1,5 @@
+import { takePhoto as takePhotoRecord, dropPhoto } from '../sim/photos';
+import { putPhoto, removePhotos, syncVault } from '../sim/save/photoVault';
 import { wipeEnded } from '../sim/wipe';
 import { planProblem } from '../sim/construction';
 import { unscripted } from '../sim/godMode';
@@ -189,6 +191,10 @@ export interface GameStore {
   /** Stake starter-compound pieces (and the yard fence) in one go; each is an ordinary structure afterwards. Returns how many went in. */
   layStarter: (pieces: ReadonlyArray<{ kind: string; x: number; z: number; rot: number }>, yard: WallPlan | null, geo: PropertyGeometry) => number;
   load: (g: GameState) => void;
+  /** Keep a picture of the place in the album with a caption (sim/photos.ts). Null on success, else why not. */
+  keepPhoto: (data: string, caption: string) => string | null;
+  /** Throw an album photo away. */
+  tossPhoto: (id: string) => void;
   /** Speed to pick up again once the decision card that paused the clock is answered (null: stay paused). */
   resumeTo: Speed | null;
   /** Lay out a fence / hedge / wall run for the family to build. */
@@ -517,7 +523,17 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     return n;
   },
   resumeTo: null,
-  load: (game) => { muteFeedback(); set({ game, welcome: false, selected: null, tool: null, cutscene: promptFor(game), resumeTo: null, dayCard: null }); },
+  keepPhoto: (data, caption) => {
+    const g = structuredClone(get().game), id = 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+    const r = takePhotoRecord(g, data, caption, id);
+    if (!r.ok) return r.why;
+    if (!putPhoto(id, data)) return 'The album is full.';
+    removePhotos(r.dropped);
+    set({ game: g }); void saveGame(AUTOSAVE, g);
+    return null;
+  },
+  tossPhoto: (id) => { const g = structuredClone(get().game); if (dropPhoto(g, id)) { removePhotos([id]); set({ game: g }); void saveGame(AUTOSAVE, g); } },
+  load: (game) => { void syncVault((game.photos ?? []).map(p => p.id)); muteFeedback(); set({ game, welcome: false, selected: null, tool: null, cutscene: promptFor(game), resumeTo: null, dayCard: null }); },
   planRun: (kind, pts, gates, offLen = 0) => {
     if (locked()) return;
     if (routeProblem(get().game, kind, pts)) return;   // a tunnel-bridge needs real low ground, a slope tunnel a hillside (the tool says why)

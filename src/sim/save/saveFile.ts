@@ -1,6 +1,7 @@
 /** Pure helpers for the Save / Load control: the export file name and a friendly check of a chosen file. */
 import type { GameState } from '../state';
 import { importJson, SaveVersionError } from './migrations';
+import { cleanPhotoData, cleanPhotoMeta } from '../photos';
 
 /** Biggest save file we will even try to parse. */
 export const MAX_SAVE_BYTES = 50 * 1024 * 1024;
@@ -11,7 +12,7 @@ export function saveFileName(s: Pick<GameState, 'lineage'>, date: Date = new Dat
   return `compound-builder-${fam}-${date.toISOString().slice(0, 10)}.json`;
 }
 
-export type SaveFileResult = { ok: true; state: GameState; warnings: string[] } | { ok: false; message: string };
+export type SaveFileResult = { ok: true; state: GameState; warnings: string[]; /** The album's pixels, cleaned; hand them to importVault. */ photoData: Record<string, string> } | { ok: false; message: string };
 
 /** Sane bounds for an imported save: far wider than any real game reaches, tight enough that nothing downstream overflows. */
 export const MONEY_MIN = -100_000_000, MONEY_MAX = 1_000_000_000, STOCK_MAX = 10_000_000, PEOPLE_MAX = 200, STRUCTURES_MAX = 5_000, LOG_MAX = 500;
@@ -43,9 +44,12 @@ export function sanitizeState(s: GameState): string[] {
 export function readSaveFile(text: string, bytes: number = text.length): SaveFileResult {
   if (bytes > MAX_SAVE_BYTES) return { ok: false, message: 'That file is too big to be a save.' };
   try {
-    const state = importJson(text);
+    const out: { data?: unknown } = {};
+    const state = importJson(text, out);
     const fixed = sanitizeState(state);
-    return { ok: true, state, warnings: fixed.length ? [`This save had problems, so some values were corrected: ${fixed.join('; ')}.`] : [] };
+    cleanPhotoMeta(state);
+    const photoData = cleanPhotoData(state, out.data);
+    return { ok: true, state, photoData, warnings: fixed.length ? [`This save had problems, so some values were corrected: ${fixed.join('; ')}.`] : [] };
   } catch (e) {
     if (e instanceof SaveVersionError) {
       if (/newer version/.test(e.message)) return { ok: false, message: 'That save is from a newer version of the game.' };

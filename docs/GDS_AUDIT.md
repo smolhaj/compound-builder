@@ -16,7 +16,7 @@ Checked `COMPOUND_BUILDER_GDS.md` against the code at origin/main (save v78). Ea
 | Farming at medium depth, spoilage, preserving | done | `sim/crops.ts`, `sim/kitchen.ts`, `sim/shelf.ts` |
 | Camera: diorama builder | partial | `game/DioramaCamera.ts`; no tilt-shift depth-of-field look (`engine/world/post` has only grading and god rays) |
 | Camera: walk / fly / tour | done | `engine/world/camera/TourController.ts`, HUD camera buttons |
-| Camera: photo mode (time of day and season) | partial | time and date sliders in `ui/Hud.tsx`; no HUD-hide and no save-image button |
+| Camera: photo mode (time of day and season) | done | time and date sliders in `ui/Hud.tsx`; **Take photo** with a caption keeps a 384 x 216 JPEG in the album and the chronicle (`sim/photos.ts`, `ui/PhotoAlbum.tsx`, save v90) |
 | Cozy / Standard / Hardcore presets | done | `sim/difficulty.ts`, `ui/SetupScreen.tsx` |
 | Hardcore permadeath, no reloads | partial | permadeath in `sim/difficulty.ts`; single autosave slot (`sim/save/saveSystem.ts`), no export/import UI to reload from |
 | Surprise mode (random length, hidden disaster) | done | `sim/disaster.ts newDisaster` |

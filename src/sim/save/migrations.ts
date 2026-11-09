@@ -72,6 +72,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 86 → 87: raid depth (sim/breachMeans.ts, crewMercy.ts, raidOrders.ts, raidOutcomes.ts, raidFire.ts). `raidFires` (fires a raid set) is optional and absent on an old save; the bollards are a new shop good (zero stock)
   // 87 → 88: raid openers and the raider's story (sim/raidOpeners.ts, sim/raiderStory.ts). `Encounter.opener` and `raiderStories` are optional and absent on an old save
   // 88 → 89: questioning prisoners and the plans for scouts (sim/interrogation.ts, sim/scoutPlans.ts, sim/parleyChoices.ts). `Prisoner.asked`, `Opener.spotted` are optional and absent on an old save
+  // 89 → 90: the photo album (sim/photos.ts). `photos` is optional; the pixels live in the photo vault, not the save
+  89: s => ({ ...s, version: 90 }),
   88: s => ({ ...s, version: 89 }),
   87: s => ({ ...s, version: 88 }),
   86: s => ({ ...s, version: 87 }),
@@ -312,13 +314,15 @@ export function migrate(raw: unknown): GameState {
 }
 
 /** JSON export (pretty, with a header the importer checks). */
-export function exportJson(s: GameState): string {
-  return JSON.stringify({ game: 'compound-builder', ...s }, null, 1);
+export function exportJson(s: GameState, photoData?: Record<string, string>): string {
+  return JSON.stringify({ game: 'compound-builder', ...s, ...(photoData && Object.keys(photoData).length ? { photoData } : {}) }, null, 1);
 }
 
-export function importJson(text: string): GameState {
+export function importJson(text: string, photoOut?: { data?: unknown }): GameState {
   const raw = JSON.parse(text) as Raw;
   if (raw.game !== 'compound-builder') throw new SaveVersionError('Not a Compound Builder save');
   delete raw.game;
+  if (photoOut) photoOut.data = raw.photoData;
+  delete raw.photoData;
   return migrate(raw);
 }
