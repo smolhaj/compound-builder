@@ -11,8 +11,10 @@ import { have } from '../sim/barter';
 import { Note, Row, Section } from './hud/common';
 import { DIM, btn } from './hud/style';
 import { useState } from 'react';
+import { toFeet } from '../sim/units';
 
 const card = { position: 'fixed', left: 12, bottom: 64, width: 'min(330px, calc(100vw - 24px))', zIndex: 20, background: 'rgba(20,22,18,0.92)', color: '#eee', borderRadius: 8, padding: '8px 10px', fontSize: 12.5, boxShadow: '0 4px 18px rgba(0,0,0,0.45)', pointerEvents: 'auto' } as const;
+const ft = (units: number): number => Math.round(toFeet(units * 6) / 10) * 10;
 const b = (primary = false, off = false) => ({ ...btn(primary), padding: '3px 8px', fontSize: 12, opacity: off ? 0.4 : 1, marginRight: 4, marginTop: 4 });
 
 export function RoadAlert() {
@@ -76,7 +78,7 @@ export function RoadSection() {
   return <Section title="The county road">
     <Row label="What shows from the road" value={sum.give} title="Lights after dark, smoke, noise and parties are what a passer notices (sim/opsec.ts)" />
     <Row label="Word on the road" value={sum.word} title="Turning people back costs it; fair dealing and handouts raise it" />
-    <Row label="You can see" value={`${Math.round(units * 6)} m of road${units * 6 < 100 ? ' (put a watch up)' : ''}`} title={parts.map(p => `${p.label}: ${Math.round(p.units * 6)} m`).join('\n')} />
+    <Row label="You can see" value={`${ft(units)} ft of road${units * 6 < 100 ? ' (put a watch up)' : ''}`} title={parts.map(p => `${p.label}: ${ft(p.units)} ft`).join('\n')} />
     <Row label="Warning of a visitor" value={warnMinutes(game) ? `${warnMinutes(game)} min` : 'none'} />
     {sum.lines.map((l, i) => <Note key={i}>{l}</Note>)}
     {!blk && <div>
