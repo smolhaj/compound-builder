@@ -149,11 +149,12 @@ try {
     for (const [kind, q] of Object.entries(st.found)) {
       const key = kind + ':' + q.key;
       if (shotLog.filter(x => x.key === key).length >= per) continue;
+      { const last = shotLog.filter(x => x.key === key).pop(); if (last && st.bt - last.bt < 1.2) continue; }   // spread the frames over the beat
       await page.evaluate(async ([kind, q]) => {
         const g = window.__cb.world.groundAt;
         const wide = kind === 'flare' || kind === 'fire';
-        const d = wide ? 2.2 : 0.8;
-        window.__force = { eye: { x: q.x + d * 0.8, y: g(q.x, q.z) + (wide ? 0.9 : 0.28), z: q.z - d * 0.6 }, look: { x: q.x, y: g(q.x, q.z) + (wide ? 0.35 : q.y + 0.12), z: q.z }, fov: wide ? 62 : 50 };
+        const d = wide ? 2.2 : kind === 'flag' ? 1.1 : 0.8;
+        window.__force = { eye: { x: q.x + d * 0.8, y: g(q.x, q.z) + (wide ? 0.9 : kind === 'flag' ? 0.42 : 0.28), z: q.z - d * 0.6 }, look: { x: q.x, y: g(q.x, q.z) + (wide ? 0.35 : kind === 'flag' ? q.y + 0.3 : q.y + 0.12), z: q.z }, fov: wide ? 62 : 50 };
         window.__cb.qa.skipDraw = false; window.__pump(10);
       }, [kind, q]);
       await page.evaluate(() => new Promise(r => setTimeout(r, 30)));

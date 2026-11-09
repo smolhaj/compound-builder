@@ -105,10 +105,11 @@ export class SceneProps {
   private _addFlag(unit: string): void {
     if (this._flagOf.length >= 2 || this._flagOf.includes(unit)) return;
     if (!this._flagMesh) {
-      const parts = [new THREE.BoxGeometry(0.01, 0.42, 0.01).translate(0, 0.21, 0), new THREE.BoxGeometry(0.16, 0.1, 0.004).translate(0.085, 0.37, 0)];
+      // a tall stick and a big cloth (as wide as a man is tall), turned 45 degrees so it reads from behind, the side and the front
+      const parts = [new THREE.BoxGeometry(0.014, 0.56, 0.014).translate(0, 0.28, 0), new THREE.PlaneGeometry(0.3, 0.2).translate(0.15, 0.44, 0).rotateY(Math.PI / 4)];
       const geo = mergeGeometries(parts)!;
       for (const g of parts) g.dispose();
-      const mat = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.9, emissive: 0x3a3a36 });
+      const mat = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.9, emissive: 0xb8b6ae, side: THREE.DoubleSide });
       this._geo.push(geo); this._mat.push(mat);
       this._flagMesh = new THREE.InstancedMesh(geo, mat, 2);
       this._flagMesh.count = 0; this._flagMesh.frustumCulled = false; this._flagMesh.userData = { noSSAO: true };
