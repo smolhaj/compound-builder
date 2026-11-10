@@ -30,6 +30,7 @@ import { communityPosture } from './watch';
 import { powered } from './gear';
 import { fogSightK } from './fogFx';
 import { hourOf } from './state';
+import { onPost } from './roadPost';
 import { log } from './economy';
 import { canGo } from './rescue';
 import { freshRoad } from './roadPassers';
@@ -141,7 +142,8 @@ export function prepProblem(s: GameState, kind: PrepKind): string | null {
   return null;
 }
 
-const adultsHome = (s: GameState) => s.people.filter(p => !p.kid && canGo(s, p));
+/** Adults who can go and are not already on the block's crew (sim/roadPost.ts). */
+const adultsHome = (s: GameState) => s.people.filter(p => !p.kid && canGo(s, p) && onPost(s, p.id, hourOf(s.clock.t)) !== 'block');
 
 /** The best talker among the adults who can go (ties: the first). */
 export function greeterCandidate(s: GameState) {

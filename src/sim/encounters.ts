@@ -554,13 +554,21 @@ export function gateDay(s: GameState): Encounter | null {
   const mk0 = waveKind || cb ? null : markKind(s, day);
   const kind = waveKind ?? (cb && (cb.probed || r() < 0.7) ? cb.kind : mk0 && r() < 0.85 ? mk0.kind : whoComes(s, p, r));
   // with the clock on, the waves are the hostile visits (a crew coming back to a place it stripped excepted); travelers stay away in the days before one
-  if (wv && !waveKind && !(cb && kind === cb.kind)) {
+  // under the wave clock a mark (sim/roadPassers.ts) does not add a raid or grow a wave: it brings two or three men to look the place over, once
+  const markProbe = !!wv && !waveKind && !cb && !!mk0 && kind === mk0.kind && (kind === 'looters' || kind === 'gang');
+  if (wv && !waveKind && !(cb && kind === cb.kind) && !markProbe) {
     if (HOSTILE.has(kind)) return null;
     if (left >= 1 && left <= WAVE.WARN) return null;
   }
   const e = makeThreat(kind, r, `e${s.nextId++}`, day, s);
   // a crew that looked the place over from the county road (sim/roadPassers.ts) comes in as the crew it saw
-  if (mk0 && kind === mk0.kind && e.strength) {
+  if (markProbe && mk0) {
+    const n = probeHeads(mulberry32(s.seed * 4157 + day * 23 + 7)());
+    e.size = n; e.strength = n * 9; e.armed = true;
+    e.title = 'Men who looked you over';
+    e.dossier = [`${n} men on foot along the drive and the fence at dusk, looking at the lights, the windows and the gate. Rifles slung.`, mk0.line.replace(/ has come back\b.*$/, ' came back to look again.'), 'They are not here for your supplies yet. The raids come when they come; these are looking, and will go and say.'];
+    takeMark(s);
+  } else if (mk0 && kind === mk0.kind && e.strength) {
     const was = e.size;
     e.size = Math.max(was, mk0.size); e.strength = Math.round(e.strength * e.size / Math.max(1, was));
     e.dossier = [e.dossier[0]?.replace(String(was), String(e.size)) ?? '', mk0.line, ...e.dossier.slice(1)].filter(Boolean);
@@ -593,7 +601,7 @@ export function gateDay(s: GameState): Encounter | null {
     wv.n = n; wv.last = day;
   }
   // (Hardcore) the world learns a defended place: a probing raid first, then bigger, better-equipped crews (sim/adaptive.ts)
-  else if (e.strength && ['looters', 'gang', 'militia'].includes(e.kind)) adaptCrew(s, e, p, day);
+  else if (e.strength && !markProbe && ['looters', 'gang', 'militia'].includes(e.kind)) adaptCrew(s, e, p, day);
   // how the raid begins: scouts ahead of it, a man under a white flag, an ambush of the people at work, a diversion (sim/raidOpeners.ts; its own random stream)
   if (['looters', 'gang', 'militia', 'patrol', 'requisition'].includes(e.kind) && !e.back && !e.dig && !e.insiderHelp) {
     const op = planOpener({ kind: crewKindOf(e.kind), temper: e.temper ?? 'desperate', size: e.size, armed: e.armed, difficulty: d.difficulty ?? 'standard' }, mulberry32(s.seed * 977 + day * 13 + 5));
