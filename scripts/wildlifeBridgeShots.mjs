@@ -52,20 +52,20 @@ if (!info.bridges) { await browser.close(); vite?.kill(); process.exit(3); }
 const step = n => page.evaluate(n => { const cb = window.__cb, w = cb.world, g = cb.game.getState().game; for (let i = 0; i < n; i++) { w.updateWildlife(0.1, g, 1); w.updateDoors(0.1, g); } const b = [...w.wildlife._beasts.values()].find(x => x.id.startsWith('qa:deer')); return { x: +b.x.toFixed(2), z: +b.z.toFixed(2), y: b.y === undefined ? null : +b.y.toFixed(2), deck: !!b.deck, ground: +w.groundAt(b.x, b.z).toFixed(2) }; }, n);
 const len = await page.evaluate(() => { const br = window.__bridge; return Math.hypot(br.mouth[1][0] - br.mouth[0][0], br.mouth[1][1] - br.mouth[0][1]); });
 const walk = 0.2, secs = len / walk, third = Math.round(secs / 0.1 / 3);
-const cam = (eye, tgt, fov = 55) => page.evaluate(([e, t, f]) => { window.__cb.qa.pose = { x: e[0], y: e[1], z: e[2], lx: t[0], ly: t[1], lz: t[2], fov: f }; }, [eye, tgt, fov]);
+const cam = (eye, tgt, fov = 55) => page.evaluate(([e, t, f]) => { const cb = window.__cb; cb.cam.target.set(t[0], t[1], t[2]); cb.cam.radius = 6; window.__cb.qa.pose = { x: e[0], y: e[1], z: e[2], lx: t[0], ly: t[1], lz: t[2], fov: f }; }, [eye, tgt, fov]);
 const geo = await page.evaluate(() => { const br = window.__bridge, ux = br.mouth[1][0] - br.mouth[0][0], uz = br.mouth[1][1] - br.mouth[0][1], l = Math.hypot(ux, uz); return { ux: ux / l, uz: uz / l, ax: br.mouth[0][0], az: br.mouth[0][1] }; });
 // normal view throughout (ground visible). 1: the deer at the near mouth about to step in, eye level beside it
 const mouth0 = await page.evaluate(() => window.__bridge.mouth[0]), mouth1 = await page.evaluate(() => window.__bridge.mouth[1]);
 let st = await step(1);
 const eyeAt = (st, back, side, up = 0.3) => cam([st.x - geo.ux * back - geo.uz * side, st.ground + up, st.z - geo.uz * back + geo.ux * side], [st.x, st.ground + 0.1, st.z], 52);
-await eyeAt(st, 2.4, 1.2); await shot('1-normal-eye-deer-at-the-near-mouth');
+await eyeAt(st, 0.3, -3.2); await shot('1-normal-eye-deer-at-the-near-mouth');
 // 2: stepping in: a little way along the ramp
 st = await step(40); console.error('stepping in', JSON.stringify(st));
-await eyeAt(st, 2.4, 1.2); await shot('2-normal-eye-deer-stepping-onto-the-deck');
+await eyeAt(st, 0.3, -3.2); await shot('2-normal-eye-deer-stepping-onto-the-deck');
 // walk it across; when the deck ends it stands on the far rim
 let k = 0; while (st.deck && k++ < 400) st = await step(20);
 console.error('off the deck', JSON.stringify(st));
 st = await step(8);
-await eyeAt(st, 2.6, 1.4); await shot('3-normal-eye-deer-stepped-off-at-the-far-mouth');
+await eyeAt(st, 0.3, -3.4); await shot('3-normal-eye-deer-stepped-off-at-the-far-mouth');
 await cam([st.x - geo.uz * 5 + geo.ux * 3, st.ground + 3.5, st.z + geo.ux * 5 + geo.uz * 3], [st.x - geo.ux * 1.5, st.ground, st.z - geo.uz * 1.5], 55); await shot('4-normal-aerial-far-mouth-deer-on-the-ground');
 await browser.close(); vite?.kill();
