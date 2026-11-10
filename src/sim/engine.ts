@@ -18,6 +18,7 @@ import { stallsDay, wantedNow } from './stalls';
 import { addFixWork, nextFix, siteJobsDay } from './improvements';
 import { addDamageWork, nextDamage } from './raidDamage';
 import { paperworkDay } from './paperwork';
+import { estateDay } from './estate';
 import { addFellWork, nextFellJob } from './forestry';
 import { burnFirewood, demandNow } from './heating';
 import { upkeepDay } from './upkeep';
@@ -220,6 +221,7 @@ function subStep(s: GameState): void {
     landMarketDay(s, dayIndex(s.clock.t));
     siteJobsDay(s);
     for (const line of paperworkDay(s)) log(s, line);
+    estateDay(s);
     for (const line of shelfDay(s)) log(s, line);
     for (const line of stallsDay(s)) { log(s, line); s.disaster.news.push({ t: s.clock.t, text: line, tone: 2 }); }   // a project stuck for want of materials we could buy (sim/stalls.ts)
     for (const line of financeDay(s)) log(s, line);

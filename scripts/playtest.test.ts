@@ -6,7 +6,7 @@
  *   PLAYTEST=1 npx vitest run scripts/playtest.test.ts
  * Report: playtest-report.md (repo root).
  * Default: each run stops at its first ending, about 400 days after the hit (the year-one measure). YEARS=6 plays on to about three years
- * after the hit (the horizon the Hardcore prepper target is measured at; docs/DECISIONS.md). Other env: SEEDS (long mode: only these seeds), STRATS, KINDS, DIFF, SEEDOFF, LIFESTYLE, WELCOME, STAY, ADMIT.
+ * after the hit (the horizon the Hardcore prepper target is measured at; docs/DECISIONS.md). Other env: SEEDS (long mode: only these seeds), STRATS, KINDS, DIFF, SEEDOFF, LIFESTYLE, WELCOME, STAY, ADMIT, STUCK_ORDERS (press the Next-step "Order it" card for a stalled project).
  */
 import { describe, expect, it } from 'vitest';
 import { appendFileSync, writeFileSync } from 'node:fs';
@@ -21,6 +21,7 @@ import { startFunds } from '../src/sim/startFunds';
 import { BLUEPRINTS, isHome } from '../src/sim/blueprints';
 import { fixBill, fixBlocked, orderHookup, pendingFixes, placeImprovements } from '../src/sim/improvements';
 import { hireCrew, hoursLeft } from '../src/sim/crews';
+import { stuckProject } from '../src/sim/stalls';
 import { applyForPermit } from '../src/sim/paperwork';
 import { sweepChimney } from '../src/sim/upkeep';
 import { stockUpRx } from '../src/sim/body';
@@ -400,6 +401,8 @@ export function play(strat: Strategy, kind: DisasterKind, seed: number, peace: '
         if (s.structures.some(x => isHome(x.kind) && isFinished(x)) && s.money > 90_000) orderNeeds(s, strat);
       } else orderNeeds(s, strat);
     }
+    // (STUCK_ORDERS=1) the Next-step card's "Order it" button, pressed: site works such as a retaining wall or a cut into the slope add materials the plans' bills do not list, and the bot never ordered them
+    if (process.env.STUCK_ORDERS && !LAZY(strat) && day % 3 === 1 && (s.clock.t < s.disaster.hitAt || payWith(s))) { const st = stuckProject(s); if (st && st.lines.length && !orderProblem(s, st.lines)) placeOrder(s, st.lines); }
     // (v2) someone taken: send word that the family will pay, whenever there's a lead to carry it
     if (!LAZY(strat) && day % 10 === 0) for (const c of openCaptives(s)) askRansom(s, c.pid);
     // (v2) a dead pump gets a hardware kit, an EMP-fried one its spare, as the HUD's buttons would
@@ -580,8 +583,8 @@ describe.skipIf(!process.env.PLAYTEST || process.env.PLAYTEST === 'long')('playt
     // (the seed is fixed by the disaster's and the strategy's place in the full table, so a filtered run replays the same game)
     const ALL_KINDS = ['grid_down', 'nuclear', 'drought', 'pandemic', 'wildfire', 'ash_winter', 'financial', 'solar_flare', 'zombies'], ALL_STRATS: Strategy[] = ['idle', 'homestead', 'prepper', 'fortress'];
     for (const kind of kinds) for (const strat of strats) { const seed = 11 + ALL_KINDS.indexOf(kind) * 4 + ALL_STRATS.indexOf(strat) + Number(process.env.SEEDOFF ?? 0), site = siteFor(seed); const t0 = Date.now(); const yrs = Number(process.env.YEARS ?? 0); const r = play(strat, kind, seed, 'medium', site, yrs); results.push(r); if (process.env.TIMING) appendFileSync(process.env.TIMING, `${kind} ${strat} seed ${seed} ${yrs}y ${((Date.now() - t0) / 1000).toFixed(1)}s ${r.days} days ${(((Date.now() - t0) / Math.max(1, r.days))).toFixed(1)} ms/day ending ${r.ending} alive ${r.alive}\n`); }
-    const md = ['# Playtest report (scripted)', '', '| Site | Disaster | Strategy | Variant | Ending | Grade | Alive | Lost to | Hungry days | Days | $ at hit | Built at hit | Fights | Hid (found) | Trials | Joiners | Bugs |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
-      ...results.map(r => `| ${r.site} | ${r.kind} | ${r.strat} | ${r.variant} | ${r.ending} | ${r.grade} | ${r.alive} | ${r.causes || '-'} | ${r.hungry} | ${r.days} | ${r.moneyAtHit.toLocaleString('en-US')} | ${r.builtAtHit} | ${r.fights.join(', ') || '-'}${r.prisoners ? ` · ${r.prisoners} held` : ''} | ${r.hides ? `${r.hides} (${r.hidFound})${r.burned ? `, ${r.burned} burned` : ''}` : '-'} | ${r.trials} | ${r.joiners} | ${r.bugs.join('; ')} |`),
+    const md = ['# Playtest report (scripted)', '', '| Site | Disaster | Strategy | Variant | Ending | Grade | Alive | Lost to | Hungry days | Days | $ at hit | $ at end | Built at hit | Fights | Hid (found) | Trials | Joiners | Bugs |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
+      ...results.map(r => `| ${r.site} | ${r.kind} | ${r.strat} | ${r.variant} | ${r.ending} | ${r.grade} | ${r.alive} | ${r.causes || '-'} | ${r.hungry} | ${r.days} | ${r.moneyAtHit.toLocaleString('en-US')} | ${Math.round(r.s.money).toLocaleString('en-US')} | ${r.builtAtHit} | ${r.fights.join(', ') || '-'}${r.prisoners ? ` · ${r.prisoners} held` : ''} | ${r.hides ? `${r.hides} (${r.hidFound})${r.burned ? `, ${r.burned} burned` : ''}` : '-'} | ${r.trials} | ${r.joiners} | ${r.bugs.join('; ')} |`),
       '', '## Report card lines', '', ...results.map(r => `- **${r.kind} / ${r.strat}:** ${r.lines.join(' ')}`),
       '', '## What keeps happening (log lines seen 40+ times in a run, numbers taken out)', '', ...results.filter(r => r.often.length).map(r => `- **${r.kind} / ${r.strat}:** ${r.often.map(([k, n]) => `${n}× "${k}"`).join('; ')}`),
       // (round 4: checking can dip a few dollars under zero within a day, until the next morning moves it onto the card)
