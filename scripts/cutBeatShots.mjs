@@ -137,6 +137,7 @@ try {
       const pos = id => { const u = U.get(id); return u && !u.dead ? { x: u.x, z: u.z, y: u.y } : null; };
       if (beats.includes('flag')) for (const e of ev) if (e.kind === 'flag' && t >= e.t + 3 && t <= e.t + 12) { const q = pos(e.unit); if (q) { found.flag = { ...q, key: e.unit }; const m = b.props?._flagMesh; window.__flagInfo = m ? { count: m.count, vis: m.visible, verts: m.geometry.attributes.position.count, side: m.material.side, layers: m.layers.mask, parent: !!m.parent } : null; } }
       for (const [k, f] of [['panic', u => u.frozenUntil != null], ['sling', u => u.sling && !u.dead], ['crawl', u => u.crawl && !u.dead], ['limp', u => u.limp && !u.crawl && !u.dead]]) if (beats.includes(k)) for (const u of U.values()) if (f(u) && !u.def.machine) { found[k] = { x: u.x, z: u.z, y: u.y, key: u.def.id }; break; }
+      if (beats.includes('answer')) { const fe = ev.find(e => e.kind === 'flag'); if (fe && t >= fe.t + 8 && t <= fe.t + 16) { const u = U.get(fe.unit); if (u) found.answer = { x: u.x, z: u.z, y: u.y, key: 'answer' }; } }
       if (beats.includes('flare')) for (const e of ev) if (e.kind === 'flare' && t >= e.t + 1 && t <= e.t + e.secs - 1) found.flare = { x: e.x, z: e.z, y: 0, key: 'flare' + e.t };
       if (beats.includes('fire')) for (const e of ev) if (e.kind === 'fire' && t >= e.t + 4 && t <= e.t + 25) found.fire = { x: e.x, z: e.z, y: 0, key: 'fire' + e.structure };
       return { phase: c?.phase, offer: c?.offer ?? null, bt: +t.toFixed(2), found, caption: b.lines?.slice(-1)[0]?.text ?? '' };
@@ -152,7 +153,7 @@ try {
       { const last = shotLog.filter(x => x.key === key).pop(); if (last && st.bt - last.bt < 1.2) continue; }   // spread the frames over the beat
       await page.evaluate(async ([kind, q]) => {
         const g = window.__cb.world.groundAt;
-        const wide = kind === 'flare' || kind === 'fire';
+        const wide = kind === 'flare' || kind === 'fire' || kind === 'answer';
         const d = wide ? 2.2 : kind === 'flag' ? 1.1 : 0.8;
         window.__force = { eye: { x: q.x + d * 0.8, y: g(q.x, q.z) + (wide ? 0.9 : kind === 'flag' ? 0.42 : 0.28), z: q.z - d * 0.6 }, look: { x: q.x, y: g(q.x, q.z) + (wide ? 0.35 : kind === 'flag' ? q.y + 0.3 : q.y + 0.12), z: q.z }, fov: wide ? 62 : 50 };
         window.__cb.qa.skipDraw = false; window.__pump(10);
