@@ -158,7 +158,7 @@ export function boreParts(pts: readonly Pt[], ground: Ground, built: number, fin
     // the face: a block of fieldstone with the arch cut out, extruded 0.3 into the hill
     const PW = 2 * (MOUND.halfTop + 0.18), PH = ARCH.crown + 0.5;
     const shape = new THREE.Shape();
-    const prof = headwallProfile(PW, PH, (lat: number) => ground(x + fx * HEAD_PROBE + fz * lat, z + fz * HEAD_PROBE - fx * lat) - y);   // (lat runs along the frame's own x: (fz, -fx))
+    const prof = headwallProfile(PW, PH, (lat: number) => Math.min(ground(x + fx * HEAD_PROBE + fz * lat, z + fz * HEAD_PROBE - fx * lat), ground(x + fz * lat, z - fx * lat)) - y);   // (the lower of the ground at the face's own plane and just behind it: the top never stands clear of the hill)   // (lat runs along the frame's own x: (fz, -fx))
     shape.moveTo(prof[0][0], -0.5); shape.lineTo(prof[prof.length - 1][0], -0.5);
     for (let k = prof.length - 1; k >= 0; k--) shape.lineTo(prof[k][0], prof[k][1]);
     shape.holes.push(archHole());
@@ -177,8 +177,8 @@ export function boreParts(pts: readonly Pt[], ground: Ground, built: number, fin
     for (const sg of [-1, 1]) for (let k = 1; k <= 3; k++) {
       const h = 1.05 - 0.28 * k, lat = PW / 2 + 0.18 * k, back = 0.1 + 0.3 * k;
       const wx = x + fx * back + fz * sg * lat, wz = z + fz * back - fx * sg * lat, gy = ground(wx, wz) - y;
-      if (gy < -1.5) continue;
-      const bottom = Math.min(-0.05, gy - 0.05), top = Math.max(h - 0.05, gy + 0.08);
+      if (gy < -0.6) continue;
+      const bottom = Math.min(-0.05, gy - 0.05), top = Math.max(bottom + 0.12, Math.min(h - 0.05, gy + 0.02));   // (a wing is never taller than the ground it stands in)
       add('fieldstone', place(new THREE.BoxGeometry(0.14, top - bottom, 0.46).rotateY(sg * 0.5), sg * lat, (top + bottom) / 2, back));
     }
     if (withDoor) {
