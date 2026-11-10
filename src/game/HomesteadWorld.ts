@@ -1,4 +1,5 @@
 import { setGroundProbe } from '../sim/towers';
+import { setRoadSightProbe } from '../sim/roadWarn';
 import { RetainWallLayer } from './terrain/RetainWalls';
 import { WALLLESS, planPad, type PadPlan } from '../sim/retainPlan';
 import * as THREE from 'three';
@@ -31,6 +32,7 @@ import { lightsOutNow } from '../sim/blackout';
 import type { NetWorld } from './paths/pathNet';
 import { WALK_CLIFF, entryRampHeight, walkRoute } from './paths/walkRoute';
 import { CorridorNet } from './paths/CorridorNet';
+import { roadYAlong } from './paths/driveHeight';
 import { animalRoute, climbLimit } from './paths/groundMovers';
 import { LANE } from '../sim/laneWalk';
 import type { Wp } from './paths/linkRoute';
@@ -316,6 +318,7 @@ export class HomesteadWorld {
     this.home = { ...site.home };
     this.parcel = new ParcelTerrain(seed, { creek: site.creek, timber: site.timber, region: site.region, lot: site.lot ?? null, home: site.home });
     setGroundProbe((x, z) => this.parcel.natural(x, z).h);
+    setRoadSightProbe(() => this._roadSightK());
     this.regionWorld = this.parcel.world;
     this.climate = this.regionWorld.climate;
     this.farms = planNeighbors(this.parcel);
@@ -414,20 +417,14 @@ export class HomesteadWorld {
     if (this._quality) this._buildRoads();
   }
 
-  /** The road's own height where it leaves the ground: on a bridge deck (null elsewhere, and while there is no drive). */
+  /** The road's own height where it leaves the ground: on a bridge deck, or inside a rock bore under the hill (null elsewhere, and while there is no drive). */
   private _driveY(x: number, z: number): number | null {
-    if (!this._drive || this._bridgeDown) return null;
-    let best = 0.32 * 0.32, y: number | null = null;
-    for (const sx of this.plan.structures) {
-      if (sx.kind !== 'bridge1' && sx.kind !== 'bridge') continue;
-      for (const p of this.plan.pts) {
-        if (p.s < sx.s0 - 1e-6 || p.s > sx.s1 + 1e-6) continue;
-        const d = (p.x - x) ** 2 + (p.z - z) ** 2;
-        if (d < best) { best = d; y = p.y; }
-      }
-    }
-    return y;
+    if (!this._drive) return null;
+    const spans = this.plan.structures.filter(sx => sx.kind === 'tunnel' || (!this._bridgeDown && (sx.kind === 'bridge1' || sx.kind === 'bridge')));
+    return spans.length ? roadYAlong(this.plan.pts, spans, x, z) : null;
   }
+  /** Ground height for anything that drives the access road: the deck or the bore floor where the road leaves the ground. */
+  private readonly _roadGround = (x: number, z: number): number => this._driveY(x, z) ?? this.groundAt(x, z);
 
   /** The family chose another entrance (before the drive): plan the road from it, redraw it and send the truck the new way. */
   replan(site: LandSite): void {
@@ -1083,6 +1080,16 @@ export class HomesteadWorld {
     const out = [...this._built.values()].filter(b => b.finished && KIT[b.placed.kind].light && !b.under).map(b => ({ x: b.placed.x, z: b.placed.z, h: KIT[b.placed.kind].floorY + 0.25, k: KIT[b.placed.kind].sleeps > 0 ? 1 : 0.6 }));
     if (!out.some(l => l.k === 1)) out.push({ x: this.camp.x, z: this.camp.z, h: 0.15, k: 0.8 });
     return out;
+  }
+
+  private _rsk = { n: -1, at: -1e9, v: 1 };
+  /** How clear the line from the buildings to the county road is, 0.7 (buried in trees and hills) to 1.4 (open). Measured with the sightline system, at most every 15 s and when a building appears (sim/roadWarn.ts reads it for the warning of a visitor). */
+  private _roadSightK(): number {
+    const n = this._built.size, now = performance.now();
+    if (this._rsk.n === n || now - this._rsk.at < 15000) { if (this._rsk.n >= 0 || now - this._rsk.at < 15000) return this._rsk.v; }
+    const vals = Object.values(this.buildingExposure());
+    this._rsk = { n, at: now, v: vals.length ? 0.7 + 0.7 * Math.min(1, vals.reduce((a, b) => a + b, 0) / vals.length / 0.6) : 1 };
+    return this._rsk.v;
   }
 
   /** Share of the county road that can see each building (its windows, ≈ 1.5 m up). */
@@ -2212,7 +2219,7 @@ export class HomesteadWorld {
       host: id => { const b = this._built.get(id); return b ? { x: b.placed.x, z: b.placed.z, rot: b.placed.rot, kind: b.placed.kind } : null; },
       yard: this.camp,
       drive: this.access.drive,
-      ground: this.groundAt,
+      ground: this._roadGround,
       route: this.vehicleRoute,
       groundRoute: (a, b) => this.vehicleGroundRoute(a, b),
       hardWinter: seasonState.params.snow > 0.25,
@@ -2807,6 +2814,7 @@ export class HomesteadWorld {
     this._built.clear();
     this.truck.dispose();
     this.roadLife.dispose();
+    setRoadSightProbe(null);
     this.plow.dispose();
     this._ws.scene.remove(this._roads);
     this._roads.traverse(o => (o as THREE.Mesh).geometry?.dispose());

@@ -134,7 +134,7 @@ try {
       if (!b?.playing) return { phase: c?.phase, offer: c?.offer ?? null, bt: null };
       const ev = b.battle.events, U = b._units, t = b.time, found = {};
       const pos = id => { const u = U.get(id); return u && !u.dead ? { x: u.x, z: u.z, y: u.y } : null; };
-      if (beats.includes('flag')) for (const e of ev) if (e.kind === 'flag' && t >= e.t + 3 && t <= e.t + 12) { const q = pos(e.unit); if (q) found.flag = { ...q, key: e.unit }; }
+      if (beats.includes('flag')) for (const e of ev) if (e.kind === 'flag' && t >= e.t + 3 && t <= e.t + 12) { const q = pos(e.unit); if (q) { found.flag = { ...q, key: e.unit }; const m = b.props?._flagMesh; window.__flagInfo = m ? { count: m.count, vis: m.visible, verts: m.geometry.attributes.position.count, side: m.material.side, layers: m.layers.mask, parent: !!m.parent } : null; } }
       for (const [k, f] of [['panic', u => u.frozenUntil != null], ['sling', u => u.sling && !u.dead], ['crawl', u => u.crawl && !u.dead], ['limp', u => u.limp && !u.crawl && !u.dead]]) if (beats.includes(k)) for (const u of U.values()) if (f(u) && !u.def.machine) { found[k] = { x: u.x, z: u.z, y: u.y, key: u.def.id }; break; }
       if (beats.includes('flare')) for (const e of ev) if (e.kind === 'flare' && t >= e.t + 1 && t <= e.t + e.secs - 1) found.flare = { x: e.x, z: e.z, y: 0, key: 'flare' + e.t };
       if (beats.includes('fire')) for (const e of ev) if (e.kind === 'fire' && t >= e.t + 4 && t <= e.t + 25) found.fire = { x: e.x, z: e.z, y: 0, key: 'fire' + e.structure };
@@ -148,11 +148,12 @@ try {
     for (const [kind, q] of Object.entries(st.found)) {
       const key = kind + ':' + q.key;
       if (shotLog.filter(x => x.key === key).length >= per) continue;
+      { const last = shotLog.filter(x => x.key === key).pop(); if (last && st.bt - last.bt < 1.2) continue; }   // spread the frames over the beat
       await page.evaluate(async ([kind, q]) => {
         const g = window.__cb.world.groundAt;
         const wide = kind === 'flare' || kind === 'fire';
-        const d = wide ? 2.2 : 0.8;
-        window.__force = { eye: { x: q.x + d * 0.8, y: g(q.x, q.z) + (wide ? 0.9 : 0.28), z: q.z - d * 0.6 }, look: { x: q.x, y: g(q.x, q.z) + (wide ? 0.35 : q.y + 0.12), z: q.z }, fov: wide ? 62 : 50 };
+        const d = wide ? 2.2 : kind === 'flag' ? 1.1 : 0.8;
+        window.__force = { eye: { x: q.x + d * 0.8, y: g(q.x, q.z) + (wide ? 0.9 : kind === 'flag' ? 0.42 : 0.28), z: q.z - d * 0.6 }, look: { x: q.x, y: g(q.x, q.z) + (wide ? 0.35 : kind === 'flag' ? q.y + 0.3 : q.y + 0.12), z: q.z }, fov: wide ? 62 : 50 };
         window.__cb.qa.skipDraw = false; window.__pump(10);
       }, [kind, q]);
       await page.evaluate(() => new Promise(r => setTimeout(r, 30)));
@@ -160,7 +161,7 @@ try {
       const shot = await globalThis.__cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 88 });
       const file = `${kind}_${String(shots).padStart(2, '0')}.jpg`;
       writeFileSync(`${outDir}/${file}`, Buffer.from(shot.data, 'base64'));
-      shotLog.push({ key, kind, file, bt: st.bt, caption: st.caption });
+      shotLog.push({ key, kind, file, bt: st.bt, caption: st.caption, flagInfo: kind === 'flag' ? await page.evaluate(() => window.__flagInfo) : undefined });
       shots++; did = true; break;
     }
     void did;

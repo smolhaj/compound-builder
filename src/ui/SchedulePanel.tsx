@@ -10,7 +10,7 @@ import { nextBuildTarget } from '../sim/engine';
 import { nextFellJob } from '../sim/forestry';
 import { hourOf, type GameState } from '../sim/state';
 import {
-  applyTemplate, behind, canDo, chronotypes, CHRONO_NAME, setFocus, choreRates, CHORE_NAME, CHORE_WHY, CHORES, dailyOf, DUTIES, DUTY, setDuty, TEMPLATE_NAME, threatLevel, unlockPerson, watchNow, workHours,
+  applyTemplate, behind, canDo, dutyAt, chronotypes, CHRONO_NAME, setFocus, choreRates, CHORE_NAME, CHORE_WHY, CHORES, dailyOf, DUTIES, DUTY, setDuty, TEMPLATE_NAME, threatLevel, unlockPerson, watchNow, workHours,
   type Duty, type TemplateId,
 } from '../sim/daily';
 import { GATHERING, gatheringProblem, callGathering, type GatheringKind } from '../sim/gatherings';
@@ -87,7 +87,7 @@ export function SchedulePanel() {
           {msg && <span style={{ color: C.warn, fontSize: 12, marginLeft: 8 }}>{msg}</span>}
         </div>
         <div style={{ display: 'flex', gap: 4, padding: '8px 20px', flexWrap: 'wrap' }}>
-          {DUTIES.map(k => <button key={k} title={DUTY[k].hint} onClick={() => setBrush(k)}
+          {DUTIES.filter(k => k !== 'post').map(k => <button key={k} title={DUTY[k].hint} onClick={() => setBrush(k)}
             style={{ ...btn(brush === k), display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: DUTY[k].color, display: 'inline-block' }} />{DUTY[k].name}</button>)}
         </div>
         <div style={{ padding: '4px 20px 10px', overflowX: 'auto' }}>
@@ -106,7 +106,7 @@ export function SchedulePanel() {
                 <td style={{ paddingRight: 8, whiteSpace: 'nowrap' }} title={plan.notes?.[p.id] ?? ''}>{p.first}{p.kid ? <span style={{ color: C.dim }}> ({p.age})</span> : ''}
                   <div style={{ fontSize: 10, color: chrono[p.id] === 'owl' ? C.warn : C.dim }}>{CHRONO_NAME[chrono[p.id]]}{plan.notes?.[p.id] ? ` · ${plan.notes[p.id]}` : ''}</div></td>
                 {Array.from({ length: 24 }, (_, h) => {
-                  const duty = row[h] ?? 'sleep';
+                  const duty = dutyAt(game, p, h) === 'post' ? 'post' : row[h] ?? 'sleep';
                   return <td key={h} title={`${p.first} ${h}:00 · ${DUTY[duty].name}`}
                     onMouseDown={() => { setPainting(true); paint(p.id, h); }} onMouseEnter={() => { if (painting) paint(p.id, h); }}
                     style={{ width: cell, height: cell, background: DUTY[duty].color, textAlign: 'center', cursor: canDo(p, brush) ? 'crosshair' : 'not-allowed', border: `1px solid ${h === hourNow ? C.gold : 'rgba(0,0,0,0.35)'}`, color: 'rgba(255,255,255,0.85)', fontSize: 10 }}>{DUTY[duty].short}</td>;
@@ -120,7 +120,7 @@ export function SchedulePanel() {
                   <select value={plan.focus?.[p.id] ?? ''} style={{ fontSize: 11, background: '#222', color: '#eee', border: `1px solid ${C.line}`, borderRadius: 4 }}
                     onChange={e => setMsg(g.daily(s => setFocus(s, p.id, (e.target.value || null) as Duty | null)))}>
                     <option value="">Planner decides</option>
-                    {DUTIES.filter(k => DUTY[k].work && k !== 'study' && k !== 'drill' && canDo(p, k)).map(k => <option key={k} value={k}>{DUTY[k].name}</option>)}
+                    {DUTIES.filter(k => DUTY[k].work && k !== 'study' && k !== 'drill' && k !== 'post' && canDo(p, k)).map(k => <option key={k} value={k}>{DUTY[k].name}</option>)}
                   </select>
                 </td>
               </tr>;

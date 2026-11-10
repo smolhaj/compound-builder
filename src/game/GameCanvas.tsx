@@ -1,6 +1,9 @@
 import { moatStates } from '../sim/waterWorks';
 import { fireMarks } from '../sim/fireRisk';
 import { litTowerIds } from '../sim/towers';
+import { encodePhoto, setPhotoCapturer } from './photoCapture';
+import { shadeGrid } from '../sim/shade';
+import { shadeReadout, shadeSceneOf } from './terrain/shadeScene';
 import { TerrainOverlay } from './terrain/TerrainOverlay';
 import { BlueprintOverlay } from './blueprint/BlueprintOverlay';
 import { blueprintPlan } from './blueprint/blueprintPlan';
@@ -264,9 +267,15 @@ export function GameCanvas() {
     const terrainOv = new TerrainOverlay(ws.scene, world.groundAt);
     const showTerrain = () => {
       const g = useGameStore.getState().game, m = useWorldStore.getState().terrainMode, t = terrainOf(g);
-      if (m === 'off' || !t) { terrainOv.set('off', null); return; }
+      if (m === 'off' || !t) { terrainOv.set('off', null); useWorldStore.getState().setShadeReadout(null); return; }
+      let sg = null;
+      if (m === 'shade') {
+        const { sc, own } = shadeSceneOf(g, world.groundAt, world.treeSpecs);
+        sg = shadeGrid(sc, t.grid);
+        useWorldStore.getState().setShadeReadout(shadeReadout(g, sc, own));
+      } else useWorldStore.getState().setShadeReadout(null);
       const lanes = lanesOf(g);
-      terrainOv.set(m, t, lanes, siteCandidates(t, { lot: g.site.home, camp: campOf(g) }, lanes), m === 'fire' ? fireMarks(g, world.fuelNear(g.structures)) : []);
+      terrainOv.set(m, t, lanes, siteCandidates(t, { lot: g.site.home, camp: campOf(g) }, lanes), m === 'fire' ? fireMarks(g, world.fuelNear(g.structures)) : [], sg);
     };
     // the blueprint view: names, rings, gates, towers and tunnels (game/blueprint)
     const host = canvas.parentElement ?? document.body;
@@ -280,6 +289,7 @@ export function GameCanvas() {
       blueprintOv.set(plan); useWorldStore.getState().setBlueprintReadout(plan.readout);
     };
     const refreshBlueprint = () => { if (useWorldStore.getState().blueprint) { clearTimeout(bpTimer); bpTimer = window.setTimeout(showBlueprint, 250); } };
+    setPhotoCapturer(() => { ws.renderFrame(); return encodePhoto(ws.renderer.domElement); });
     const unsub = [
       useWorldStore.subscribe(s => s.weakView, showWeak),
       useGameStore.subscribe(s => `${s.game.structures.length}|${s.game.forestry.cleared.length}|${s.game.forestry.jobs.length}|${s.game.perimeter.map(r => r.id + (r.finishedAt === null ? 'p' : 'f') + Math.round((r.brush ?? 0) * 4)).join()}`, () => { if (useWorldStore.getState().weakView) showWeak(); }),
@@ -331,7 +341,7 @@ export function GameCanvas() {
       useWorldStore.subscribe(s => s.sightMode, m => sight.set(m)),
       // the terrain overlay (sim/terrain.ts): high ground, lanes, water, sun
       useWorldStore.subscribe(s => s.terrainMode, showTerrain),
-      useGameStore.subscribe(s => s.game.structures.length + '|' + s.game.perimeter.length, () => { if (['lanes', 'fire'].includes(useWorldStore.getState().terrainMode)) showTerrain(); }),
+      useGameStore.subscribe(s => s.game.structures.length + '|' + s.game.perimeter.length, () => { if (['lanes', 'fire', 'shade'].includes(useWorldStore.getState().terrainMode)) showTerrain(); }),
       // the compound changed: recompute the overlay
       useGameStore.subscribe(s => `${s.game.structures.map(x => x.id + x.stage).join()}|${s.game.perimeter.map(r => r.id + (r.finishedAt === null ? Math.round(r.done) : 'f')).join()}`, () => sight.refresh()),
     ];
@@ -751,7 +761,7 @@ export function GameCanvas() {
       ws.dispose();
     };
     })();
-    return () => { cancelled = true; stop(); useWorldStore.getState().setBoot(null); };
+    return () => { cancelled = true; stop(); setPhotoCapturer(null); useWorldStore.getState().setBoot(null); };
   }, []);
 
   return <canvas ref={ref} style={{ width: '100%', height: '100%' }} />;

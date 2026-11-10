@@ -25,7 +25,7 @@ import { NEED_KEYS, activeNeeds, needDays, type NeedKey } from './needsStuck';
 /** Days a project waits for materials, with the cash to buy them, before the game makes noise about it. */
 export const STALL_DAYS = 3;
 /** A stall this old, with the cash in hand, is escalated: red card at the top, red board line, a second log line. */
-export const ESCALATE_DAYS = 14;
+export const ESCALATE_DAYS = 7;
 
 type Miss = Partial<Record<MaterialId, number>>;
 export interface Waiter { key: string; label: string; home: boolean; miss: Miss; /** The building to select (null: a wall run). */ at: string | null }

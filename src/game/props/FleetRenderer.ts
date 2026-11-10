@@ -13,6 +13,7 @@ import { buildVehicle, paintFor, VEHICLE_SIZE } from './vehicleGeometry';
 import { lineLength, type Pt } from '../region/access';
 import { sampleRoute, inCorridorAt } from '../paths/deckWalk';
 import { drivablePrefix } from '../paths/groundMovers';
+import { surfacePitch } from '../paths/driveHeight';
 import type { Wp } from '../paths/linkRoute';
 
 /** A placed building the bays are laid out in (world position, rotation about y, structure kind). */
@@ -171,7 +172,7 @@ export class FleetRenderer {
         const p = sampleRoute(it.anim.path, Math.min(it.anim.d, len));
         it.group.position.set(p.x, p.y ?? ctx.ground(p.x, p.z), p.z);
         it.group.rotation.order = 'YXZ';
-        it.group.rotation.set(-p.pitch, p.rot, 0);
+        it.group.rotation.set(-(p.y !== null ? p.pitch : surfacePitch(ctx.ground, p.x, p.z, p.rot)), p.rot, 0);
         it.group.visible = true;
         this.moving.push([p.x, p.z]);
         if (it.anim.d >= len) { it.anim = null; it.group.rotation.set(0, 0, 0); }

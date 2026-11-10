@@ -320,7 +320,7 @@ export function takeRestDay(s: GameState): string | null {
   return null;
 }
 /** The duties that do not wait for a rest day. */
-export const ESSENTIAL: ReadonlySet<Duty> = new Set<Duty>(['sleep', 'meal', 'leisure', 'school', 'livestock', 'kitchen', 'pets', 'watch', 'medic']);
+export const ESSENTIAL: ReadonlySet<Duty> = new Set<Duty>(['sleep', 'meal', 'leisure', 'school', 'livestock', 'kitchen', 'pets', 'watch', 'medic', 'post']);
 
 /** A word for the Family tab: how they are. */
 export function moodText(s: GameState, p: Person): string {
