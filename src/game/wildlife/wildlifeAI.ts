@@ -5,6 +5,7 @@
  * outside it when a wall holds them (sim/wildlife.ts `side`), never in a building or the creek.
  */
 import { SPECIES, type SpeciesId } from '../../sim/wildlife';
+import { advanceDeck } from './wildlifeCrossing';
 
 export type Mood = 'graze' | 'walk' | 'alert' | 'flee';
 export interface Beast {
@@ -33,6 +34,11 @@ export interface Beast {
   /** The way to (tx, tz) round whatever is in between (a wall, a cliff, a building), and the target it was found for. */
   via?: Array<[number, number]>;
   viaFor?: string;
+  /** On a tunnel-bridge's deck (game/wildlife/wildlifeCrossing): the points still to walk, and the deck height it stands at now. */
+  deck?: Array<[number, number, number]>;
+  y?: number;
+  /** On its way to a bridge's mouth to cross it. */
+  cross?: { mouth: [number, number]; bridge: string; from: 0 | 1 };
 }
 
 export interface StepCtx {
@@ -91,6 +97,15 @@ function newTarget(b: Beast, ctx: StepCtx): void {
 export function stepBeast(b: Beast, dt: number, ctx: StepCtx): void {
   const sd = SPECIES[b.sp], sp = speeds(b.sp), k = Math.max(1, Math.min(3, ctx.speedK));
   b.vis += ((b.want ? 1 : 0) - b.vis) * Math.min(1, dt * 1.2);
+  // on a bridge's deck: walk it end to end at a steady pace, at its height, whatever the threats (a deer on a closed deck has nowhere to bolt to)
+  if (b.deck) {
+    b.mood = 'walk'; b.via = undefined; b.viaFor = undefined; b.cross = undefined;
+    const v = sp.walk * k;
+    if (advanceDeck(b, v * dt)) { b.hx = b.tx = b.x; b.hz = b.tz = b.z; b.mood = 'graze'; b.t = 3 + ctx.rnd() * 5; b.v = 0; } else b.v = v;
+    b.phase += dt * b.v * 9 / Math.max(0.05, sd.h * 6);
+    b.head += (0.55 - b.head) * Math.min(1, dt * 4);
+    return;
+  }
   const th = nearestThreat(b, ctx.threats);
   // a bear or cougar does not run from the first person it sees; a deer does
   const fear = sd.fear;
