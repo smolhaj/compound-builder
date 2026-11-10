@@ -135,7 +135,7 @@ try {
       if (!b?.playing) return { phase: c?.phase, offer: c?.offer ?? null, bt: null };
       const ev = b.battle.events, U = b._units, t = b.time, found = {};
       const pos = id => { const u = U.get(id); return u && !u.dead ? { x: u.x, z: u.z, y: u.y } : null; };
-      if (beats.includes('flag')) for (const e of ev) if (e.kind === 'flag' && t >= e.t + 3 && t <= e.t + 12) { const q = pos(e.unit); if (q) found.flag = { ...q, key: e.unit }; }
+      if (beats.includes('flag')) for (const e of ev) if (e.kind === 'flag' && t >= e.t + 3 && t <= e.t + 12) { const q = pos(e.unit); if (q) { found.flag = { ...q, key: e.unit }; const m = b.props?._flagMesh; window.__flagInfo = m ? { count: m.count, vis: m.visible, verts: m.geometry.attributes.position.count, side: m.material.side, layers: m.layers.mask, parent: !!m.parent } : null; } }
       for (const [k, f] of [['panic', u => u.frozenUntil != null], ['sling', u => u.sling && !u.dead], ['crawl', u => u.crawl && !u.dead], ['limp', u => u.limp && !u.crawl && !u.dead]]) if (beats.includes(k)) for (const u of U.values()) if (f(u) && !u.def.machine) { found[k] = { x: u.x, z: u.z, y: u.y, key: u.def.id }; break; }
       if (beats.includes('flare')) for (const e of ev) if (e.kind === 'flare' && t >= e.t + 1 && t <= e.t + e.secs - 1) found.flare = { x: e.x, z: e.z, y: 0, key: 'flare' + e.t };
       if (beats.includes('fire')) for (const e of ev) if (e.kind === 'fire' && t >= e.t + 4 && t <= e.t + 25) found.fire = { x: e.x, z: e.z, y: 0, key: 'fire' + e.structure };
@@ -162,7 +162,7 @@ try {
       const shot = await globalThis.__cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 88 });
       const file = `${kind}_${String(shots).padStart(2, '0')}.jpg`;
       writeFileSync(`${outDir}/${file}`, Buffer.from(shot.data, 'base64'));
-      shotLog.push({ key, kind, file, bt: st.bt, caption: st.caption });
+      shotLog.push({ key, kind, file, bt: st.bt, caption: st.caption, flagInfo: kind === 'flag' ? await page.evaluate(() => window.__flagInfo) : undefined });
       shots++; did = true; break;
     }
     void did;

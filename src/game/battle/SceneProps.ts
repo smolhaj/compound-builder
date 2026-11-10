@@ -106,7 +106,7 @@ export class SceneProps {
     if (this._flagOf.length >= 2 || this._flagOf.includes(unit)) return;
     if (!this._flagMesh) {
       // a tall stick and a big cloth (as wide as a man is tall), turned 45 degrees so it reads from behind, the side and the front
-      const parts = [new THREE.BoxGeometry(0.014, 0.56, 0.014).translate(0, 0.28, 0), new THREE.PlaneGeometry(0.3, 0.2).translate(0.15, 0.44, 0).rotateY(Math.PI / 4)];
+      const parts = [new THREE.BoxGeometry(0.014, 0.56, 0.014).translate(0, 0.28, 0), new THREE.PlaneGeometry(0.3, 0.2).translate(0.15, 0.44, 0).rotateY(Math.PI / 4), new THREE.PlaneGeometry(0.3, 0.2).translate(0.15, 0.44, 0).rotateY(-Math.PI / 4)];   // two cloths in a V: one is never edge-on to the camera
       const geo = mergeGeometries(parts)!;
       for (const g of parts) g.dispose();
       const mat = new THREE.MeshStandardMaterial({ color: 0xf2efe6, roughness: 0.9, emissive: 0xb8b6ae, side: THREE.DoubleSide });
