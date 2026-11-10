@@ -33,6 +33,7 @@ import type { NetWorld } from './paths/pathNet';
 import { WALK_CLIFF, entryRampHeight, walkRoute } from './paths/walkRoute';
 import { CorridorNet } from './paths/CorridorNet';
 import { roadYAlong } from './paths/driveHeight';
+import type { Bridge } from './wildlife/wildlifeCrossing';
 import { animalRoute, climbLimit } from './paths/groundMovers';
 import { LANE } from '../sim/laneWalk';
 import type { Wp } from './paths/linkRoute';
@@ -2275,8 +2276,19 @@ export class HomesteadWorld {
       hard: (x, z, sp) => this._animalHard(sp)(x, z),
       creek,
       threats,
+      bridges: this._wildBridges(),
+      bridgesOpen: !(this.doorLock ?? locksNow(game)),
       cam: { x: this._ws.camera.position.x, z: this._ws.camera.position.z },
     }, speedK);
+  }
+  /** The standing tunnel-bridges as the animals see them (deck and mouths); a rock tunnel is closed to them. */
+  private _wildBridges(): Bridge[] {
+    const net = this.corridors, out: Bridge[] = [];
+    for (const l of net.links) {
+      const c = net.corridors.find(x => x.id === l.id);
+      if (c && c.kind === 'tunnel_bridge' && !c.collapsed && !l.blocked) out.push({ id: l.id, deck: l.deck, mouth: l.mouth });
+    }
+    return out;
   }
   private _hardBy = new Map<string, (x: number, z: number) => boolean>();
   private _hardWorld: object | null = null;
