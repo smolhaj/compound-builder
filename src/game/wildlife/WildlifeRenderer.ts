@@ -213,7 +213,7 @@ export class WildlifeRenderer {
       if (!c.bridgesOpen || b.mood === 'flee') { b.cross = undefined; return; }
       const br = c.bridges.find(x => x.id === b.cross!.bridge);
       if (!br) { b.cross = undefined; return; }
-      if (Math.hypot(b.x - b.cross.mouth[0], b.z - b.cross.mouth[1]) < 0.3) { b.deck = deckFrom(br, b.cross.from); b.cross = undefined; }
+      if (Math.hypot(b.x - b.cross.mouth[0], b.z - b.cross.mouth[1]) < 0.3) { b.deck = deckFrom(br, b.cross.from, c.ground); b.y = c.ground(b.x, b.z); b.cross = undefined; }
       return;
     }
     if (b.mood !== 'graze' || b.side === 'in' || this._rnd() > CROSS_PER_S * dt) return;

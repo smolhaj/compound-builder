@@ -42,7 +42,7 @@ const info = await page.evaluate(async () => {
   const br = bridges[0];
   w.wildlife.spawnDebug('deer', br.mouth[0][0], br.mouth[0][1], 0, true, 'free');
   const b = [...w.wildlife._beasts.values()].find(x => x.id.startsWith('qa:deer'));
-  b.deck = W.deckFrom(br, 0); b.x = br.mouth[0][0]; b.z = br.mouth[0][1];
+  b.deck = W.deckFrom(br, 0, w.groundAt); b.x = br.mouth[0][0]; b.z = br.mouth[0][1]; b.y = w.groundAt(b.x, b.z);
   window.__bridge = br;
   return { bridges: bridges.length, deckPts: br.deck.length, y0: br.deck[0][2], opens: !(w.doorLock ?? false) };
 });
@@ -54,19 +54,18 @@ const len = await page.evaluate(() => { const br = window.__bridge; return Math.
 const walk = 0.2, secs = len / walk, third = Math.round(secs / 0.1 / 3);
 const cam = (eye, tgt, fov = 55) => page.evaluate(([e, t, f]) => { window.__cb.qa.pose = { x: e[0], y: e[1], z: e[2], lx: t[0], ly: t[1], lz: t[2], fov: f }; }, [eye, tgt, fov]);
 const geo = await page.evaluate(() => { const br = window.__bridge, ux = br.mouth[1][0] - br.mouth[0][0], uz = br.mouth[1][1] - br.mouth[0][1], l = Math.hypot(ux, uz); return { ux: ux / l, uz: uz / l, ax: br.mouth[0][0], az: br.mouth[0][1] }; });
-// the deer steps in at the near door (day: the leaves stand open), then deeper on the deck
-let st = await step(60); console.error('just inside', JSON.stringify(st));
-await cam([geo.ax - geo.ux * 3.2 - geo.uz * 0.5, st.y + 0.32, geo.az - geo.uz * 3.2 + geo.ux * 0.5], [st.x, st.y + 0.1, st.z], 55); await shot('1-eye-deer-in-the-open-door');
-// the same moment from beside the span
-await cam([st.x - geo.uz * 5 - geo.ux * 2, st.y + 0.8, st.z + geo.ux * 5 - geo.uz * 2], [st.x, st.y + 0.1, st.z], 50); await shot('2-from-the-side-door-and-deer');
-// the cutaway views: the tube opened so the deer on the deck shows, high over the gorge bed
-st = await step(250); console.error('on the span', JSON.stringify(st));
-for (const [mode, name] of [['cutaway', '3-cutaway-deer-on-the-deck'], ['xray', '3b-xray-deer-on-the-deck']]) {
-  await page.evaluate(m => { try { window.__cb.store.getState().setBuildingView(m); } catch (e) { console.error('view', String(e)); } }, mode);
-  await page.waitForTimeout(600);
-  await cam([st.x - geo.uz * 4 - geo.ux * 1.5, st.y + 1.2, st.z + geo.ux * 4 - geo.uz * 1.5], [st.x, st.y + 0.05, st.z], 50); await shot(name);
-}
-await page.evaluate(() => { const s = window.__cb.store.getState(); s.setBuildingView('full'); s.setUnderground(true); });
-await page.waitForTimeout(600);
-await cam([st.x - geo.uz * 4 - geo.ux * 1.5, st.y + 1.2, st.z + geo.ux * 4 - geo.uz * 1.5], [st.x, st.y + 0.05, st.z], 50); await shot('3c-underground-deer-on-the-deck');
+// normal view throughout (ground visible). 1: the deer at the near mouth about to step in, eye level beside it
+const mouth0 = await page.evaluate(() => window.__bridge.mouth[0]), mouth1 = await page.evaluate(() => window.__bridge.mouth[1]);
+let st = await step(1);
+const eyeAt = (st, back, side, up = 0.3) => cam([st.x - geo.ux * back - geo.uz * side, st.ground + up, st.z - geo.uz * back + geo.ux * side], [st.x, st.ground + 0.1, st.z], 52);
+await eyeAt(st, 2.4, 1.2); await shot('1-normal-eye-deer-at-the-near-mouth');
+// 2: stepping in: a little way along the ramp
+st = await step(40); console.error('stepping in', JSON.stringify(st));
+await eyeAt(st, 2.4, 1.2); await shot('2-normal-eye-deer-stepping-onto-the-deck');
+// walk it across; when the deck ends it stands on the far rim
+let k = 0; while (st.deck && k++ < 400) st = await step(20);
+console.error('off the deck', JSON.stringify(st));
+st = await step(8);
+await eyeAt(st, 2.6, 1.4); await shot('3-normal-eye-deer-stepped-off-at-the-far-mouth');
+await cam([st.x - geo.uz * 5 + geo.ux * 3, st.ground + 3.5, st.z + geo.ux * 5 + geo.uz * 3], [st.x - geo.ux * 1.5, st.ground, st.z - geo.uz * 1.5], 55); await shot('4-normal-aerial-far-mouth-deer-on-the-ground');
 await browser.close(); vite?.kill();

@@ -61,3 +61,26 @@ describe('walking the deck', () => {
     expect(advanceDeck({ x: 0, z: 0, rot: 0 }, 1)).toBe(true);
   });
 });
+
+describe('no actor floats: on the deck at the deck height, on the ground at the ground height, never a step in the air', () => {
+  // ground: a rim at y=3.7 at each end (the deck is 4.0), falling away to a gorge floor under the span; the animal steps on at one mouth and off at the other
+  const ground = (x: number) => (x < 10 || x > 51 ? 3.7 : 0.5);
+  for (const sp of ['deer', 'elk', 'antelope', 'javelina', 'coyote', 'wolf'] as const) it(`${sp}: every sampled step`, () => {
+    const b = beast(sp, 9.2, 20); b.y = ground(9.2); b.deck = deckFrom(bridge, 0, ground);
+    const walk = speeds(sp).walk, dt = 0.1, samples: Array<{ x: number; y: number | undefined }> = [];
+    let last = b.y!, maxJump = 0, onDeck = 0;
+    for (let i = 0; i < 6000 && b.deck; i++) {
+      stepBeast(b, dt, ctx());
+      const y = b.y ?? ground(b.x);
+      maxJump = Math.max(maxJump, Math.abs(y - last)); last = y; samples.push({ x: b.x, y: b.y });
+      // inside the span (between the first and last deck point) it stands exactly at the deck height
+      if (b.x > 10.2 && b.x < 49.8 && b.y !== undefined) { onDeck++; expect(b.y).toBeCloseTo(4, 6); }
+    }
+    expect(onDeck).toBeGreaterThan(50);
+    // the ramps at the two ends: no jump larger than a step's worth of the steepest leg (0.3 u of rim-to-deck over ~0.9 u) plus nothing
+    expect(maxJump).toBeLessThan(walk * dt * (0.4 / 0.8) + 1e-6);
+    // off the deck it is on the ground (the renderer draws it at the terrain height there), and the last point it left was the ground's height
+    expect(b.y).toBeUndefined();
+    expect(Math.abs(last - ground(b.x))).toBeLessThan(1e-6);
+  });
+});

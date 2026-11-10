@@ -30,11 +30,12 @@ export function planCross(sp: SpeciesId, x: number, z: number, bridges: readonly
 }
 
 /** The deck points in walking order from the end the animal stands at, then the far mouth (where it steps off). */
-export function deckFrom(b: Bridge, from: 0 | 1): Array<[number, number, number]> {
+export function deckFrom(b: Bridge, from: 0 | 1, ground?: (x: number, z: number) => number): Array<[number, number, number]> {
   const d = b.deck.map(p => [p[0], p[1], p[2]] as [number, number, number]);
   const far = b.mouth[from === 0 ? 1 : 0], last = d[from === 0 ? d.length - 1 : 0];
   const out = from === 0 ? d : d.reverse();
-  out.push([far[0], far[1], last[2]]);
+  // the far mouth is on the ground: the last leg runs from the deck down (or up) to the ground it steps onto, so there is no step in the air
+  out.push([far[0], far[1], ground ? ground(far[0], far[1]) : last[2]]);
   return out;
 }
 
