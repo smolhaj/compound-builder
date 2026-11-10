@@ -210,3 +210,30 @@ describe('real lots', () => {
     expect(a.lengthM).toBeGreaterThan(b.lengthM);
   });
 });
+
+describe('a bore stands where the hill has closed over it', () => {
+  it('the portals are inset from the feet of the spur to where the ground clears the crown, and the road goes on level in a cutting', async () => {
+    const { boreInset, BORE_COVER } = await import('./roadPlan');
+    const { BORE } = await import('./terrain');
+    // a ramp of ground rising 0.2 per station from y=0 at i=0; the road's straight profile is level at 0: cover reaches BORE_COVER at crown + 0.2
+    const g = (i: number) => 0.2 * i, y = () => 0;
+    const [j0, j1] = boreInset(0, 40, i => Math.min(g(i), g(40 - i)), y);
+    expect(j0).toBeGreaterThanOrEqual(Math.ceil((BORE.CROWN + BORE_COVER) / 0.2)); expect(j0).toBeLessThanOrEqual(Math.ceil((BORE.CROWN + BORE_COVER) / 0.2) + 1); expect(j1).toBe(40 - j0);
+    // never closes over: the portals stay at the feet
+    expect(boreInset(0, 40, () => 0.3, y)).toEqual([0, 40]);
+    // too short once inset: keep the feet
+    expect(boreInset(0, 6, () => 5, y)[1] - boreInset(0, 6, () => 5, y)[0]).toBeGreaterThanOrEqual(2);
+  });
+  it('planned bores on several hills: every tunnel station has the hill over its crown beyond the portals, and the cutting stations before it are on the straight profile', () => {
+    let n = 0;
+    for (const sig of [2, 3, 4]) for (const ht of [3.5, 4.5]) {
+      const sp: RoadGround = { h: (x, z) => 1 + ht * Math.exp(-(((x - 45) / sig) ** 2)) * (z > 14 && z < 50 ? 1 : 0) };
+      const pl = planRoad(input('mountain_west', sp, { rect: { x0: 0, z0: 22, x1: 67, z1: 42 }, frontage: { x: 67, zMin: 24, zMax: 40, band: [24, 40] }, yard: [25, 32] }));
+      const b = pl.structures.find(s => s.kind === 'tunnel'); if (!b) continue; n++;
+      const ends = pl.pts.filter(p => p.s >= b.s0 - 1e-6 && p.s <= b.s1 + 1e-6);
+      expect(sp.h(ends[0].x, ends[0].z) - ends[0].y).toBeGreaterThanOrEqual(0.8 + 0.2 - 0.05);      // cover at the face (a heightfield cannot hold the arch otherwise)
+      expect(sp.h(ends[ends.length - 1].x, ends[ends.length - 1].z) - ends[ends.length - 1].y).toBeGreaterThanOrEqual(0.8 + 0.2 - 0.05);
+    }
+    expect(n).toBeGreaterThanOrEqual(4);
+  });
+});

@@ -41,6 +41,7 @@ import { M_TO_FT, ROAD_DAYS, ROAD_PRICE, ROAD_STYLE, UNIT_M, type RoadStyle } fr
 import { BED, RoadBed } from './roadBed';
 import { findHairpins } from './roadHairpins';
 import { lengthText } from './units';
+import { BORE } from './terrain';
 
 export type Pt = [number, number];
 
@@ -488,6 +489,20 @@ const OFFSETS: ReadonlyArray<readonly [number, number]> = [[0.2, 0.4], [0.55, 0.
 
 // ── the plan ──
 
+/**
+ * Where a bore's two portals stand along the straight from station `i0` to `i1` (foot to foot): at the first station from each end where the natural ground
+ * is at least `BORE_COVER` over the crown of the road's straight profile (`yLin`), looking no further than the middle. If the hill never closes over
+ * the crown the portals stay at the feet. Pure (tested).
+ */
+export const BORE_COVER = 0.2;
+export function boreInset(i0: number, i1: number, groundAt: (i: number) => number, yLin: (i: number) => number): [number, number] {
+  const mid = Math.floor((i0 + i1) / 2), closed = (i: number) => groundAt(i) - (yLin(i) + BORE.CROWN) >= BORE_COVER;
+  let j0 = i0, j1 = i1;
+  for (let i = i0; i < mid; i++) if (closed(i)) { j0 = i; break; }
+  for (let i = i1; i > mid; i--) if (closed(i)) { j1 = i; break; }
+  return j1 - j0 >= 2 ? [j0, j1] : [i0, i1];
+}
+
 export function planRoad(inp: RoadInput): RoadPlan {
   const style = ROAD_STYLE[inp.region];
   const grid = buildGrid(inp, style);
@@ -560,6 +575,8 @@ function finish(inp: RoadInput, style: RoadStyle, grid: GridData, found: Search 
   const structures: RoadStructure[] = [];
   const rotAt = (i: number) => { const a = st[Math.max(0, i - 1)], b = st[Math.min(n - 1, i + 1)]; return Math.atan2(b[0] - a[0], b[1] - a[1]); };
   const at = new Map<RoadStructure, [number, number]>();
+  /** A bore's whole straight (foot to foot): the road's profile runs along it, the tube only where the hill has closed over. */
+  const boreLine = new Map<RoadStructure, [number, number]>();
   const mk = (kind: StructureKind, i0: number, i1: number, lengthM: number): RoadStructure => {
     const im = Math.round((i0 + i1) / 2), pr = structurePrice(kind, lengthM);
     const choke = kind === 'bridge1' || kind === 'tunnel' || kind === 'low_water' || kind === 'ford';
@@ -575,7 +592,16 @@ function finish(inp: RoadInput, style: RoadStyle, grid: GridData, found: Search 
       if (Math.hypot(st[i][0] - sg.from[0], st[i][1] - sg.from[1]) < 0.3 && i0 < 0) i0 = i;
       if (Math.hypot(st[i][0] - sg.to[0], st[i][1] - sg.to[1]) < 0.3) i1 = i;
     }
-    if (i0 >= 0 && i1 > i0) { for (let i = i0; i <= i1; i++) kindAt[i] = 'tunnel'; structures.push(mk('tunnel', i0, i1, (s[i1] - s[i0]) * UNIT_M)); }
+    if (i0 >= 0 && i1 > i0) {
+      // The portals stand where the hill has really closed over the crown, not at its foot: a heightfield cannot hold a tunnel, so a face set on
+      // open ground would have the hill's surface across its arch. The road reaches each face in a cutting (the straight profile below runs on under the
+      // approach, the bed carves the cut and ends in a vertical wall at the face): see `boreInset`.
+      const ya = ground.h(st[i0][0], st[i0][1]), yb = ground.h(st[i1][0], st[i1][1]);
+      const [j0, j1] = boreInset(i0, i1, i => ground.h(st[i][0], st[i][1]), i => ya + (yb - ya) * (i - i0) / (i1 - i0));
+      for (let i = j0; i <= j1; i++) kindAt[i] = 'tunnel';
+      const sx = mk('tunnel', j0, j1, (s[j1] - s[j0]) * UNIT_M);
+      structures.push(sx); boreLine.set(sx, [i0, i1]);
+    }
   }
   // creek crossings: runs of wet stations
   if (creek || ground.lakeY != null) {
@@ -607,7 +633,7 @@ function finish(inp: RoadInput, style: RoadStyle, grid: GridData, found: Search 
   for (const sx of structures) {
     const [i0, i1] = at.get(sx)!;
     if (sx.kind === 'bridge' || sx.kind === 'bridge1') { const ya = y0[Math.max(0, i0 - 1)], yb = y0[Math.min(n - 1, i1 + 1)]; const deck = Math.max(ya, yb); setLin(i0, i1, deck, deck); }
-    else if (sx.kind === 'tunnel') setLin(i0, i1, ground.h(st[i0][0], st[i0][1]), ground.h(st[i1][0], st[i1][1]));
+    else if (sx.kind === 'tunnel') { const [f0, f1] = boreLine.get(sx) ?? [i0, i1]; setLin(f0, f1, ground.h(st[f0][0], st[f0][1]), ground.h(st[f1][0], st[f1][1])); }
     else if (sx.kind === 'ford' || sx.kind === 'low_water') { let low = Infinity; for (let i = i0; i <= i1; i++) low = Math.min(low, creek ? creek.waterY(st[i][0]) : y0[i]); setLin(i0, i1, low + 0.07, low + 0.07); }
     else if (sx.kind === 'culvert' || sx.kind === 'arch_culvert') { for (let i = i0; i <= i1; i++) y0[i] = Math.max(y0[i], (creek ? creek.waterY(st[i][0]) : y0[i]) + 0.55); }
   }
