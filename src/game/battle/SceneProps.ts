@@ -25,7 +25,7 @@ export const lootKind = (what: string): string => /fuel|gas|diesel/i.test(what) 
 export const itemColor = (item: string): number => ITEM_COLOR[item] ?? ITEM_COLOR.default;
 
 interface Door { pivot: THREE.Group; leaf: THREE.Mesh; nx: number; nz: number; open: number; target: number; speed: number; shudder: number }
-interface Fire { x: number; z: number; big: boolean; age: number; acc: number }
+interface Fire { x: number; z: number; big: boolean; age: number; acc: number; spread?: boolean; smoke?: number }
 
 export class SceneProps {
   private _door: Door | null = null;
@@ -33,6 +33,7 @@ export class SceneProps {
   private _packOf: Array<{ unit: string; color: number }> = [];
   private _fires: Fire[] = [];
   private _flagOf: string[] = [];
+  private _dog: { mesh: THREE.Group; head: THREE.Mesh; x: number; z: number; age: number } | null = null;
   private _flagMesh: THREE.InstancedMesh | null = null;
   private _flares: Array<{ x: number; z: number; age: number; secs: number; acc: number }> = [];
   private _ladders: { x: number; z: number; h: number; fx: number; fz: number }[] = [];
@@ -56,7 +57,7 @@ export class SceneProps {
     if (this._packs) this._group.remove(this._packs);
     if (this._ladderMesh) this._group.remove(this._ladderMesh);
     this._ladderMesh = null; this._ladders = [];
-    this._door = null; this._packs = null; this._packOf = []; this._fires = []; this._flares = []; this._flagOf = []; if (this._flagMesh) this._group.remove(this._flagMesh); this._flagMesh = null;
+    this._door = null; this._packs = null; this._packOf = []; this._fires = []; this._flares = []; this._flagOf = []; if (this._dog) this._group.remove(this._dog.mesh); this._dog = null; if (this._flagMesh) this._group.remove(this._flagMesh); this._flagMesh = null;
     for (const g of this._geo) g.dispose();
     for (const m of this._mat) m.dispose();
     this._geo = []; this._mat = [];
@@ -66,6 +67,7 @@ export class SceneProps {
     if (e.kind === 'house_door') this._doorEvent(e);
     else if (e.kind === 'ladder') this._addLadder(e);
     else if (e.kind === 'flag') this._addFlag(e.unit);
+    else if (e.kind === 'alarm') this._addDog();
     else if (e.kind === 'flare') { if (this._flares.length < MAX_FLARES) this._flares.push({ x: e.x, z: e.z, age: 0, secs: e.secs, acc: 0 }); }
     else if (e.kind === 'loot') {
       if (this._packOf.length < MAX_PACKS && !this._packOf.some(p => p.unit === e.by)) this._packOf.push({ unit: e.by, color: itemColor(lootKind(e.what)) });
@@ -116,6 +118,23 @@ export class SceneProps {
       this._group.add(this._flagMesh);
     }
     this._flagOf.push(unit);
+  }
+
+  /** The yard dog, barking at the drive from the alarm on (one small group of boxes: a body, a head that jerks with each bark, four legs, a tail). Placed beside the house. */
+  centerOf: () => { x: number; z: number } = () => ({ x: 0, z: 0 });
+  private _addDog(): void {
+    if (this._dog) return;
+    const c = this.centerOf(), g = new THREE.Group(), mat = new THREE.MeshStandardMaterial({ color: 0x5a4632, roughness: 0.95 });
+    this._mat.push(mat);
+    const box = (w: number, h: number, d: number, x: number, y: number, z: number) => { const geo = new THREE.BoxGeometry(w, h, d); this._geo.push(geo); const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); g.add(m); return m; };
+    box(0.13, 0.055, 0.05, 0, 0.075, 0);                       // body (a dog is 0.1 tall at the shoulder: SCALE v2)
+    const head = box(0.05, 0.045, 0.04, 0.085, 0.105, 0);
+    for (const [x, z] of [[0.05, 0.018], [0.05, -0.018], [-0.05, 0.018], [-0.05, -0.018]]) box(0.014, 0.05, 0.014, x, 0.025, z);
+    const tail = box(0.05, 0.012, 0.012, -0.09, 0.1, 0); tail.rotation.z = 0.5;
+    const x = c.x + 0.7, z = c.z + 0.55;
+    g.position.set(x, this._h.ground(x, z), z);
+    this._group.add(g);
+    this._dog = { mesh: g, head, x, z, age: 0 };
   }
 
   private _ensurePacks(): void {
@@ -198,6 +217,14 @@ export class SceneProps {
       h.flash(new THREE.Vector3(f.x + Math.sin(f.age * 0.7) * 0.2, y, f.z), 9 * fade + 1, 0xff9a80);
       h.puff(new THREE.Vector3(f.x + Math.sin(f.age * 0.7) * 0.2, y, f.z), 0.03, 0.09, 0.5, 0, 0xffb090, 0.9, true);
     }
+    if (this._dog) {
+      // barking: the head jerks up and back three times a second, and he turns to face the drive
+      const d = this._dog; d.age += dt;
+      const bark = Math.max(0, Math.sin(d.age * 18)) * (Math.sin(d.age * 3) > 0 ? 1 : 0.2);
+      d.head.position.y = 0.105 + bark * 0.018; d.head.rotation.z = bark * 0.35;
+      d.mesh.rotation.y = Math.atan2(d.x - this.centerOf().x, d.z - this.centerOf().z) - Math.PI / 2 + 0.4;
+      if (d.age > 3 && Math.floor(d.age * 3) !== Math.floor((d.age - dt) * 3) && bark > 0.3) h.puff(new THREE.Vector3(d.x, h.ground(d.x, d.z) + 0.12, d.z), 0.01, 0.05, 0.4, 0.02, 0xdddddd, 0.15);
+    }
     if (this._flagMesh) {
       let n = 0;
       for (const id of this._flagOf) {
@@ -214,6 +241,10 @@ export class SceneProps {
     }
     for (const f of this._fires) {
       f.age += dt; f.acc += dt;
+      // the fire spreads: a few seconds on, a second one takes along the wall (at most MAX_FIRES burning), and the smoke piles up thick enough to hide the yard behind it
+      if (!f.spread && f.age > 7 && this._fires.length < MAX_FIRES) { f.spread = true; const a = f.x * 12.9898 + f.z * 78.233; this._fires.push({ x: f.x + Math.cos(a) * 0.5, z: f.z + Math.sin(a) * 0.5, big: f.big, age: 0, acc: 0 }); }
+      f.smoke = (f.smoke ?? 0) + dt;
+      if (f.smoke > 0.45) { f.smoke = 0; const yy = h.ground(f.x, f.z); h.puff(new THREE.Vector3(f.x, yy + 0.3, f.z), 0.15, 0.9 + Math.min(1, f.age / 10) * 0.6, 5, 0.25, 0x2a2826, 0.42); }
       if (f.acc < (f.big ? 0.1 : 0.16)) continue;
       f.acc = 0;
       const y = h.ground(f.x, f.z), r = f.big ? 0.45 : 0.14, grow = Math.min(1, f.age / 6);
