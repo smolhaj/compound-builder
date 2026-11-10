@@ -20,5 +20,5 @@ export const PACE: Record<RaidClass, number> = { skirmish: 1, serious: 4.5, inva
 export const INVASION_FIGHT_EXTRA = 70;
 
 export function withPace(scenes: readonly Scene[], cls: RaidClass): Scene[] {
-  return scenes.map(sc => ({ ...sc, pace: PACE[cls] }));
+  return scenes.map(sc => ({ ...sc, pace: sc.pace ?? PACE[cls] }));   // (scenes already played keep the pace they were shown with)
 }
