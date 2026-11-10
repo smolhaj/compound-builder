@@ -104,6 +104,12 @@ export class WildlifeRenderer {
   animals(): Array<{ id: string; sp: SpeciesId; x: number; z: number; mood: string; vis: number }> {
     return [...this._beasts.values()].map(b => ({ id: b.id, sp: b.sp, x: b.x, z: b.z, mood: b.mood, vis: b.vis }));
   }
+  /** Where the animals on (or heading for) a bridge are: they swing the day-open doors the way a keyholder does. */
+  crossers(): Array<[number, number]> {
+    const out: Array<[number, number]> = [];
+    for (const b of this._beasts.values()) if (b.deck || b.cross) out.push([b.x, b.z]);
+    return out;
+  }
   /** Put an animal somewhere (QA shots): returns false if there is none of that species. */
   place(sp: SpeciesId, x: number, z: number, rot = 0, index = 0): boolean {
     const l = [...this._beasts.values()].filter(b => b.sp === sp);

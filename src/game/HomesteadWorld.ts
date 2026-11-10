@@ -1300,6 +1300,7 @@ export class HomesteadWorld {
     for (const p of this.family.positions()) holders.push([p.x, p.z]);
     for (const p of this.dogPositions()) holders.push([p[0], p[1]]);
     for (const p of this.keyedVehicles()) holders.push(p);
+    for (const p of this.wildlife.crossers()) holders.push(p);       // (an animal crossing the bridge by day: the leaf swings open for it, and closes behind it)
     this._doors.update(dt, this.corridors.corridors, new Map([...this._runGroups].map(([id, g]) => [id, g.group])), this.doorLock ?? locksNow(game), holders);
   }
 
