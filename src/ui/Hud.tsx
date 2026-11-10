@@ -20,6 +20,7 @@ import { CompoundBoardPanel } from './CompoundBoard';
 import { WaveChip } from './WaveClock';
 import { CollapseChip } from './CollapseChip';
 import { KinPanel } from './KinPanel';
+import { RoadSection } from './RoadPanel';
 import { NewcomersPanel } from './NewcomersPanel';
 import { HouseRulesPanel } from './HouseRulesPanel';
 import { COMFORT, comfortMonthly, comfortTier, hasEstate } from '../sim/estate';
@@ -49,6 +50,7 @@ import { roadLine } from '../sim/roadFx';
 import { crossingLine } from '../sim/roadWildlife';
 import { roadPlanOf } from '../sim/roadState';
 import { SaveMenu } from './SaveMenu';
+import { Album, PhotoShutter, Thumb } from './PhotoAlbum';
 import { EntranceCard } from './hud/EntranceCard';
 import { PlowNote } from './hud/PlowNote';
 import { DRIVE_PER_FT, driveQuote, hookupProblem, POLE_PER_FT, powerQuote } from '../sim/improvements';
@@ -307,6 +309,7 @@ export function Hud() {
             <KinPanel />
             <NewcomersPanel />
             <HouseRulesPanel />
+            <RoadSection />
             <HousingPanel />
             <QuartersPanel />
             <PeopleSection />
@@ -686,9 +689,11 @@ export function Hud() {
         <button style={btn(w.terrainMode === 'off')} title="Hide the terrain overlay" onClick={() => w.setTerrainMode('off')}>Off</button>
         {(Object.keys(TERRAIN_LEGEND) as Array<Exclude<TerrainMode, 'off'>>).map(m => <button key={m} title={TERRAIN_LEGEND[m].tip} style={btn(w.terrainMode === m)} onClick={() => w.setTerrainMode(m)}>{TERRAIN_LEGEND[m].label}</button>)}
         {w.terrainMode !== 'off' && <div style={{ flexBasis: '100%', fontSize: 11.5, opacity: 0.85 }}>{TERRAIN_LEGEND[w.terrainMode].legend}</div>}
+        {w.terrainMode === 'shade' && w.shadeReadout && <div data-testid="shade-readout" style={{ flexBasis: '100%', fontSize: 11.5, color: '#bcd', display: 'flex', flexWrap: 'wrap', gap: '2px 14px' }}>{w.shadeReadout.length ? w.shadeReadout.map(l => <span key={l}>{l}</span>) : <span>Nothing to site yet: place a solar array or a garden bed and its shade shows here.</span>}</div>}
         {(w.terrainMode !== 'off' || w.sightMode !== 'off') && (() => { const t = fogLineFor(g.game, w.dayOfYear, w.timeOfDay, w.weatherMode); return t ? <div data-testid="fog-readout" style={{ flexBasis: '100%', fontSize: 11.5, color: '#bcd' }} title="Valley fog and low cloud (sim/fog.ts): it cuts what a watch, a camera or a night-vision tube sees; thermal sees through it. The same fog is drawn in the valley.">{t}</div> : null; })()}
         <button data-testid="blueprint-toggle" style={btn(w.blueprint)} title="Blueprint view: names and roles of the buildings, rings, gates, towers and tunnels, with the defense readouts" onClick={() => w.setBlueprint(!w.blueprint)}>Blueprint</button>
         {w.blueprint && w.blueprintReadout && (() => { const r = w.blueprintReadout; return <div data-testid="blueprint-readout" style={{ flexBasis: '100%', fontSize: 11.5, color: '#bcd', display: 'flex', flexWrap: 'wrap', gap: '2px 14px' }}>
+          {r.radiation && <span data-testid="radiation-readout" style={{ flexBasis: '100%', color: '#ffd27a' }} title="Protection factor (PF) divides the dose: PF 10 means a tenth. Every building and bunker room shows its own under its name.">☢ {r.radiation}</span>}
           <span title="The Defense tab's score">Defense <b>{r.score}</b> {r.label}</span>
           <span title="How hard the walls, gates and bars stop a crew">Line holds {r.barrierPct}%</span>
           <span title="How likely it is that a crew is seen before it reaches the wall">Chance of seeing a crew coming: {r.detectionPct}%</span>
@@ -704,6 +709,7 @@ export function Hud() {
           <span>{dateLabel(w.dayOfYear)}</span>
           <input type="range" min={1} max={365} step={1} value={w.dayOfYear} onChange={e => w.setDayOfYear(+e.target.value)} />
         </>}
+        <PhotoShutter />
       </div>}
     </>
   );
@@ -793,7 +799,7 @@ function TakenSection() {
 }
 
 const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
-const KIND_MARK: Record<string, string> = { era: '◆', birth: '✦', death: '✝', partner: '♥', coming: '▲', milestone: '★', retire: '·', home: '⌂', threat: '▼', bond: '✧' };
+const KIND_MARK: Record<string, string> = { era: '◆', birth: '✦', death: '✝', partner: '♥', coming: '▲', milestone: '★', retire: '·', home: '⌂', threat: '▼', bond: '✧', photo: '▣' };
 
 /** The long game: the family over the years, the eras, milestones and the dynasty score. */
 function Chronicle() {
@@ -831,11 +837,12 @@ function Chronicle() {
     <Section title={`Milestones ${L.milestones.length}/${MILESTONE_COUNT}`}>
       {L.milestones.length ? L.milestones.map(m => <div key={m} style={{ padding: '1px 0' }}><span style={{ color: '#d8c08a' }}>★</span> {MILESTONE_NAME[m]}</div>) : <Note>None yet. Get through the first winter.</Note>}
     </Section>
+    <Album />
     <Section title="Chronicle">
       {L.chronicle.length === 0 && <Note>Births, deaths, weddings, the eras: it all goes here.</Note>}
       {L.chronicle.slice(-40).reverse().map((e, i) => <div key={i} style={{ display: 'flex', gap: 6, padding: '3px 0', borderBottom: `1px solid ${LINE}` }}>
         <span style={{ color: DIM, width: 32, flex: 'none', fontVariantNumeric: 'tabular-nums' }}>{e.year}</span>
-        <span style={{ color: e.kind === 'death' ? '#b8a8a0' : e.kind === 'era' ? '#d8c08a' : undefined }}>{KIND_MARK[e.kind]} {e.text}</span>
+        <span style={{ color: e.kind === 'death' ? '#b8a8a0' : e.kind === 'era' ? '#d8c08a' : undefined }}>{KIND_MARK[e.kind]} {e.text}{e.photo && <Thumb id={e.photo} width={150} />}</span>
       </div>)}
     </Section>
   </>;

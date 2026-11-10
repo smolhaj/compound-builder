@@ -10,6 +10,7 @@
  * bulk staples. A diet of one thing wears on morale; going hungry wears on
  * health, and with it how much work people can do.
  */
+import { flockFactor } from './poultry';
 import { hasBasement } from './housingStyles';
 import { layFactor } from './wildlife';
 import { calendarOf, type GameState } from './state';
@@ -180,7 +181,7 @@ export function produceParts(s: GameState): ProduceParts {
   const grow = climate(s).grow, pol = pollination(s);
   const pick = orchardPicking(s, pol.orchard), orchardK = careYield(s, 'orchard') * grow;
   return {
-    eggs: Math.max(0, eggs) * Math.max(0.5, grow) * henSeason(s, doy),
+    eggs: Math.max(0, eggs) * Math.max(0.5, grow) * henSeason(s, doy) * flockFactor(s),
     veg: Math.max(0, veg) * grow * pol.garden,
     greens: (greenhouseGreens(s) * careYield(s, 'greenhouse') + aquaPlants(s)) * grow,
     orchard: pick.kcal * orchardK,

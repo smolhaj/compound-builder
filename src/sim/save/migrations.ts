@@ -46,8 +46,12 @@ type Raw = Record<string, unknown> & { version?: number };
 /** version n → n + 1 upgraders. */
 const STEPS: Record<number, (s: Raw) => Raw> = {
   // 89 → 90: survival realism (sim/radiation.ts, thirst.ts, cold.ts): `Needs.rad / dry / chill` are optional and made on first use, the hand pump, iodide and radiation meter are stock goods that read as zero. Nothing to back-fill.
+  // 91 → 92: life on the county road (sim/roadPassers.ts, sim/roadWarn.ts): `road` is optional and made on first use
+  // 93 → 94: the road post (sim/roadPost.ts): `RoadBlock.crew`, `Order.held`, both optional; no old-save work
+  94: s => ({ ...s, version: 95 }),
+  93: s => ({ ...s, version: 94 }),
+  91: s => ({ ...s, version: 92 }),
   89: s => ({ ...s, version: 90 }),
-  90: s => ({ ...s, version: 91 }),
   // 78 → 79: Cozy starvation (sim/starvation.ts): `Needs.starved` counts consecutive starving days; old saves start at 0, and a runaway `hunger` is clamped
   78: s => ({ ...s, version: 79, personState: ((s.personState as Array<{ needs?: { hunger?: number; starved?: number } }>) ?? []).map(ps => ps?.needs ? { ...ps, needs: { ...ps.needs, starved: ps.needs.starved ?? 0, hunger: Math.min(ps.needs.hunger ?? 0, 400_000) } } : ps) }),
   // 77 → 78: per-ring gate vetting (sim/gateVetting.ts): no one is checked at the gates until the household chooses
@@ -75,6 +79,10 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 86 → 87: raid depth (sim/breachMeans.ts, crewMercy.ts, raidOrders.ts, raidOutcomes.ts, raidFire.ts). `raidFires` (fires a raid set) is optional and absent on an old save; the bollards are a new shop good (zero stock)
   // 87 → 88: raid openers and the raider's story (sim/raidOpeners.ts, sim/raiderStory.ts). `Encounter.opener` and `raiderStories` are optional and absent on an old save
   // 88 → 89: questioning prisoners and the plans for scouts (sim/interrogation.ts, sim/scoutPlans.ts, sim/parleyChoices.ts). `Prisoner.asked`, `Opener.spotted` are optional and absent on an old save
+  // 92 → 93: the photo album (sim/photos.ts). `photos` is optional; the pixels live in the photo vault, not the save
+  92: s => ({ ...s, version: 93 }),
+  // 90 → 91: farm & kitchen part 3 (sim/haying.ts, swine.ts, poultry.ts): new goods start at zero; `farm.haying / swine / poultry` are made on first use
+  90: s => ({ ...s, version: 91 }),
   88: s => ({ ...s, version: 89 }),
   87: s => ({ ...s, version: 88 }),
   86: s => ({ ...s, version: 87 }),
@@ -315,13 +323,15 @@ export function migrate(raw: unknown): GameState {
 }
 
 /** JSON export (pretty, with a header the importer checks). */
-export function exportJson(s: GameState): string {
-  return JSON.stringify({ game: 'compound-builder', ...s }, null, 1);
+export function exportJson(s: GameState, photoData?: Record<string, string>): string {
+  return JSON.stringify({ game: 'compound-builder', ...s, ...(photoData && Object.keys(photoData).length ? { photoData } : {}) }, null, 1);
 }
 
-export function importJson(text: string): GameState {
+export function importJson(text: string, photoOut?: { data?: unknown }): GameState {
   const raw = JSON.parse(text) as Raw;
   if (raw.game !== 'compound-builder') throw new SaveVersionError('Not a Compound Builder save');
   delete raw.game;
+  if (photoOut) photoOut.data = raw.photoData;
+  delete raw.photoData;
   return migrate(raw);
 }

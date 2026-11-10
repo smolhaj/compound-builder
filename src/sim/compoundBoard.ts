@@ -7,6 +7,7 @@
  * Pure. `boardCache` keeps the answer until the day (or a card, a build, a person) changes, so a HUD that
  * redraws every frame still computes it about once a day.
  */
+import { roadPostLine } from './roadPost';
 import type { Pt } from './perimeter';
 import { isFinished, holdReason } from './construction';
 import { defenseReport, type Check } from './defenseReport';
@@ -127,6 +128,10 @@ export function compoundBoard(s: GameState, drive?: readonly Pt[]): CompoundBoar
     if (w && day <= w.until) threats.push({ id: 'weather', text: `${w.kind.replace(/_/g, ' ')} ${day < w.at ? `due in ${days(w.at - day)}` : 'on now'}`, tone: day < w.at ? 'warn' : 'bad', act: { label: 'Outside', act: open('outside') } }); }
   { const hurt = alive.filter(x => { const n = s.personState[x.i].needs; return n.health < 40 || n.hurt.length > 0; }).length;
     if (hurt) threats.push({ id: 'hurt', text: `${hurt} hurt or ill`, tone: 'bad', act: { label: 'Family', act: open('family') } }); }
+
+  // the road post (sim/roadPost.ts): who is tied up at the drive
+  { const post = roadPostLine(s);
+    if (post) threats.push({ id: 'roadpost', text: post, tone: 'warn', act: { label: 'Family', act: open('family') } }); }
 
   // decisions: the unmet checklist items without a row above, a pending card, held work, loose wiring, the Next steps
   const decisions: BoardItem[] = [];

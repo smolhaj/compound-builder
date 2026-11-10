@@ -9,6 +9,7 @@ import { SchedulePanel } from './ui/SchedulePanel';
 import { Ticker } from './ui/Ticker';
 import { BattleOverlay } from './ui/BattleOverlay';
 import { GateCard } from './ui/GateCard';
+import { RoadAlert } from './ui/RoadPanel';
 import { CutsceneOverlay } from './ui/CutsceneOverlay';
 import { ReportCard } from './ui/ReportCard';
 import { DayCard } from './ui/DayCard';
@@ -81,6 +82,7 @@ export default function App() {
       {!clean && !raid && <BattleOverlay />}
       {!clean && <CutsceneOverlay />}
       {!clean && plan.gate && <GateCard />}
+      {!clean && !raid && !title && <RoadAlert />}
       {!clean && plan.ending && <ReportCard />}
       {!clean && plan.dayCard && <DayCard />}
       {shop && !clean && !raid && <ShopWindow />}

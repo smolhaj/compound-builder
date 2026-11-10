@@ -9,11 +9,11 @@
 import * as THREE from 'three';
 import { buildTrafficGeometries, CLOTHES, PAINT, RAIDER_PAINT, TINTED } from './props/trafficGeometry';
 import {
-  APPROACH, LENGTH, MAX_SHOWN, RAID_LIKE, SLOT, WINDOW, monthOfDoy, partyForEncounter, spawnFor, stalledCars, trafficLevel, weekdayOf,
+  APPROACH, LEAD, LENGTH, MAX_SHOWN, RAID_LIKE, SLOT, WINDOW, partyForEncounter, spawnFor, stalledCars, trafficLevel,
   type Member, type MemberKind, type RoadParty, type StalledCar, type TrafficCtx, type TrafficLevel, approachDistance,
 } from '../sim/roadTraffic';
-import { calendarOf, dayIndex, hourOf, type GameState } from '../sim/state';
-import { tension as tensionOf } from '../sim/disaster';
+import { hourOf, type GameState } from '../sim/state';
+import { REAL_CLASSES, simHandles, trafficCtx } from '../sim/roadPassers';
 import { hasCutscene } from '../sim/siege';
 
 type Quality = 'high' | 'medium' | 'low';
@@ -78,6 +78,12 @@ export class RoadTraffic {
   private _incoming: Live | null = null;
   private _incomingId = '';
   private _tableau: Live | null = null;
+  /** The day's real passers-by (sim/roadPassers.ts) and a party stopped at the line for a swap. */
+  private readonly _passes = new Map<string, Live>();
+  private _hail: Live | null = null;
+  /** The roadblock or checkpoint across the county road at the drive (sim/roadPassers.ts `RoadBlock`). */
+  private _block: THREE.Group | null = null;
+  private _blockKey = '';
   private _tableauId = '';
   private _qaFreeze = false;
   /** QA / tests: draw this much darkness (0-1) instead of the world's. */
@@ -130,14 +136,7 @@ export class RoadTraffic {
     this._qaFreeze = true;
   }
 
-  private _ctx(game: GameState, hour: number): TrafficCtx {
-    const d = game.disaster, cal = calendarOf(game.clock);
-    return {
-      seed: game.seed, region: game.site.region, hour, dow: weekdayOf(game.clock.startDoy, game.clock.startYear, dayIndex(game.clock.t)), month: monthOfDoy(cal.doy),
-      phase: d.phase, kind: d.kind, variant: d.variant, sinceHit: d.kind ? game.clock.t - d.hitAt : -999, tension: d.kind ? tensionOf(d, game.clock.t) : 0,
-      tracks: { fuel: d.tracks.fuel, law: d.tracks.law, grid: d.tracks.grid, deliveries: d.tracks.deliveries },
-    };
-  }
+  private _ctx(game: GameState, hour: number): TrafficCtx { return trafficCtx(game, hour); }
 
   private _at(z: number, lat: number): { x: number; z: number; y: number; yaw: number; pitch: number } {
     const dx = (this._county.x(z + 0.5) - this._county.x(z - 0.5));
@@ -149,7 +148,7 @@ export class RoadTraffic {
   }
 
   update(dt: number, game: GameState, speedK: number, cam: { x: number; z: number }, dark: number): void {
-    if (game.seed !== this._seed) { this._seed = game.seed; this._live.length = 0; this._slot = 0; this._acc = 0; this._incoming = this._tableau = null; this._incomingId = this._tableauId = ''; }
+    if (game.seed !== this._seed) { this._seed = game.seed; this._live.length = 0; this._slot = 0; this._acc = 0; this._incoming = this._tableau = this._hail = null; this._passes.clear(); this._incomingId = this._tableauId = ''; }
     const k = Math.min(4, Math.max(0, speedK));
     const w = dt * k;
     this._time += dt;
@@ -166,7 +165,10 @@ export class RoadTraffic {
       while (this._acc >= SLOT && guard++ < 8) {
         this._acc -= SLOT; this._slot++;
         if (this._live.filter(l => !l.fixed || !l.spec.encounter).length >= cap.parties) continue;
-        const spec = spawnFor(this._ctx(game, hour), this._slot, level);
+        const ctx = this._ctx(game, hour);
+        const spec = spawnFor(ctx, this._slot, level);
+        // once the world has ended the busy classes are real events, scheduled by the sim (they come through `_encounters`)
+        if (spec && simHandles(ctx) && REAL_CLASSES.has(spec.cls)) continue;
         if (spec) this._live.push({ spec, z: spec.dir > 0 ? zLo - 4 : zHi + 4, speed: spec.speed, t: 0, fade: 1 });
       }
       this._follow(w);
@@ -178,6 +180,48 @@ export class RoadTraffic {
     const sk = `${game.seed}|${stalledN}|${Math.round(this._gateZ)}`;
     if (sk !== this._stalledKey) { this._stalledKey = sk; this._stalled = stalledCars(game.seed, stalledN, zLo, zHi, this._gateZ); }
     this._draw(cap, cam, night, level.lightsOk);
+  }
+
+  /** Build or remove the barrier / checkpoint across the road at the gate. Primitives only, merged per material (a handful of draw calls). */
+  private _syncBlock(b: { kind: string } | null): void {
+    const key = b ? `${b.kind}|${Math.round(this._gateZ)}` : '';
+    if (key === this._blockKey) return;
+    this._blockKey = key;
+    if (this._block) { this._scene.remove(this._block); this._block.traverse(o => { const m = o as THREE.Mesh; m.geometry?.dispose(); }); this._block = null; }
+    if (!b) return;
+    const g = new THREE.Group(); g.name = 'road_block'; g.userData = { type: 'roadBlock', noSSAO: true };
+    const mat = (c: number) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, metalness: 0.05 });
+    const orange = mat(0xe8742a), white = mat(0xeeeeee), red = mat(0xb3281f), wood = mat(0x8a6a44), dark = mat(0x3b3f3a), glass = mat(0x9db8c4);
+    const box = (m: THREE.Material, w: number, h: number, d: number, x: number, y: number, z: number, ry = 0) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.rotation.y = ry; o.castShadow = false; g.add(o); return o; };
+    // the road here: centre line, +x across it (the lanes lie either side); everything sized to the 0.65 lane, person 0.28, rail height 0.17
+    const half = 0.62;
+    if (b.kind === 'barrier') {
+      // two sawhorses with striped rails, a chain between, a stop sign on a post
+      for (const x of [-0.32, 0.32]) {
+        box(orange, 0.5, 0.03, 0.025, x, 0.15, 0); box(white, 0.5, 0.03, 0.025, x, 0.115, 0);
+        for (const s of [-0.22, 0.22]) box(wood, 0.025, 0.17, 0.025, x + s, 0.085, 0);
+      }
+      box(dark, 0.24, 0.006, 0.006, 0, 0.13, 0);
+      box(wood, 0.02, 0.34, 0.02, half - 0.06, 0.17, 0.06); box(red, 0.12, 0.12, 0.012, half - 0.06, 0.32, 0.06);
+    } else {
+      // a boom gate across the road, a guard booth at the verge with a window and roof, a stop sign, cones
+      box(dark, 0.06, 0.2, 0.06, -half, 0.1, 0);
+      for (let i = 0; i < 6; i++) box(i % 2 ? white : red, (2 * half - 0.06) / 6, 0.03, 0.03, -half + 0.03 + (i + 0.5) * (2 * half - 0.06) / 6, 0.2, 0);
+      box(dark, 0.04, 0.17, 0.04, half, 0.085, 0);
+      box(white, 0.26, 0.2, 0.26, half + 0.28, 0.1, -0.05); box(dark, 0.3, 0.025, 0.3, half + 0.28, 0.215, -0.05); box(glass, 0.18, 0.07, 0.01, half + 0.28, 0.13, -0.18);
+      box(wood, 0.02, 0.36, 0.02, -half - 0.1, 0.18, 0.1); box(red, 0.13, 0.13, 0.012, -half - 0.1, 0.34, 0.1);
+      for (const x of [-0.3, 0.3]) { const c = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.09, 8), orange); c.position.set(x, 0.045, 0.14); g.add(c); }
+    }
+    this._block = g;
+    this._scene.add(g);
+    this._placeBlock();
+  }
+
+  private _placeBlock(): void {
+    if (!this._block) return;
+    const a = this._at(this._gateZ, 0);
+    this._block.position.set(a.x, a.y, a.z);
+    this._block.rotation.set(0, a.yaw, 0);
   }
 
   /** Cars keep a gap behind the one ahead in their lane; everything else just goes. */
@@ -225,6 +269,29 @@ export class RoadTraffic {
       this._incoming.fade = Number.isFinite(d) ? 1 : 0;
       this._incoming.t += w;
     } else { this._incoming = null; this._incomingId = ''; }
+    // the day's real passers-by: each crosses the stretch of road the world shows round the hour it is abreast of the gate
+    const road = game.road;
+    if (road) {
+      const seen = new Set<string>();
+      for (const p of road.passes) {
+        const away = (t - p.at) / LEAD;
+        // one that turned up the drive or stopped for a swap is not drawn going on past
+        const back = p.fate === 'turned' || p.fate === 'blocked';
+        if (Math.abs(away) > 1 || (p.fate === 'stopped' && away >= 0)) continue;
+        seen.add(p.id);
+        let l = this._passes.get(p.id);
+        const want = back && away >= 0 ? -p.party.dir as 1 | -1 : p.party.dir;
+        if (!l || l.spec.dir !== want) { l = { spec: want === p.party.dir ? p.party : { ...p.party, dir: want }, z: 0, speed: 0, t: l?.t ?? 0, fixed: true, fade: 1 }; this._passes.set(p.id, l); }
+        // a party turned back at the block drives or walks back the way it came
+        l.z = back && away >= 0 ? this._gateZ - p.party.dir * away * APPROACH : this._gateZ + p.party.dir * away * APPROACH;
+        l.t += w;
+      }
+      for (const id of [...this._passes.keys()]) if (!seen.has(id)) this._passes.delete(id);
+      const h = road.hail;
+      if (h) { if (!this._hail || this._hail.spec.id !== h.party.id) this._hail = { spec: h.party, z: this._gateZ, speed: 0, t: 0, fixed: true, fade: 1 }; this._hail.t += w; }
+      else this._hail = null;
+    } else { this._passes.clear(); this._hail = null; }
+    this._syncBlock(game.road?.block ?? null);
     // someone at the gate now (anything but a raid, which the cutscene plays): the party stands on the road outside it
     const pe = g.pending;
     if (pe && !hasCutscene(pe) && !RAID_LIKE.has(pe.kind)) {
@@ -312,6 +379,8 @@ export class RoadTraffic {
     const prev = this._lastUsed;
     for (const [kind, n] of prev) { const ids = pools.get(kind)!; for (let i = 0; i < n; i++) this._batch.setVisibleAt(ids[i], false); }
     for (const l of this._live) drawParty(l, false, false);
+    for (const l of this._passes.values()) drawParty(l, false, false);
+    if (this._hail) drawParty(this._hail, true, false);
     if (this._incoming) drawParty(this._incoming, false, true);
     if (this._tableau) drawParty(this._tableau, true, false);
     // the dead cars
@@ -325,7 +394,7 @@ export class RoadTraffic {
     this._lights.count = nLights;
     this._lights.visible = nLights > 0;
     if (nLights) { this._lights.instanceMatrix.needsUpdate = true; if (this._lights.instanceColor) this._lights.instanceColor.needsUpdate = true; (this._lights.material as THREE.MeshBasicMaterial).opacity = Math.min(0.95, 0.35 + night); }
-    this.stats = { parties: this._live.length + (this._incoming ? 1 : 0) + (this._tableau ? 1 : 0), drawn: shown, lit: nLights, stalled: this._stalled.length };
+    this.stats = { parties: this._live.length + this._passes.size + (this._hail ? 1 : 0) + (this._incoming ? 1 : 0) + (this._tableau ? 1 : 0), drawn: shown, lit: nLights, stalled: this._stalled.length };
   }
   private _lastUsed = new Map<Kind, number>();
 
@@ -352,6 +421,7 @@ export class RoadTraffic {
   static readonly MAX_SHOWN = MAX_SHOWN;
 
   dispose(): void {
+    this._syncBlock(null);
     this._scene.remove(this._batch); this._scene.remove(this._lights);
     this._batch.dispose(); this._lights.geometry.dispose(); (this._lights.material as THREE.Material).dispose(); this._beamTex.dispose();
     (this._batch.material as THREE.Material).dispose();

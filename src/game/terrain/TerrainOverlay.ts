@@ -9,9 +9,10 @@
  */
 import type { FireMark } from '../../sim/fireRisk';
 import * as THREE from 'three';
+import type { ShadeGrid } from '../../sim/shade';
 import { T, type Lane, type SiteCandidate, type Terrain } from '../../sim/terrain';
 
-export type TerrainMode = 'off' | 'high' | 'lanes' | 'water' | 'sun' | 'fire';
+export type TerrainMode = 'off' | 'high' | 'lanes' | 'water' | 'sun' | 'shade' | 'fire';
 
 /** What each mode shows, in plain words (the legend). */
 export const TERRAIN_LEGEND: Record<Exclude<TerrainMode, 'off'>, { label: string; tip: string; legend: string }> = {
@@ -19,6 +20,7 @@ export const TERRAIN_LEGEND: Record<Exclude<TerrainMode, 'off'>, { label: string
   lanes: { label: 'Lanes', tip: 'The ways a crew would come at you', legend: 'Green: easy going. Amber: a scramble. Red: cliff (ladders needed). Blue: the creek (a ford). The bright line is the way a crew takes: the cheapest; rings mark where it narrows to a choke. The road side counts as easy.' },
   water: { label: 'Water', tip: 'Floodplain, mud, frost pockets and reservoir sites', legend: 'Deep blue: the creek\'s floodplain (floods take what stands here; spring mud slows building). Light blue: wet flats and gullies. White: frost pockets where cold air pools. Green ring: a bench that would feed the camp by gravity.' },
   fire: { label: 'Fire', tip: 'How likely each building is to burn in a wildfire', legend: 'A ring around each building: green, cleared or fire-safe walls; amber, trees close in; red, trees hard against it. The ring grows with the chance (the same number the fire front rolls). Cut the trees nearest the red ones.' },
+  shade: { label: 'Shade', tip: 'What the low winter sun misses: noon on Dec 21', legend: 'Dark blue: shaded at noon on the winter solstice, when shadows are longest (hills, buildings, evergreens; bare oaks only dim). Clear: full sun. Site solar and beds in the clear; the list below says how much of each you have shaded.' },
   sun: { label: 'Sun', tip: 'Which slopes catch the sun', legend: 'Yellow: south-facing ground (up to +25% solar and warmer beds). Blue: north-facing ground (down to -25%, frost lingers).' },
 };
 
@@ -34,14 +36,15 @@ export class TerrainOverlay {
   private _lanes: Lane[] = [];
   private _sites: SiteCandidate[] = [];
   private _fire: FireMark[] = [];
+  private _shade: ShadeGrid | null = null;
 
   constructor(scene: THREE.Scene, ground: (x: number, z: number) => number) { this._scene = scene; this._ground = ground; }
 
   get mode(): TerrainMode { return this._mode; }
 
   /** Show a mode with the analysis it reads. */
-  set(mode: TerrainMode, t: Terrain | null, lanes: Lane[] = [], sites: SiteCandidate[] = [], fire: FireMark[] = []): void {
-    this._mode = mode; this._t = t; this._lanes = lanes; this._sites = sites; this._fire = fire;
+  set(mode: TerrainMode, t: Terrain | null, lanes: Lane[] = [], sites: SiteCandidate[] = [], fire: FireMark[] = [], shade: ShadeGrid | null = null): void {
+    this._shade = shade; this._mode = mode; this._t = t; this._lanes = lanes; this._sites = sites; this._fire = fire;
     this.refresh();
   }
 
@@ -95,6 +98,10 @@ export class TerrainOverlay {
         if (t.wet[k] === 1) return [0.35, 0.6, 0.95, 0.38];
         if (t.frost[k]) return [0.92, 0.92, 1, 0.5];
         return [0, 0, 0, 0];
+      }
+      case 'shade': {
+        const sh = this._shade?.shade[k] ?? 0;
+        return sh > 0.04 ? [0.1, 0.15, 0.6, Math.min(0.62, 0.15 + sh * 0.5)] : [1, 0.9, 0.4, 0.07];
       }
       case 'sun': {
         const s = t.sun[k] - 1;
