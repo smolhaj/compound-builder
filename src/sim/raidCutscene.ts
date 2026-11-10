@@ -133,6 +133,8 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?:
     scenes = fresh.scenes; battles = []; spent = [];
     for (const sc of scenes) {
       if (sc.index === scenes.length - 1) { battles.push(finalBattle()); spent.push({}); continue; }
+      // the man shot under his white flag is the opening of the siege: a murder on the drive, then the crew's answer (the scenes after it)
+      if (sc.index === 0 && stance.startsWith('flag_')) { battles.push(gateScene(game, e, stance, stance === 'flag_shoot' ? 'bad' : outcome.tone, seed)); spent.push({}); continue; }
       const p = probeBattle(game, sc.kind, e.size, seed + sc.index * 977);
       battles.push(deco(p, sc)); spent.push(p.spent);
     }

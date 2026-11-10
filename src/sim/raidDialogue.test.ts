@@ -49,7 +49,7 @@ describe('line director', () => {
   });
   it('has no retreat line in an approach pool and no pool line that trips the other phase', () => {
     for (const role of ['raider', 'defender'] as const) for (const [ctx, vs] of Object.entries(LINES[role])) for (const lines of Object.values(vs!)) for (const t of lines!) {
-      if (!['retreat', 'aftermath', 'leaving', 'passage', 'tribute', 'loot_item', 'arson', 'captive', 'spare', 'kill', 'wounded_fallback', 'fallback_stage', 'cover_fire'].includes(ctx)) expect(RETREAT_RE.test(t), `${role}.${ctx}: ${t}`).toBe(false);
+      if (!['retreat', 'aftermath', 'leaving', 'passage', 'tribute', 'loot_item', 'arson', 'captive', 'spare', 'kill', 'wounded_fallback', 'fallback_stage', 'cover_fire', 'pull_out'].includes(ctx)) expect(RETREAT_RE.test(t), `${role}.${ctx}: ${t}`).toBe(false);
       expect(t).not.toMatch(/[—–]/);
     }
   });
