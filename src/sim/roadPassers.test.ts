@@ -20,6 +20,8 @@ const world = (seed = 3): GameState => {
   g.disaster.phase = 'survival';
   return g;
 };
+/** Move the clock to an hour of the day (0-24) on the same day. */
+const atHour = (g: GameState, h: number): void => { g.clock.t = Math.floor(g.clock.t) + ((h - 6 + 24) % 24) / 24; };
 const visitor = (kind: Encounter['kind'] = 'arrival'): Encounter =>
   ({ id: 'e77', kind, day: 4, title: 'Strangers', dossier: ['4 on foot.'], size: 4, armed: false, strength: 0, stances: ['take_in', 'turn_away'] }) as Encounter;
 const hold = (g: GameState, e = visitor(), lead = 120): void => { g.gate.pending = null; g.gate.incoming = { e, at: g.clock.t + lead / 1440, from: g.clock.t }; };
@@ -216,14 +218,14 @@ describe('roadblocks and checkpoints', () => {
     expect(removeBlock(g)).toBeNull(); expect(removeBlock(g)).toMatch(/no block/);
   });
   it('turning back people on foot costs word, humanity and the good-neighbor record; an armed crew turned back raises respect and brings risk', () => {
-    const g = world(); g.stock.lumber = 20; buildBlock(g, 'barrier');
+    const g = world(); g.stock.lumber = 20; buildBlock(g, 'barrier'); atHour(g, 11);
     const t0 = g.gate.turnedAway, hum = g.gate.humanity;
     roadOf(g).passes = [passOf('wanderers', 4, g.clock.t - 0.001)];
     passStep(g);
     expect(g.road!.word).toBeLessThan(0); expect(g.gate.turnedAway).toBe(t0 + 1); expect(g.gate.humanity).toBeLessThan(hum);
     let hurt = 0, angry = 0;
     for (let seed = 1; seed <= 80; seed++) {
-      const h = world(seed); h.stock.lumber = 20; buildBlock(h, 'barrier');
+      const h = world(seed); h.stock.lumber = 20; buildBlock(h, 'barrier'); atHour(h, 11);
       roadOf(h).passes = [passOf('raiders', 6, h.clock.t - 0.001)];
       passStep(h);
       expect(h.gate.respect ?? 0).toBeGreaterThan(0);
@@ -236,7 +238,7 @@ describe('roadblocks and checkpoints', () => {
   it('a checkpoint that inspects lets people on foot through and sends some drivers to a trading stop', () => {
     let stops = 0;
     for (let seed = 1; seed <= 60; seed++) {
-      const g = world(seed); g.stock.lumber = 20; g.stock.hardware = 5; buildBlock(g, 'checkpoint');
+      const g = world(seed); g.stock.lumber = 20; g.stock.hardware = 5; buildBlock(g, 'checkpoint'); atHour(g, 11);
       roadOf(g).passes = [passOf('wanderers', 3, g.clock.t - 0.002), passOf('traffic', 1, g.clock.t - 0.001)];
       const turned0 = g.gate.turnedAway;
       passStep(g);
@@ -262,7 +264,7 @@ describe('rumors from the road', () => {
   it('radioDay uses them and keeps the heard list consistent', () => {
     let used = 0;
     for (let seed = 1; seed <= 25; seed++) {
-      const g = world(seed); g.stock.sw_radio = 1; roadOf(g).block = { kind: 'barrier', policy: 'turn_back', since: 0, turned: 0, passed: 0 };
+      const g = world(seed); g.stock.sw_radio = 1; roadOf(g).block = { kind: 'barrier', policy: 'turn_back', since: 0, turned: 0, passed: 0, crew: [] };
       for (let d = 0; d < 20; d++) { g.clock.t += 1; roadOf(g).recent.push({ day: dayIndex(g.clock.t), cls: 'wanderers', heads: 4, seen: true, id: `r${d}` }); radioDay(g); }
       used += (g.radio?.heard ?? []).filter(h => h.kind === 'travelers' || (h.kind === 'checkpoint' && /barrier|checkpoint/.test(h.text))).length;
       for (const h of g.radio?.heard ?? []) expect(typeof h.truth).toBe('boolean');

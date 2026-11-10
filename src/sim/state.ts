@@ -47,7 +47,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 93;
+export const SAVE_VERSION = 94;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -110,6 +110,8 @@ export interface Order {
   placedAt: number;
   dueAt: number;
   status: 'ordered' | 'delivered';
+  /** The truck was already held at a roadblock once (sim/roadPost.ts `truckHold`; save v94). */
+  held?: boolean;
 }
 
 export interface Structure {
