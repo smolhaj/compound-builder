@@ -13,6 +13,7 @@ import { ownedRects } from '../../sim/enclosure';
 import type { Rect } from '../../sim/land';
 import { hourOf, type GameState } from '../../sim/state';
 import { stepBeast, type Beast, type StepCtx } from './wildlifeAI';
+import { CROSS_PER_S, deckFrom, planCross, type Bridge } from './wildlifeCrossing';
 import { animalRoute } from '../paths/groundMovers';
 import { crossesHard } from '../paths/walkRoute';
 
@@ -54,6 +55,9 @@ export interface WildlifeCtx {
   hard?: (x: number, z: number, sp: SpeciesId) => boolean;
   /** Where people and dogs are (animals bolt from them). */
   threats: ReadonlyArray<readonly [number, number]>;
+  /** Tunnel-bridges animals may cross while `bridgesOpen` (doors open by day; game/wildlife/wildlifeCrossing). */
+  bridges?: readonly Bridge[];
+  bridgesOpen?: boolean;
   /** Camera position: animals farther than DRAW_RANGE are not drawn (a deer is 0.17 tall: a speck past that). */
   cam?: { x: number; z: number };
 }
@@ -99,6 +103,12 @@ export class WildlifeRenderer {
   /** The animals that exist now (QA / camera): id, species, position, mood. */
   animals(): Array<{ id: string; sp: SpeciesId; x: number; z: number; mood: string; vis: number }> {
     return [...this._beasts.values()].map(b => ({ id: b.id, sp: b.sp, x: b.x, z: b.z, mood: b.mood, vis: b.vis }));
+  }
+  /** Where the animals on (or heading for) a bridge are: they swing the day-open doors the way a keyholder does. */
+  crossers(): Array<[number, number]> {
+    const out: Array<[number, number]> = [];
+    for (const b of this._beasts.values()) if (b.deck || b.cross) out.push([b.x, b.z]);
+    return out;
   }
   /** Put an animal somewhere (QA shots): returns false if there is none of that species. */
   place(sp: SpeciesId, x: number, z: number, rot = 0, index = 0): boolean {
@@ -187,12 +197,31 @@ export class WildlifeRenderer {
       } : undefined,
     };
     for (const [id, b] of this._beasts) {
-      // an animal the wall now keeps out (or in) is somewhere else: put it where it belongs
-      if (!b.id.startsWith('qa:') && !ctx.allowed(b.x, b.z, b) && b.sp !== 'waterfowl') this._relocate(b, c);
+      this._bridge(b, dt, c, ctx);
+      // an animal the wall now keeps out (or in) is somewhere else: put it where it belongs (not one on a deck)
+      if (!b.deck && !b.id.startsWith('qa:') && !ctx.allowed(b.x, b.z, b) && b.sp !== 'waterfowl') this._relocate(b, c);
       stepBeast(b, dt, ctx);
       if (!b.want && b.vis < 0.02) this._beasts.delete(id);
     }
     this._draw(c);
+  }
+
+  /** Think of a bridge: a grazing crosser near an open bridge's mouth now and then walks to it; at the mouth it steps onto the deck. */
+  private _bridge(b: Beast, dt: number, c: WildlifeCtx, ctx: StepCtx): void {
+    if (b.deck || !c.bridges?.length) { if (!c.bridges?.length) b.cross = undefined; return; }
+    if (b.cross) {
+      if (!c.bridgesOpen || b.mood === 'flee') { b.cross = undefined; return; }
+      const br = c.bridges.find(x => x.id === b.cross!.bridge);
+      if (!br) { b.cross = undefined; return; }
+      if (Math.hypot(b.x - b.cross.mouth[0], b.z - b.cross.mouth[1]) < 0.3) { b.deck = deckFrom(br, b.cross.from, c.ground); b.y = c.ground(b.x, b.z); b.cross = undefined; }
+      return;
+    }
+    if (b.mood !== 'graze' || b.side === 'in' || this._rnd() > CROSS_PER_S * dt) return;
+    const plan = planCross(b.sp, b.x, b.z, c.bridges, !!c.bridgesOpen);
+    if (!plan) return;
+    b.cross = { mouth: plan.mouth, bridge: plan.bridge.id, from: plan.from };
+    b.tx = plan.mouth[0]; b.tz = plan.mouth[1]; b.mood = 'walk'; b.t = 30; b.via = undefined; b.viaFor = undefined;
+    void ctx;
   }
 
   private _relocate(b: Beast, c: WildlifeCtx): void {
@@ -221,7 +250,7 @@ export class WildlifeRenderer {
       if (b.vis < 0.02) continue;
       if (c.cam && Math.abs(b.x - c.cam.x) + Math.abs(b.z - c.cam.z) > DRAW_RANGE * 1.42) continue;
       const sd = SPECIES[b.sp], pal = PAL[b.sp], size = b.vis * (b.sp === 'moose' || b.sp === 'elk' ? 0.94 + b.k * 0.1 : 0.94 + b.k * 0.12);
-      let gy = c.ground(b.x, b.z);
+      let gy = b.y ?? c.ground(b.x, b.z);
       if (b.sp === 'waterfowl' && c.creek && Math.abs(b.z - c.creek.zAt(b.x)) < c.creek.halfWidth) gy = Math.max(gy, c.creek.waterY(b.x)) - 0.004;
       tmpB.compose(tmpV.set(b.x, gy, b.z), tmpQ.setFromEuler(tmpE.set(0, b.rot, 0)), tmpS.set(size, size, size));
       const H = sd.h, L = sd.len, swing = Math.sin(b.phase) * Math.min(0.7, b.v * 0.7 + 0.05) * (b.v > 0.01 ? 1 : 0);

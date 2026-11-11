@@ -27,6 +27,7 @@ import type { RegionId } from './regions';
 import { townTaxHalf } from './weekender';
 import { mulberry32 } from './rng';
 import { diffOf } from './difficulty';
+import { estateFactor } from './estate';
 import { pluralize } from './words';
 
 export const CLOSING_COSTS = 0.03;
@@ -61,6 +62,8 @@ export interface Paper {
   paidMonth: number;
   /** Fines paid so far. */
   fines: number;
+  /** The household's comfort tier (sim/estate.ts, Cozy). Absent: it follows the savings. */
+  comfort?: 'plain' | 'comfortable' | 'gracious';
 }
 export const newPaper = (): Paper => ({ permits: true, insured: true, backTax: 0, paidMonth: 0, fines: 0 });
 
@@ -81,14 +84,14 @@ export function assessed(s: GameState): { land: number; built: number } {
   const built = s.structures.filter(x => isFinished(x) && !x.pre).reduce((a, x) => a + materialsValue(x.kind) * 1.6, 0);
   return { land, built };
 }
-export const yearlyTax = (s: GameState) => { const a = assessed(s); return Math.round((a.land + a.built) * COUNTY[s.site.region].tax); };
+export const yearlyTax = (s: GameState) => { const a = assessed(s); return Math.round((a.land + a.built) * COUNTY[s.site.region].tax * estateFactor(s)); };
 
 /** The home's insured value and the year's premium (0 with no home). */
 export function premium(s: GameState): number {
   const homes = s.structures.filter(x => isFinished(x) && isHome(x.kind));
   if (!homes.length) return 0;
   const dwelling = homes.reduce((a, h) => a + (h.pre ? 150_000 : materialsValue(h.kind) * 2.2), 0);
-  return Math.round((1200 + dwelling * 0.006) * (s.site.miles > 8 ? 1.3 : 1) + 250);
+  return Math.round(((1200 + dwelling * 0.006) * (s.site.miles > 8 ? 1.3 : 1) + 250) * estateFactor(s));
 }
 
 /** Can a structure be built under a permit now? Planning applies for one (fee, review) when permits are on. */

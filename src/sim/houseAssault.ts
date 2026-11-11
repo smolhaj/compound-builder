@@ -19,7 +19,7 @@ import { planInterior, type InteriorOut } from './interiorTactics';
 import { styleMercy } from './mercy';
 
 /** Seconds added to a scene that breaks the line (the staging adds them to the plan; this planner fills them). */
-export const ASSAULT_EXTRA = 40;
+export const ASSAULT_EXTRA = 80;
 export interface Box2 { x0: number; z0: number; x1: number; z1: number }
 export interface AssaultCtx {
   box: Box2;
@@ -288,8 +288,9 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
     // 4. the callouts
     // a new line every two or three seconds, never one repeated: the rooms are cleared, the doorways held, the house searched
     for (let t = tI + 6, k = 0; t < tI + D - 13; t += 2.4 + r() * 0.6, k++) {
-      if (k % 3 === 1) say(t, 'defender', 'hold_room', adults[k % nHome]);
-      else say(t, 'raider', k % 3 === 2 ? 'search' : 'clear_room', breachers[k % breachers.length]);
+      const RC: Ctx[] = ['clear_room', 'search', 'room_clear', 'pie_corner', 'cover_fire', 'rally', 'funnel'], DC: Ctx[] = ['hold_room', 'cover_fire', 'last_stand', 'rally', 'pie_corner', 'funnel'];
+      if (k % 3 === 1) say(t, 'defender', DC[Math.floor(k / 3) % DC.length], adults[k % nHome]);
+      else say(t, 'raider', RC[Math.floor(k / 3 + (k % 3)) % RC.length], breachers[k % breachers.length]);
     }
     // 5. a wounded defender (the sim's wound, kept at its time) is dragged to the back room
     const casualty = adults.find(u => hurtT.has(u.id) && !b.events.some(e => e.kind === 'death' && e.unit === u.id));
@@ -334,10 +335,10 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
       while (t - prev > 4.5) {
         prev += 3.2;
         const pick = k++ % 3;
+        const RC: Ctx[] = ['clear_room', 'search', 'room_clear', 'pie_corner', 'cover_fire', 'rally', 'funnel'], DC: Ctx[] = ['hold_room', 'cover_fire', 'last_stand', 'rally', 'pie_corner', 'funnel'];
         if (prev > outroAt + 3) { if (pick === 1 && adults.length) say(prev, 'defender', 'aftermath', adults[k % adults.length]); else say(prev, 'raider', 'leaving', crewNow[k % crewNow.length]); }
-        else if (pick === 0) say(prev, 'raider', 'clear_room', crewNow[k % crewNow.length]);
-        else if (pick === 1 && adults.length) say(prev, 'defender', 'hold_room', adults[k % adults.length]);
-        else say(prev, 'raider', 'search', crewNow[(k + 1) % crewNow.length]);
+        else if (pick === 1 && adults.length) say(prev, 'defender', DC[Math.floor(k / 3) % DC.length], adults[k % adults.length]);
+        else say(prev, 'raider', RC[Math.floor(k / 3 + pick) % RC.length], crewNow[(k + pick) % crewNow.length]);
       }
       prev = Math.max(prev, t);
     }

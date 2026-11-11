@@ -17,7 +17,7 @@
  * Nothing here changes a raid's odds directly: a mark only brings a crew sooner and a little bigger through the existing roll.
  */
 import { mulberry32 } from './rng';
-import { dayIndex, type GameState } from './state';
+import { dayIndex, hourOf, type GameState } from './state';
 import { log } from './economy';
 import { SLOT, monthOfDoy, spawnFor, trafficLevel, weekdayOf, type PartyClass, type RoadParty, type TrafficCtx, type TrafficLevel } from './roadTraffic';
 import { tension } from './disaster';
@@ -30,6 +30,7 @@ import { nobodyHome } from './orphans';
 import { canGo } from './rescue';
 import { makeThreat, type Encounter, type EncounterKind } from './encounters';
 import { pluralize } from './words';
+import { blockManned, postNeed } from './roadPost';
 
 // ─────────────────────────────────────────────────────────────────────────
 // State
@@ -69,7 +70,8 @@ export interface Hail {
 }
 export type BlockKind = 'barrier' | 'checkpoint';
 export type BlockPolicy = 'turn_back' | 'inspect';
-export interface RoadBlock { kind: BlockKind; policy: BlockPolicy; since: number; turned: number; passed: number }
+/** `crew`: the named adults on the line in the day (sim/roadPost.ts). */
+export interface RoadBlock { kind: BlockKind; policy: BlockPolicy; since: number; turned: number; passed: number; crew: string[] }
 export interface Mark { kind: 'looters' | 'gang' | 'requisition'; size: number; until: number; line: string }
 export interface Recent { day: number; cls: PartyClass; heads: number; seen: boolean; id: string }
 export interface RoadLife {
@@ -250,14 +252,32 @@ function wound(s: GameState, r: () => number, what: string): string {
   return `${p.first} was hit: ${what}.`;
 }
 
-/** The block's crew for this pass: manned or not. */
-function manned(s: GameState, b: RoadBlock): boolean {
-  return homeAdults(s).length >= (b.kind === 'checkpoint' ? 2 : 1);
+/** Is the block staffed now: the named crew, on their feet, in the day's hours (sim/roadPost.ts). */
+const manned = (s: GameState, b: RoadBlock): boolean => { void b; return blockManned(s, hourOf(s.clock.t), pid => { const p = s.people.find(x => x.id === pid); return !!p && canGo(s, p); }); };
+
+/** Name the crew: the best talkers among the adults on their feet (nobody who is already the greeter). */
+function nameCrew(s: GameState, kind: BlockKind): string[] {
+  const greeter = s.road?.prep?.pid;
+  return homeAdults(s).filter(p => p.id !== greeter).sort((a, b) => (b.skills.negotiator ?? 0) - (a.skills.negotiator ?? 0)).slice(0, postNeed(kind)).map(p => p.id);
 }
 
-function tireCrew(s: GameState, n: number): void {
-  const crew = homeAdults(s).slice(0, n);
-  for (const p of crew) { const ps = s.personState.find(x => x.id === p.id); if (ps) ps.fatigue = Math.min(100, (ps.fatigue ?? 0) + PASS.CREW_FATIGUE); }
+/** Each morning: a crew member who is hurt, away or gone is replaced from the adults on their feet; short-handed, the pole stays down. */
+export function postDay(s: GameState): void {
+  const b = s.road?.block;
+  if (!b) return;
+  const ok = (pid: string) => { const p = s.people.find(x => x.id === pid); return !!p && canGo(s, p); };
+  const keep = (b.crew ?? []).filter(ok);
+  if (keep.length === (b.crew ?? []).length && keep.length >= postNeed(b.kind)) return;
+  const fill = homeAdults(s).filter(p => !keep.includes(p.id) && p.id !== s.road?.prep?.pid).sort((a, c) => (c.skills.negotiator ?? 0) - (a.skills.negotiator ?? 0));
+  const crew = [...keep, ...fill.map(p => p.id)].slice(0, postNeed(b.kind));
+  const changed = crew.join() !== (b.crew ?? []).join();
+  b.crew = crew;
+  if (crew.length < postNeed(b.kind)) log(s, `Nobody to man the ${b.kind === 'checkpoint' ? 'checkpoint' : 'roadblock'} today: the pole stays down.`);
+  else if (changed) log(s, `${crew.map(id => s.people.find(p => p.id === id)?.first ?? 'Someone').join(' and ')} took over the ${b.kind === 'checkpoint' ? 'checkpoint' : 'roadblock'}.`);
+}
+
+function tireCrew(s: GameState, b: RoadBlock): void {
+  for (const id of b.crew ?? []) { const ps = s.personState.find(x => x.id === id); if (ps) ps.fatigue = Math.min(100, (ps.fatigue ?? 0) + PASS.CREW_FATIGUE); }
 }
 
 /** A block stops a pass. Returns true when the block dealt with it. */
@@ -271,7 +291,7 @@ function atBlock(s: GameState, pass: Pass, b: RoadBlock, r: () => number): boole
   }
   // a bare barrier with nobody behind it slows a vehicle: half turn round; people on foot walk round it
   if (!crewed) { if (cls === 'traffic' && r() < 0.5) { pass.fate = 'blocked'; return true; } return false; }
-  tireCrew(s, b.kind === 'checkpoint' ? 2 : 1);
+  tireCrew(s, b);
   const say = pass.seen || r() < 0.5;
   if (cls === 'raiders') {
     const turned = b.policy === 'turn_back' || b.kind === 'barrier';
@@ -498,8 +518,9 @@ export function buildBlock(s: GameState, kind: BlockKind): string | null {
   if (why) return why;
   s.stock.lumber -= kind === 'barrier' ? PASS.BARRIER_LUMBER : PASS.CHECKPOINT_LUMBER;
   if (kind === 'checkpoint') s.stock.hardware -= PASS.CHECKPOINT_HARDWARE;
-  roadOf(s).block = { kind, policy: kind === 'checkpoint' ? 'inspect' : 'turn_back', since: s.clock.t, turned: 0, passed: 0 };
-  log(s, kind === 'barrier' ? 'Sawhorses and a chain across the county road at the drive: nobody gets through without stopping.' : 'A checkpoint at the drive: a pole across the road, a sign, and two of you on the line.');
+  roadOf(s).block = { kind, policy: kind === 'checkpoint' ? 'inspect' : 'turn_back', since: s.clock.t, turned: 0, passed: 0, crew: nameCrew(s, kind) };
+  const names = roadOf(s).block!.crew.map(id => s.people.find(p => p.id === id)?.first ?? 'Someone').join(' and ');
+  log(s, kind === 'barrier' ? `Sawhorses and a chain across the county road at the drive. ${names} will stand by them from 8 AM to 5 PM; outside those hours they only slow a vehicle.` : `A checkpoint at the drive: a pole across the road and a sign. ${names} will man it from 8 AM to 5 PM.`);
   return null;
 }
 

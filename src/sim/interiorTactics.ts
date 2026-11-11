@@ -146,10 +146,12 @@ export function planInterior(a: InteriorArgs): InteriorOut | null {
     return a.out;
   };
   const tS = tShut + 0.4;
-  const s = tS + (disc ? 4.2 : 1.5);   // when the door gives
+  // the door gives only when the crew is AT it: the longest walk of the stack (the router's path is longer than the straight line) before the kick
+  const stackWalk = Math.max(0, ...crew.slice(0, 6).map((u, i) => { const w = wallSpot(i % 2 ? 1 : -1, Math.floor(i / 2) * (disc ? 0.12 : 0.1)); const p0 = a.pos.get(u.id) ?? u; return (near(p0, w) * 1.3) / RUN + i * (disc ? 0.25 : 0.15); }));
+  const s = tS + Math.max(disc ? 4.2 : 1.5, stackWalk + (disc ? 2.2 : 0.8));   // when the door gives
   if (disc) {
     crew.slice(0, 6).forEach((u, i) => ev.push({ t: r2(tS + i * 0.25), kind: 'move', unit: u.id, x: r2(wallSpot(i % 2 ? 1 : -1, Math.floor(i / 2) * 0.12).x), z: r2(wallSpot(i % 2 ? 1 : -1, Math.floor(i / 2) * 0.12).z) }));
-    say(tS + 1.4, 'raider', 'stack_door', crew[1] ?? breacher);
+    say(Math.max(tS + 1.4, tS + stackWalk - 0.4), 'raider', 'stack_door', crew[1] ?? breacher);
     doorEv(s - 1.8, 'kick', false, breacher);
     say(s - 1.7, 'raider', 'kick_door', breacher);
     doorEv(s - 0.2, 'kick', true, breacher);
@@ -160,7 +162,7 @@ export function planInterior(a: InteriorArgs): InteriorOut | null {
   }
   // the family waits behind the door
   if (fighters[1]) say(tS + 0.9, 'defender', 'pie_corner', fighters[1]);
-  const stageLen = Math.max(disc ? 6.5 : 3.6, Math.min(disc ? 10 : 6.2, (tI + D - 14 - s) / m));
+  const stageLen = Math.max(disc ? 6.5 : 3.6, Math.min(disc ? 15 : 8.5, (tI + D - 14 - s) / m));
   const insideCrew = crew.slice(0, 6);
 
   // ── 3. room by room ──────────────────────────────────────────────────────────────────────────

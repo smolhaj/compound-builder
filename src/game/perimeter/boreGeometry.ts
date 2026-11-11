@@ -10,6 +10,7 @@
  * end to the ground at the other (the grade the sim priced), the arch 4.4 m wide with its crown 4.8 m over the deck.
  */
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { KitMaterialId } from '../buildkit/materials';
 import { BORE } from '../../sim/terrain';
 import type { Pt } from '../../sim/perimeter';
@@ -20,6 +21,33 @@ type Ground = (x: number, z: number) => number;
 export const ARCH = { hw: 0.366, wall: BORE.CROWN - 0.366, crown: BORE.CROWN } as const;
 /** Earth banked over the crown where the hill has not closed over it (1.8 m), the half width of the mound's top, and its side slope (horizontal per vertical). */
 export const MOUND = { over: 0.3, halfTop: 0.62, slope: 1.5 } as const;
+
+
+/** How far behind the face (into the hill) the ground is read for the headwall's outline (units). */
+export const HEAD_PROBE = 0.35;
+/** The widest a headwall spreads to either side (units, 18 m) and the tallest it stands over the deck (units, 15 m). */
+export const HEAD_MAX = { half: 3, high: 2.5 } as const;
+
+/**
+ * The outline of a portal's headwall: a block over the arch, `pw` wide and `ph` tall, that goes on to follow the hill's surface at each side down to the
+ * deck, so the face meets the ground on both sides and never stands clear of it. `rise(lat)` is the ground behind the face over the deck, `lat` across
+ * (right positive). Returns the top edge, left to right, as [lat, height over the deck]. Pure (tested).
+ */
+export function headwallProfile(pw: number, ph: number, rise: (lat: number) => number, step = 0.1): Array<[number, number]> {
+  const top = (l: number): number => {
+    const block = ph * Math.max(0, Math.min(1, (pw / 2 + 0.3 - Math.abs(l)) / 0.3));
+    return Math.min(HEAD_MAX.high, Math.max(block, rise(l) - 0.08));   // (a hair under the ground it climbs, so no strip stands clear of the hill)
+  };
+  const edge = (sg: 1 | -1): number => {
+    let l = pw / 2;
+    while (l < HEAD_MAX.half && top(sg * l) > 0.1) l += step;
+    return sg * l;
+  };
+  const a = edge(-1), b = edge(1), out: Array<[number, number]> = [];
+  for (let l = a; l < b - 1e-9; l += step) out.push([l, l === a ? Math.max(0, top(l)) : top(l)]);
+  out.push([b, Math.max(0, top(b))]);
+  return out;
+}
 
 /** A portal's blast door, apart from the merged parts so it can slide up into the lintel when it opens (game/perimeter/CorridorDoors): world-space geometry, drawn when closed. */
 export interface BoreDoor { end: 0 | 1; parts: Array<[KitMaterialId, THREE.BufferGeometry]>; /** How far it lifts when open (units). */ lift: number }
@@ -58,10 +86,13 @@ function frame(x: number, y: number, z: number, fwd: THREE.Vector3): THREE.Matri
 }
 
 /**
+ * `mound`: bank earth over the tube where the hill has not closed over it (a road bore's faces stand in a cutting where it has: none needed).
+ * `faceDepth`: how thick the headwall block is (a face on a rock cliff is 0.3 u; where the road comes in by a cutting the face stands out in it and is a deep block, so the step
+ * where the cut ends is buried in the stone).
  * `built`: how much of the tunnel is built, 0 to 1 (a portal stands from 5 %, the second, the mound and the tube when it is finished).
  * `lit`: the lamps are on. `pts`: the run (its first and last points are the two portals).
  */
-export function boreParts(pts: readonly Pt[], ground: Ground, built: number, finished: boolean, lit: boolean, collapsed = false): BoreParts {
+export function boreParts(pts: readonly Pt[], ground: Ground, built: number, finished: boolean, lit: boolean, collapsed = false, faceDepth = 0.3, mound = true): BoreParts {
   const out: BoreParts = { parts: [], doors: [], tube: null };
   if (pts.length < 2 || built <= 0.05) return out;
   const add = (m: KitMaterialId, g: THREE.BufferGeometry) => out.parts.push([m, g]);
@@ -84,7 +115,7 @@ export function boreParts(pts: readonly Pt[], ground: Ground, built: number, fin
   }
 
   // earth banked over the tube where the hill has not closed over it: a mound with its sides sloped down to the ground
-  if (finished) {
+  if (finished && mound) {
     const N = Math.max(2, Math.ceil(L / 0.5)), top = (s: number) => deckAt(s) + ARCH.crown + MOUND.over;
     const rows: Array<{ l: THREE.Vector3; lt: THREE.Vector3; rt: THREE.Vector3; r: THREE.Vector3 } | null> = [];
     for (let i = 0; i <= N; i++) {
@@ -118,6 +149,7 @@ export function boreParts(pts: readonly Pt[], ground: Ground, built: number, fin
     }
   }
 
+  const plugs: THREE.BufferGeometry[] = [];
   // a portal at one end: its face outward, the arch, the voussoirs, wing walls, the door and the lamp. `into` points into the hill.
   const portal = (s: number, into: 1 | -1, withDoor: boolean, end: 0 | 1) => {
     const [x, z] = at(s), y = deckAt(s), fx = dx * into, fz = dz * into;
@@ -126,9 +158,14 @@ export function boreParts(pts: readonly Pt[], ground: Ground, built: number, fin
     // the face: a block of fieldstone with the arch cut out, extruded 0.3 into the hill
     const PW = 2 * (MOUND.halfTop + 0.18), PH = ARCH.crown + 0.5;
     const shape = new THREE.Shape();
-    shape.moveTo(-PW / 2, -0.5); shape.lineTo(PW / 2, -0.5); shape.lineTo(PW / 2, PH); shape.lineTo(-PW / 2, PH); shape.lineTo(-PW / 2, -0.5);
+    const prof = headwallProfile(PW, PH, (lat: number) => Math.min(ground(x + fx * HEAD_PROBE + fz * lat, z + fz * HEAD_PROBE - fx * lat), ground(x + fz * lat, z - fx * lat)) - y);   // (the lower of the ground at the face's own plane and just behind it: the top never stands clear of the hill)   // (lat runs along the frame's own x: (fz, -fx))
+    shape.moveTo(prof[0][0], -0.5); shape.lineTo(prof[prof.length - 1][0], -0.5);
+    for (let k = prof.length - 1; k >= 0; k--) shape.lineTo(prof[k][0], prof[k][1]);
     shape.holes.push(archHole());
-    add('fieldstone', place(new THREE.ExtrudeGeometry(shape, { depth: 0.3, bevelEnabled: false, curveSegments: 10 })));
+    add('fieldstone', place(new THREE.ExtrudeGeometry(shape, { depth: faceDepth, bevelEnabled: false, curveSegments: 10 })));
+    // a dark plug filling the arch just behind the face, facing into the hill (seen from outside by the tube's inside-out material): wherever the ground's own ramp
+    // lies across the opening (a mesh cell cannot make a vertical step) the eye finds the dark of a tunnel, never grass; a vehicle goes into it and is gone
+    if (finished) { const pg = new THREE.ShapeGeometry(archShape(0.985)).toNonIndexed(); plugs.push(place(pg, 0, 0.004, Math.min(0.06, faceDepth - 0.02))); }
     // a concrete cap over it
     add('concrete', place(new THREE.BoxGeometry(PW + 0.08, 0.05, 0.38), 0, PH + 0.025, 0.15));
     // voussoirs: rough stones round the arch, proud of the face
@@ -136,10 +173,13 @@ export function boreParts(pts: readonly Pt[], ground: Ground, built: number, fin
       const t = Math.PI * k / 12, lat = Math.cos(t) * (ARCH.hw + 0.05), up = ARCH.wall + Math.sin(t) * (ARCH.hw + 0.05);
       add('fieldstone', place(new THREE.BoxGeometry(0.09, 0.1, 0.08).rotateZ(t - Math.PI / 2), lat, up, -0.03 - ((k * 37) % 5) * 0.004));
     }
-    // wing walls stepping back along the cut, lower as they go, splayed outward
+    // wing walls stepping back along the cut, lower as they go, splayed outward; each one stands on the ground where it is (down to it, never hanging over a drop)
     for (const sg of [-1, 1]) for (let k = 1; k <= 3; k++) {
       const h = 1.05 - 0.28 * k, lat = PW / 2 + 0.18 * k, back = 0.1 + 0.3 * k;
-      add('fieldstone', place(new THREE.BoxGeometry(0.14, h, 0.46).rotateY(sg * 0.5), sg * lat, h / 2 - 0.05, back));
+      const wx = x + fx * back + fz * sg * lat, wz = z + fz * back - fx * sg * lat, gy = ground(wx, wz) - y;
+      if (gy < -0.6) continue;
+      const bottom = Math.min(-0.05, gy - 0.05), top = Math.max(bottom + 0.12, Math.min(h - 0.05, gy + 0.02));   // (a wing is never taller than the ground it stands in)
+      add('fieldstone', place(new THREE.BoxGeometry(0.14, top - bottom, 0.46).rotateY(sg * 0.5), sg * lat, (top + bottom) / 2, back));
     }
     if (withDoor) {
       // the steel blast door in the arch, set back, with its hazard band and seam: its own leaf (it lifts into the lintel when it opens); a lamp over it stays on the face
@@ -157,6 +197,10 @@ export function boreParts(pts: readonly Pt[], ground: Ground, built: number, fin
   };
   portal(0, 1, true, 0);
   if (finished) portal(L, -1, true, 1);
+  if (out.tube && plugs.length) {
+    const strip = (g: THREE.BufferGeometry): THREE.BufferGeometry => { const n = g.index ? g.toNonIndexed() : g; for (const k of Object.keys(n.attributes)) if (k !== 'position' && k !== 'normal') n.deleteAttribute(k); return n; };
+    out.tube = mergeGeometries([strip(out.tube), ...plugs.map(strip)]) ?? out.tube;
+  }
   return out;
 }
 

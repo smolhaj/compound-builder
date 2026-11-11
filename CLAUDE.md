@@ -23,7 +23,7 @@ Compound Builder must look at least as good as **University Empire** (`smolhaj/U
 - **US spelling** in code, UI text and docs. **Procedural art only** and **real scale** (1 unit ≈ 6 m; check a street-level shot with a person).
 - **PR workflow:** one feature branch per change, open a **draft PR**, squash-merge when `check` and `perf-budget` are green. **Merge main into the branch first**: CI does not run on conflicting PRs. Never force-push; **never raise the perf budgets** (fix the cost instead).
 - **`docs/DECISIONS.md`**: add a dated row for every design decision. On a merge conflict in that file keep both sides.
-- Save version is `SAVE_VERSION` in `src/sim/state.ts` (now **89**). Bump it and migrate when state fields change; the per-version history is in the DECISIONS rows ("Save vNN").
+- Save version is `SAVE_VERSION` in `src/sim/state.ts` (now **93**). Bump it and migrate when state fields change; the per-version history is in the DECISIONS rows ("Save vNN").
 
 ## What is built (since the first renderer port; details in `docs/DECISIONS.md`, gaps in `docs/DEPTH_AUDIT.md`, branch status in `docs/BRANCHES.md`)
 - **HUD declutter** (`src/ui/hud/common.tsx`: `Group` folds advanced sections, `Hint` shows a short line with "more", `Clamp` holds text to two lines). Build tab opens with the *Get operational* checklist (`sim/operational.ts`: shelter, water, power, food, defense) and at most three next steps; New Game wizard, decision cards (`GateCard`), supplies, family and report follow the same pattern. Esc closes the Shop.

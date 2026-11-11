@@ -4,6 +4,7 @@
  * Bump SAVE_VERSION and add a migration in save/migrations.ts whenever a
  * field changes (CLAUDE.md rule 5).
  */
+import type { PhotoMeta } from './photos';
 import { foundLineage, newLineage, type Lineage } from './lineage';
 import type { RadioState } from './radio';
 import { emptyStock, type Stock, type MaterialId } from './materials';
@@ -46,7 +47,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 92;
+export const SAVE_VERSION = 95;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -109,6 +110,8 @@ export interface Order {
   placedAt: number;
   dueAt: number;
   status: 'ordered' | 'delivered';
+  /** The truck was already held at a roadblock once (sim/roadPost.ts `truckHold`; save v94). */
+  held?: boolean;
 }
 
 export interface Structure {
@@ -282,6 +285,8 @@ export interface GameState {
   wild: Wild;
   /** Native wildlife on the land: predators taken, sightings, raids (sim/wildlife.ts). Save v49; made lazily. */
   wildlife?: Wildlife;
+  /** The album: records of the photos the family took (sim/photos.ts); the pixels are in the photo vault, not here. Save v93. */
+  photos?: PhotoMeta[];
   /** The long game: eras, the chronicle, milestones, the dynasty score. */
   lineage: Lineage;
   /** Goats, pigs, the steer, rabbits (lazily made: `s.livestock ??= newLivestock()`). */
@@ -320,6 +325,8 @@ export interface GameState {
   kin?: Kin;
   /** Neighbors and strangers who joined: loyalty, hidden character, guests sheltering, who left (sim/newcomers.ts). Save v60; `newcomersOf` makes it lazily. */
   newcomers?: NewcomerState;
+  /** House rules the grown residents voted on, from the hamlet stage (sim/rules.ts; save v90; `rulesOf` makes it lazily). */
+  rules?: import('./rules').RulesState;
   /** Joiners' own homes: rigs, modular homes and cabins being built for them, rigs waiting for a pad (sim/joinerHome.ts). Save v77; `joinersOf` makes it lazily. */
   joiners?: JoinerState;
   /** Pet care settings, the family's grief for lost pets, yesterday's care (sim/pets.ts; save v43; `??=` for safety). */

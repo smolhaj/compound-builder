@@ -18,6 +18,7 @@ import { stallsDay, wantedNow } from './stalls';
 import { addFixWork, nextFix, siteJobsDay } from './improvements';
 import { addDamageWork, nextDamage } from './raidDamage';
 import { paperworkDay } from './paperwork';
+import { estateDay } from './estate';
 import { addFellWork, nextFellJob } from './forestry';
 import { burnFirewood, demandNow } from './heating';
 import { upkeepDay } from './upkeep';
@@ -67,7 +68,7 @@ import { winterDay } from './adaptive';
 import { mutualAidDay } from './barter';
 import { arrivalCheck, hasCutscene, scheduleArrival } from './siege';
 import { scheduleLead } from './roadLead';
-import { passStep, roadDay } from './roadPassers';
+import { passStep, postDay, roadDay } from './roadPassers';
 import { prepLine, roadWarnStep } from './roadWarn';
 import { scavengeDay } from './scavenge';
 import { marketDay } from './market';
@@ -220,6 +221,7 @@ function subStep(s: GameState): void {
     landMarketDay(s, dayIndex(s.clock.t));
     siteJobsDay(s);
     for (const line of paperworkDay(s)) log(s, line);
+    estateDay(s);
     for (const line of shelfDay(s)) log(s, line);
     for (const line of stallsDay(s)) { log(s, line); s.disaster.news.push({ t: s.clock.t, text: line, tone: 2 }); }   // a project stuck for want of materials we could buy (sim/stalls.ts)
     for (const line of financeDay(s)) log(s, line);
@@ -270,6 +272,7 @@ function subStep(s: GameState): void {
     for (const line of cellarDay(s)) log(s, line);
     for (const line of crowdDay(s)) log(s, line);
     roadDay(s);
+    postDay(s);
     const e = gateDay(s);
     for (const line of kinDay(s)) log(s, line);
     for (const line of newcomersDay(s)) log(s, line);   // neighbors and strangers who joined; neighbors asking for shelter (after the gate: a card waits its turn)

@@ -14,7 +14,7 @@ import { lightLabel } from './lightLabel';
 import { Director, auditPose, poseAt, type PoseAudit, type V3, type Box } from './director';
 import type { BattleRenderer } from './BattleRenderer';
 import type { Battle } from '../../sim/battleTypes';
-import { interiorShot } from './interiorShot';
+import { interiorShot, type CrewPos, type DoorBeat } from './interiorShot';
 import { breachShot } from './breachShot';
 import { liveBreach } from './liveBreach';
 
@@ -182,7 +182,7 @@ export class CutscenePlayer {
     this._dir.night = lightLabel(hourAfter(plan, loc.game)) === 'Night'; this._dir.variant = loc.segment.scene;
     let shot;
     if (battle.playing !== this._wasPlaying) { this._wasPlaying = battle.playing; this._dir.shot = null; this._lastKind = ''; }
-    const inner = battle.playing ? (interiorShot(battle.battle?.invasion, battle.time, ground, this._boxes, this._focusOf(battle)) ?? breachShot(battle.battle?.invasion, battle.time, ground, this._boxes)) : null;
+    const inner = battle.playing ? (interiorShot(battle.battle?.invasion, battle.time, ground, this._boxes, this._focusOf(battle), this._doorBeats(battle), this._crewOf(battle)) ?? breachShot(battle.battle?.invasion, battle.time, ground, this._boxes)) : null;
     this._setInside(inner?.kind === 'house');
     if (inner) {
       this._dir.shot = inner; this._lastKind = 'interior';
@@ -210,6 +210,23 @@ export class CutscenePlayer {
     if (on === this._inside) return;
     this._inside = on;
     this.d.cutaway?.(on);
+  }
+
+  private _doorsFor: unknown = null; private _doors: DoorBeat[] = [];
+  /** The kicks, charges and shots at the house door in this battle's timeline (cached per battle). */
+  private _doorBeats(battle: BattleRenderer): DoorBeat[] {
+    const b = battle.battle; if (!b) return [];
+    if (this._doorsFor !== b) {
+      this._doorsFor = b;
+      this._doors = b.events.flatMap(e => e.kind === 'house_door' && (e.action === 'kick' || e.action === 'charge') ? [{ t: e.t, x: e.x, z: e.z, nx: e.nx, nz: e.nz }] : []);
+    }
+    return this._doors;
+  }
+
+  /** The live raiders and whether each is inside the house (the door-level shot follows them). */
+  private _crewOf(battle: BattleRenderer): CrewPos[] {
+    const h = battle.battle?.invasion?.house; if (!h) return [];
+    return battle.actors().filter(u => u.side === 'raider' && !u.dead && !u.gone).map(u => ({ x: u.x, z: u.z, inside: u.x > h.x0 && u.x < h.x1 && u.z > h.z0 && u.z < h.z1 }));
   }
 
   /** Where the action is inside the house: the middle of the live fighters near it. */

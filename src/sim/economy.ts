@@ -7,6 +7,7 @@ import { MATERIALS, type MaterialId, type Stock } from './materials';
 import { listCapped, materialCount, pluralize } from './words';
 import { weatherDelay } from './upkeep';
 import type { GameState, OrderLine } from './state';
+import { truckHold } from './roadPost';
 import { canOrder, priceFactor } from './disaster';
 import { CARRY_H } from './improvements';
 import { adoptDog, coatName } from './pets';
@@ -82,6 +83,9 @@ export function placeOrder(s: GameState, lines: readonly OrderLine[]): string | 
 export function deliverOrders(s: GameState): void {
   for (const o of s.orders) {
     if (o.status !== 'ordered' || s.clock.t < o.dueAt) continue;
+    // a block on the county road holds the truck (sim/roadPassers.ts); neighbors are never stopped
+    const hold = truckHold(s, o);
+    if (hold > 0) { o.dueAt = s.clock.t + hold; log(s, 'The delivery truck was held up at the roadblock on the county road.'); continue; }
     o.status = 'delivered';
     const what = listCapped(o.lines.map(l => l.food ? foodCount(l.food, l.n ?? 0) : materialCount(l.material, l.qty, MATERIALS[l.material].name, String(l.qty))));
     // no drive yet, or the bridge on it is down: the truck leaves it at the road (at the creek) and the family carries it in

@@ -1,6 +1,6 @@
 /**
  * Shade overlay, radiation view and photo capture on the mountain showcase (aerial, top, eye level with a person, the HUD readouts, the album).
- *   flock $SP/render.lock node scripts/viewsShots.mjs --out shots/views [--port 5442] [--serve] [--q medium] [--only shade,radiation]
+ *   flock $SP/render.lock node scripts/viewsShots.mjs --out shots/views [--port 5442] [--serve] [--q medium] [--only shade,radiation,photo]
  */
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
-const port = Number(opt('--port', 5442)), outDir = resolve(opt('--out', 'shots/views')), q = opt('--q', 'medium'), only = opt('--only', 'shade,radiation').split(',');
+const port = Number(opt('--port', 5442)), outDir = resolve(opt('--out', 'shots/views')), q = opt('--q', 'medium'), only = opt('--only', 'shade,radiation,photo').split(',');
 mkdirSync(outDir, { recursive: true });
 let vite = null;
 if (args.includes('--serve')) {
@@ -20,7 +20,7 @@ const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=sw
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 page.setDefaultTimeout(900000);
 page.on('pageerror', e => console.error('PAGEERROR', e.message));
-await page.goto(`http://localhost:${port}/?lowrender=0.75&clean&seed=7&${LOT}&showcase=mountain&rings=1&wall=stone&layout=shelf`);
+await page.goto(`http://localhost:${port}/?lowrender=0.75${only.includes("photo") ? "" : "&clean"}&seed=7&${LOT}&showcase=mountain&rings=1&wall=stone&layout=shelf`);
 await page.waitForFunction(() => window.__cb?.qa?.renderNow && window.__showcase, null, { timeout: 900000 });
 await page.evaluate(() => { const { game, store } = window.__cb; game.getState().setSpeed(0); store.getState().setQuality('low'); store.getState().setTimeOfDay(12); store.getState().setWeatherMode('clear'); store.getState().setSeasonMode('winter'); store.getState().setViewOpen(true); });
 for (let i = 0; i < 12; i++) { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(120); }
@@ -73,22 +73,26 @@ if (only.includes('photo')) {
     const out = [];
     for (const cap of ['First golden evening on the shelf', '']) { const d = capturePhoto(); out.push({ len: d?.length ?? 0, head: d?.slice(0, 22), why: d ? useGameStore.getState().keepPhoto(d, cap) : 'no capture' }); }
     const g = useGameStore.getState().game;
+    window.__photoData = (g.photos ?? []).map(p => vault.photoData(p.id));
     return { out, album: (g.photos ?? []).map(p => ({ id: p.id, caption: p.caption, size: p.size })), vault: vault.vaultSize(), chron: g.lineage.chronicle.filter(e => e.kind === 'photo').length };
   });
   console.error('photo', JSON.stringify(r));
+  const datas = await page.evaluate(() => window.__photoData);
+  const { writeFileSync } = await import('node:fs');
+  datas.forEach((d, i) => { if (d) writeFileSync(`${outDir}/photo-kept-${i + 1}.jpg`, Buffer.from(d.split(',')[1], 'base64')); });
   // the HUD: View panel shutter, then the Years tab with the album and chronicle thumbnails
   await page.evaluate(() => window.__cb.store.getState().setViewOpen(true));
   await page.waitForTimeout(500);
   await orbit(30, 0.5, info.up + 0.6);
   await shot('photo-1-view-panel');
-  const tab = page.getByText('Years', { exact: true }).first();
+  const tab = page.getByRole('button', { name: /^Years/ }).first();
   if (await tab.count()) { await tab.click(); await page.waitForTimeout(800); await page.screenshot({ path: `${outDir}/photo-2-album.png` }); console.error('shot photo-2-album'); }
   // reload from IndexedDB: pixels must come back
   const survived = await page.evaluate(async () => {
     const { useGameStore } = await import('/src/store/gameStore.ts'); const vault = await import('/src/sim/save/photoVault.ts'); const { loadGame, saveGame, AUTOSAVE } = await import('/src/sim/save/saveSystem.ts');
     const g = useGameStore.getState().game; await saveGame(AUTOSAVE, g);
     const ids = (g.photos ?? []).map(p => p.id);
-    await vault.syncVault([]); const gone = ids.every(id => !vault.photoData(id));
+    vault.forgetMemory(); const gone = ids.every(id => !vault.photoData(id));
     const back = await loadGame(AUTOSAVE); await vault.syncVault((back.photos ?? []).map(p => p.id));
     return { gone, restored: ids.every(id => !!vault.photoData(id)) };
   });
