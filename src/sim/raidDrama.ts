@@ -95,6 +95,7 @@ export interface DramaInput {
 
 /** Lay the fall and the wake on the staged battles. Returns new battles (the input is untouched) and what was staged, or null for a raid with no death. */
 export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo | null } {
+  for (const bb of inp.battles) inp.dir.noteUnits(bb.units);
   const victim = findVictim(inp.before, inp.after, inp.battles);
   if (!victim) return { battles: [...inp.battles], info: null };
   const out = [...inp.battles];

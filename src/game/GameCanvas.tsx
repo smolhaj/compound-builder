@@ -54,6 +54,7 @@ import { decorateBreach } from '../sim/breach';
 import { planHouseAssault } from '../sim/houseAssault';
 import { routeScene } from '../sim/cutLive';
 import { voiceMoments } from '../sim/momentVoices';
+import { deadSilent } from '../sim/deadSilent';
 import { stepSegments } from '../sim/standingSurfaces';
 import { LineDirector } from '../sim/raidDialogue';
 import { fireBoxesOf } from './battle/lineOfFire';
@@ -415,7 +416,7 @@ export function GameCanvas() {
           for (const other of useGameStore.getState().cutscene?.battles ?? []) if (other !== b0) d2.noteAll(other);
           b = voiceMoments(b, d2, id => { const pid = b0.units.find(u => u.id === id)?.personId; const p = pid ? g2.people.find(q => q.id === pid) : undefined; return (p as { first?: string } | undefined)?.first; });
         } catch (err) { console.warn('cutscene staging failed; playing the plain scene', err); b = b0; }
-        return routeScene(b, solid, undefined, stepSegments(useGameStore.getState().game.perimeter)).battle;
+        return routeScene(deadSilent(b), solid, undefined, stepSegments(useGameStore.getState().game.perimeter)).battle;
       },
       cutaway: on => { const ws2 = useWorldStore.getState(); if (on) { cutawayBefore ??= ws2.buildingView; ws2.setBuildingView('cutaway'); } else if (cutawayBefore) { ws2.setBuildingView(cutawayBefore); cutawayBefore = null; } } });
     const nameLayer = new NameLabelLayer();

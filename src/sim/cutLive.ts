@@ -63,9 +63,6 @@ export function routeScene(b: Battle, solid: (x: number, z: number) => boolean, 
  * the outside of the wall, defenders' on the inside of the step. Surfaces that are real buildings (a tower's cab, a wall-top deck, an upper floor)
  * are left as they are. Pure.
  */
-/** How long (battle seconds) a raider is on the ladder before he is back at its foot: the climb, a look over the top, the way down. */
-export const CLIMB_HOLD = 0.5;
-
 export function elevateOnProps(b: Battle, steps: readonly StepSeg[], solid: (x: number, z: number) => boolean = () => false): Battle {
   const homes = b.units.filter(u => u.side === 'home' && !u.bystander && !u.machine);
   if (!homes.length) return b;
@@ -98,17 +95,7 @@ export function elevateOnProps(b: Battle, steps: readonly StepSeg[], solid: (x: 
         const foot = { x: base.x + dir.x * d1, z: base.z + dir.z * d1 };
         const r2 = (n: number) => Math.round(n * 100) / 100;
         out.push({ t: Math.max(0, r2(e.t - 1.5)), kind: 'ladder', x: r2(topAt.x), z: r2(topAt.z), h: r2(e.y!), fx: r2(foot.x), fz: r2(foot.z) });
-        out.push({ ...e, x: r2(raider || lat ? topAt.x : e.x), z: r2(raider || lat ? topAt.z : e.z), via: { x: r2(foot.x), z: r2(foot.z) } });
-        // a raider is on the rungs only while he climbs: there is no drawn wall-walk on the crown, so he never stands or fights up there, he comes
-        // straight back down (unless he is told to do something sooner, which the router also sends down the ladder first)
-        if (raider) {
-          const nextOwn = b.events.filter(x => x.t > e.t && 'unit' in x && x.unit === e.unit && (x.kind === 'move' || x.kind === 'cover' || x.kind === 'death' || x.kind === 'lay' || x.kind === 'taken')).sort((a, c) => a.t - c.t)[0];
-          let from = b.units.find(x => x.id === e.unit) ?? { x: e.x, z: e.z };
-          for (const x of b.events) if (x.t < e.t && (x.kind === 'move' || x.kind === 'cover') && x.unit === e.unit) from = x;
-          const arrive = e.t + (Math.hypot(from.x - foot.x, from.z - foot.z) * 1.3) / 1.1 + 0.5;   // (he walks to the foot, then climbs)
-          const back = arrive + CLIMB_HOLD;
-          if (!nextOwn || nextOwn.t > back + 0.4) out.push({ t: r2(back), kind: 'move', unit: e.unit, x: r2(foot.x), z: r2(foot.z) });
-        }
+        out.push({ ...e, ...(raider ? { y: r2(e.y! * 0.82) } : {}), x: r2(raider || lat ? topAt.x : e.x), z: r2(raider || lat ? topAt.z : e.z), via: { x: r2(foot.x), z: r2(foot.z) } });   // (a raider's feet stop on a rung just under the crown: he looks over the top, he does not stand on it)
         changed = true;
         continue;
       }
