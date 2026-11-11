@@ -102,3 +102,27 @@ describe('the sim grants an elevated shot only where a surface is drawn', () => 
     expect(stepSegments(scenes(1, 2.25, 'gang', 6, 'hard', 'steel_wall').g.perimeter)).toEqual([]);
   });
 });
+
+/** Raiders on a ladder with nothing drawn at the top: nobody may stand or wait up there (a climbing motion only, then straight back down). */
+function idleOnRungs(b: Battle, g: GameState): string[] {
+  const bad: string[] = [], last = new Map<string, { x: number; z: number; t0: number }>();
+  walkBattle(b, navFor(b, yardSolid(g, [HOUSE], 0.012)), {
+    route: false,
+    onStep: (id, t, _a, c, y) => {
+      if (!id.startsWith('r') || y < 0.12) { last.delete(id); return; }
+      const p = last.get(id);
+      if (!p || Math.hypot(p.x - c.x, p.z - c.z) > 0.004) { last.set(id, { x: c.x, z: c.z, t0: t }); return; }
+      if (t - p.t0 > 1.5 && bad.length < 6) bad.push(`${id} idle on the rungs from t=${p.t0.toFixed(1)} to ${t.toFixed(1)}, y=${y.toFixed(2)}`);
+    },
+  });
+  return bad;
+}
+
+describe('raiders do not wait at the top of a ladder', () => {
+  for (const wall of ['log_palisade', 'stone_wall'] as const) for (const seed of [3, 5, 8]) {
+    it(`${wall}, night gang, seed ${seed}`, () => {
+      const { g, battles } = scenes(seed, 2.25, 'gang', 10, 'hard', wall);
+      for (const b of battles) expect(idleOnRungs(prepared(b, g, seed * 17), g)).toEqual([]);
+    }, 90000);
+  }
+});
