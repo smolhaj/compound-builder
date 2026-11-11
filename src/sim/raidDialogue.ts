@@ -15,7 +15,7 @@
  *
  * Nothing here changes an outcome; it only changes words and who says them.
  */
-import type { Battle, BattleEvent } from './battleTypes';
+import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import type { RaiderTemper } from './battle';
 import type { CrewStyle } from './raiderKinds';
 import { mulberry32 } from './rng';
@@ -153,7 +153,7 @@ const EVENT_BOUND_RE = /wire|barb|thorn|spike|electrif|\bditch|\bice\b|\bdog|gre
 
 /** Who is speaking, for a defender: a child, an untrained adult or teenager, or someone with real training (service, police, a guard, a high shot). */
 export type Profile = 'vet' | 'civ' | 'kid';
-export function profileOfUnit(u: Pick<BattleUnit, 'civilian' | 'traits'> | undefined): Profile {
+export function profileOfUnit(u: { civilian?: boolean; traits?: BattleUnit['traits'] } | undefined): Profile {
   if (!u) return 'civ';
   if (u.civilian) return 'kid';
   const t = u.traits;

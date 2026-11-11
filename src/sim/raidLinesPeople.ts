@@ -22,12 +22,12 @@ export const PEOPLE_LINES: Record<'raider' | 'defender', Record<string, Variants
       vet: ['Vehicles on the road. Count them.', 'Eyes up. They are early.', 'Kids inside. We have this.', 'Steady. Let them come.', 'I count ten. Stay calm.'],
       kid: ['Mom?', 'Who is that?', 'I am scared.', 'Daddy?'],
       elder: ['Lord, protect us.', 'God help us.', 'Dear God, they are here.'],
-      elder: ['Lord Jesus.', 'Dear God, no.', 'Oh Lord, they are shooting.'],
     },
     first_shots: {
       civ: ['They are shooting! They are shooting at us!', 'Get down! Get down!', 'Oh my God.', 'Stay down. Stay down, please.', 'I did not think they would really shoot.', 'Dad! Are you okay?', 'Somebody help.', 'Keep your head down!', 'Jesus Christ, they are shooting!', 'Holy shit!', 'What the fuck! What the fuck!', 'Son of a bitch!'],
       vet: ['Contact. Stay low.', 'Stay down. Let them show themselves.', 'Wait for a target.', 'Easy. Make it count.'],
       kid: ['Mom!', 'Make it stop.', 'I want Dad.'],
+      elder: ['Lord Jesus.', 'Dear God, no.', 'Oh Lord, they are shooting.'],
     },
     fight: {
       civ: ['I cannot see them. Where are they?', 'He is behind the truck!', 'There is one by the fence!', 'I do not know where they are!', 'Oh God, oh God.', 'Did I hit him?', 'Somebody help me!', 'He is moving! He is moving!', 'Where the hell are they?', 'Shit, shit, shit.', 'Come on, come on, hit something!'],
