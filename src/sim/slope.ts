@@ -11,6 +11,7 @@ import type { Site } from './site';
 import type { GameState, Structure } from './state';
 import { dayIndex } from './state';
 import { VEHICLES, fleetOf, runs } from './vehicles';
+import { bladeOn, burnPlowing } from './plowing';
 import { roadResponse, roadWinter } from './roadFx';
 import { tunnelResponse } from './corridors';
 import { pluralize } from './words';
@@ -144,7 +145,7 @@ function snowStartChance(s: GameState, day: number): number {
 }
 
 /** Days the road stays shut after a heavy snow starts: 1 at the threshold, more the harder the way in; a plow blade halves it. */
-function closureDays(s: GameState): number { return closureFor(roadDifficulty(s.site, s.seed), traction(s), s.stock.plow >= 1); }
+function closureDays(s: GameState): number { return closureFor(roadDifficulty(s.site, s.seed), traction(s), bladeOn(s)); }
 
 /** Days a heavy snow shuts a road of difficulty `difficulty` for a truck of this traction, with or without a plow blade on it (the pure rule `closureDays` and the entrance choice both read). */
 export function closureFor(difficulty: number, trac: number, plow: boolean): number {
@@ -161,7 +162,17 @@ export const shutDaysPerWinter = (site: Pick<Site, 'region'>, daysEach: number):
 export function plowReport(s: GameState): { without: number; withBlade: number; heavy: number; eachWithout: number; eachWith: number; haveBlade: boolean; responseShut: [number, number] } | null {
   if (!s.site.lot) return null;
   const d = roadDifficulty(s.site, s.seed), t = traction(s), eachWithout = closureFor(d, t, false), eachWith = closureFor(d, t, true);
-  return { without: shutDaysPerWinter(s.site, eachWithout), withBlade: shutDaysPerWinter(s.site, eachWith), heavy: Math.round(regionFor(s.site).snowCm / 12), eachWithout, eachWith, haveBlade: s.stock.plow >= 1, responseShut: [2.5, 1.5] };
+  return { without: shutDaysPerWinter(s.site, eachWithout), withBlade: shutDaysPerWinter(s.site, eachWith), heavy: Math.round(regionFor(s.site).snowCm / 12), eachWithout, eachWith, haveBlade: bladeOn(s), responseShut: [2.5, 1.5] };
+}
+
+/** A heavy snow began on `day` (pure in the seed: the roll `roadClosedFor` reads). */
+export const heavySnowOn = (s: GameState, day: number): boolean => mulberry32(s.seed * 8191 + day * 31 + 17)() < snowStartChance(s, day);
+
+/** The day a heavy snow falls the blade goes out: fuel and wear from the rig that carries it, or a line if nothing can. */
+export function plowDay(s: GameState, day = dayIndex(s.clock.t)): string[] {
+  if (!s.site.lot || s.stock.plow < 1 || !heavySnowOn(s, day)) return [];
+  if (burnPlowing(s) > 0) return [];
+  return ['A heavy snow, and the plow blade has no truck to hang on (nothing running, home and fueled): the drive stays under it.'];
 }
 
 /** Days left that the way in is closed by snow on `day` (0: open). Pure in the seed and the day: nothing is stored. */
@@ -184,7 +195,7 @@ export const ROAD_CLOSED_TEXT = 'the road up the hill is drifted shut and the pl
 export function responseFactor(s: GameState): number {
   // the planned road: its length, hairpins, grade and single-file structures (sim/roadFx.ts); a place with no lot keeps the old 1
   let k = s.site.lot ? roadResponse(s) : 1;
-  if (roadClosedFor(s) > 0) k *= s.stock.plow >= 1 ? 1.5 : 2.5;
+  if (roadClosedFor(s) > 0) k *= bladeOn(s) ? 1.5 : 2.5;
   k += tunnelResponse(s);
   return k;
 }
@@ -195,6 +206,6 @@ export function winterRoadLine(s: GameState): string | null {
   const n = closureDays(s), R = regionFor(s.site);
   if (n <= 0) return roadDifficulty(s.site, s.seed) > 0.5 ? 'The way in is steep, but a truck gets up it in snow.' : null;
   const heavy = Math.round(R.snowCm / 12);
-  return `The road closes about ${pluralize(Math.round(heavy * n * 0.6), 'day')} a winter (${heavy} heavy snows, ${n} day${n === 1 ? '' : 's'} each)${s.stock.plow >= 1 ? ', fewer with the plow blade on the truck' : ': a plow blade would cut that in half'}.`;
+  return `The road closes about ${pluralize(Math.round(heavy * n * 0.6), 'day')} a winter (${heavy} heavy snows, ${n} day${n === 1 ? '' : 's'} each)${bladeOn(s) ? ', fewer with the plow blade on the truck' : ': a plow blade would cut that in half'}.`;
 }
 

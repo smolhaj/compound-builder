@@ -8,12 +8,13 @@
  * and dogs). Sizes are SCALE v2: a person is 0.28, a deer 0.17 at the shoulder.
  */
 import * as THREE from 'three';
-import { SPECIES, wildlifeView, type SpeciesId } from '../../sim/wildlife';
+import { SPECIES, count, wildlifeView, type SpeciesId } from '../../sim/wildlife';
 import { ownedRects } from '../../sim/enclosure';
 import type { Rect } from '../../sim/land';
-import { hourOf, type GameState } from '../../sim/state';
+import { dayIndex, hourOf, type GameState } from '../../sim/state';
 import { stepBeast, type Beast, type StepCtx } from './wildlifeAI';
 import { CROSS_PER_S, deckFrom, planCross, type Bridge } from './wildlifeCrossing';
+import { crossingDeck, onRoad, planRoadCrossings, ROAD_CROSSERS, stillDue, type RoadCross } from './roadCrossing';
 import { animalRoute } from '../paths/groundMovers';
 import { crossesHard } from '../paths/walkRoute';
 
@@ -58,6 +59,8 @@ export interface WildlifeCtx {
   /** Tunnel-bridges animals may cross while `bridgesOpen` (doors open by day; game/wildlife/wildlifeCrossing). */
   bridges?: readonly Bridge[];
   bridgesOpen?: boolean;
+  /** The county road past the gate: animals cross it at dawn and dusk (game/wildlife/roadCrossing). `y` is the surface; `halfW` half the carriageway; `gateZ` where along it. */
+  road?: { x(z: number): number; y(x: number, z: number): number; halfW: number; gateZ: number };
   /** Camera position: animals farther than DRAW_RANGE are not drawn (a deer is 0.17 tall: a speck past that). */
   cam?: { x: number; z: number };
 }
@@ -81,6 +84,9 @@ export class WildlifeRenderer {
   private _seed = -1;
   /** Routes still to be searched this frame (a search is the costly part; the rest wait a moment and graze). */
   private _budget = 0;
+  /** The day's road crossings and which have started (by id). */
+  private _plan: { key: string; list: RoadCross[]; done: Set<string> } = { key: '', list: [], done: new Set() };
+  private _roadHalf = 0.5;
 
   constructor(scene: THREE.Scene) {
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0 });
@@ -174,7 +180,7 @@ export class WildlifeRenderer {
     if (key !== this._viewKey && this._time - this._viewAt > 0.5) {
       this._viewKey = key; this._viewAt = this._time;
       const want = new Map(wildlifeView(game, hour).slice(0, CAP).map(v => [v.id, v]));
-      for (const [id, b] of this._beasts) if (!want.has(id) && !id.startsWith('qa:')) b.want = false;
+      for (const [id, b] of this._beasts) if (!want.has(id) && !id.startsWith('qa:') && !id.startsWith('road:')) b.want = false;
       for (const [id, v] of want) {
         const have = this._beasts.get(id);
         if (have) { have.want = true; if (have.side !== v.side) { have.side = v.side; this._relocate(have, c); } continue; }
@@ -183,6 +189,7 @@ export class WildlifeRenderer {
         if (b) this._beasts.set(id, b);
       }
     }
+    this._roadCrossings(game, clock, hour, c);
     // step everyone
     this._budget = 3;
     const ctx: StepCtx = {
@@ -199,11 +206,60 @@ export class WildlifeRenderer {
     for (const [id, b] of this._beasts) {
       this._bridge(b, dt, c, ctx);
       // an animal the wall now keeps out (or in) is somewhere else: put it where it belongs (not one on a deck)
-      if (!b.deck && !b.id.startsWith('qa:') && !ctx.allowed(b.x, b.z, b) && b.sp !== 'waterfowl') this._relocate(b, c);
+      if (b.id.startsWith('road:') && !b.deck) b.want = false;        // across and off the far verge: it fades into the cover
+      if (!b.deck && !b.id.startsWith('qa:') && !b.id.startsWith('road:') && !ctx.allowed(b.x, b.z, b) && b.sp !== 'waterfowl') this._relocate(b, c);
       stepBeast(b, dt, ctx);
       if (!b.want && b.vis < 0.02) this._beasts.delete(id);
     }
     this._draw(c);
+  }
+
+  /** Where the animals that are on the county road (or its shoulder) are, along it: vehicles stop for them (game/RoadTraffic). */
+  roadCrossers(): Array<{ z: number }> {
+    const out: Array<{ z: number }> = [];
+    for (const b of this._beasts.values()) if (b.id.startsWith('road:') && b.deck && b.vis > 0.5 && this._roadX && onRoad(b.x - this._roadX(b.z), this._roadHalf)) out.push({ z: b.z });
+    return out;
+  }
+  private _roadX: ((z: number) => number) | null = null;
+  private _road: WildlifeCtx['road'] | null = null;
+  /** QA shots: a file of `n` animals steps out now and crosses the road at world z (the last update's road). Returns false without a road. */
+  qaCross(sp: SpeciesId, n: number, z: number, dir: 1 | -1 = 1): boolean {
+    const road = this._road;
+    if (!road) return false;
+    const ev: RoadCross = { id: `qa${this._beasts.size}`, sp, at: 0, z, dir, n };
+    this._launch(ev, 7, 0);
+    return true;
+  }
+
+  /** The day's crossings: when one is due, a file of animals steps out of the cover on one side and walks across the road (they use the bridge-deck walker). */
+  private _roadCrossings(game: GameState, clock: number, hour: number, c: WildlifeCtx): void {
+    const road = c.road;
+    if (!road) { this._roadX = null; return; }
+    this._roadX = road.x; this._roadHalf = road.halfW; this._road = road;
+    const day = dayIndex(clock), key = `${game.seed}|${day}|${Math.round(road.gateZ)}`;
+    if (this._plan.key !== key) {
+      const herds = [...ROAD_CROSSERS].map(sp => ({ sp, n: count(game, sp) }));
+      this._plan = { key, list: planRoadCrossings(game.seed, day, herds, road.gateZ), done: new Set() };
+    }
+    for (const ev of this._plan.list) {
+      if (this._plan.done.has(ev.id) || hour < ev.at) continue;
+      this._plan.done.add(ev.id);
+      if (!stillDue(ev, hour)) continue;
+      this._launch(ev, game.seed, day);
+    }
+  }
+
+  private _launch(ev: RoadCross, seed: number, day: number): void {
+    const road = this._road;
+    if (!road) return;
+    const sd = SPECIES[ev.sp], r = hashRnd(Math.imul(seed + 3, 40503) ^ Math.imul(day + 1, 2654435761) ^ ev.z * 1000);
+    for (let i = 0; i < ev.n; i++) {
+      const deck = crossingDeck(road.x, road.y, road.halfW, ev, i);
+      const [x, z, y] = deck[0];
+      const id = `road:${ev.id}:${i}`;
+      // (a file: the buck last)
+      this._beasts.set(id, { id, sp: ev.sp, x, z, rot: Math.atan2(deck[1][0] - x, deck[1][1] - z), hx: x, hz: z, tx: x, tz: z, mood: 'walk', t: 99, phase: r() * 6, vis: 0.6, want: true, head: 0.2, v: 0, male: sd.kind === 'hoofed' && i === ev.n - 1, side: 'free', group: 99, k: r(), deck: deck.slice(1), y });
+    }
   }
 
   /** Think of a bridge: a grazing crosser near an open bridge's mouth now and then walks to it; at the mouth it steps onto the deck. */
