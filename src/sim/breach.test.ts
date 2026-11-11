@@ -48,6 +48,18 @@ describe('breach: how the wall comes down', () => {
     breachOptions.force = null;
   });
 
+  it('a sim that let the crew climb is left alone, unless a method is forced (the movie recipe really rams)', () => {
+    const g = world(), b = battle('crowd');
+    const climbed: Battle = { ...b, events: b.events.map(e => (e.kind === 'breach' ? { ...e, method: 'climb' as const } : e)) };
+    expect(decorateBreach(climbed, g.perimeter, { x: 0, z: 0 }, 5).events.some(e => e.kind === 'ram')).toBe(false);
+    breachOptions.force = 'ram';
+    try {
+      const d = decorateBreach(climbed, g.perimeter, { x: 0, z: 0 }, 5);
+      expect(d.invasion?.method).toBe('ram');
+      expect(d.events.some(e => e.kind === 'ram')).toBe(true);
+    } finally { breachOptions.force = null; }
+  });
+
   it('a ram run ends on the sim breach, with a gap at the same moment, and adds no shots, wounds or deaths', () => {
     const g = world(), b = battle('crowd');
     const d = decorateBreach(b, g.perimeter, { x: 0, z: 0 }, 5);

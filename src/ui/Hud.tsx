@@ -671,6 +671,7 @@ export function Hud() {
         <select value={w.quality} onChange={e => { w.setQuality(e.target.value as Quality, true); w.setPerfNotice(null); }} title="Graphics quality (Low: no shadows or post-processing; Medium: soft shadows; High: adds ambient occlusion and a sharper pixel ratio)" aria-label="Graphics quality">
           {QUALITIES.map(x => <option key={x}>{x}</option>)}
         </select>
+        <button data-testid="tilt-shift-toggle" style={{ ...btn(w.tiltShift && w.quality === 'high'), opacity: w.quality === 'high' ? 1 : 0.5 }} disabled={w.quality !== 'high'} title={w.quality === 'high' ? 'Diorama look: the middle of the picture stays sharp and the top and bottom blur, like a model on a table. It fades out near eye level.' : 'Diorama look needs High graphics'} onClick={() => w.setTiltShift(!w.tiltShift)}>Diorama</button>
         <ViolenceSelect />
         <NamesSelect />
         <select value={w.frameCap} onChange={e => w.setFrameCap(Number(e.target.value) as FrameCap)} title="Frame-rate cap: 60 is smooth and halves the work on a 120 Hz display" aria-label="Frame-rate cap">

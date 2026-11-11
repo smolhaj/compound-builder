@@ -65,6 +65,7 @@ try {
     const { decorateBreach } = await import('/src/sim/breach.ts');
     const { planHouseAssault } = await import('/src/sim/houseAssault.ts');
     const { routeScene } = await import('/src/sim/cutLive.ts');
+    const { stepSegments } = await import('/src/sim/standingSurfaces.ts');
     const { LineDirector } = await import('/src/sim/raidDialogue.ts');
     const { KIT, footprint } = await import('/src/game/buildkit/kit.ts');
     const { isFinished } = await import('/src/sim/construction.ts');
@@ -89,15 +90,15 @@ try {
       const seed = g.seed * 131 + Math.round(last.duration * 7), dir = new LineDirector(seed);
       let b = decorateBreach(last, g.perimeter, { x: home.x, z: home.z }, seed, false, dir);
       b = planHouseAssault(b, { box: footprint(KIT[home.kind], home.x, home.z, home.rot, false), blocked: solid, seed, dir });
-      const r = routeScene(b, solid);
+      const r = routeScene(b, solid, undefined, stepSegments(g.perimeter));
       const prep = performance.now() - t0;
       cb.battle.play(r.battle);
-      let steps = 0, maxStep = 0;
-      while (cb.battle.playing && steps < 4000) { const s0 = performance.now(); cb.battle.update(1 / 12); maxStep = Math.max(maxStep, performance.now() - s0); steps++; if (cb.battle.time > r.battle.duration + 1) break; }
+      let steps = 0, maxStep = 0, drawn = null;
+      while (cb.battle.playing && steps < 4000) { const s0 = performance.now(); cb.battle.update(1 / 12); maxStep = Math.max(maxStep, performance.now() - s0); steps++; if (!drawn && cb.battle.time > r.battle.duration * 0.6) { cb.qa.skipDraw = false; const f0 = performance.now(); cb.ws.renderFrame(); const ms = performance.now() - f0; const i = cb.ws.renderer.info.render; drawn = { ms: +ms.toFixed(1), calls: i.calls, triangles: i.triangles }; cb.qa.skipDraw = true; } if (cb.battle.time > r.battle.duration + 1) break; }
       slowest = Math.max(slowest, maxStep);
       cb.battle.stop();
       await gc();
-      rows.push({ k, day: d, prepMs: Math.round(prep), unrouted: r.unrouted, ok: r.ok, steps, maxStepMs: +maxStep.toFixed(1), ...info(), props: cb.battle.props.live });
+      rows.push({ k, day: d, prepMs: Math.round(prep), unrouted: r.unrouted, ok: r.ok, steps, maxStepMs: +maxStep.toFixed(1), frame: drawn, heap: Math.round(performance.memory.usedJSHeapSize / 1e6), ...info(), props: cb.battle.props.live });
     }
     return { base, rows, slowestStepMs: +slowest.toFixed(1) };
   }, [hour0, N, wantDay]);

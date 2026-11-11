@@ -9,7 +9,7 @@ import type { LineDirector, Ctx } from './raidDialogue';
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 export function voiceMoments(b: Battle, dir: LineDirector, nameOf: (unitId: string) => string | undefined = () => undefined): Battle {
-  dir.noteAll(b);
+  dir.noteAll(b); dir.noteUnits(b.units);
   const side = new Map(b.units.map(u => [u.id, u.side]));
   const spoke = new Map<string, number[]>();
   for (const e of b.events) if (e.kind === 'say' && e.who) spoke.set(e.who, [...(spoke.get(e.who) ?? []), e.t]);

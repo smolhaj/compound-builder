@@ -78,6 +78,47 @@ export function inFrame(eye: V3, look: V3, fov: number, p: V3): boolean {
 }
 function norm3(a: V3): V3 { const l = Math.hypot(a.x, a.y, a.z) || 1; return { x: a.x / l, y: a.y / l, z: a.z / l }; }
 
+
+/** A near surface may not cover more than this share of the picture (a roof skimmed from just above, a wall the camera is pressed against). */
+export const MAX_SURFACE_COVER = 0.35;
+/** "Near": within this many units (about 9 m) of the eye. */
+const SURFACE_NEAR = 1.5;
+
+/**
+ * The share of the picture covered by one solid close to the camera: a grid of rays across the picture (9 x 5), each marched to SURFACE_NEAR, counted when it
+ * ends inside a building, wall or tree box (the ground does not count: every overview looks down at it). A roof plane filling the view, or a wall plane
+ * over half of it, reads near 0.5 to 1; an ordinary shot reads 0 to 0.1. Pure; the harness and the director use the same number.
+ */
+export function surfaceCover(eye: V3, look: V3, fov: number, boxes: readonly Box[], ground: Ground): number {
+  const near = boxes.filter(b => b.kind !== 'brush' && flatDist(eye.x, eye.z, b) < SURFACE_NEAR + 0.2);
+  if (!near.length) return 0;
+  const f = norm3(sub(look, eye)), r = norm3({ x: f.z, y: 0, z: -f.x });
+  const u = { x: r.y * f.z - r.z * f.y, y: r.z * f.x - r.x * f.z, z: r.x * f.y - r.y * f.x };
+  const th = Math.tan(fov * Math.PI / 360);
+  let hit = 0, total = 0;
+  for (let ix = -4; ix <= 4; ix++) for (let iy = -2; iy <= 2; iy++) {
+    total++;
+    const a = ix / 4 * th * FRAME.aspect * FRAME.h, c = iy / 2 * th * FRAME.v;
+    const d = norm3({ x: f.x + r.x * a + u.x * c, y: f.y + r.y * a + u.y * c, z: f.z + r.z * a + u.z * c });
+    for (let k = 0.06; k <= SURFACE_NEAR; k += 0.06) {
+      const q = { x: eye.x + d.x * k, y: eye.y + d.y * k, z: eye.z + d.z * k };
+      if (near.some(b => insideAny(q, b, ground, b.kind === 'building' ? 0.1 : 0))) { hit++; break; }
+    }
+  }
+  return hit / total;
+}
+
+/**
+ * The best of a few candidate eyes for a shot that looks at `look`: out of every obstacle by `margin`, and the one with the least surface in the way (a wall or
+ * roof filling the picture is the worst frame there is). When none is clear of the obstacles, the least covered of all of them.
+ */
+export function bestEye(list: readonly V3[], look: V3, fov: number, boxes: readonly Box[], ground: Ground, margin: number): V3 {
+  const scored = list.map(p => ({ p, clear: !boxes.some(b => nearBox(p, b, ground, margin)), cover: surfaceCover(p, look, fov, boxes, ground) }));
+  const pool = scored.some(c => c.clear) ? scored.filter(c => c.clear) : scored;
+  const ok = pool.find(c => c.cover <= MAX_SURFACE_COVER);
+  return (ok ?? pool.reduce((a, c) => (c.cover < a.cover ? c : a))).p;
+}
+
 /** How close to the subject (units) a bush on the ray counts as hiding it. */
 const COVER_NEAR = 0.9;
 
@@ -180,6 +221,7 @@ export function shotProblems(s: Shot, ctx: ShotCtx): string[] {
     if (![eye.x, eye.y, eye.z, look.x, look.y, look.z].every(Number.isFinite)) { out.push('not finite'); break; }
     if (eye.y - ctx.ground(eye.x, eye.z) < EYE_MIN - 1e-6) out.push(`eye on the ground at t=${t.toFixed(1)}`);
     for (const b of ctx.boxes) if (nearBox(eye, b, ctx.ground, CLEAR)) { out.push(`eye ${insideBox(eye, b, ctx.ground) ? 'inside' : 'against'} a ${b.kind} at t=${t.toFixed(1)}`); break; }
+    { const cov = surfaceCover(eye, look, s.fov, ctx.boxes, ctx.ground); if (cov > MAX_SURFACE_COVER) out.push(`a surface covers ${Math.round(cov * 100)}% of the picture at t=${t.toFixed(1)}`); }
     // dead ahead: nothing solid within VIEW_CLEAR (or before the look target, whichever is nearer)
     const f = norm3(sub(look, eye)), dist = Math.hypot(look.x - eye.x, look.y - eye.y, look.z - eye.z);
     for (const d of [0.1, 0.25, 0.5, 0.75, 1]) {
@@ -232,6 +274,8 @@ export interface PoseAudit {
   live: number; inPicture: number; visible: number;
   /** The tallest visible raider in the picture, in pixels on a 720-line picture (0 = none). */
   raiderPx: number;
+  /** The share of the picture covered by one near solid (a roof or a wall the camera is up against): over MAX_SURFACE_COVER is a bad frame. */
+  cover: number;
 }
 
 /** A measurement of a camera pose against the world, independent of how the shot was chosen (the tests and the screenshot harness use it). */
@@ -256,7 +300,7 @@ export function auditPose(eye: V3, look: V3, fov: number, boxes: readonly Box[],
     inPicture++;
     if (!blockedBetween(eye, c, boxes, ground)) { visible++; if (a.side === 'raider') raiderPx = Math.max(raiderPx, figurePx(eye, c, fov, viewH)); }
   }
-  return { inside, nearest: Math.round(nearest * 100) / 100, aboveGround: Math.round((eye.y - ground(eye.x, eye.z)) * 100) / 100, ahead: Math.round(ahead * 100) / 100, live: live.length, inPicture, visible, raiderPx: Math.round(raiderPx) };
+  return { inside, nearest: Math.round(nearest * 100) / 100, aboveGround: Math.round((eye.y - ground(eye.x, eye.z)) * 100) / 100, ahead: Math.round(ahead * 100) / 100, live: live.length, inPicture, visible, raiderPx: Math.round(raiderPx), cover: Math.round(surfaceCover(eye, look, fov, boxes, ground) * 100) / 100 };
 }
 
 export class Director {
