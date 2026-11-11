@@ -20,12 +20,12 @@ const part = (g: THREE.BufferGeometry, color: number): THREE.BufferGeometry => {
   g.setAttribute('color', new THREE.BufferAttribute(c, 3));
   return g;
 };
-const WOOD = 0x6e5233, IRON = 0x8a8d90, EARTH = 0x5a4228, PIT = 0x1c130b, PLANK = 0xa98a58;
+const WOOD = 0x6e5233, IRON = 0x8a8d90, PIT = 0x1c130b, PLANK = 0xa98a58;
 
 export class AftermathProps {
   private _held: Held[] = [];
   private _meshes = new Map<ToolKind, THREE.InstancedMesh>();
-  private _grave: { g: Grave; group: THREE.Group; pit: THREE.Mesh; mound: THREE.Mesh; marker: THREE.Group } | null = null;
+  private _grave: { g: Grave; group: THREE.Group; pit: THREE.Mesh; mound: THREE.Group; marker: THREE.Group } | null = null;
   private _repair: { r: Repair; group: THREE.Group; planks: THREE.Mesh[] } | null = null;
   private _geo: THREE.BufferGeometry[] = [];
   private _mat: THREE.Material[] = [];
@@ -61,6 +61,17 @@ export class AftermathProps {
     return m;
   }
 
+  /** Turned earth: a heap of low, flat-shaded lumps in three browns (not a smooth slab). */
+  private _lumps(): THREE.Group {
+    const g = new THREE.Group();
+    const geo = new THREE.IcosahedronGeometry(1, 0);
+    this._geo.push(geo);
+    const spots: Array<[number, number, number, number, number, number]> = [[-0.09, 0, 0.01, 0.09, 0.05, 0.07], [0.0, 0, 0.035, 0.1, 0.06, 0.06], [0.08, 0, -0.01, 0.09, 0.045, 0.07], [-0.03, 0, -0.045, 0.08, 0.04, 0.05], [0.11, 0, 0.045, 0.06, 0.035, 0.045], [-0.12, 0, -0.03, 0.05, 0.03, 0.04], [0.02, 0.025, 0, 0.07, 0.04, 0.05]];
+    [0x6e4d2d, 0x5a3f25, 0x7b5834].forEach(c => { const m = new THREE.MeshStandardMaterial({ color: c, roughness: 1, flatShading: true }); this._mat.push(m); (g.userData.mats ??= []).push(m); });
+    spots.forEach(([x, y, z, sx, sy, sz], i) => { const m = new THREE.Mesh(geo, (g.userData.mats as THREE.Material[])[i % 3]); m.position.set(x, y + sy * 0.4, z); m.scale.set(sx, sy, sz); m.rotation.y = i * 0.9; g.add(m); });
+    return g;
+  }
+
   private _box(w: number, h: number, d: number, color: number): THREE.Mesh {
     const geo = new THREE.BoxGeometry(w, h, d), mat = new THREE.MeshStandardMaterial({ color, roughness: 0.95 });
     this._geo.push(geo); this._mat.push(mat);
@@ -74,12 +85,12 @@ export class AftermathProps {
     } else if (e.kind === 'grave') {
       if (!this._grave) {
         const group = new THREE.Group(), y = this._h.ground(e.x, e.z);
-        const pit = this._box(0.26, 0.012, 0.14, PIT), mound = this._box(0.3, 0.06, 0.17, EARTH), marker = new THREE.Group();
+        const pit = this._box(0.26, 0.012, 0.14, PIT), mound = this._lumps(), marker = new THREE.Group();
         const post = this._box(0.012, 0.09, 0.012, PLANK), bar = this._box(0.06, 0.012, 0.012, PLANK);
         post.position.y = 0.045; bar.position.y = 0.07; marker.add(post, bar);
         const yaw = 0.5 + ((e.x * 12.9898 + e.z * 78.233) % 1) * 0.4;
         group.position.set(e.x, y, e.z); group.rotation.y = yaw;
-        pit.position.y = 0.004; mound.position.y = 0.03; marker.position.set(-0.17, 0, 0);
+        pit.position.y = 0.004; mound.position.y = 0; marker.position.set(-0.17, 0, 0);
         pit.visible = mound.visible = marker.visible = false;
         group.add(pit, mound, marker);
         this._group.add(group);
@@ -126,7 +137,7 @@ export class AftermathProps {
       const dug = g.dig ? Math.min(1, (this._t - g.dig.t0) / g.dig.secs) : 0;
       gr.pit.visible = dug > 0; gr.pit.scale.set(0.25 + 0.75 * dug, 1, 0.25 + 0.75 * dug);
       const filled = g.fill ? Math.min(1, (this._t - g.fill.t0) / g.fill.secs) : 0;
-      gr.mound.visible = filled > 0.02; gr.mound.scale.set(0.5 + 0.5 * filled, Math.max(0.05, filled), 0.5 + 0.5 * filled);
+      gr.mound.visible = filled > 0.02; gr.mound.scale.set(0.6 + 0.4 * filled, Math.max(0.05, filled), 0.6 + 0.4 * filled);
       if (filled > 0.5) gr.pit.visible = false;   // (the earth has covered it)
       gr.marker.visible = filled >= 1;
       // earth flying: a brown puff off the spade every third of a second while they dig or fill

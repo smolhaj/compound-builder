@@ -12,6 +12,7 @@
  */
 import { mulberry32 } from './rng';
 import { QUESTION_NAME, type Approach, type Question } from './interrogation';
+import { contract } from './raidDialogue';
 
 export interface SceneLine { dt: number; text: string; who?: string; kind: 'say' | 'caption' }
 type Rng = () => number;
@@ -22,19 +23,22 @@ const pickOut = (pool: readonly string[], used: Set<string>, r: Rng): string => 
 };
 const fill = (s: string, v: Record<string, string>) => s.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? '');
 
-export interface Mourner { id: string; name: string; kid?: boolean; kin?: boolean }
+export interface Mourner { id: string; name: string; kid?: boolean; kin?: boolean; /** Old and devout: prays, never swears. */ elder?: boolean }
 export interface BurialInput { name: string; age: number; kid: boolean; elder: boolean; mourners: readonly Mourner[]; seed: number }
 
-const WORDS_KIN = ['"I do not know what to say. You were here, and now you are not."', '"{n}, I will keep the place. I promise you that."', '"Thank you. For every single day."'];
-const WORDS_KID = ['"Is {n} cold down there?"', '"Can I put this on top? It was {n}\'s."', '"I will not make noise anymore. Please come back."'];
-const WORDS_ANY = ['"Rest now. We have it from here."', '"{n} did not run. Remember that."', '"Lord, take {n}. We have nothing else to give."'];
+// What people say at a grave: broken, plain, spoken (contractions, fragments, a name; grief and anger can swear in an adult; a child says a few words and never
+// curses; an old, devout person prays).
+const WORDS_KIN = ['"God. I don\'t know what to say. You were just here."', '"{n}. {n}, I\'ll keep the place. I promise."', '"Thank you. For every single day."', '"Fuck. Fuck, {n}. Why you?"', '"I\'m sorry. I\'m so sorry, {n}."', '"Goddamn it, {n}. Goddamn it."'];
+const WORDS_KID = ['"Is {n} cold down there?"', '"Can I put this on top? It was {n}\'s."', '"I\'ll be quiet now. Please come back."', '"I want {n} back."'];
+const WORDS_ANY = ['"Rest now. We\'ve got it from here."', '"{n} didn\'t run. Remember that."', '"Shit. Shit, {n}."', '"Jesus. I can\'t believe it."', '"He\'d have done it for any of us."'];
+const WORDS_ELDER = ['"Lord, take {n} home."', '"Dear God, hold {n}. We have nothing else to give."', '"Eternal rest, grant unto {n}, O Lord..."'];
 
 export function burialWords(inp: BurialInput): SceneLine[] {
   const r = mulberry32(inp.seed * 31 + 7), used = new Set<string>(), v = { n: inp.name };
   const speakers = [...inp.mourners].sort((a, b) => Number(!!b.kin) - Number(!!a.kin)).slice(0, 3);
   return speakers.map((m, i) => {
-    const pool = m.kid ? WORDS_KID : m.kin || i === 0 ? WORDS_KIN : WORDS_ANY;
-    return { dt: i * 2.6, kind: 'say' as const, who: m.id, text: fill(pickOut(pool, used, r), v) };
+    const pool = m.kid ? WORDS_KID : m.elder ? WORDS_ELDER : m.kin || i === 0 ? WORDS_KIN : WORDS_ANY;
+    return { dt: i * 2.6, kind: 'say' as const, who: m.id, text: contract(fill(pickOut(pool, used, r), v)) };
   });
 }
 
@@ -74,26 +78,26 @@ export function raiderFace(name: string, seed: number): Face {
 
 export interface Exchange { who: 'you' | 'note'; text: string }   // (his answers are the sim's own lines, told in the third person: notes, not quotes)
 const ASK_KIND: Record<Question, string[]> = {
-  next_crew: ['"I brought you a plate. Who is coming after you?"', '"Sit. Eat. Is there another crew behind yours?"'],
-  who_sent: ['"I am not going to hurt you. Who runs your outfit?"', '"Somebody gave the orders. Who?"'],
-  stash: ['"You took things from other places. Where is it kept?"', '"I would like to know where the food went. Will you tell me?"'],
+  next_crew: ['"I brought you a plate. Who\'s coming after you?"', '"Sit. Eat. Is there another crew behind yours?"'],
+  who_sent: ['"I\'m not going to hurt you. Who runs your outfit?"', '"Somebody gave the orders. Who?"'],
+  stash: ['"You took things from other places. Where\'s it kept?"', '"I\'d like to know where the food went. Will you tell me?"'],
 };
 const ASK_HARSH: Record<Question, string[]> = {
-  next_crew: ['"Who is coming next? You have until the lamp burns down."', '"Tell me who else is out there, or you spend the night in the cold."'],
-  who_sent: ['"Name. Now. Who gave the order?"', '"I will ask once. Who sent you?"'],
-  stash: ['"Where is the loot? Do not make me ask the rope."', '"Where did you hide it?"'],
+  next_crew: ['"Who\'s coming next? Talk. You\'ve got until the lamp burns down."', '"Who else is out there? Tell me, or you spend the night in the cold."', '"Who\'s coming? Say it, goddamn it."'],
+  who_sent: ['"Name. Now. Who gave the order?"', '"I\'ll ask once. Who sent you?"', '"Who sent you, you son of a bitch?"'],
+  stash: ['"Where\'s the loot? Don\'t make me ask the rope."', '"Where did you hide it?"', '"Where\'s the fucking stash?"'],
 };
-const SILENT_KIND = ['He looks at the floor. "I do not know. I am sorry."', 'He shakes his head slowly and will not meet your eye.'];
-const SILENT_HARSH = ['He spits on the boards and says nothing.', 'His jaw is tight. He stares at the wall.'];
+const SILENT_KIND = ['He looks at the floor. "I don\'t know. I\'m sorry."', 'He shakes his head slowly and won\'t meet your eye.'];
+const SILENT_HARSH = ['He spits on the boards and says nothing.', 'His jaw is tight. He stares at the wall. "Go to hell."'];
 const LINE = ['He thinks about it a long moment.', 'He wets his lips.'];
 
 /** The questioning as lines on a screen: your question, then his answer (the sim's own words) or his silence. */
 export function interrogationScene(name: string, q: Question, approach: Approach, result: { ok: boolean; lines: readonly string[] }, seed: number): Exchange[] {
   const r = mulberry32(seed * 11 + QUESTION_NAME[q].length);
   const ask = (approach === 'harsh' ? ASK_HARSH : ASK_KIND)[q];
-  const out: Exchange[] = [{ who: 'you', text: ask[Math.floor(r() * ask.length)] }];
-  if (result.ok) { out.push({ who: 'note', text: LINE[Math.floor(r() * LINE.length)] }); for (const l of result.lines) out.push({ who: 'note', text: l }); }
-  else if (result.lines.length) for (const l of result.lines) out.push({ who: 'note', text: l });
+  const out: Exchange[] = [{ who: 'you', text: contract(ask[Math.floor(r() * ask.length)]) }];
+  if (result.ok) { out.push({ who: 'note', text: LINE[Math.floor(r() * LINE.length)] }); for (const l of result.lines) out.push({ who: 'note', text: contract(l) }); }
+  else if (result.lines.length) for (const l of result.lines) out.push({ who: 'note', text: contract(l) });
   else out.push({ who: 'note', text: (approach === 'harsh' ? SILENT_HARSH : SILENT_KIND)[Math.floor(r() * 2)].replace('He', name.split(' ')[0]) });
   return out;
 }

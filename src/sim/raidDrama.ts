@@ -18,7 +18,7 @@ import type { Person } from './family';
 import type { RaiderTemper } from './battle';
 import type { CrewStyle } from './raiderKinds';
 import { burialWords, cleanupCaptions, graveCaptions, traumaBeats } from './aftermathScenes';
-import { LineDirector, prisonerVariants, type Role } from './raidDialogue';
+import { contract, LineDirector, prisonerVariants, type Role } from './raidDialogue';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const dist = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -135,7 +135,7 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
   const W0 = Math.max(b.duration, ...b.events.filter(e => e.kind === 'end').map(e => e.t));
   const say = (t: number, text: string | null, who: string | undefined, ctx: string) => { if (text) events.push({ t: r2(t), kind: 'say', text, ...(who ? { who } : {}), ctx }); };
   const sayLine = (t: number, role: Role, ctx: Parameters<LineDirector['pick']>[1], who: string, variants: string[] = [], n = victim.name) => say(t, inp.dir.pick(role, ctx, { speaker: who, variants, vars: { n } }), who, ctx);
-  const caption = (t: number, text: string) => events.push({ t: r2(t), kind: 'say', text, ctx: 'aftermath' });
+  const caption = (t: number, text: string) => events.push({ t: r2(t), kind: 'say', text: contract(text), ctx: 'aftermath' });
 
   const living = b.units.filter(u => u.side === 'home' && !u.machine && !u.bystander && u.id !== victim.unit && !b.events.some(e => (e.kind === 'death' || e.kind === 'taken') && e.unit === u.id));
   const kinOf = (u: BattleUnit) => { const p = person(u); return p ? kinRank(vPerson, p) : { rank: 9, as: 'any' as const }; };
@@ -229,10 +229,11 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
     if (shared) diggers = [...carriers];
     const gc = graveCaptions(victim.name, diggers.map(firstOf));
     if (diggers.length) {
-      grave = { x: r2(to.x + dx / dl * 0.1), z: r2(to.z + dz / dl * 0.1) };   // (the pit is where the body is set down: a hand ahead of the carrier)
+      // the pit is dug a body's length to one side of where the carriers will stand, so nobody stands on the fallen: they set the body down beside it, then lower it in
+      grave = { x: r2(to.x - dz / dl * 0.32), z: r2(to.z + dx / dl * 0.32) };
       const walkT = Math.max(...diggers.map(d => dist(unitAt(b, d.id, W0), to))) / WALK + 0.8;
       const G0 = grave;
-      diggers.forEach((d, i) => events.push({ t: r2(end), kind: 'move', unit: d.id, x: r2(G0.x + (i ? 0.17 : -0.17)), z: r2(G0.z + 0.13), walk: true }));
+      diggers.forEach((d, i) => events.push({ t: r2(end), kind: 'move', unit: d.id, x: r2(G0.x + (i ? 0.17 : -0.17) * dx / dl - dz / dl * 0.12), z: r2(G0.z + (i ? 0.17 : -0.17) * dz / dl + dx / dl * 0.12), walk: true }));
       const t1 = end + walkT;
       diggers.forEach(d => events.push({ t: r2(t1), kind: 'tool', unit: d.id, what: 'shovel', secs: 5.4 }));
       events.push({ t: r2(t1), kind: 'grave', x: G0.x, z: G0.z, stage: 'dig', secs: 5 });
@@ -253,7 +254,7 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
     events.push({ t: r2(end), kind: 'lower', unit: victim.unit });
     end += 1;
     if (grave) {
-      events.push({ t: r2(end), kind: 'grave', x: grave.x, z: grave.z, stage: 'lower', secs: 1 });
+      events.push({ t: r2(end), kind: 'grave', x: grave.x, z: grave.z, stage: 'lower', secs: 1.4, unit: victim.unit });
       events.push({ t: r2(end + 0.1), kind: 'beat', role: 'vigil', unit: victim.unit, with: [...carriers, ...diggers].map(c => c.id) });
       caption(end + 0.3, gc.lower);
       end += 2.6;
@@ -288,7 +289,7 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
       sayLine(ar + 0.6, 'defender', 'prisoner', gs);
       say(ar + 2.2, inp.dir.pick('raider', 'prisoner_reply', { speaker: raider, variants: prisonerVariants(inp.temper, inp.style) }), raider, 'prisoner_reply');
       sayLine(ar + 4, 'defender', 'prisoner', guards[1]?.id ?? gs);
-      caption(ar + 5, 'What happens to him is the family\'s call.');
+      caption(ar + 5, 'It\'s the family\'s call what happens to him.');
       end = Math.max(end, ar + 6.5);
     }
   }
@@ -297,7 +298,7 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
   {
     const seed = inp.seed;
     if (grave) {
-      for (const l of burialWords({ name: victim.name, age: victim.age, kid: victim.kid, elder: victim.elder, seed, mourners: order.filter(m => !diggers.includes(m)).slice(0, 4).map(m => ({ id: m.id, name: firstOf(m), kid: !!m.civilian && !!inp.after.people.find(p => p.id === m.personId)?.kid, kin: m === kin })) })) say(end + l.dt, l.text, l.who, 'grief');
+      for (const l of burialWords({ name: victim.name, age: victim.age, kid: victim.kid, elder: victim.elder, seed, mourners: order.filter(m => !diggers.includes(m)).slice(0, 4).map(m => ({ id: m.id, name: firstOf(m), kid: !!m.civilian && !!inp.after.people.find(p => p.id === m.personId)?.kid, kin: m === kin, elder: !!inp.after.people.find(p => p.id === m.personId)?.elder })) })) say(end + l.dt, l.text, l.who, 'grief');
       end += 4.6;
     }
     const workers = [...diggers, ...order.filter(m => !m.civilian && !diggers.includes(m) && !carriers.includes(m))].filter((u, i, a2) => a2.indexOf(u) === i);
