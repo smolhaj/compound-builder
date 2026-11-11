@@ -59,10 +59,10 @@ if (args.includes('--focus')) {
   // zoomed shots of the labels this PR adds: the ring wall (razor / patrol deck on top) and the tunnel's door
   const marks = await page.evaluate(async () => { const m = await import('/src/game/blueprint/blueprintPlan.ts'); const g = window.__cb.game.getState().game; return m.blueprintPlan(g).marks.filter(k => /ring wall|tunnel|bridge/i.test(k.label)).map(k => ({ label: k.label, sub: k.sub, x: k.x, z: k.z })); });
   console.error('focus marks', JSON.stringify(marks));
-  const look = (m, r, name) => page.evaluate(([m, r]) => { const { world, cam } = window.__cb; window.__cb.qa.pose = null; cam.target.set(m.x, world.groundAt(m.x, m.z) + 0.8, m.z); cam.radius = r; cam.pitch = 0.6; cam.yaw = 0.5; }, [m, r]).then(() => shot(name));
+  const look = (m, r, name) => page.evaluate(([m, r]) => { const { world, cam } = window.__cb; window.__cb.qa.pose = null; cam.target.set(m.x, world.groundAt(m.x, m.z) + 0.8, m.z); cam.radius = r; cam.pitch = 1.0; cam.yaw = 0.5; cam.apply(window.__cb.ws.camera); window.__cb.blueprintOv.update(3e6 + Math.floor(Math.random() * 1e6)); }, [m, r]).then(() => shot(name));
   const ring = marks.find(k => /ring wall/i.test(k.label)), tun = marks.find(k => /tunnel|bridge/i.test(k.label));
-  if (ring) await look(ring, 7, 'focus-ring-wall');
-  if (tun) await look(tun, 7, 'focus-tunnel-door');
+  if (ring) await look(ring, 9, 'focus-ring-wall');
+  if (tun) await look(tun, 9, 'focus-tunnel-door');
 }
 await page.evaluate(() => window.__cb.store.getState().setBlueprint(false));
 await orbit(40, 0.55, info.up + 0.3);
