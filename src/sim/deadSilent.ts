@@ -24,7 +24,10 @@ export function deadSilent(b: Battle): Battle {
     changed = true;
     const s = side.get(e.who);
     const busy = (id: string) => spoke.some(q => q.who === id && Math.abs(q.t - e.t) < 2.2);
-    const pool = voices.filter(u => u.side === s && u.id !== e.who && alive(u.id, e.t) && !busy(u.id) && !(s === 'home' && u.civilian && !e.ctx?.startsWith('kid')));
+    const living = voices.filter(u => u.side === s && u.id !== e.who && alive(u.id, e.t));
+    // (a grown-up first, one not speaking just now; failing that anyone alive on the side: a line said is better than a silence)
+    const tiers = [living.filter(u => !busy(u.id) && !(s === 'home' && u.civilian)), living.filter(u => !busy(u.id)), living.filter(u => !(s === 'home' && u.civilian)), living];
+    const pool = tiers.find(x => x.length) ?? [];
     const pick = pool.length ? pool[Math.floor(e.t * 7) % pool.length] : null;
     if (!pick) continue;
     out.push({ ...e, who: pick.id });

@@ -297,7 +297,8 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
     // a new line every two or three seconds, never one repeated: the rooms are cleared, the doorways held, the house searched
     for (let t = tI + 6, k = 0; t < tI + D - 13; t += 2.4 + r() * 0.6, k++) {
       const RC: Ctx[] = FILL_RAIDER, DC: Ctx[] = FILL_DEFENDER;
-      if (k % 3 === 1) say(t, 'defender', DC[Math.floor(k / 3) % DC.length], adults[k % nHome]);
+      const alive0 = adults.filter(u => !b.events.some(e => e.kind === 'death' && e.unit === u.id && e.t <= t));
+      if (k % 3 === 1 && alive0.length) say(t, 'defender', DC[Math.floor(k / 3) % DC.length], alive0[k % alive0.length]);
       else say(t, 'raider', RC[Math.floor(k / 3 + (k % 3)) % RC.length], breachers[k % breachers.length]);
     }
     // 5. a wounded defender (the sim's wound, kept at its time) is dragged to the back room
@@ -336,7 +337,11 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
   const kept = b.events.filter(e => !mine(e) && e.kind !== 'end' && !(e.kind === 'taken' && captiveIds.has(e.unit)) && !(strip.size && (e.kind === 'move' || e.kind === 'cover') && strip.has(e.unit) && e.t > tI - 3.6) && !(e.kind === 'flee' && strip.has(e.unit) && e.t > tI - 3.6));
   // no quiet stretch in the fight: a callout whenever four and a half seconds pass without one (the crew clearing and searching, the family holding)
   if (planned) {
-    const said = [...kept.filter(e => e.kind === 'say' && e.t >= tI - 3).map(e => e.t), ...ev.filter(e => e.kind === 'say').map(e => e.t)].sort((x, y) => x - y);
+    // (a line by someone already dead is not a line: deadSilent will hand it on or drop it, so it does not count as one that was said, and no filler is given to the dead)
+    const diedAt = new Map<string, number>();
+    for (const e of [...b.events, ...ev]) if ((e.kind === 'death' || e.kind === 'taken') && !diedAt.has(e.unit)) diedAt.set(e.unit, e.t);
+    const liveAt = (id: string | undefined, t: number) => !id || !(diedAt.has(id) && diedAt.get(id)! <= t);
+    const said = [...kept, ...ev].filter(e => e.kind === 'say' && e.t >= tI - 3 && liveAt(e.who, e.t)).map(e => e.t).sort((x, y) => x - y);
     const crewNow = planned.insideCrew, from = tI - 3, to = newEnd - 1.5, outroAt = tI + D - 11;
     let prev = from, k = 0;
     for (const t of [...said, to]) {
@@ -344,8 +349,9 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
         prev += 3.2;
         const pick = k++ % 3;
         const RC: Ctx[] = FILL_RAIDER, DC: Ctx[] = FILL_DEFENDER;
-        if (prev > outroAt + 3) { if (pick === 1 && adults.length) say(prev, 'defender', 'aftermath', adults[k % adults.length]); else say(prev, 'raider', 'leaving', crewNow[k % crewNow.length]); }
-        else if (pick === 1 && adults.length) say(prev, 'defender', DC[Math.floor(k / 3) % DC.length], adults[k % adults.length]);
+        const liveAdults = adults.filter(u => liveAt(u.id, prev));
+        if (prev > outroAt + 3) { if (pick === 1 && liveAdults.length) say(prev, 'defender', 'aftermath', liveAdults[k % liveAdults.length]); else say(prev, 'raider', 'leaving', crewNow[k % crewNow.length]); }
+        else if (pick === 1 && liveAdults.length) say(prev, 'defender', DC[Math.floor(k / 3) % DC.length], liveAdults[k % liveAdults.length]);
         else say(prev, 'raider', RC[Math.floor(k / 3 + pick) % RC.length], crewNow[(k + pick) % crewNow.length]);
       }
       prev = Math.max(prev, t);
