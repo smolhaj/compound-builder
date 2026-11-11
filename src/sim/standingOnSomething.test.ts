@@ -112,7 +112,7 @@ function idleOnRungs(b: Battle, g: GameState): string[] {
       if (!id.startsWith('r') || y < 0.12) { last.delete(id); return; }
       const p = last.get(id);
       if (!p || Math.hypot(p.x - c.x, p.z - c.z) > 0.004) { last.set(id, { x: c.x, z: c.z, t0: t }); return; }
-      if (t - p.t0 > 1.5 && bad.length < 6) bad.push(`${id} idle on the rungs from t=${p.t0.toFixed(1)} to ${t.toFixed(1)}, y=${y.toFixed(2)}`);
+      if (t - p.t0 > 1.2 && bad.length < 6) bad.push(`${id} idle on the rungs from t=${p.t0.toFixed(1)} to ${t.toFixed(1)}, y=${y.toFixed(2)}`);
     },
   });
   return bad;

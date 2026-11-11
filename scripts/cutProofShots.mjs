@@ -158,7 +158,7 @@ try {
       }
       if (tag) await page.evaluate(() => { window.__force = null; });
     }
-    if (tag) { const lastT = shotLog.filter(x => x.tag === tag).pop(); if (lastT && tag !== 'raider' && st.bt - lastT.bt < 0.6) tag = ''; }
+    if (tag) { const lastT = shotLog.filter(x => x.tag === tag).pop(); if (lastT && st.bt - lastT.bt < (tag === 'raider' ? 0.5 : 0.6)) tag = ''; }
     if (!tag) continue;
     await page.evaluate(() => { window.__cb.qa.skipDraw = false; window.__pump(10); });
     await page.evaluate(() => new Promise(r => setTimeout(r, 30)));
