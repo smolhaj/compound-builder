@@ -106,6 +106,12 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?:
   rotateRaidMemory(seed);   // (this raid's words count against the next raid's)
   const played: Stance = battle ? 'defend' : stance;
   const fresh = planSiege({ kind: e.kind, size: e.size, temper: e.temper ?? 'desperate', hour, seed, fought: !!battle, fightSeconds: battle?.duration ?? null, armed: e.armed });
+  // the white flag was answered and the answer led to a fight (a bluff that failed, a shot envoy that did not scatter the crew): the exchange at the gate is the first
+  // scene, then the assault. (Before this the fight alone was staged, and the man under the flag, the bluff and the shot were never shown.)
+  if (!keep && stance.startsWith('flag_') && battle) {
+    const pre: Scene = { index: 0, kind: 'gate', label: 'At the gate', gap: 0, lead: 0, fight: 48, tail: 6, ...(fresh.style ? { style: fresh.style } : {}) };
+    fresh.scenes = [pre, ...fresh.scenes.map((sc, i) => ({ ...sc, index: i + 1, gap: i === 0 ? 20 : sc.gap }))];
+  }
   const finalScene = fresh.scenes[fresh.scenes.length - 1];
   // a fight that ends with the line broken gets the invasion's last act (the crew in the house, sim/houseAssault.ts): the scene runs ASSAULT_EXTRA seconds longer,
   // cinematic only (the sim's result, wounds and deaths are what they were)
