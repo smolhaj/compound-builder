@@ -49,6 +49,7 @@ const winterPlow = async (kind, drifts) => {
   console.error('winter look set; berms mesh', snow);
   const dbg = await page.evaluate(([kind, drifts]) => { const { world } = window.__cb; world.plow.qaPose(world.plow._len * 0.3, kind, drifts); window.__cb.qa.pose = null; const m = world.plow._drifts; return m ? { vis: m.visible, range: m.geometry.drawRange, parent: !!m.parent, pos: m.geometry.attributes.position.array.slice(0, 3), n: m.geometry.index.count } : null; }, [kind, drifts]);
   console.error('drifts', JSON.stringify(dbg));
+  if (args.includes('--debugdrift')) await page.evaluate(() => { const m = window.__cb.world.plow._drifts; m.material.color.set(0xff2020); m.material.depthTest = false; m.renderOrder = 99; m.material.needsUpdate = true; });
 };
 /** Where the drive is at distance d from the yard: x, z, heading (the way toward the county road). */
 const along = d => page.evaluate(d => { const R = window.__cb.world.plow._route; let left = d; for (let i = 1; i < R.length; i++) { const l = Math.hypot(R[i][0] - R[i - 1][0], R[i][1] - R[i - 1][1]); if (left <= l || i === R.length - 1) { const t = Math.min(1, left / l); return { x: R[i - 1][0] + (R[i][0] - R[i - 1][0]) * t, z: R[i - 1][1] + (R[i][1] - R[i - 1][1]) * t, dx: (R[i][0] - R[i - 1][0]) / l, dz: (R[i][1] - R[i - 1][1]) / l, len: window.__cb.world.plow._len }; } left -= l; } }, d);
