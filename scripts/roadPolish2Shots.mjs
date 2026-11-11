@@ -63,6 +63,11 @@ const plowShots = async (kind, tag) => {
   // eye level: a person standing beside the drive between the truck and the drift, the camera behind the truck
   await page.evaluate(([T, N]) => { const { world } = window.__cb; world.qaFigure((T.x + N.x) / 2 + T.dz * 0.4, (T.z + N.z) / 2 - T.dx * 0.4); const ex = T.x - T.dx * 1.9 + T.dz * 0.35, ez = T.z - T.dz * 1.9 - T.dx * 0.35; window.__cb.qa.pose = { x: ex, y: world.groundAt(ex, ez) + 0.4, z: ez, lx: N.x, ly: world.groundAt(N.x, N.z) + 0.12, lz: N.z, fov: 58 }; }, [T, N]);
   await shot(`${tag}-eye`);
+  // straight at the first drift ahead of the truck (its center is at 41 % of the drive for four drifts)
+  const D = await along(L * 0.41);
+  await page.evaluate(([D, T]) => { const { world, cam } = window.__cb; window.__cb.qa.pose = null; cam.target.set(D.x, world.groundAt(D.x, D.z) + 0.08, D.z); cam.radius = 1.9; cam.pitch = 0.45; cam.yaw = Math.atan2(T.dx, T.dz) + 0.5; }, [D, T]);
+  console.error('drift center', JSON.stringify(D));
+  await shot(`${tag}-drift`);
 };
 if (only.includes('plow')) { await winterPlow('pickup', true); await plowShots('1-plow-pickup-drift', 'a'); }
 if (only.includes('tractor')) { await winterPlow('tractor', true); await plowShots('2-plow-tractor-drift', 'b'); }
