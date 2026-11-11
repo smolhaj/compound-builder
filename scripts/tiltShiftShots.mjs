@@ -32,7 +32,8 @@ const orbit = (r, pitch, yaw) => page.evaluate(([r, pitch, yaw]) => { const { wo
 await orbit(30, 0.75, 0.6); await tilt(false); await shot('1-aerial-off'); await tilt(true); await shot('1b-aerial-on');
 await orbit(18, 1.0, 0.9); await shot('2-steep-on'); await tilt(false); await shot('2b-steep-off');
 await tilt(true);
-await page.evaluate(() => { const { world } = window.__cb, c = world.camp, x = c.x + 2.5, z = c.z + 3; world.qaFigure(x - 0.3, z - 0.6); window.__cb.qa.pose = { x, y: world.groundAt(x, z) + 0.42, z, lx: c.x, ly: world.groundAt(c.x, c.z) + 0.35, lz: c.z, fov: 62 }; });
+const eye = await page.evaluate(() => { const cb = window.__cb, w = cb.world, ag = [...w.family._agents.values()].find(a => a.x !== undefined); if (!ag) return null; const rx = Math.sin(ag.rot ?? 0), rz = Math.cos(ag.rot ?? 0); const ex = ag.x - rx * 1.1 + rz * 0.3, ez = ag.z - rz * 1.1 - rx * 0.3; window.__cb.qa.pose = null; cb.cam.placeEye(ex, ez, ag.x, ag.z, 0.36); return { x: ag.x, z: ag.z }; });
+console.error('eye person', JSON.stringify(eye));
 await shot('3-eye-level-on');
 await browser.close(); vite?.kill();
 process.exit(0);
