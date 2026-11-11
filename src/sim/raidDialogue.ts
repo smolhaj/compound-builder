@@ -132,6 +132,32 @@ for (const role of ['raider', 'defender'] as const) {
   }
 }
 
+
+/**
+ * Spoken, not written: "do not" -> "don't", "I am" -> "I'm", "they are" -> "they're", "let us" -> "let's" and the like (user: real people use contractions and
+ * fragments). Only after pronouns and plain words where it is natural; a noun and "is" ("the wall is down") is left alone, other lines match on those phrases.
+ */
+export function contract(text: string): string {
+  const keep = (to: string) => (m: string) => (m[0] === m[0].toUpperCase() && m[0] !== m[0].toLowerCase() ? to[0].toUpperCase() + to.slice(1) : to);
+  const RULES: Array<[RegExp, string]> = [
+    [/\bcannot\b/gi, "can't"], [/\bdo not\b/gi, "don't"], [/\bdoes not\b/gi, "doesn't"], [/\bdid not\b/gi, "didn't"], [/\bwill not\b/gi, "won't"], [/\bwould not\b/gi, "wouldn't"],
+    [/\bcould not\b/gi, "couldn't"], [/\bshould not\b/gi, "shouldn't"], [/\bis not\b/gi, "isn't"], [/\bare not\b/gi, "aren't"], [/\bwas not\b/gi, "wasn't"], [/\bwere not\b/gi, "weren't"],
+    [/\bhave not\b/gi, "haven't"], [/\bhas not\b/gi, "hasn't"], [/\blet us\b/gi, "let's"],
+    [/\bI am\b/g, "I'm"], [/\bI will\b/g, "I'll"], [/\bwe are\b/gi, "we're"], [/\bwe will\b/gi, "we'll"], [/\byou are\b/gi, "you're"], [/\byou will\b/gi, "you'll"],
+    [/\bthey are\b/gi, "they're"], [/\bthey will\b/gi, "they'll"], [/\bit is\b/gi, "it's"], [/\bthat is\b/gi, "that's"], [/\bthere is\b/gi, "there's"], [/\bhe is\b/gi, "he's"],
+    [/\bshe is\b/gi, "she's"], [/\bwhat is\b/gi, "what's"], [/\bwho is\b/gi, "who's"], [/\bhere is\b/gi, "here's"], [/\bI have not\b/g, "I haven't"],
+  ];
+  let out = text;
+  for (const [re, to] of RULES) out = out.replace(re, keep(to));
+  return out;
+}
+for (const role of ['raider', 'defender'] as const) {
+  for (const pool of Object.values(LINES[role] as Record<string, Variants | undefined>)) {
+    if (!pool) continue;
+    for (const k of Object.keys(pool)) pool[k] = [...new Set((pool[k] ?? []).map(contract))];
+  }
+}
+
 /**
  * What the last raid(s) said, so back-to-back raids do not open with the same words (user: no repeats within a scene or across consecutive raids).
  * Module memory only (never saved): `rotateRaidMemory` is called once per new raid; every director built after it shares the raid's set.

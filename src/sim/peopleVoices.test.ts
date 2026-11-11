@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import type { BattleUnit } from './battleTypes';
-import { CURSE, LineDirector, TACTICAL, profileOfUnit, resetRaidMemory, rolePool, type Ctx } from './raidDialogue';
+import { CURSE, LINES, LineDirector, TACTICAL, profileOfUnit, resetRaidMemory, rolePool, type Ctx } from './raidDialogue';
 import { scenes, prepared } from './cutFixtures';
 
 const BANNED = /covering fire|cover fire|suppressing|suppress|flank|tango|breach|perimeter/i;
@@ -84,4 +84,34 @@ describe('whole scenes: nobody untrained is given a fire team\'s words', () => {
       }
     }, 90000);
   }
+});
+
+
+// ── lint-style: lines are spoken, not written ──
+const UNCONTRACTED = /\b(do not|does not|did not|cannot|will not|would not|could not|should not|is not|are not|was not|were not|have not|let us|I am|I will|we are|we will|you are|you will|they are|they will|it is|that is|there is|he is|she is|what is|who is)\b/;
+const CALM_NARRATION = /^(I see|I hear|I can see|I notice|I think I see)\b/;
+
+describe('lines are spoken, not written', () => {
+  it('no line in any pool (either side) is left uncontracted where a contraction is natural', () => {
+    const bad: string[] = [];
+    for (const role of ['raider', 'defender'] as const) for (const [ctx, pool] of Object.entries(LINES[role])) for (const [k, ls] of Object.entries(pool ?? {})) for (const t of ls ?? []) if (UNCONTRACTED.test(t)) bad.push(`${role}.${ctx}.${k}: ${t}`);
+    expect(bad.slice(0, 12)).toEqual([]);
+  });
+  it('an untrained person never narrates calmly, and speaks in short pieces', () => {
+    for (const who of [civ, kid]) for (const ctx of DEF_CTX) for (const t of lines(who, ctx)) {
+      expect(t, `${who.id} ${ctx}: "${t}"`).not.toMatch(CALM_NARRATION);
+      expect(t.split(/\s+/).length, `${who.id} ${ctx}: "${t}"`).toBeLessThanOrEqual(12);
+    }
+  });
+  it('the untrained people\'s own pools carry the swearing and the prayers of the user\'s decision, and children none', () => {
+    const own = (k: 'civ' | 'kid' | 'elder' | 'vet') => Object.values(LINES.defender).flatMap(p => p?.[k] ?? []);
+    expect(own('civ').filter(t => CURSE.test(t)).length).toBeGreaterThan(12);
+    expect(own('kid').filter(t => CURSE.test(t))).toEqual([]);
+    expect(own('elder').filter(t => CURSE.test(t))).toEqual([]);
+    expect(own('elder').some(t => /Lord|God/.test(t))).toBe(true);
+    expect(own('vet').filter(t => CURSE.test(t)).length).toBeLessThanOrEqual(3);   // (only when hit)
+    const raiders = Object.values(LINES.raider).flatMap(p => [...(p?.crowd ?? []), ...(p?.opportunists ?? [])]);
+    expect(raiders.filter(t => CURSE.test(t)).length).toBeGreaterThan(8);
+    expect((Object.values(LINES.raider).flatMap(p => p?.crew ?? []) as string[]).filter(t => CURSE.test(t))).toEqual([]);   // (an organized crew stays terse)
+  });
 });
