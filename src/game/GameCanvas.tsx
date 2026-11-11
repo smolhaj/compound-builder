@@ -323,6 +323,7 @@ export function GameCanvas() {
         for (const st of todo) world.removeStructure(st.id);
         useGameStore.getState().respotJoiners(spots);
       }),
+      useWorldStore.subscribe(s => s.tiltShift, on => ws.setTiltShift(on)),
       useGameStore.subscribe(s => s.game.site.improvements.drive, on => world.setDrive(on)),
       useGameStore.subscribe(s => s.game.roadBridge?.down ?? false, on => world.setBridgeDown(on)),
       useGameStore.subscribe(s => s.game.site.entrance ?? null, () => { world.replan(useGameStore.getState().game.site); world.previewEntrance(useGameStore.getState().game.site, null); }),
