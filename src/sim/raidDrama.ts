@@ -324,7 +324,7 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
       caption(t1 + 0.4, cc.repair);
       end = t1 + 5.2;
     }
-    const shaken = living.filter(u => !u.civilian).map(u => ({ id: u.id, name: firstOf(u), trauma: (inp.after.personState[inp.after.people.findIndex(p => p.id === u.personId)] as { trauma?: number } | undefined)?.trauma ?? 0 }));
+    const shaken = living.filter(u => !u.civilian).map(u => ({ id: u.id, name: firstOf(u), trauma: inp.after.mind?.psyche[u.personId ?? '']?.trauma ?? 0 }));   // (the psyche ledger: the same trauma the sim's own panic and courage read)
     const tb = traumaBeats(shaken, seed);
     tb.forEach((l, i) => {
       events.push({ t: r2(end + l.dt), kind: 'panic', unit: l.who!, how: 'freeze', secs: 2.8, kin: false });

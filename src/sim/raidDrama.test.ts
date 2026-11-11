@@ -72,7 +72,7 @@ describe('the death and the wake', () => {
       if (/fill it in/.test(c.text)) expect(near('grave', c.t, e => e.stage === 'fill'), c.text).toBe(true);
       if (/rakes sand/.test(c.text)) expect(near('clean', c.t) && near('tool', c.t, e => e.what === 'rake'), c.text).toBe(true);
       if (/nails planks/.test(c.text)) expect(near('repair', c.t) && near('tool', c.t, e => e.what === 'hammer'), c.text).toBe(true);
-      if (/frozen|cannot move|stopped where|stares at nothing/.test(c.text)) expect(near('panic', c.t), c.text).toBe(true);
+      if (/frozen|cannot move|can't move|stopped where|stares at nothing/.test(c.text)) expect(near('panic', c.t), c.text).toBe(true);
       expect(c.text).not.toMatch(/wheelbarrow|chickens|bedsheet|empty chair|scrub/i);                // (captions that have nothing behind them were cut)
     }
     // grief is named for who died, with no pronouns assumed and no gore in the words
@@ -89,6 +89,25 @@ describe('the death and the wake', () => {
     const dig = b.events.find(e => e.kind === 'grave')!, lift = b.events.find(e => e.kind === 'lift' && e.unit === v)!;
     expect(dig.t).toBeLessThan(lift.t);
     expect(b.events.filter(e => e.kind === 'tool' && e.what === 'shovel').length).toBeGreaterThanOrEqual(4);   // two diggers, twice
+  });
+  it('the shaken freeze in the wake, in plain sight, and the caption is backed by the freeze', () => {
+    let seen = false;
+    for (let seed = 1; seed <= 30 && !seen; seed++) {
+      const g = base(seed);
+      for (const id of Object.keys(g.mind?.psyche ?? {})) g.mind!.psyche[id].trauma = 60;
+      const st = stageRaid(g, 'defend');
+      if (!st.drama) continue;
+      const b = st.battles[st.drama.scene];
+      const freezes = b.events.flatMap(e => (e.kind === 'panic' && e.how === 'freeze' && e.t >= st.drama!.victim.t + 10 ? [e] : []));
+      const caps = b.events.flatMap(e => (e.kind === 'say' && e.ctx === 'aftermath' && /frozen|cannot move|can't move|stopped where|stares at nothing/.test(e.text) ? [e] : []));
+      if (!caps.length) continue;
+      seen = true;
+      expect(freezes.length).toBeGreaterThanOrEqual(caps.length);
+      for (const c of caps) expect(freezes.some(f => Math.abs(f.t - c.t) < 1.6), c.text).toBe(true);
+      // a close shot on them (a vigil beat on the shaken one, the others round)
+      expect(b.events.some(e => e.kind === 'beat' && e.role === 'vigil' && freezes.some(f => f.unit === e.unit))).toBe(true);
+    }
+    expect(seen, 'some household in range is shaken').toBe(true);
   });
   it('is deterministic', () => {
     const a = find(st => !!st.drama)!, g = base(a.g.seed), st2 = stageRaid(g, 'defend');
