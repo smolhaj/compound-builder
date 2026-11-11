@@ -40,6 +40,8 @@ try {
     window.requestAnimationFrame = cb => { if (!window.__manual) return real(cb); window.__q.push(cb); return window.__q.length; };
     window.__pump = ms => { window.__fakeNow += ms; const q = window.__q; window.__q = []; for (const cb of q) cb(window.__fakeNow); };
   });
+  await page.addInitScript(o => { window.__opener = o; }, opt('--opener', null));
+  await page.addInitScript(f => { window.__flags = f; }, { breach: args.includes('--needbreach'), trauma: args.includes('--trauma') });
   await page.goto(`http://localhost:${port}/?seed=7${lowrender ? '&lowrender=1&looktier=medium' : ''}`);
   await page.waitForFunction(() => window.__cb, null, { timeout: 180000 });
   if (lowrender) await page.evaluate(() => { window.__cb.qa.weather = true; });
@@ -66,9 +68,10 @@ try {
     for (const [i, p] of g.people.entries()) if (!p.kid || p.age >= 15) { g.armory.guns.push({ id: `g${i}`, model: 'sw_mp15', condition: 1, fired: 0, where: 'house', carrier: p.id }); g.armory.skill[p.id] = 5; }
     if (OPT_DOG) { const { adoptDog } = await import('/src/sim/pets.ts'); adoptDog(g, { ageYears: 3, training: 60, guard: true }); }
     if (OPT_TOWER) { for (const [i, [tx, tz]] of [[-4, 10], [4, 10]].entries()) g.structures.push({ id: 'tw' + i, kind: 'watchtower_flood', x: sp[0] + tx, z: sp[1] + tz, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 }); g.utilities.lit = ['house']; }
+    if (window.__flags.trauma && g.mind?.psyche) for (const id of Object.keys(g.mind.psyche)) g.mind.psyche[id].trauma = 60;
     let ed = 0;
     const { stageRaid } = await import('/src/sim/raidCutscene.ts');
-    const mk = d => ({ id: 'e9', kind: KIND, day: d, title: 'An armed crew', dossier: ["10 of them, organized, rifles. They've been working the farms east of town.", 'They know what they want, and they think you have it.'], size: SIZE, armed: true, strength: 120, wants: { canned: 8, fuel: 4 }, stances: ['hide', 'parley', 'defend', 'trade', 'flag_pay', 'flag_pass', 'flag_bluff', 'flag_shoot'], ...(STANCE.startsWith('flag_') ? { opener: { kind: 'demand' } } : {}), temper: TEMPER });
+    const mk = d => ({ id: 'e9', kind: KIND, day: d, title: 'An armed crew', dossier: ["10 of them, organized, rifles. They've been working the farms east of town.", 'They know what they want, and they think you have it.'], size: SIZE, armed: true, strength: 120, wants: { canned: 8, fuel: 4 }, stances: ['hide', 'parley', 'defend', 'trade', 'flag_pay', 'flag_pass', 'flag_bluff', 'flag_shoot'], ...(STANCE.startsWith('flag_') ? { opener: { kind: 'demand' } } : window.__opener ? { opener: { kind: window.__opener, spotted: true } } : {}), temper: TEMPER });
     const cands = [];
     if (wantDay) ed = wantDay;
     for (let d = 1; d < (scan ? 90 : 400) && !ed; d++) {
@@ -81,7 +84,7 @@ try {
       const hw = br ? last.events.filter(e => (e.kind === 'wound' || e.kind === 'death') && e.t >= br.t - 2 && e.unit.startsWith('h_') && !e.stopped).length : 0;
       if (scan) { if (br) cands.push({ d, res, dur: last.duration, deaths, hw, scenes: st.plan.scenes.length, br: br.t }); continue; }
       if (wantDay) { if (d === wantDay) ed = d; continue; }
-      if (WANT_WAKE) { if (st.drama && st.battles.some(bb => bb.events.some(e => e.kind === 'grave'))) ed = d; continue; }
+      if (WANT_WAKE) { if (st.drama && st.battles.some(bb => bb.events.some(e => e.kind === 'grave')) && (!window.__flags.breach || st.battles.some(bb => bb.events.some(e => e.kind === 'breach' && e.where)))) ed = d; continue; }
     }
     if (scan) return { cands };
     g.gate.pending = mk(ed);
