@@ -87,7 +87,7 @@ export function raiderFace(name: string, seed: number): Face {
   return { age, skin: SKIN[Math.floor(r() * SKIN.length)], hair: HAIR[Math.floor(r() * HAIR.length)], eyes: EYES[Math.floor(r() * EYES.length)], scar: r() < 0.35, beard: age > 22 && r() < 0.5, story: STORIES[Math.floor(r() * STORIES.length)] };
 }
 
-export interface Exchange { who: 'you' | 'him'; text: string }
+export interface Exchange { who: 'you' | 'note'; text: string }   // (his answers are the sim's own lines, told in the third person: notes, not quotes)
 const ASK_KIND: Record<Question, string[]> = {
   next_crew: ['"I brought you a plate. Who is coming after you?"', '"Sit. Eat. Is there another crew behind yours?"'],
   who_sent: ['"I am not going to hurt you. Who runs your outfit?"', '"Somebody gave the orders. Who?"'],
@@ -107,8 +107,8 @@ export function interrogationScene(name: string, q: Question, approach: Approach
   const r = mulberry32(seed * 11 + QUESTION_NAME[q].length);
   const ask = (approach === 'harsh' ? ASK_HARSH : ASK_KIND)[q];
   const out: Exchange[] = [{ who: 'you', text: ask[Math.floor(r() * ask.length)] }];
-  if (result.ok) { out.push({ who: 'him', text: LINE[Math.floor(r() * LINE.length)] }); for (const l of result.lines) out.push({ who: 'him', text: l }); }
-  else if (result.lines.length) for (const l of result.lines) out.push({ who: 'him', text: l });
-  else out.push({ who: 'him', text: (approach === 'harsh' ? SILENT_HARSH : SILENT_KIND)[Math.floor(r() * 2)].replace('He', name.split(' ')[0]) });
+  if (result.ok) { out.push({ who: 'note', text: LINE[Math.floor(r() * LINE.length)] }); for (const l of result.lines) out.push({ who: 'note', text: l }); }
+  else if (result.lines.length) for (const l of result.lines) out.push({ who: 'note', text: l });
+  else out.push({ who: 'note', text: (approach === 'harsh' ? SILENT_HARSH : SILENT_KIND)[Math.floor(r() * 2)].replace('He', name.split(' ')[0]) });
   return out;
 }

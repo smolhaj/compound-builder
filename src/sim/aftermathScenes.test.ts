@@ -34,7 +34,7 @@ describe('aftermath scenes', () => {
   });
   it('interrogation reads as a conversation: your question, then his answer or his silence', () => {
     const a = interrogationScene('Dale', 'stash', 'kind', { ok: true, lines: ['Dale says it is under the old silo.'] }, 1);
-    expect(a[0].who).toBe('you'); expect(a.slice(1).every(x => x.who === 'him')).toBe(true); expect(a.some(x => x.text.includes('silo'))).toBe(true);
+    expect(a[0].who).toBe('you'); expect(a.slice(1).every(x => x.who === 'note')).toBe(true); expect(a.some(x => x.text.includes('silo'))).toBe(true);
     const b = interrogationScene('Dale', 'who_sent', 'harsh', { ok: false, lines: [] }, 1);
     expect(b.length).toBe(2); expect(b[1].text.length).toBeGreaterThan(10);
     expect(interrogationScene('Dale', 'next_crew', 'kind', { ok: false, lines: ['Dale looked at the floor and said nothing.'] }, 1)[1].text).toContain('floor');

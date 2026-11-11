@@ -871,7 +871,7 @@ function Questioning({ id, name, asked, hurt }: { id: string; name: string; aske
   const transcript = talk.length > 0 && <div data-testid={`conversation-${id}`} style={{ display: 'flex', gap: 8, margin: '4px 0', alignItems: 'flex-start' }}>
     <RaiderFace face={face} />
     <div style={{ flex: 1, fontSize: 11.5 }}>
-      {talk.map((x, i) => <div key={i} style={{ margin: '2px 0', textAlign: x.who === 'you' ? 'right' : 'left', opacity: x.who === 'you' ? 0.75 : 0.95, fontStyle: x.who === 'you' ? 'italic' : undefined }}>{x.who === 'you' ? 'You: ' : name.split(' ')[0] + ': '}{x.text}</div>)}
+      {talk.map((x, i) => <div key={i} style={{ margin: '2px 0', textAlign: x.who === 'you' ? 'right' : 'left', opacity: x.who === 'you' ? 0.75 : 0.95, fontStyle: x.who === 'you' ? 'italic' : undefined }}>{x.who === 'you' ? 'You: ' : ''}{x.text}</div>)}
     </div>
   </div>;
   const say = (q: Question) => { const lines = ask(id, q, harsh ? 'harsh' : 'kind'); setTalk(t => [...t, ...interrogationScene(name, q, harsh ? 'harsh' : 'kind', { ok: !lines.some(l => /said nothing|nothing more|no such|already/.test(l)), lines }, t.length + id.length)]); };
