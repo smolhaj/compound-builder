@@ -63,7 +63,7 @@ interface U {
   rot: number; phase: number; speed: number;
   wear: Wear; wound: number; dead: boolean; crouch: boolean; gone: boolean;
   /** Battle time the fall began (a body drops after the round has arrived), and when a living one was laid down. */
-  fallAt?: number; layAt?: number;
+  fallAt?: number; layAt?: number; /** Taken out of the picture at this time (buried: the earth has covered the fallen). */ hideAt?: number;
   /** Who carries this unit in their arms now. */
   carriedBy?: string;
   /** Wounds to draw as patches (graphic only) and when the first-aid bandage went on. */
@@ -83,7 +83,7 @@ interface U {
   gs?: number;
 }
 /** A flat mark on the ground or a wall: pools, spatter. `born`: a pool still spreading (radius `r1` after a few seconds). */
-interface Stain { x: number; y: number; z: number; r: number; stretch: number; rot: number; color: number; wall?: { nx: number; nz: number }; born?: number; r1?: number; /** A prop on the ground (a dropped rifle): drawn in Restrained too. */ prop?: boolean }
+interface Stain { clean?: { t0: number; secs: number }; x: number; y: number; z: number; r: number; stretch: number; rot: number; color: number; wall?: { nx: number; nz: number }; born?: number; r1?: number; /** A prop on the ground (a dropped rifle): drawn in Restrained too. */ prop?: boolean }
 const WALK = 0.8;
 const MAX_STAINS = 200;
 interface Tracer { ttl: number; a: THREE.Vector3; b: THREE.Vector3 }
@@ -435,6 +435,10 @@ export class BattleRenderer {
   /** Where a rifle's muzzle is (the shoulder: SCALE v2, a person is 0.28 tall) and where a round aimed at someone lands (the chest). */
   private _muzzle(u: U, out: THREE.Vector3): THREE.Vector3 { return out.set(u.x, this._ground(u.x, u.z) + u.y + (u.crouch ? MUZZLE.kneel : MUZZLE.stand) * u.scale, u.z); }
   private _torso(u: U, out: THREE.Vector3): THREE.Vector3 { return out.set(u.x, this._ground(u.x, u.z) + u.y + (u.crouch ? TORSO.kneel : TORSO.stand) * u.scale, u.z); }
+  /** Sand over the blood: every pool within a hand's breadth of the place shrinks away over `secs`. */
+  private _cleanStains(x: number, z: number, secs: number): void {
+    for (const s of this._stains) if (!s.prop && Math.hypot(s.x - x, s.z - z) < 0.45) s.clean = { t0: this.time, secs: Math.max(0.5, secs) };
+  }
   private _stain(s: Stain): void {
     if (this._stains.length >= MAX_STAINS) { const i = this._stains.findIndex(x => x.born == null); if (i >= 0) this._stains.splice(i, 1); else this._stains.shift(); }
     this._stains.push(s);
@@ -554,7 +558,14 @@ export class BattleRenderer {
         break;
       }
       case 'ram': case 'charge': case 'gap': this.invasion.onEvent(e); break;
-      case 'house_door': case 'loot': case 'fire': case 'ladder': case 'flare': case 'flag': this.props.onEvent(e); break;
+      case 'house_door': case 'loot': case 'fire': case 'ladder': case 'flare': case 'flag': case 'tool': case 'repair': this.props.onEvent(e); break;
+      case 'grave': {
+        this.props.onEvent(e);
+        // under the earth: the fallen is no longer on the ground once the filling has begun
+        if (e.stage === 'fill' && e.unit) { const v = U_(e.unit); if (v) v.hideAt = this.time + 1.2; }
+        break;
+      }
+      case 'clean': this._cleanStains(e.x, e.z, e.secs); break;
       case 'breach':
         this._boom(e.x, this._ground(e.x, e.z), e.z, 0.5, true);
         // a crew that has broken the line shoots out the floodlights: the yard goes dark a moment after (night only: by day nobody needs them)
@@ -718,6 +729,7 @@ export class BattleRenderer {
   private _moveUnits(dt: number): void {
     let n = 0;
     for (const u of this._units.values()) {
+      if (u.hideAt != null && this.time >= u.hideAt) u.gone = true;   // (buried: under the earth)
       if (u.gone || u.def.machine) continue;
       let moving = false;
       if (u.frozenUntil != null && this.time >= u.frozenUntil) { u.frozenUntil = undefined; u.hands = false; }
@@ -751,7 +763,8 @@ export class BattleRenderer {
       const dv = this.viewer ? Math.hypot(u.x - this.viewer.x, gy - this.viewer.y, u.z - this.viewer.z) : 0;
       const gs = u.scale * Math.min(2.4, Math.max(1, dv / 16));
       this._layer.setPose(n, { x: u.x, y: gy, z: u.z, rot: u.rot, scale: gs,
-        pose: u.hands && !moving ? FIG_POSE.REACH : (u.crouch || (u.duckUntil != null && this.time < u.duckUntil)) && !moving ? FIG_POSE.KNEEL : u.sling && !u.dead ? FIG_POSE.CROSS : FIG_POSE.STAND, phase: u.phase, amp: moving ? (u.limp ? 0.3 : 0.6) : 0 });
+        pose: (u.hands && !moving) || (u.y > 0.06 && u.def.side === 'raider' && !u.dead) ? FIG_POSE.REACH :   // (a raider off the ground is on a ladder's rungs: arms up, reaching for the next one)
+           (u.crouch || (u.duckUntil != null && this.time < u.duckUntil)) && !moving ? FIG_POSE.KNEEL : u.sling && !u.dead ? FIG_POSE.CROSS : FIG_POSE.STAND, phase: u.phase, amp: moving ? (u.limp ? 0.3 : 0.6) : 0 });
       u.gs = gs;
       const down = u.carriedBy ? 1 : u.dead ? Math.max(0, Math.min(1, (this.time - (u.fallAt ?? 0)) / 0.95)) : u.layAt != null ? Math.max(0, Math.min(1, (this.time - u.layAt) / 0.7)) : -1;
       const flat = ((u.proneUntil != null && this.time < u.proneUntil && !moving) || !!u.crawl) && !u.dead && u.layAt == null && !u.carriedBy && !u.hands && u.frozenUntil == null;
@@ -846,8 +859,9 @@ export class BattleRenderer {
     };
     for (const s of this._stains) {
       if (!this._graphic && !s.prop) continue;
-      const r = s.born != null ? (this.time < s.born ? 0 : Math.max(0.004, poolRadius(this.time - s.born, s.r1 ?? s.r))) : s.r;
-      if (r <= 0) continue;
+      let r = s.born != null ? (this.time < s.born ? 0 : Math.max(0.004, poolRadius(this.time - s.born, s.r1 ?? s.r))) : s.r;
+      if (s.clean) r *= Math.max(0, 1 - (this.time - s.clean.t0) / s.clean.secs);
+      if (r <= 0.002) continue;
       if (s.wall) put(s.x, s.y, s.z, r, r * s.stretch, s.color, Math.atan2(s.wall.nx, s.wall.nz), false);
       else put(s.x, s.y, s.z, r * s.stretch, r, s.color, 0, true, s.rot);
     }

@@ -48,7 +48,7 @@ try {
   if (opt('--method', null)) await page.evaluate(async m => { (await import('/src/sim/breach.ts')).breachOptions.force = m; }, opt('--method', null));
   console.log('quality', await page.evaluate(() => window.__cb.store.getState().quality));
   const frames = async (k) => { const f0 = await page.evaluate(() => window.__cb.qa.frames); await page.waitForFunction(x => window.__cb.qa.frames >= x, f0 + k, { polling: 200 }); };
-  const info = await page.evaluate(async ([hour0, scan, wantDay, KIND, SIZE, TEMPER, STANCE, OPT_DOG, OPT_TOWER]) => {
+  const info = await page.evaluate(async ([hour0, scan, wantDay, KIND, SIZE, TEMPER, STANCE, OPT_DOG, OPT_TOWER, WANT_WAKE]) => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp;
     const { planSiege } = await import('/src/sim/siege.ts');
     const sp = cb.tool.findSpot('timber_cabin', c.x, c.z, 0);
@@ -81,12 +81,13 @@ try {
       const hw = br ? last.events.filter(e => (e.kind === 'wound' || e.kind === 'death') && e.t >= br.t - 2 && e.unit.startsWith('h_') && !e.stopped).length : 0;
       if (scan) { if (br) cands.push({ d, res, dur: last.duration, deaths, hw, scenes: st.plan.scenes.length, br: br.t }); continue; }
       if (wantDay) { if (d === wantDay) ed = d; continue; }
+      if (WANT_WAKE) { if (st.drama && st.battles.some(bb => bb.events.some(e => e.kind === 'grave'))) ed = d; continue; }
     }
     if (scan) return { cands };
     g.gate.pending = mk(ed);
     G.getState().load(g);
     return { day: ed };
-  }, [hour0, scan, wantDay, opt('--kind', 'gang'), Number(opt('--crewsize', 10)), opt('--temper', 'hard'), opt('--stance', 'defend'), OPT_DOG, OPT_TOWER]);
+  }, [hour0, scan, wantDay, opt('--kind', 'gang'), Number(opt('--crewsize', 10)), opt('--temper', 'hard'), opt('--stance', 'defend'), OPT_DOG, OPT_TOWER, process.argv.includes('--needwake')]);
   console.log(JSON.stringify(info), new Date().toISOString());
   if (scan) { await browser.close(); vite.kill(); process.exit(0); }
   await frames(10); console.log('frames ok', new Date().toISOString());
@@ -144,13 +145,14 @@ try {
       if (beats.includes('dog')) for (const e of ev) if (e.kind === 'alarm' && e.what === 'dog' && t >= e.t + 2 && t <= e.t + 14) { const d = b.props?._dog; if (d) found.dog = { x: d.x, z: d.z, y: 0, key: 'dog' }; }
       if (beats.includes('lights') && b._lightsSparked && b._floods?.length) { const f = b._floods[0].position; found.lights = { x: f.x, z: f.z, y: 0, key: 'lights' }; }
       if (beats.includes('scout')) for (const e of ev) if (e.kind === 'scout' && t >= e.t + 1 && t <= e.t + 10) { const q = pos(e.units[0]); if (q) found.scout = { ...q, key: 'scout' }; }
+      if (beats.includes('wake')) for (const e of ev) if ((e.kind === 'say' && e.ctx === 'aftermath') || e.kind === 'grave' || e.kind === 'tool' || e.kind === 'clean' || e.kind === 'repair') { if (t >= e.t + 0.8 && t <= e.t + (e.kind === 'grave' ? Math.max(3.2, e.secs + 1) : 3.2)) found.wake = { x: 0, z: 0, y: 0, key: (e.kind === 'say' ? e.text.slice(0, 24) : e.kind + (e.stage ?? e.what ?? '') + e.t) }; }
       if (beats.includes('flare')) for (const e of ev) if (e.kind === 'flare' && t >= e.t + 1 && t <= e.t + e.secs - 1) found.flare = { x: e.x, z: e.z, y: 0, key: 'flare' + e.t };
       if (beats.includes('fire')) for (const e of ev) if (e.kind === 'fire' && t >= e.t + 4 && t <= e.t + 25) found.fire = { x: e.x, z: e.z, y: 0, key: 'fire' + e.structure };
       return { phase: c?.phase, offer: c?.offer ?? null, bt: +t.toFixed(2), found, kinds: [...new Set(ev.map(e => e.kind + (e.what ? ':' + e.what : '')))], lt: ev.filter(e => e.kind === 'lights' || e.kind === 'breach').map(e => e.kind + '@' + e.t),  dog: !!b.props?._dog, floods: b._floods?.length ?? 0, sp: b._lightsSparked, fo: b._floodsOutAt, tm: b.time, ln: b.lightNight, bn: b.battle?.night, caption: b.lines?.slice(-1)[0]?.text ?? '' };
     }, [FPS, beats]);
     p++;
     if (st.offer != null) await page.evaluate(() => window.__cb.game.getState().midStance(null));
-    if (st.phase === 'aftermath') break;
+    if (st.phase === 'aftermath') { console.log('BREAK aftermath', p, st.bt); break; }
     if (st.bt == null) continue;
     for (const k of st.kinds ?? []) (globalThis.__kinds ??= new Set()).add(k); if (st.dog) globalThis.__dog = true; globalThis.__floods = Math.max(globalThis.__floods ?? 0, st.floods ?? 0); if (st.sp) globalThis.__sp = true; if (st.lt?.length && globalThis.__lt !== st.lt.join()) { globalThis.__lt = st.lt.join(); console.log('LT', st.bt, JSON.stringify(st.lt)); } if (st.bt >= 67 && !globalThis.__fo) { globalThis.__fo = 1; console.log('FLOODOUT', JSON.stringify({ fo: st.fo, tm: st.bt, ln: st.ln, bn: st.bn })); }
     let did = false;
@@ -160,6 +162,7 @@ try {
       { const last = shotLog.filter(x => x.key === key).pop(); if (last && st.bt - last.bt < 1.2) continue; }   // spread the frames over the beat
       await page.evaluate(async ([kind, q]) => {
         const g = window.__cb.world.groundAt;
+        if (kind === 'wake') { window.__force = null; window.__cb.qa.skipDraw = false; window.__pump(10); return; }
         const wide = kind === 'flare' || kind === 'fire' || kind === 'answer' || kind === 'lights';
         const d = wide ? 2.2 : kind === 'flag' ? 1.1 : (kind === 'panic' || kind === 'sling') ? 1.3 : 0.8;
         window.__force = { eye: { x: q.x + d * 0.8, y: g(q.x, q.z) + (wide ? 0.9 : kind === 'flag' ? 0.42 : (kind === 'panic' || kind === 'sling') ? 0.75 : 0.28), z: q.z - d * 0.6 }, look: { x: q.x, y: g(q.x, q.z) + (wide ? 0.35 : kind === 'flag' ? q.y + 0.3 : q.y + 0.12), z: q.z }, fov: wide ? 62 : 50 };
