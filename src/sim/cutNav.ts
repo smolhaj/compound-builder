@@ -154,6 +154,25 @@ function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[]
     if (stuck(si, sj) || !lineClear(w, a, { x: cx(si), z: cz(sj) }, t, speed)) { const q = snap(a, si, sj); if (q) { si = q.i; sj = q.j; snapped.a = q.p; } }
     if (stuck(ti, tj) || !lineClear(w, { x: cx(ti), z: cz(tj) }, b, t, speed)) { const q = snap(b, ti, tj); if (q) { ti = q.i; tj = q.j; snapped.b = q.p; } }
     s = idx(si, sj); goal = idx(ti, tj);
+    // (a start or a goal shut into a small pocket - a pen, a closet, the lee of a fence - has no way out, and finding that out by flooding the whole grid took minutes in
+    // some scenes: look round each end first, and give up on this box when one is boxed in. A 4-connected flood reaches everything the 8-connected search could.)
+    const pocket = (c: number, other: number): boolean => {
+      const seen = new Set<number>([c]), q = [c];
+      for (let h = 0; h < q.length; h++) {
+        const n = q[h]; if (n === other) return false;
+        const ci = n % nx, cj = (n - ci) / nx;
+        for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const ni = ci + di, nj = cj + dj;
+          if (ni < 0 || nj < 0 || ni >= nx || nj >= nz) continue;
+          const m = idx(ni, nj);
+          if (seen.has(m) || !free(ni, nj, t)) continue;
+          seen.add(m); q.push(m);
+          if (seen.size > 700) return false;
+        }
+      }
+      return true;
+    };
+    if (pocket(s, goal) || pocket(goal, s)) continue;
     g.fill(Infinity); heap.length = 0; g[s] = 0; push(Math.hypot(cx(ti) - cx(si), cz(tj) - cz(sj)), s);
     let found = false;
     while (heap.length) {
