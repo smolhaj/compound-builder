@@ -17,7 +17,8 @@ import type { GameState } from './state';
 import type { Person } from './family';
 import type { RaiderTemper } from './battle';
 import type { CrewStyle } from './raiderKinds';
-import { LineDirector, prisonerVariants, type Role } from './raidDialogue';
+import { burialWords, cleanupCaptions, graveCaptions, traumaBeats } from './aftermathScenes';
+import { contract, LineDirector, prisonerVariants, type Role } from './raidDialogue';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 const dist = (a: { x: number; z: number }, b: { x: number; z: number }) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -95,6 +96,7 @@ export interface DramaInput {
 
 /** Lay the fall and the wake on the staged battles. Returns new battles (the input is untouched) and what was staged, or null for a raid with no death. */
 export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo | null } {
+  for (const bb of inp.battles) inp.dir.noteUnits(bb.units);
   const victim = findVictim(inp.before, inp.after, inp.battles);
   if (!victim) return { battles: [...inp.battles], info: null };
   const out = [...inp.battles];
@@ -133,7 +135,7 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
   const W0 = Math.max(b.duration, ...b.events.filter(e => e.kind === 'end').map(e => e.t));
   const say = (t: number, text: string | null, who: string | undefined, ctx: string) => { if (text) events.push({ t: r2(t), kind: 'say', text, ...(who ? { who } : {}), ctx }); };
   const sayLine = (t: number, role: Role, ctx: Parameters<LineDirector['pick']>[1], who: string, variants: string[] = [], n = victim.name) => say(t, inp.dir.pick(role, ctx, { speaker: who, variants, vars: { n } }), who, ctx);
-  const caption = (t: number, text: string) => events.push({ t: r2(t), kind: 'say', text, ctx: 'aftermath' });
+  const caption = (t: number, text: string) => events.push({ t: r2(t), kind: 'say', text: contract(text), ctx: 'aftermath' });
 
   const living = b.units.filter(u => u.side === 'home' && !u.machine && !u.bystander && u.id !== victim.unit && !b.events.some(e => (e.kind === 'death' || e.kind === 'taken') && e.unit === u.id));
   const kinOf = (u: BattleUnit) => { const p = person(u); return p ? kinRank(vPerson, p) : { rank: 9, as: 'any' as const }; };
@@ -213,23 +215,55 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
     if (other) sayLine(mt + 2.2, 'defender', 'grief', other.id, [kinOf(other).as === 'kid' ? 'kid' : 'any']);
   }
   let end = mt + 3.6;
-  let carryAt = -1;
-  // 4. two carry the fallen to the house, the rest follow
+  // 4. the grave: two dig it (shovels in their hands, the pit opening in the ground), two carry the fallen to it, lay them in, and the diggers fill it in and
+  // set a marker. Every caption below is for something drawn when it shows; with nobody free to dig, the fallen is carried to the house instead.
+  const firstOf = (u: BattleUnit) => inp.after.people.find(p => p.id === u.personId)?.first ?? 'Someone';
   const carriers = [kin, ...order.filter(m => m !== kin && !m.civilian)].filter((u): u is BattleUnit => !!u && !u.civilian).slice(0, 2);
+  let grave: { x: number; z: number } | null = null, diggers: BattleUnit[] = [];
   if (carriers.length) {
     const dx = inp.house.x - vp.x, dz = inp.house.z - vp.z, dl = Math.hypot(dx, dz) || 1;
     const stop = Math.max(0, Math.min(dl - 3.2, dl * 0.8, 3.5));
     const to = { x: r2(vp.x + dx / dl * stop), z: r2(vp.z + dz / dl * stop) };
-    caption(end, `They carry ${victim.name} to the house.`);
+    diggers = order.filter(m => !m.civilian && !carriers.includes(m)).slice(0, 2);
+    const shared = !diggers.length;   // (nobody else free: the two who will carry dig first, then go back for the fallen)
+    if (shared) diggers = [...carriers];
+    const gc = graveCaptions(victim.name, diggers.map(firstOf));
+    if (diggers.length) {
+      // the pit is dug a body's length to one side of where the carriers will stand, so nobody stands on the fallen: they set the body down beside it, then lower it in
+      grave = { x: r2(to.x - dz / dl * 0.32), z: r2(to.z + dx / dl * 0.32) };
+      const walkT = Math.max(...diggers.map(d => dist(unitAt(b, d.id, W0), to))) / WALK + 0.8;
+      const G0 = grave;
+      diggers.forEach((d, i) => events.push({ t: r2(end), kind: 'move', unit: d.id, x: r2(G0.x + (i ? 0.17 : -0.17) * dx / dl - dz / dl * 0.12), z: r2(G0.z + (i ? 0.17 : -0.17) * dz / dl + dx / dl * 0.12), walk: true }));
+      const t1 = end + walkT;
+      diggers.forEach(d => events.push({ t: r2(t1), kind: 'tool', unit: d.id, what: 'shovel', secs: 5.4 }));
+      events.push({ t: r2(t1), kind: 'grave', x: G0.x, z: G0.z, stage: 'dig', secs: 5 });
+      events.push({ t: r2(t1 + 0.2), kind: 'beat', role: 'vigil', unit: diggers[0].id, with: diggers.slice(1).map(d => d.id) });
+      caption(t1 + 0.4, gc.dig);
+      end = t1 + 5.6;
+      if (shared) {
+        carriers.forEach((c, i) => events.push({ t: r2(end), kind: 'move', unit: c.id, x: r2(vp.x + 0.12 + i * 0.12), z: r2(vp.z + 0.12), walk: true }));
+        end += dist(to, vp) / WALK + 0.8;
+      }
+    }
+    caption(end, grave ? gc.carry : `They carry ${victim.name} to the house.`);
     events.push({ t: r2(end), kind: 'beat', role: 'carry', unit: carriers[0].id, with: carriers.slice(1).map(c => c.id) });
     events.push({ t: r2(end + 0.4), kind: 'lift', unit: victim.unit, by: carriers[0].id });
     carriers.forEach((c, i) => events.push({ t: r2(end + 0.5), kind: 'move', unit: c.id, x: r2(to.x + i * 0.12), z: to.z, walk: true }));
-    for (const m of order.filter(x => !carriers.includes(x))) events.push({ t: r2(end + 1.5), kind: 'move', unit: m.id, x: r2(to.x - dx / dl * 0.6), z: r2(to.z - dz / dl * 0.6), walk: true });
-    const carryStart = end;
+    for (const m of order.filter(x => !carriers.includes(x) && !diggers.includes(x))) events.push({ t: r2(end + 1.5), kind: 'move', unit: m.id, x: r2(to.x - dx / dl * 0.6), z: r2(to.z - dz / dl * 0.6), walk: true });
     end += 0.6 + stop / WALK;
     events.push({ t: r2(end), kind: 'lower', unit: victim.unit });
     end += 1;
-    carryAt = carryStart + 1.5;
+    if (grave) {
+      events.push({ t: r2(end), kind: 'grave', x: grave.x, z: grave.z, stage: 'lower', secs: 1.4, unit: victim.unit });
+      events.push({ t: r2(end + 0.1), kind: 'beat', role: 'vigil', unit: victim.unit, with: [...carriers, ...diggers].map(c => c.id) });
+      caption(end + 0.3, gc.lower);
+      end += 2.6;
+      diggers.forEach(d => events.push({ t: r2(end), kind: 'tool', unit: d.id, what: 'shovel', secs: 5.2 }));
+      events.push({ t: r2(end), kind: 'grave', x: grave.x, z: grave.z, stage: 'fill', secs: 4.8, unit: victim.unit });
+      events.push({ t: r2(end + 0.2), kind: 'beat', role: 'vigil', unit: diggers[0].id, with: diggers.slice(1).map(d => d.id) });
+      caption(end + 0.3, gc.fill);
+      end += 5.8;
+    }
   }
   // 5. the raider left on the drive, only if the sim left one
   let raider: string | undefined;
@@ -240,7 +274,7 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
     if (raider && guards.length) {
       const rp = unitAt(b, raider, W0);
       if (!b.events.some(e => e.kind === 'lay' && e.unit === raider)) events.push({ t: r2(W0 + 0.3), kind: 'lay', unit: raider });
-      const t1 = carryAt > 0 ? carryAt : end;
+      const t1 = end;   // (after the burial: the family does not leave a grave half dug to question a prisoner)
       caption(t1, 'One of them was left on the drive, alive. Two of the family walk out to him, rifles up.');
       events.push({ t: r2(Math.max(end, t1 + 4)), kind: 'beat', role: 'prisoner', unit: raider, with: guards.map(g => g.id) });
       let ar = t1;
@@ -255,9 +289,49 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
       sayLine(ar + 0.6, 'defender', 'prisoner', gs);
       say(ar + 2.2, inp.dir.pick('raider', 'prisoner_reply', { speaker: raider, variants: prisonerVariants(inp.temper, inp.style) }), raider, 'prisoner_reply');
       sayLine(ar + 4, 'defender', 'prisoner', guards[1]?.id ?? gs);
-      caption(ar + 5, 'What happens to him is the family\'s call.');
+      caption(ar + 5, 'It\'s the family\'s call what happens to him.');
       end = Math.max(end, ar + 6.5);
     }
+  }
+  // 6. at the grave the mourners say their words; then the cleanup, shown (a rake over the stain, planks across the breach), and the shaken, frozen in plain sight.
+  // (aftermathScenes.ts: nothing is captioned that is not drawn)
+  {
+    const seed = inp.seed;
+    if (grave) {
+      for (const l of burialWords({ name: victim.name, age: victim.age, kid: victim.kid, elder: victim.elder, seed, mourners: order.filter(m => !diggers.includes(m)).slice(0, 4).map(m => ({ id: m.id, name: firstOf(m), kid: !!m.civilian && !!inp.after.people.find(p => p.id === m.personId)?.kid, kin: m === kin, elder: !!inp.after.people.find(p => p.id === m.personId)?.elder })) })) say(end + l.dt, l.text, l.who, 'grief');
+      end += 4.6;
+    }
+    const workers = [...diggers, ...order.filter(m => !m.civilian && !diggers.includes(m) && !carriers.includes(m))].filter((u, i, a2) => a2.indexOf(u) === i);
+    const raker = workers[0], hammerer = workers[1] ?? workers[0];
+    const br = b.events.find(e => e.kind === 'breach') as Extract<BattleEvent, { kind: 'breach' }> | undefined;
+    const cc = cleanupCaptions(raker ? firstOf(raker) : 'Someone', victim.name, hammerer ? firstOf(hammerer) : 'Someone');
+    if (raker) {
+      events.push({ t: r2(end), kind: 'move', unit: raker.id, x: r2(vp.x + 0.12), z: r2(vp.z), walk: true });
+      const t1 = end + dist(unitAt(b, raker.id, end), vp) / WALK + 0.6;
+      events.push({ t: r2(t1), kind: 'tool', unit: raker.id, what: 'rake', secs: 4.6 });
+      events.push({ t: r2(t1), kind: 'clean', x: vp.x, z: vp.z, secs: 4.2 });
+      events.push({ t: r2(t1 + 0.2), kind: 'beat', role: 'vigil', unit: raker.id });
+      caption(t1 + 0.4, cc.stain);
+      end = t1 + 5;
+    }
+    if (br?.where && hammerer) {
+      const w = br.where, inside = { x: w.x - w.out.x * 0.3, z: w.z - w.out.z * 0.3 };
+      events.push({ t: r2(end), kind: 'move', unit: hammerer.id, x: r2(inside.x), z: r2(inside.z), walk: true });
+      const t1 = end + dist(unitAt(b, hammerer.id, end), inside) / WALK + 0.6;
+      events.push({ t: r2(t1), kind: 'tool', unit: hammerer.id, what: 'hammer', secs: 4.8 });
+      events.push({ t: r2(t1), kind: 'repair', x: r2(w.x), z: r2(w.z), w: r2(w.w), heading: r2(w.heading), secs: 4.4 });
+      events.push({ t: r2(t1 + 0.2), kind: 'beat', role: 'vigil', unit: hammerer.id });
+      caption(t1 + 0.4, cc.repair);
+      end = t1 + 5.2;
+    }
+    const shaken = living.filter(u => !u.civilian).map(u => ({ id: u.id, name: firstOf(u), trauma: inp.after.mind?.psyche[u.personId ?? '']?.trauma ?? 0 }));   // (the psyche ledger: the same trauma the sim's own panic and courage read)
+    const tb = traumaBeats(shaken, seed);
+    tb.forEach(l => {
+      events.push({ t: r2(end + l.dt), kind: 'panic', unit: l.who!, how: 'freeze', secs: 2.8, kin: false });
+      events.push({ t: r2(end + l.dt + 0.1), kind: 'beat', role: 'aim', unit: l.who! });   // (a plain close shot on the frozen person: no rate, so no slow-motion)
+      caption(end + l.dt + 0.3, l.text);
+    });
+    end += tb.length ? tb[tb.length - 1].dt + 3.6 : 0;
   }
   // the end of the scene moves to the end of the wake
   const wake = r2(end - W0 + 1);

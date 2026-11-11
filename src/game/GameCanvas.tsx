@@ -54,6 +54,7 @@ import { decorateBreach } from '../sim/breach';
 import { planHouseAssault } from '../sim/houseAssault';
 import { routeScene } from '../sim/cutLive';
 import { voiceMoments } from '../sim/momentVoices';
+import { deadSilent } from '../sim/deadSilent';
 import { stepSegments } from '../sim/standingSurfaces';
 import { LineDirector } from '../sim/raidDialogue';
 import { fireBoxesOf } from './battle/lineOfFire';
@@ -74,7 +75,7 @@ import { sceneCensus } from './perfCensus';
 import { yieldToBrowser, warmShaders } from './bootStages';
 import { StarterPreview } from './StarterPreview';
 import { parseLowRender, RenderRequests, type QaQuality } from './qaRender';
-import { onEntrancePreview } from './roadPreview';
+import { entrancePick, nearestSpot, onEntrancePreview, setEntrancePreview } from './roadPreview';
 
 /** Background damp of the season (ground darkens a little in the shoulder seasons). */
 const SEASON_WETNESS: Record<VisualSeason, number> = { spring: 0.22, fall: 0.28, winter: 0.14, summer: 0 };
@@ -203,8 +204,29 @@ export function GameCanvas() {
     let vsDown: { x: number; y: number } | null = null;
     const onVsDown = (e: PointerEvent) => { vsDown = { x: e.clientX, y: e.clientY }; };
     let servicesKey = '';
+    // the entrance card's map pick: the point of the ground under the pointer, when it is on the county road
+    const roadPoint = (cx: number, cy: number): number | null => {
+      const r = canvas.getBoundingClientRect();
+      vsNdc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+      vsRay.setFromCamera(vsNdc, ws.camera);
+      const h = world.terrain.mesh ? vsRay.intersectObject(world.terrain.mesh, false)[0] : undefined;
+      const p = h ? h.point : vsRay.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), new THREE.Vector3());
+      return p && Math.abs(p.x - world.county.x(p.z)) < 5 ? p.z : null;
+    };
+    const onPickMove = (e: PointerEvent) => {
+      const pk = entrancePick();
+      if (!pk || useGameStore.getState().tool) return;
+      const z = roadPoint(e.clientX, e.clientY);
+      setEntrancePreview(z === null ? null : nearestSpot(pk.spots, z));
+    };
     const onVsUp = (e: PointerEvent) => {
       const d = vsDown; vsDown = null;
+      const pk = entrancePick();
+      if (pk && d && e.button === 0 && Math.hypot(e.clientX - d.x, e.clientY - d.y) <= 5 && !useGameStore.getState().tool) {
+        const z = roadPoint(e.clientX, e.clientY);
+        const pick = z === null ? null : nearestSpot(pk.spots, z);
+        if (pick !== null) { pk.apply(pick); return; }
+      }
       // click a building (no tool, no viewshed) to select it
       if (d && Math.hypot(e.clientX - d.x, e.clientY - d.y) <= 5 && e.button === 0 && !useGameStore.getState().tool && useWorldStore.getState().sightMode !== 'viewshed') {
         const r = canvas.getBoundingClientRect();
@@ -222,6 +244,7 @@ export function GameCanvas() {
       if (h) sight.set('viewshed', { x: h.point.x, z: h.point.z, eye: e.shiftKey ? 1.7 : 0.3 });
     };
     canvas.addEventListener('pointerdown', onVsDown);
+    canvas.addEventListener('pointermove', onPickMove);
     canvas.addEventListener('pointerup', onVsUp);
     const applyCameraMode = () => {
       const m = useWorldStore.getState().cameraMode;
@@ -322,6 +345,7 @@ export function GameCanvas() {
         for (const st of todo) world.removeStructure(st.id);
         useGameStore.getState().respotJoiners(spots);
       }),
+      useWorldStore.subscribe(s => s.tiltShift, on => ws.setTiltShift(on)),
       useGameStore.subscribe(s => s.game.site.improvements.drive, on => world.setDrive(on)),
       useGameStore.subscribe(s => s.game.roadBridge?.down ?? false, on => world.setBridgeDown(on)),
       useGameStore.subscribe(s => s.game.site.entrance ?? null, () => { world.replan(useGameStore.getState().game.site); world.previewEntrance(useGameStore.getState().game.site, null); }),
@@ -414,7 +438,7 @@ export function GameCanvas() {
           for (const other of useGameStore.getState().cutscene?.battles ?? []) if (other !== b0) d2.noteAll(other);
           b = voiceMoments(b, d2, id => { const pid = b0.units.find(u => u.id === id)?.personId; const p = pid ? g2.people.find(q => q.id === pid) : undefined; return (p as { first?: string } | undefined)?.first; });
         } catch (err) { console.warn('cutscene staging failed; playing the plain scene', err); b = b0; }
-        return routeScene(b, solid, undefined, stepSegments(useGameStore.getState().game.perimeter)).battle;
+        return routeScene(deadSilent(b), solid, undefined, stepSegments(useGameStore.getState().game.perimeter)).battle;
       },
       cutaway: on => { const ws2 = useWorldStore.getState(); if (on) { cutawayBefore ??= ws2.buildingView; ws2.setBuildingView('cutaway'); } else if (cutawayBefore) { ws2.setBuildingView(cutawayBefore); cutawayBefore = null; } } });
     const nameLayer = new NameLabelLayer();
@@ -754,6 +778,7 @@ export function GameCanvas() {
       useWorldStore.getState().setMarkNearestTrees(null);
       useWorldStore.getState().setUnderground(false);
       canvas.removeEventListener('pointerdown', onVsDown);
+      canvas.removeEventListener('pointermove', onPickMove);
       canvas.removeEventListener('pointerup', onVsUp);
       cam.dispose();
       weather.dispose();

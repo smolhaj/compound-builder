@@ -22,6 +22,7 @@ import { FXAAShader } from 'three/examples/jsm/shaders/FXAAShader.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { ColorGradingShader, COLOR_GRADING_PRESETS } from './post/ColorGradingShader';
 import { GodRayShader } from './post/GodRayShader';
+import { TiltShiftH, TiltShiftV, tiltStrength } from './post/tiltShift';
 import {
   ProceduralSky, SKY_PALETTES, blendSkyPalettes, createSkyPalette, type SkyPalette, type SkyWeather,
 } from './sky/ProceduralSky';
@@ -98,6 +99,8 @@ export class WorldScene {
   private _colorGradingPass: ShaderPass | null = null;
   private _bloomPass: UnrealBloomPass | null = null;
   private _godRayPass: ShaderPass | null = null;
+  private _tiltPasses: ShaderPass[] = [];
+  private _tiltOn = false;
   private _postProcessingEnabled = true;
   private _shadowFrame = 0;
   private _sky: ProceduralSky | null = null;
@@ -864,6 +867,10 @@ export class WorldScene {
 
     composer.addPass(new OutputPass());
 
+    // the optional tilt-shift diorama look (post/tiltShift.ts): off until asked for, High only; a disabled pass is skipped
+    this._tiltPasses = [new ShaderPass(TiltShiftH), new ShaderPass(TiltShiftV)];
+    for (const p of this._tiltPasses) { p.enabled = false; p.uniforms['uAspect'].value = w / h; composer.addPass(p); }
+
     const fxaaPass = new ShaderPass(FXAAShader);
     fxaaPass.uniforms['resolution'].value.set(1 / w, 1 / h);
     composer.addPass(fxaaPass);
@@ -872,6 +879,16 @@ export class WorldScene {
     this._fxaaPass = fxaaPass;
     this._lastEnvUpdateHour = -999;
     if (this.qaPixelRatio != null) this.renderer.setPixelRatio(this.qaPixelRatio);
+  }
+
+  /** The diorama look on or off (the player's choice; it only draws on High quality and when the camera looks down). */
+  setTiltShift(on: boolean): void { this._tiltOn = on; if (!on) for (const p of this._tiltPasses) p.enabled = false; }
+  get tiltShift(): boolean { return this._tiltOn; }
+  private _applyTiltShift(): void {
+    if (!this._tiltPasses.length) return;
+    let s = 0;
+    if (this._tiltOn && this._quality === 'high') { this.camera.getWorldDirection(this._ssaoDir); s = tiltStrength(this._ssaoDir.y); }
+    for (const p of this._tiltPasses) { p.enabled = s > 0.01; p.uniforms['uStrength'].value = s; }
   }
 
   /** QA only (`?lowrender`): a fixed pixel ratio that overrides the tier's, or null for the tier's own. */
@@ -930,6 +947,7 @@ export class WorldScene {
         this._ssaoPass.enabled = this._quality === 'high' && this._ssaoDir.y < -0.3;
         this._ssaoPass.kernelRadius = Math.max(0.3, Math.min(4, this.camera.position.y * 0.3));
       }
+      this._applyTiltShift();
       this._composer.render();
     } else {
       this.renderer.render(this.scene, this.camera);
@@ -949,6 +967,7 @@ export class WorldScene {
       this._composer.setSize(w, h);
       this._ssaoPass?.setSize(Math.floor(w / 2), Math.floor(h / 2));
       this._fxaaPass?.uniforms['resolution'].value.set(1 / w, 1 / h);
+      for (const p of this._tiltPasses) p.uniforms['uAspect'].value = w / Math.max(1, h);
     }
   }
 

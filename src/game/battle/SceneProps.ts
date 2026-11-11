@@ -7,11 +7,14 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { BattleEvent } from '../../sim/battleTypes';
+import { AftermathProps } from './AftermathProps';
 
 export interface PropHooks {
   ground: (x: number, z: number) => number;
   puff: (p: THREE.Vector3, r0: number, r1: number, life: number, rise: number, color: number, o0: number, glow?: boolean) => void;
   flash: (p: THREE.Vector3, k: number, color: number) => void;
+  /** A steady light that stays where it is put (one per fire, a fixed few made with the renderer so the shaders never change): index, place, intensity, color. */
+  glow?: (i: number, p: THREE.Vector3, k: number, color: number) => void;
   shake: (v: number) => void;
 }
 export interface UnitAt { x: number; y: number; z: number; rot: number; dead: boolean; gone: boolean }
@@ -25,7 +28,7 @@ export const lootKind = (what: string): string => /fuel|gas|diesel/i.test(what) 
 export const itemColor = (item: string): number => ITEM_COLOR[item] ?? ITEM_COLOR.default;
 
 interface Door { pivot: THREE.Group; leaf: THREE.Mesh; nx: number; nz: number; open: number; target: number; speed: number; shudder: number }
-interface Fire { x: number; z: number; big: boolean; age: number; acc: number; spread?: boolean; smoke?: number }
+interface Fire { x: number; z: number; big: boolean; age: number; acc: number; spread?: boolean; smoke?: number; light?: number }
 
 export class SceneProps {
   private _door: Door | null = null;
@@ -47,12 +50,14 @@ export class SceneProps {
   private _mat: THREE.Material[] = [];
   private readonly _group: THREE.Group;
   private readonly _h: PropHooks;
-  constructor(group: THREE.Group, hooks: PropHooks) { this._group = group; this._h = hooks; }
+  private readonly _after: AftermathProps;
+  constructor(group: THREE.Group, hooks: PropHooks) { this._group = group; this._h = hooks; this._after = new AftermathProps(group, { ground: hooks.ground, puff: hooks.puff }); }
 
   /** Counts for the leak test. */
   get live(): { door: boolean; packs: number; fires: number; ladders: number } { return { door: !!this._door, packs: this._packOf.length, fires: this._fires.length, ladders: this._ladders.length }; }
 
   end(): void {
+    this._after.end();
     if (this._door) this._group.remove(this._door.pivot);
     if (this._packs) this._group.remove(this._packs);
     if (this._ladderMesh) this._group.remove(this._ladderMesh);
@@ -67,6 +72,7 @@ export class SceneProps {
     if (e.kind === 'house_door') this._doorEvent(e);
     else if (e.kind === 'ladder') this._addLadder(e);
     else if (e.kind === 'flag') this._addFlag(e.unit);
+    else if (e.kind === 'tool' || e.kind === 'grave' || e.kind === 'repair') this._after.onEvent(e);
     else if (e.kind === 'alarm') this._addDog();
     else if (e.kind === 'flare') { if (this._flares.length < MAX_FLARES) this._flares.push({ x: e.x, z: e.z, age: 0, secs: e.secs, acc: 0 }); }
     else if (e.kind === 'loot') {
@@ -182,6 +188,7 @@ export class SceneProps {
 
   update(dt: number, at: (id: string) => UnitAt | null): void {
     const h = this._h;
+    this._after.update(dt, at);
     const d = this._door;
     if (d) {
       d.open += Math.sign(d.target - d.open) * Math.min(Math.abs(d.target - d.open), d.speed * dt);
@@ -243,6 +250,11 @@ export class SceneProps {
       f.age += dt; f.acc += dt;
       // the fire spreads: a few seconds on, a second one takes along the wall (at most MAX_FIRES burning), and the smoke piles up thick enough to hide the yard behind it
       if (!f.spread && f.age > 7 && this._fires.length < MAX_FIRES) { f.spread = true; const a = f.x * 12.9898 + f.z * 78.233; this._fires.push({ x: f.x + Math.cos(a) * 0.5, z: f.z + Math.sin(a) * 0.5, big: f.big, age: 0, acc: 0 }); }
+      // the firelight: ONE steady light per fire, brightening over the first seconds and then only breathing (two slow sines, under 10 % either way): a fire
+      // lights a room evenly, it does not strobe (the old on-off flash every half second made the interior flicker between red and dark)
+      { const i = this._fires.indexOf(f), grow0 = Math.min(1, f.age / 6), target = (4 * grow0 + 1.2) * (1 + 0.06 * Math.sin(f.age * 1.9 + i) + 0.04 * Math.sin(f.age * 3.1 + i * 2));
+        f.light = (f.light ?? 0) + (target - (f.light ?? 0)) * Math.min(1, dt * 2.5);
+        h.glow?.(i, new THREE.Vector3(f.x, h.ground(f.x, f.z) + 0.25, f.z), f.light, 0xff8a30); }
       f.smoke = (f.smoke ?? 0) + dt;
       if (f.smoke > 0.45) { f.smoke = 0; const yy = h.ground(f.x, f.z); h.puff(new THREE.Vector3(f.x, yy + 0.3, f.z), 0.15, 0.9 + Math.min(1, f.age / 10) * 0.6, 5, 0.25, 0x2a2826, 0.42); }
       if (f.acc < (f.big ? 0.1 : 0.16)) continue;
@@ -251,7 +263,6 @@ export class SceneProps {
       const jx = (Math.sin(f.age * 7.3) * 0.5) * r * grow, jz = (Math.cos(f.age * 5.1) * 0.5) * r * grow;
       h.puff(new THREE.Vector3(f.x + jx, y + 0.05, f.z + jz), 0.05 * (0.5 + grow), 0.18 * (0.5 + grow) * (f.big ? 2 : 1), 0.7, 0.28, 0xff7a24, 0.9, true);
       h.puff(new THREE.Vector3(f.x - jx, y + 0.2 * grow, f.z - jz), 0.1, 0.5 * (f.big ? 2 : 1), 2.6, 0.45, 0x2a2826, 0.55);
-      if (Math.floor(f.age * 4) % 2 === 0) h.flash(new THREE.Vector3(f.x, y + 0.2, f.z), 5 * grow + 1, 0xff8a30);
     }
   }
 }

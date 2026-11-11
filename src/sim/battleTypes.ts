@@ -146,6 +146,14 @@ export type BattleEvent =
   | { t: number; kind: 'heroic'; unit: string; act: 'cover' | 'drag' | 'avenge'; for?: string }
   /** A man carries a white flag (a cloth on a stick) from now on: the envoy of a parley. */
   | { t: number; kind: 'flag'; unit: string }
+  /** After the fight (sim/raidDrama.ts): `unit` works with a tool in hand for `secs` (a shovel at the grave, a rake over the stain, a hammer at the wall). */
+  | { t: number; kind: 'tool'; unit: string; what: 'shovel' | 'rake' | 'hammer'; secs: number }
+  /** The grave at (x, z): `dig` opens the pit over `secs`; `lower` the fallen lies in it; `fill` heaps the mound over `secs` and `unit` (the fallen) is under it. */
+  | { t: number; kind: 'grave'; x: number; z: number; stage: 'dig' | 'lower' | 'fill'; secs: number; unit?: string }
+  /** Sand raked over the blood within a hand's breadth of (x, z) for `secs`. */
+  | { t: number; kind: 'clean'; x: number; z: number; secs: number }
+  /** Planks nailed across the breach in the wall at (x, z), `w` wide, the wall running at `heading`, over `secs`. */
+  | { t: number; kind: 'repair'; x: number; z: number; w: number; heading: number; secs: number }
   /** A flare goes up and lights the yard for `secs`. */
   | { t: number; kind: 'flare'; x: number; z: number; by: string; secs: number }
   | { t: number; kind: 'end'; result: 'repelled' | 'fled' | 'breached' | 'overrun' };
