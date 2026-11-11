@@ -23,7 +23,7 @@ page.setDefaultTimeout(900000);
 page.on('pageerror', e => console.error('PAGEERROR', e.message));
 await page.goto(`http://localhost:${port}/?lowrender=0.75&clean&seed=7&${LOT}&showcase=mountain`);
 await page.waitForFunction(() => window.__cb?.qa?.renderNow && window.__showcase, null, { timeout: 900000 });
-const look = (season, tod = 10) => page.evaluate(([season, tod]) => { const { game, store } = window.__cb; game.getState().setSpeed(0); store.getState().setQuality('low'); store.getState().setTimeOfDay(tod); store.getState().setWeatherMode('clear'); store.getState().setSeasonMode(season); store.getState().setDayOfYear(season === 'winter' ? 20 : 200); }, [season, tod]);
+const look = (season, tod = 10) => page.evaluate(([season, tod]) => { const { game, store } = window.__cb; game.getState().setSpeed(0); store.getState().setQuality('low'); store.getState().setTimeOfDay(tod); store.getState().setWeatherMode(season === 'winter' ? 'snow' : 'clear'); store.getState().setSeasonMode(season); store.getState().setDayOfYear(season === 'winter' ? 20 : 200); }, [season, tod]);
 await look('summer');
 for (let i = 0; i < 14; i++) { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(120); }
 const frames = async () => { await page.evaluate(q => window.__cb.qa.renderFull(q), q); await page.waitForTimeout(250); };
@@ -47,7 +47,7 @@ const winterPlow = async (kind, drifts) => {
   for (let i = 0; i < 40; i++) { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(100); }
   const snow = await page.evaluate(() => window.__cb.world.plow._berms !== null);
   console.error('winter look set; berms mesh', snow);
-  const dbg = await page.evaluate(([kind, drifts]) => { const { world } = window.__cb; world.plow.qaPose(world.plow._len * 0.3, kind, drifts); window.__cb.qa.pose = null; const m = world.plow._drifts; return m ? { vis: m.visible, range: m.geometry.drawRange, parent: !!m.parent, pos: m.geometry.attributes.position.array.slice(0, 3), n: m.geometry.index.count } : null; }, [kind, drifts]);
+  const dbg = await page.evaluate(([kind, drifts]) => { const { world } = window.__cb; world.plow.qaPose(world.plow._len * 0.36, kind, drifts); window.__cb.qa.pose = null; const m = world.plow._drifts; return m ? { vis: m.visible, range: m.geometry.drawRange, parent: !!m.parent, pos: m.geometry.attributes.position.array.slice(0, 3), n: m.geometry.index.count } : null; }, [kind, drifts]);
   console.error('drifts', JSON.stringify(dbg));
   if (args.includes('--debugdrift')) await page.evaluate(() => { const m = window.__cb.world.plow._drifts; m.material.color.set(0xff2020); m.material.depthTest = false; m.renderOrder = 99; m.material.needsUpdate = true; });
 };
@@ -56,9 +56,9 @@ const along = d => page.evaluate(d => { const R = window.__cb.world.plow._route;
 const plowShots = async (kind, tag) => {
   const L = (await along(0)).len;
   // the truck stands at 30 % of the drive going out; the first drift ahead of it lies near 38 %
-  const T = await along(L * 0.3), N = await along(L * 0.4);
+  const T = await along(L * 0.36), N = await along(L * 0.41);
   // low camera behind and beside the truck, looking at the blade and the drift ahead of it
-  await page.evaluate(([T, N]) => { const { world, cam } = window.__cb; window.__cb.qa.pose = null; const mx = (T.x + N.x) / 2, mz = (T.z + N.z) / 2; cam.target.set(mx, world.groundAt(mx, mz) + 0.12, mz); cam.radius = 2.6; cam.pitch = 0.3; cam.yaw = Math.atan2(T.dx, T.dz) + 0.9; }, [T, N]);
+  await page.evaluate(([T, N]) => { const { world, cam } = window.__cb; window.__cb.qa.pose = null; const mx = (T.x + N.x) / 2, mz = (T.z + N.z) / 2; cam.target.set(mx, world.groundAt(mx, mz) + 0.12, mz); cam.radius = 3.0; cam.pitch = 0.4; cam.yaw = Math.atan2(T.dx, T.dz) + 0.9; }, [T, N]);
   await shot(`${tag}-close`);
   // eye level: a person standing beside the drive between the truck and the drift, the camera behind the truck
   await page.evaluate(([T, N]) => { const { world } = window.__cb; world.qaFigure((T.x + N.x) / 2 + T.dz * 0.4, (T.z + N.z) / 2 - T.dx * 0.4); const ex = T.x - T.dx * 1.9 + T.dz * 0.35, ez = T.z - T.dz * 1.9 - T.dx * 0.35; window.__cb.qa.pose = { x: ex, y: world.groundAt(ex, ez) + 0.4, z: ez, lx: N.x, ly: world.groundAt(N.x, N.z) + 0.12, lz: N.z, fov: 58 }; }, [T, N]);
