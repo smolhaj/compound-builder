@@ -14,6 +14,8 @@ import { terrainDefense } from '../../sim/terrainFx';
 import { fogNow } from '../../sim/fogFx';
 import { sensorSightM, fogReadout } from '../../sim/fog';
 import { SALLY } from '../../sim/rings';
+import { doorTierOf, holdSeconds } from '../../sim/doorBreach';
+import { gatesUsed } from '../../sim/gateVetting';
 import type { GameState } from '../../sim/state';
 import { lengthText } from '../../sim/units';
 import { radiationKnown, radiationSub, radiationSummary, shelterRows, type RadTone } from '../../sim/shelterView';
@@ -87,6 +89,14 @@ const area = (p: readonly Pt[]): number => { let a = 0; for (let i = 0; i < p.le
 
 const TUNNEL_NAME: Record<string, string> = { rock_tunnel: 'Rock tunnel', tunnel_bridge: 'Tunnel-bridge', slope_tunnel: 'Slope tunnel', escape_tunnel: 'Escape tunnel', underground_passage: 'Underground passage' };
 
+/** What crowns a wall, in words for its label: razor coils or live wire stop climbers, a patrol deck puts guards on it (they stack: coils ride the deck's outer rail). */
+function topWords(s: GameState, r: { id: string; razor?: boolean; electric?: boolean }): string {
+  const bits: string[] = [];
+  if (s.perimeter.some(x => x.hostId === r.id && x.kind === 'wall_walk' && runFinished(x))) bits.push('patrol deck');
+  if (r.razor) bits.push('razor coils'); else if (r.electric) bits.push('live wire');
+  return bits.length ? ` · ${bits.join(' and ')} on top` : '';
+}
+
 export function blueprintPlan(s: GameState): BlueprintPlan {
   const marks: BpMark[] = [], outlines: BpOutline[] = [];
   let towerNo = 0;
@@ -115,6 +125,8 @@ export function blueprintPlan(s: GameState): BlueprintPlan {
   const rings = yardRings(s).sort((a, b) => area(b.pts) - area(a.pts));
   const ringIds = new Map(rings.map((r, i) => [r.id, i + 1]));
   let gates = 0;
+  // which ring's gate checks visitors (sim/gateVetting.ts: the outer gate, the inner one, both or neither)
+  const vetting = gatesUsed(s, s.gate.vet ?? 'none');
   for (const r of s.perimeter) {
     const d = PERIMETER[r.kind];
     if (d.wallTop || r.pts.length < 2) continue;
@@ -125,13 +137,17 @@ export function blueprintPlan(s: GameState): BlueprintPlan {
       const name = TUNNEL_NAME[r.kind] ?? d.name;
       outlines.push({ id: r.id, cat: d.span ? 'bridge' : 'tunnel', pts: r.pts, closed: false, under: !d.span });
       const mid = along(r.pts, wallLength(r) / 2);
-      marks.push({ id: r.id, cat: d.span ? 'bridge' : 'tunnel', x: mid[0], z: mid[1], label: name, sub: !fin ? 'being built' : r.dropped ? 'dropped' : d.vehicleWay ? 'vehicles and people' : d.egressOnly ? 'way out only' : 'people', prio: PRIO.tunnel, lift: 1.4 });
+      // a tunnel with a door (a tunnel-bridge, a slope tunnel, a rock bore): the tier and how long it typically holds (sim/doorBreach.ts)
+      const doored = r.kind === 'tunnel_bridge' || r.kind === 'slope_tunnel' || r.kind === 'rock_tunnel';
+      const hold = doored ? holdSeconds(doorTierOf(r.kind, !!d.bore)) : null;
+      const doorWords = hold ? `${r.kind === 'rock_tunnel' ? 'blast' : 'steel'} door holds ${Math.round(hold.hand)} s by hand, ${Math.round(hold.ram)} s to a ram` : '';
+      marks.push({ id: r.id, cat: d.span ? 'bridge' : 'tunnel', x: mid[0], z: mid[1], label: name, sub: !fin ? 'being built' : r.dropped ? 'dropped' : doorWords ? `${d.vehicleWay ? 'vehicles and people' : 'people'} · ${doorWords}` : d.vehicleWay ? 'vehicles and people' : d.egressOnly ? 'way out only' : 'people', prio: PRIO.tunnel, lift: 1.4 });
       continue;
     }
     if (ringNo) {
       outlines.push({ id: r.id, cat: 'ring', pts: r.pts, closed: true });
       const top = r.pts.reduce((a, p) => (p[1] < a[1] ? p : a), r.pts[0]);
-      marks.push({ id: r.id, cat: 'ring', x: top[0], z: top[1], label: `${ringNo === 1 ? 'Outer' : 'Inner'} ring wall ${ringNo}`, sub: `${d.name.toLowerCase()} · stops ${Math.round(d.blocks.people * 100)}% of a crew`, prio: PRIO.ring, lift: 1.1 });
+      marks.push({ id: r.id, cat: 'ring', x: top[0], z: top[1], label: `${ringNo === 1 ? 'Outer' : 'Inner'} ring wall ${ringNo}`, sub: `${d.name.toLowerCase()} · stops ${Math.round(d.blocks.people * 100)}% of a crew${topWords(s, r)}`, prio: PRIO.ring, lift: 1.1 });
     } else if (d.blocks.people >= 0.3) {
       outlines.push({ id: r.id, cat: 'wall', pts: r.pts, closed: false });
       const mid = along(r.pts, wallLength(r) / 2);
@@ -140,7 +156,8 @@ export function blueprintPlan(s: GameState): BlueprintPlan {
     if (fin) for (const [i, g] of r.gates.entries()) {
       const p = along(r.pts, g.at);
       gates++;
-      marks.push({ id: `${r.id}:g${i}`, cat: 'gate', x: p[0], z: p[1], label: g.sally ? 'Sally port' : g.garage ? 'Gate garage' : 'Gate', sub: g.sally ? `defenders sortie · ${lengthText(Math.round(SALLY.W * 6 * 10) / 10)}` : `${lengthText(g.w * 6)} wide`, prio: PRIO.gate, lift: 1.1 });
+      const checks = !g.sally && ringNo !== undefined && ((ringNo === 1 && vetting.includes('outer')) || (ringNo === rings.length && rings.length >= 2 && vetting.includes('inner')));
+      marks.push({ id: `${r.id}:g${i}`, cat: 'gate', x: p[0], z: p[1], label: g.sally ? 'Sally port' : g.garage ? 'Gate garage' : 'Gate', sub: g.sally ? `defenders sortie · ${lengthText(Math.round(SALLY.W * 6 * 10) / 10)}` : `${lengthText(g.w * 6)} wide${checks ? ' · visitors checked here' : ''}`, prio: PRIO.gate, lift: 1.1 });
     }
   }
 

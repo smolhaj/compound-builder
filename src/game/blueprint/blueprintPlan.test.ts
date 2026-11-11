@@ -37,6 +37,39 @@ describe('blueprint plan', () => {
   });
 });
 
+describe('blueprint wall tops and doors', () => {
+  it('a ring wall says what crowns it, and a doored tunnel says how long its door holds', () => {
+    const g = newGame(3);
+    const pts: Pt[] = [[4, 4], [20, 4], [20, 20], [4, 20], [4, 4]];
+    const r = ring(g, 'stone_wall', pts);
+    expect(blueprintPlan(g).marks.find(m => m.id === r.id)?.sub).not.toMatch(/on top/);
+    r.razor = true;
+    expect(blueprintPlan(g).marks.find(m => m.id === r.id)?.sub).toMatch(/razor coils on top/);
+    const deck = planRun(g, 'wall_walk', pts); deck.hostId = r.id; deck.done = deck.hours; deck.supplied = true; deck.finishedAt = 0; g.perimeter.push(deck);
+    expect(blueprintPlan(g).marks.find(m => m.id === r.id)?.sub).toMatch(/patrol deck and razor coils on top/);
+    expect(blueprintPlan(g).marks.find(m => /^Gate/.test(m.label))).toBeUndefined();   // (no gate on this ring)
+    const tb = planRun(g, 'tunnel_bridge', [[30, 4], [30, 16]]); tb.done = tb.hours; tb.supplied = true; tb.finishedAt = 0; g.perimeter.push(tb);
+    expect(blueprintPlan(g).marks.find(m => m.id === tb.id)?.sub).toMatch(/steel door holds \d+ s by hand, \d+ s to a ram/);
+  });
+});
+
+describe('blueprint gates', () => {
+  it('says which ring gate checks visitors under the vetting policy', () => {
+    const g = newGame(3);
+    const outer: Pt[] = [[2, 2], [30, 2], [30, 30], [2, 30], [2, 2]], inner: Pt[] = [[10, 10], [22, 10], [22, 22], [10, 22], [10, 10]];
+    const a = ring(g, 'stone_wall', outer, [{ at: 6, w: 0.6 }]), b = ring(g, 'stone_wall', inner, [{ at: 4, w: 0.6 }]);
+    g.structures.push(st('h', 'timber_cabin', 16, 16));
+    const sub = (id: string) => blueprintPlan(g).marks.find(m => m.id === `${id}:g0`)?.sub ?? '';
+    g.gate.vet = 'none';
+    expect(sub(a.id)).not.toMatch(/checked/);
+    g.gate.vet = 'both';
+    const subs = [sub(a.id), sub(b.id)];
+    expect(subs.filter(x => /visitors checked here/.test(x)).length).toBe(2);
+    g.gate.vet = 'outer';
+    expect(blueprintPlan(g).marks.filter(m => m.cat === 'gate' && /checked/.test(m.sub ?? '')).length).toBe(1);
+  });
+});
+
 describe('declutter', () => {
   it('keeps the higher priority of two crowded labels and drops one that sits on it', () => {
     const out = declutter([
