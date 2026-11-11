@@ -70,7 +70,7 @@ export interface BpReadout {
 export interface BlueprintPlan { marks: BpMark[]; outlines: BpOutline[]; readout: BpReadout }
 
 const CAT_OF: Record<string, MarkCat> = { home: 'home', work: 'work', food: 'food', sanitation: 'work', water: 'water', power: 'power', bunker: 'bunker', defense: 'tower' };
-const PRIO: Record<MarkCat, number> = { home: 8, tower: 7, gate: 9, ring: 6, tunnel: 8, bridge: 8, bunker: 5, work: 5, food: 4, water: 3, power: 3, wall: 1 };
+const PRIO: Record<MarkCat, number> = { home: 8, tower: 7, gate: 9, ring: 8, tunnel: 8, bridge: 8, bunker: 5, work: 5, food: 4, water: 3, power: 3, wall: 1 };
 
 const corners = (b: { x0: number; z0: number; x1: number; z1: number }): Pt[] => [[b.x0, b.z0], [b.x1, b.z0], [b.x1, b.z1], [b.x0, b.z1]];
 
@@ -146,7 +146,9 @@ export function blueprintPlan(s: GameState): BlueprintPlan {
     }
     if (ringNo) {
       outlines.push({ id: r.id, cat: 'ring', pts: r.pts, closed: true });
-      const top = r.pts.reduce((a, p) => (p[1] < a[1] ? p : a), r.pts[0]);
+      // label the middle of the ring's longest side (the corners are where the towers' labels stand)
+      let top: Pt = r.pts[0], bestLen = -1;
+      for (let i = 1; i < r.pts.length; i++) { const l = Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]); if (l > bestLen) { bestLen = l; top = [(r.pts[i][0] + r.pts[i - 1][0]) / 2, (r.pts[i][1] + r.pts[i - 1][1]) / 2]; } }
       marks.push({ id: r.id, cat: 'ring', x: top[0], z: top[1], label: `${ringNo === 1 ? 'Outer' : 'Inner'} ring wall ${ringNo}`, sub: `${d.name.toLowerCase()} · stops ${Math.round(d.blocks.people * 100)}% of a crew${topWords(s, r)}`, prio: PRIO.ring, lift: 1.1 });
     } else if (d.blocks.people >= 0.3) {
       outlines.push({ id: r.id, cat: 'wall', pts: r.pts, closed: false });
