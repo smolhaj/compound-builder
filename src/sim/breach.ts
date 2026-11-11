@@ -87,6 +87,7 @@ export function breachMethod(units: readonly Pick<BattleUnit, 'side' | 'look'>[]
 
 /** Add the break to a battle that has a sim `breach` event. Returns the battle untouched when there is nothing to show (no breach, no wall near it). */
 export function decorateBreach(b: Battle, runs: readonly PerimeterRun[], home: { x: number; z: number }, seed: number, carriesCharges = false, dir: LineDirector = new LineDirector(seed)): Battle {
+  dir.noteUnits(b.units);
   const br = b.events.find(e => e.kind === 'breach') as Extract<BattleEvent, { kind: 'breach' }> | undefined;
   if (!br || b.invasion) { breachOptions.note = br ? 'already decorated' : 'no breach event'; return b; }
   // a battle made by the sim of save v87 or later says HOW the wall fell and WHERE (the drawn wall segment or gate), and already carries the truck / charge / gap

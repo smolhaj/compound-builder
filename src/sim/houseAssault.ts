@@ -153,6 +153,7 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
   const inv0 = b.invasion ?? (b.raid && (end?.result === 'breached' || end?.result === 'overrun') ? { method: 'climb' as const } : undefined);
   if (!br || !end || !inv0 || inv0.interior) return b;
   const r = mulberry32(ctx.seed * 6007 + 19), dir = ctx.dir ?? new LineDirector(ctx.seed);
+  dir.noteUnits(b.units);
   dir.noteAll(b);   // (what the scene already said counts as said)
   const tb = br.t, tI = tb + 9;
   const D = Math.max(32, ASSAULT_EXTRA - 6 + (end.t - (tb + 9)));

@@ -15,12 +15,13 @@
  *
  * Nothing here changes an outcome; it only changes words and who says them.
  */
-import type { Battle, BattleEvent } from './battleTypes';
+import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import type { RaiderTemper } from './battle';
 import type { CrewStyle } from './raiderKinds';
 import { mulberry32 } from './rng';
 import { INTERIOR_LINES, type InteriorCtx } from './raidLinesInterior';
 import { MOMENT_LINES, type MomentCtx } from './raidLinesMoments';
+import { PEOPLE_LINES } from './raidLinesPeople';
 
 export type Ctx = 'approach' | 'first_shots' | 'fight' | 'defender_hit' | 'mate_down' | 'raider_down' | 'retreat' | 'fire' | 'breach' | 'aftermath'
   | 'grief' | 'tend' | 'tended' | 'prisoner' | 'prisoner_reply' | 'looting' | 'held'
@@ -123,7 +124,7 @@ export const LINES: Record<Role, Partial<Record<Ctx, Variants>>> = {
 
 // the interior fight and the aftermath pools join the rest (a context both files define keeps both pools' keys)
 for (const role of ['raider', 'defender'] as const) {
-  for (const [ctx, pool] of [...Object.entries(INTERIOR_LINES[role]), ...Object.entries(MOMENT_LINES[role])]) {
+  for (const [ctx, pool] of [...Object.entries(INTERIOR_LINES[role]), ...Object.entries(MOMENT_LINES[role]), ...Object.entries(PEOPLE_LINES[role])]) {
     const have = (LINES[role] as Record<string, Variants | undefined>)[ctx] ?? {};
     const merged: Record<string, string[]> = {};
     for (const [k, v] of [...Object.entries(have), ...Object.entries(pool as Variants)]) merged[k] = [...new Set([...(merged[k] ?? []), ...(v ?? [])])];
@@ -150,7 +151,22 @@ const BREACH_RE = /(?:inside|through) the (?:fence|line|wall)|fall back to the (
 /** Lines tied to an event that the sim wrote on purpose (the wire, a dog, a grenade, a kid taken): never swapped, only deduplicated. */
 const EVENT_BOUND_RE = /wire|barb|thorn|spike|electrif|\bditch|\bice\b|\bdog|grenade|rpg|rocket|\bkid|\bmom\b|\bdad\b|tie his|can dig|hands where|noise|\bdoor|sheriff|911/i;
 
-const rolePool = (role: Role, ctx: Ctx): Variants | undefined => LINES[role][ctx];
+/** Who is speaking, for a defender: a child, an untrained adult or teenager, or someone with real training (service, police, a guard, a high shot). */
+export type Profile = 'vet' | 'civ' | 'kid';
+export function profileOfUnit(u: { civilian?: boolean; traits?: BattleUnit['traits'] } | undefined): Profile {
+  if (!u) return 'civ';
+  if (u.civilian) return 'kid';
+  const t = u.traits;
+  if (t && (t.veteran || t.experience >= 6 || t.history.some(h => h === 'veteran' || h === 'police' || h === 'guard'))) return 'vet';
+  return 'civ';
+}
+/** Tactical talk: what an untrained person never says (the user's list: covering fire, suppressing, flank, tango, breach, perimeter, and the like). */
+export const TACTICAL = /covering fire|cover fire|suppress|flank|tango|breach|perimeter|sector|contact|\bpie\b|slice|angle|funnel|stack|overwatch|fall ?back|rally|hold the (line|doorway|door|hall|room)|cover me|cover my|pinned|keep (their|his|her) heads? down|fire lane|move up|\bclear\b|watch the (left|right)|eyes on|on my count/i;
+/** Swearing: a scared adult may; a child, and a devout elder (who prays), never. */
+export const CURSE = /\b(fuck\w*|shit\w*|goddamn\w*|damn\w*|hell|son of a bitch|jesus christ)\b/i;
+const PROFILE_KEYS = ['vet', 'civ', 'kid', 'elder'];
+
+export const rolePool = (role: Role, ctx: Ctx): Variants | undefined => LINES[role][ctx];
 
 export class LineDirector {
   private readonly used = new Set<string>();
@@ -163,6 +179,9 @@ export class LineDirector {
   note(text: string, speaker?: string): void { this.used.add(text); RECENT.current.add(text); if (speaker) this.last.set(speaker, text); }
   /** Count the lines already in a battle as said (so the planners that add lines later never repeat them). */
   noteAll(b: Battle): void { for (const e of b.events) if (e.kind === 'say') this.note(e.text, e.who); }
+  private readonly units = new Map<string, BattleUnit>();
+  /** Tell the director who is who (a battle's units), so a defender's line is chosen for the person: a child, an untrained adult, a veteran. */
+  noteUnits(us: readonly BattleUnit[]): void { for (const u of us) this.units.set(u.id, u); }
   /**
    * A line for the moment: the crew's own variant first (and the temper's, for a prisoner), then the common ones; never the speaker's last line;
    * unused ones first, and only when every line of the pool has been used does it start over (still never the same line back to back).
@@ -171,8 +190,19 @@ export class LineDirector {
     const pool = rolePool(role, ctx);
     if (!pool) return null;
     const vs = o.variants ?? [];
-    const mine = vs.flatMap(v => pool[v] ?? []);
-    const all = [...new Set([...mine, ...(pool.any ?? []), ...(vs.length ? [] : Object.values(pool).flatMap(x => x ?? []))])];
+    let mine = vs.flatMap(v => pool[v] ?? []);
+    let base = [...(pool.any ?? []), ...(vs.length ? [] : Object.entries(pool).filter(([k]) => !PROFILE_KEYS.includes(k)).flatMap(([, x]) => x ?? []))];
+    // a defender speaks as who they are (an untrained adult or a child never gives tactical orders; a veteran keeps it short and plain)
+    if (role === 'defender') {
+      const prof = profileOfUnit(o.speaker ? this.units.get(o.speaker) : undefined), own = pool[prof] ?? [];
+      const elder = prof === 'civ' && !!(o.speaker && this.units.get(o.speaker)?.traits?.history.includes('elder'));
+      if (prof === 'vet') mine = [...mine, ...own];
+      else if (prof === 'civ') {
+        base = base.filter(t => !TACTICAL.test(t)); mine = [...mine.filter(t => !TACTICAL.test(t)), ...own];
+        if (elder) { base = base.filter(t => !CURSE.test(t)); mine = [...mine.filter(t => !CURSE.test(t)), ...(pool.elder ?? [])]; }   // (an old, devout person prays)
+      } else { base = []; mine = [...mine.filter(t => !TACTICAL.test(t) && !CURSE.test(t)), ...own]; }
+    }
+    const all = [...new Set([...mine, ...base])];
     const vars = o.vars ?? {};
     const sub = (t: string) => t.replace(/\{(\w+)\}/g, (_m, k: string) => vars[k] ?? (k === 'n' ? 'them' : k === 'item' ? 'supplies' : k));
     const need = (t: string) => [...t.matchAll(/\{(\w+)\}/g)].every(m => !!vars[m[1]]);
@@ -259,6 +289,7 @@ export function voiceCutscene(battles: readonly Battle[], o: VoiceOpts): Battle[
   const from = o.from ?? 0;
   const out: Battle[] = [];
   battles.forEach((b, i) => {
+    dir.noteUnits(b.units);
     if (i < from) {
       for (const e of b.events) if (e.kind === 'say') dir.note(e.text, e.who);
       out.push(b); return;
