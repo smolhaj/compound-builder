@@ -137,7 +137,7 @@ try {
       const C = { x: homes.reduce((s, u) => s + u.x, 0) / Math.max(1, homes.length), z: homes.reduce((s, u) => s + u.z, 0) / Math.max(1, homes.length) };
       const up = acts.filter(u => !u.dead && !u.gone && u.y > 0.12 && u.post !== 'tower' && u.post !== 'building').sort((a, c2) => c2.y - a.y);
       const kick = ev.find(e => e.kind === 'house_door' && e.action === 'kick' && e.ok), clear = ev.find(e => e.kind === 'say' && e.ctx === 'room_clear'), stack = ev.find(e => e.kind === 'say' && e.ctx === 'stack_door');
-      const sh = cb.player._dir?.shot; const dd = b.battle?.invasion?.house?.door; const near = dd ? [...b._units.values()].filter(u => !u.dead && !u.gone && Math.hypot(u.x - dd.x, u.z - dd.z) < 3.5).map(u => ({ id: u.id, s: u.def.side, dx: +(u.x - dd.x).toFixed(2), dz: +(u.z - dd.z).toFixed(2), y: +u.y.toFixed(2), hid: !!u.hidden })) : []; return { near, dbg: sh ? { eye: sh.eye, look: sh.look, fov: sh.fov, kind: sh.kind, hold: sh.hold, since: sh.since } : null, doors: cb.player._doors, win: b.battle?.invasion?.interior, door: b.battle?.invasion?.house?.door, phase: c?.phase, offer: c?.offer ?? null, bt: +b.time.toFixed(2), C, raiderUp: up.find(u => u.side === 'raider') ?? null, kickT: kick?.t ?? null, clearT: clear?.t ?? null, stackT: stack?.t ?? null, caption: b.lines?.slice(-1)[0]?.text ?? '' };
+      const sh = cb.player._dir?.shot; const dd = b.battle?.invasion?.house?.door; const allR = dd ? [...b._units.entries()].filter(([, u]) => u.def.side === 'raider').map(([id, u]) => id + ':' + (+(u.x - dd.x).toFixed(1)) + ',' + (+(u.z - dd.z).toFixed(1)) + (u.dead ? 'D' : '') + (u.gone ? 'G' : '') + (u.hidden ? 'H' : '')) : []; const near = dd ? [...b._units.values()].filter(u => !u.dead && !u.gone && Math.hypot(u.x - dd.x, u.z - dd.z) < 3.5).map(u => ({ id: u.id, s: u.def.side, dx: +(u.x - dd.x).toFixed(2), dz: +(u.z - dd.z).toFixed(2), y: +u.y.toFixed(2), hid: !!u.hidden })) : []; return { allR, near, dbg: sh ? { eye: sh.eye, look: sh.look, fov: sh.fov, kind: sh.kind, hold: sh.hold, since: sh.since } : null, doors: cb.player._doors, win: b.battle?.invasion?.interior, door: b.battle?.invasion?.house?.door, phase: c?.phase, offer: c?.offer ?? null, bt: +b.time.toFixed(2), C, raiderUp: up.find(u => u.side === 'raider') ?? null, kickT: kick?.t ?? null, clearT: clear?.t ?? null, stackT: stack?.t ?? null, caption: b.lines?.slice(-1)[0]?.text ?? '' };
     }, [FPS]);
     p++;
     if (st.offer != null) await page.evaluate(() => window.__cb.game.getState().midStance(null));
@@ -166,7 +166,7 @@ try {
     const shot = await globalThis.__cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 88 });
     const file = `${tag}_${String(shots).padStart(2, '0')}.jpg`;
     writeFileSync(`${outDir}/${file}`, Buffer.from(shot.data, 'base64'));
-    shotLog.push({ tag, file, bt: st.bt, caption: st.caption, dbg: tag === 'kick' ? { near: st.near, dbg: st.dbg, doors: st.doors, win: st.win, door: st.door } : undefined });
+    shotLog.push({ tag, file, bt: st.bt, caption: st.caption, ru: tag === 'raider' ? st.raiderUp : undefined, dbg: tag === 'kick' || tag === 'stack' || tag === 'clear' ? { allR: st.allR, near: st.near, dbg: st.dbg, doors: st.doors, win: st.win, door: st.door } : undefined });
     shots++;
   }
   writeFileSync(`${outDir}/shots.json`, JSON.stringify(shotLog, null, 1));
