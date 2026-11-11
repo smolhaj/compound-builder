@@ -24,12 +24,12 @@ export function interiorShot(meta: InvasionMeta | undefined, t: number, ground: 
     const px = -oz, pz = ox, since = beat.t - 3.4;
     const tries0: V3[] = [];
     for (let attempt = 0; attempt < 4; attempt++) {
-      const out = 0.95 + attempt * 0.35, side = (attempt % 2 ? -1 : 1) * 0.55;
+      const out = 1.55 + attempt * 0.35, side = (attempt % 2 ? -1 : 1) * 0.75;
       const x = beat.x + ox * out + px * side, z = beat.z + oz * out + pz * side;
-      tries0.push({ x, y: ground(x, z) + 0.85 + attempt * 0.2, z });
+      tries0.push({ x, y: ground(x, z) + 1.05 + attempt * 0.2, z });
     }
     const eye0 = tries0.find(p => !boxes.some(b => nearBox(p, b, ground, 0.3))) ?? tries0[tries0.length - 1];
-    return { kind: 'house', eye: eye0, look: { x: beat.x - ox * 0.25, y: ground(beat.x, beat.z) + 0.16, z: beat.z - oz * 0.25 }, fov: 32, since, hold: 5.6, drift: { x: 0.01 * px, y: 0, z: 0.01 * pz } };
+    return { kind: 'house', eye: eye0, look: { x: beat.x + ox * 0.3, y: ground(beat.x, beat.z) + 0.1, z: beat.z + oz * 0.3 }, fov: 40, since, hold: 5.6, drift: { x: 0.01 * px, y: 0, z: 0.01 * pz } };
   }
   const k = Math.floor((t - win.from) / HOLD);
   const since = win.from + k * HOLD;
