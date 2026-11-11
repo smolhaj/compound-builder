@@ -225,6 +225,8 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
     const stop = Math.max(0, Math.min(dl - 3.2, dl * 0.8, 3.5));
     const to = { x: r2(vp.x + dx / dl * stop), z: r2(vp.z + dz / dl * stop) };
     diggers = order.filter(m => !m.civilian && !carriers.includes(m)).slice(0, 2);
+    const shared = !diggers.length;   // (nobody else free: the two who will carry dig first, then go back for the fallen)
+    if (shared) diggers = [...carriers];
     const gc = graveCaptions(victim.name, diggers.map(firstOf));
     if (diggers.length) {
       grave = to;
@@ -236,6 +238,10 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
       events.push({ t: r2(t1 + 0.2), kind: 'beat', role: 'vigil', unit: diggers[0].id, with: diggers.slice(1).map(d => d.id) });
       caption(t1 + 0.4, gc.dig);
       end = t1 + 5.6;
+      if (shared) {
+        carriers.forEach((c, i) => events.push({ t: r2(end), kind: 'move', unit: c.id, x: r2(vp.x + 0.12 + i * 0.12), z: r2(vp.z + 0.12), walk: true }));
+        end += dist(to, vp) / WALK + 0.8;
+      }
     }
     caption(end, grave ? gc.carry : `They carry ${victim.name} to the house.`);
     events.push({ t: r2(end), kind: 'beat', role: 'carry', unit: carriers[0].id, with: carriers.slice(1).map(c => c.id) });
