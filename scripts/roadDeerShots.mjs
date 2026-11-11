@@ -27,7 +27,9 @@ for (let i = 0; i < 14; i++) { await page.evaluate(() => window.__cb.qa.renderNo
 const shot = async name => { for (let i = 0; i < 2; i++) { await page.evaluate(() => window.__cb.qa.renderFull('medium')); await page.waitForTimeout(250); } await page.screenshot({ path: `${outDir}/${name}.png` }); console.error('shot', name); };
 const step = (n, dt = 0.1) => page.evaluate(([n, dt]) => { const { world, game } = window.__cb; const g = game.getState().game; let held = 0, on = 0, minGap = 99; for (let i = 0; i < n; i++) { world.updateWildlife(dt, g, 1); world.updateRoadLife(dt, g, 1); held = Math.max(held, world.roadLife.held); on = Math.max(on, world.wildlife.roadCrossers().length); } return { held, on, live: world.roadLife._live.map(l => ({ z: +l.z.toFixed(2), v: +l.speed.toFixed(2) })), animals: world.wildlife.animals().filter(a => a.id.startsWith('road:')).map(a => ({ x: +a.x.toFixed(2), z: +a.z.toFixed(2), vis: +a.vis.toFixed(2) })) }; }, [n, dt]);
 const gz0 = await page.evaluate(() => window.__cb.world.access.drive[0][1]);
-const gz = gz0; console.error('gate z', gz);
+// a stretch of road clear of the county road's bridges (the crossing is on the ground, not on a deck)
+const gz = await page.evaluate(g0 => { const w = window.__cb.world; for (const off of [0, 10, -10, 20, -20, 30, -30, 45, -45, 60, -60]) { const z = g0 + off; if (!w.countyGaps.some(g => z > g.z0 - 14 && z < g.z1 + 14)) return z; } return g0 + 60; }, gz0);
+console.error('gate z', gz0, 'crossing z', gz);
 await step(3);
 // a southbound car comes down the road toward the crossing; the animals cross just south of the camera
 await page.evaluate(([gz, sp]) => { const { world } = window.__cb; world.roadLife.qaDrive('pickup', gz + 12, -1, 1.4); world.wildlife.qaCross(sp, 3, gz, 1); }, [gz, sp]);
@@ -37,9 +39,9 @@ for (let i = 0; i < 40; i++) {
   console.error(i, JSON.stringify({ on: r.on, live: r.live, n: r.animals.length }));
   if (r.on > 0 && r.live.some(l => l.v < 0.15 && Math.abs(l.z - gz) < 9) && !seen) {
     seen = r;
-    await page.evaluate(gz => { const { world, cam } = window.__cb, x = world.county.x(gz); world.qaFigure(x + 1.1, gz - 2.2); cam.placeEye(x + 0.9, gz - 5, x, gz + 4, 0.34); }, gz);
+    await page.evaluate(gz => { const { world, cam } = window.__cb, x = world.county.x(gz); world.qaFigure(x - 1.2, gz - 3.4); cam.placeEye(x - 1.7, gz - 5.5, x + 0.2, gz + 2, 0.34); }, gz);
     await shot('3-crossing-eye-traffic-stopped');
-    await page.evaluate(gz => { const { world, cam } = window.__cb, x = world.county.x(gz); cam.target.set(x, world.groundAt(x, gz) + 0.1, gz); cam.radius = 9; cam.pitch = 0.6; cam.yaw = 1.0; }, gz);
+    await page.evaluate(gz => { const { world, cam } = window.__cb, x = world.county.x(gz); cam.target.set(x, world.groundAt(x, gz) + 0.1, gz); cam.radius = 6; cam.pitch = 0.55; cam.yaw = 1.2; }, gz);
     await shot('3b-crossing-aerial-traffic-stopped');
     break;
   }
