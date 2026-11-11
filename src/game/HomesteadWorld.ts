@@ -53,7 +53,7 @@ import type { DogCtx } from './people/dogGoals';
 import { WildlifeRenderer } from './wildlife/WildlifeRenderer';
 import { log } from '../sim/economy';
 import { livingDogs, ageYears } from '../sim/pets';
-import { dayIndex } from '../sim/state';
+import { dayIndex, hourOf } from '../sim/state';
 import { GuardPostProp } from './people/GuardPostProp';
 import { innerPost } from './people/guardPost';
 import { postSpot } from './people/dogGoals';
@@ -117,6 +117,8 @@ import { deckY, onGap, type CountyGap } from '../sim/countyCrossings';
 import { countyGapsFor, roadPlanFor } from '../sim/roadState';
 import { pinSeed } from '../sim/lotSeed';
 import { PlowRun } from './fx/PlowRun';
+import { plowRig } from '../sim/plowing';
+import { roadClosedFor } from '../sim/slope';
 import { roadBedOf, type RoadPlan } from '../sim/roadPlan';
 import { buildRibbon } from '../engine/world/roads/RoadRibbon';
 import { gravelMaterial, roadMaterial } from '../engine/world/roads/roadTextures';
@@ -581,7 +583,11 @@ export class HomesteadWorld {
     this.truck.update(dt, speedK);
     // the lake skins over and freezes when the sim says so (sim/waterfront lakeIce), not by the calendar alone
     this.lakes.setIce(waterBody(game) ? ICE_COVER[lakeIce(game)] : -1, dt);
-    this.plow.update(dt, this._drive && game.stock.plow >= 1, seasonState.params.snow, speedK);
+    {
+      // the blade rides on a real vehicle of the fleet (sim/plowing); the drifts follow the sim's closure clock
+      const rig = this._drive && game.stock.plow >= 1 ? plowRig(game) : null;
+      this.plow.update(dt, { rig: rig ? rig.kind : null, snow: seasonState.params.snow, closed: roadClosedFor(game), day: dayIndex(game.clock.t), hour: hourOf(game.clock.t), speedK });
+    }
     this._syncGateHouse(game.stock.gate_house >= 1);
     this._syncGuardCars(parkedCars(game), dt);
     // deliveries left at the road (no drive yet), by the gate
@@ -2263,6 +2269,7 @@ export class HomesteadWorld {
   /** Life on the county road: ambient traffic by the collapse clock, and the parties that are real encounters on their way (game/RoadTraffic.ts). */
   updateRoadLife(dt: number, game: GameState, speedK: number): void {
     this.roadLife.setGate(this._truckRoute()[0][1]);
+    this.roadLife.setCrossers(this.wildlife.roadCrossers());     // deer and turkeys on the road: the traffic stops for them
     this.roadLife.update(dt, game, speedK, { x: this._ws.camera.position.x, z: this._ws.camera.position.z }, Math.max(0, Math.min(1, (1 - this.air.daylight) / 0.85)));
   }
 
@@ -2279,6 +2286,7 @@ export class HomesteadWorld {
       threats,
       bridges: this._wildBridges(),
       bridgesOpen: !(this.doorLock ?? locksNow(game)),
+      road: { x: this.county.x, y: (x, z) => (Math.abs(x - this.county.x(z)) < ROAD_W / 2 + 0.3 ? this.countyY(x, z) : this.groundAt(x, z)), halfW: ROAD_W / 2, gateZ: this._truckRoute()[0][1] },
       cam: { x: this._ws.camera.position.x, z: this._ws.camera.position.z },
     }, speedK);
   }
