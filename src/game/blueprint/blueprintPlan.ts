@@ -14,7 +14,7 @@ import { terrainDefense } from '../../sim/terrainFx';
 import { fogNow } from '../../sim/fogFx';
 import { sensorSightM, fogReadout } from '../../sim/fog';
 import { SALLY } from '../../sim/rings';
-import { doorTierOf, holdSeconds } from '../../sim/doorBreach';
+import { DOOR, doorTierOf, holdSeconds } from '../../sim/doorBreach';
 import { gatesUsed } from '../../sim/gateVetting';
 import type { GameState } from '../../sim/state';
 import { lengthText } from '../../sim/units';
@@ -140,7 +140,8 @@ export function blueprintPlan(s: GameState): BlueprintPlan {
       // a tunnel with a door (a tunnel-bridge, a slope tunnel, a rock bore): the tier and how long it typically holds (sim/doorBreach.ts)
       const doored = r.kind === 'tunnel_bridge' || r.kind === 'slope_tunnel' || r.kind === 'rock_tunnel';
       const hold = doored ? holdSeconds(doorTierOf(r.kind, !!d.bore)) : null;
-      const doorWords = hold ? `${r.kind === 'rock_tunnel' ? 'blast' : 'steel'} door holds ${Math.round(hold.hand)} s by hand, ${Math.round(hold.ram)} s to a ram` : '';
+      const sec = (x: number) => x > DOOR.GIVE_UP ? 'longer than a crew stays' : `${Math.round(x)} s`;   // (a crew gives up after DOOR.GIVE_UP seconds)
+      const doorWords = hold ? `${r.kind === 'rock_tunnel' ? 'blast' : 'steel'} door: by hand ${sec(hold.hand)}, a ram ${sec(hold.ram)}` : '';
       marks.push({ id: r.id, cat: d.span ? 'bridge' : 'tunnel', x: mid[0], z: mid[1], label: name, sub: !fin ? 'being built' : r.dropped ? 'dropped' : doorWords ? `${d.vehicleWay ? 'vehicles and people' : 'people'} · ${doorWords}` : d.vehicleWay ? 'vehicles and people' : d.egressOnly ? 'way out only' : 'people', prio: PRIO.tunnel, lift: 1.4 });
       continue;
     }

@@ -49,7 +49,7 @@ describe('blueprint wall tops and doors', () => {
     expect(blueprintPlan(g).marks.find(m => m.id === r.id)?.sub).toMatch(/patrol deck and razor coils on top/);
     expect(blueprintPlan(g).marks.find(m => /^Gate/.test(m.label))).toBeUndefined();   // (no gate on this ring)
     const tb = planRun(g, 'tunnel_bridge', [[30, 4], [30, 16]]); tb.done = tb.hours; tb.supplied = true; tb.finishedAt = 0; g.perimeter.push(tb);
-    expect(blueprintPlan(g).marks.find(m => m.id === tb.id)?.sub).toMatch(/steel door holds \d+ s by hand, \d+ s to a ram/);
+    expect(blueprintPlan(g).marks.find(m => m.id === tb.id)?.sub).toMatch(/steel door: by hand \d+ s, a ram \d+ s/);
   });
 });
 
