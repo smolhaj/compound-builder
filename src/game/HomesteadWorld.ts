@@ -2269,7 +2269,9 @@ export class HomesteadWorld {
   /** Life on the county road: ambient traffic by the collapse clock, and the parties that are real encounters on their way (game/RoadTraffic.ts). */
   updateRoadLife(dt: number, game: GameState, speedK: number): void {
     this.roadLife.setGate(this._truckRoute()[0][1]);
-    this.roadLife.setCrossers(this.wildlife.roadCrossers());     // deer and turkeys on the road: the traffic stops for them
+    const crossers = this.wildlife.roadCrossers();
+    this.roadLife.setCrossers(crossers);
+    this.truck.setCrossers(crossers);     // deer and turkeys on the road: the traffic stops for them
     this.roadLife.update(dt, game, speedK, { x: this._ws.camera.position.x, z: this._ws.camera.position.z }, Math.max(0, Math.min(1, (1 - this.air.daylight) / 0.85)));
   }
 
