@@ -214,7 +214,6 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
     if (other) sayLine(mt + 2.2, 'defender', 'grief', other.id, [kinOf(other).as === 'kid' ? 'kid' : 'any']);
   }
   let end = mt + 3.6;
-  let carryAt = -1;
   // 4. the grave: two dig it (shovels in their hands, the pit opening in the ground), two carry the fallen to it, lay them in, and the diggers fill it in and
   // set a marker. Every caption below is for something drawn when it shows; with nobody free to dig, the fallen is carried to the house instead.
   const firstOf = (u: BattleUnit) => inp.after.people.find(p => p.id === u.personId)?.first ?? 'Someone';
@@ -229,12 +228,13 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
     if (shared) diggers = [...carriers];
     const gc = graveCaptions(victim.name, diggers.map(firstOf));
     if (diggers.length) {
-      grave = to;
+      grave = { x: r2(to.x + dx / dl * 0.1), z: r2(to.z + dz / dl * 0.1) };   // (the pit is where the body is set down: a hand ahead of the carrier)
       const walkT = Math.max(...diggers.map(d => dist(unitAt(b, d.id, W0), to))) / WALK + 0.8;
-      diggers.forEach((d, i) => events.push({ t: r2(end), kind: 'move', unit: d.id, x: r2(to.x + (i ? 0.17 : -0.17)), z: r2(to.z + 0.13), walk: true }));
+      const G0 = grave;
+      diggers.forEach((d, i) => events.push({ t: r2(end), kind: 'move', unit: d.id, x: r2(G0.x + (i ? 0.17 : -0.17)), z: r2(G0.z + 0.13), walk: true }));
       const t1 = end + walkT;
-      diggers.forEach(d => events.push({ t: r2(t1), kind: 'tool', unit: d.id, what: 'shovel', secs: 6.6 }));
-      events.push({ t: r2(t1), kind: 'grave', x: to.x, z: to.z, stage: 'dig', secs: 6.2 });
+      diggers.forEach(d => events.push({ t: r2(t1), kind: 'tool', unit: d.id, what: 'shovel', secs: 5.4 }));
+      events.push({ t: r2(t1), kind: 'grave', x: G0.x, z: G0.z, stage: 'dig', secs: 5 });
       events.push({ t: r2(t1 + 0.2), kind: 'beat', role: 'vigil', unit: diggers[0].id, with: diggers.slice(1).map(d => d.id) });
       caption(t1 + 0.4, gc.dig);
       end = t1 + 5.6;
@@ -248,11 +248,9 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
     events.push({ t: r2(end + 0.4), kind: 'lift', unit: victim.unit, by: carriers[0].id });
     carriers.forEach((c, i) => events.push({ t: r2(end + 0.5), kind: 'move', unit: c.id, x: r2(to.x + i * 0.12), z: to.z, walk: true }));
     for (const m of order.filter(x => !carriers.includes(x) && !diggers.includes(x))) events.push({ t: r2(end + 1.5), kind: 'move', unit: m.id, x: r2(to.x - dx / dl * 0.6), z: r2(to.z - dz / dl * 0.6), walk: true });
-    const carryStart = end;
     end += 0.6 + stop / WALK;
     events.push({ t: r2(end), kind: 'lower', unit: victim.unit });
     end += 1;
-    carryAt = carryStart + 1.5;
     if (grave) {
       events.push({ t: r2(end), kind: 'grave', x: grave.x, z: grave.z, stage: 'lower', secs: 1 });
       events.push({ t: r2(end + 0.1), kind: 'beat', role: 'vigil', unit: victim.unit, with: [...carriers, ...diggers].map(c => c.id) });
@@ -274,7 +272,7 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
     if (raider && guards.length) {
       const rp = unitAt(b, raider, W0);
       if (!b.events.some(e => e.kind === 'lay' && e.unit === raider)) events.push({ t: r2(W0 + 0.3), kind: 'lay', unit: raider });
-      const t1 = carryAt > 0 ? carryAt : end;
+      const t1 = end;   // (after the burial: the family does not leave a grave half dug to question a prisoner)
       caption(t1, 'One of them was left on the drive, alive. Two of the family walk out to him, rifles up.');
       events.push({ t: r2(Math.max(end, t1 + 4)), kind: 'beat', role: 'prisoner', unit: raider, with: guards.map(g => g.id) });
       let ar = t1;
