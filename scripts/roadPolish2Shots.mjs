@@ -23,7 +23,7 @@ page.setDefaultTimeout(900000);
 page.on('pageerror', e => console.error('PAGEERROR', e.message));
 await page.goto(`http://localhost:${port}/?lowrender=0.75&clean&seed=7&${LOT}&showcase=mountain`);
 await page.waitForFunction(() => window.__cb?.qa?.renderNow && window.__showcase, null, { timeout: 900000 });
-const look = (season, tod = 10) => page.evaluate(([season, tod]) => { const { game, store } = window.__cb; game.getState().setSpeed(0); store.getState().setQuality('low'); store.getState().setTimeOfDay(tod); store.getState().setWeatherMode('clear'); store.getState().setSeasonMode(season); }, [season, tod]);
+const look = (season, tod = 10) => page.evaluate(([season, tod]) => { const { game, store } = window.__cb; game.getState().setSpeed(0); store.getState().setQuality('low'); store.getState().setTimeOfDay(tod); store.getState().setWeatherMode('clear'); store.getState().setSeasonMode(season); store.getState().setDayOfYear(season === 'winter' ? 20 : 200); }, [season, tod]);
 await look('summer');
 for (let i = 0; i < 14; i++) { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(120); }
 const frames = async () => { await page.evaluate(q => window.__cb.qa.renderFull(q), q); await page.waitForTimeout(250); };
@@ -47,7 +47,8 @@ const winterPlow = async (kind, drifts) => {
   for (let i = 0; i < 40; i++) { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(100); }
   const snow = await page.evaluate(() => window.__cb.world.plow._berms !== null);
   console.error('winter look set; berms mesh', snow);
-  await page.evaluate(([kind, drifts]) => { const { world } = window.__cb; world.plow.qaPose(world.plow._len * 0.3, kind, drifts); window.__cb.qa.pose = null; }, [kind, drifts]);
+  const dbg = await page.evaluate(([kind, drifts]) => { const { world } = window.__cb; world.plow.qaPose(world.plow._len * 0.3, kind, drifts); window.__cb.qa.pose = null; const m = world.plow._drifts; return m ? { vis: m.visible, range: m.geometry.drawRange, parent: !!m.parent, pos: m.geometry.attributes.position.array.slice(0, 3), n: m.geometry.index.count } : null; }, [kind, drifts]);
+  console.error('drifts', JSON.stringify(dbg));
 };
 /** Where the drive is at distance d from the yard: x, z, heading (the way toward the county road). */
 const along = d => page.evaluate(d => { const R = window.__cb.world.plow._route; let left = d; for (let i = 1; i < R.length; i++) { const l = Math.hypot(R[i][0] - R[i - 1][0], R[i][1] - R[i - 1][1]); if (left <= l || i === R.length - 1) { const t = Math.min(1, left / l); return { x: R[i - 1][0] + (R[i][0] - R[i - 1][0]) * t, z: R[i - 1][1] + (R[i][1] - R[i - 1][1]) * t, dx: (R[i][0] - R[i - 1][0]) / l, dz: (R[i][1] - R[i - 1][1]) / l, len: window.__cb.world.plow._len }; } left -= l; } }, d);
