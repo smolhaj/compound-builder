@@ -763,7 +763,8 @@ export class BattleRenderer {
       const dv = this.viewer ? Math.hypot(u.x - this.viewer.x, gy - this.viewer.y, u.z - this.viewer.z) : 0;
       const gs = u.scale * Math.min(2.4, Math.max(1, dv / 16));
       this._layer.setPose(n, { x: u.x, y: gy, z: u.z, rot: u.rot, scale: gs,
-        pose: u.hands && !moving ? FIG_POSE.REACH : (u.crouch || (u.duckUntil != null && this.time < u.duckUntil)) && !moving ? FIG_POSE.KNEEL : u.sling && !u.dead ? FIG_POSE.CROSS : FIG_POSE.STAND, phase: u.phase, amp: moving ? (u.limp ? 0.3 : 0.6) : 0 });
+        pose: (u.hands && !moving) || (u.y > 0.06 && u.def.side === 'raider' && !u.dead) ? FIG_POSE.REACH :   // (a raider off the ground is on a ladder's rungs: arms up, reaching for the next one)
+           (u.crouch || (u.duckUntil != null && this.time < u.duckUntil)) && !moving ? FIG_POSE.KNEEL : u.sling && !u.dead ? FIG_POSE.CROSS : FIG_POSE.STAND, phase: u.phase, amp: moving ? (u.limp ? 0.3 : 0.6) : 0 });
       u.gs = gs;
       const down = u.carriedBy ? 1 : u.dead ? Math.max(0, Math.min(1, (this.time - (u.fallAt ?? 0)) / 0.95)) : u.layAt != null ? Math.max(0, Math.min(1, (this.time - u.layAt) / 0.7)) : -1;
       const flat = ((u.proneUntil != null && this.time < u.proneUntil && !moving) || !!u.crawl) && !u.dead && u.layAt == null && !u.carriedBy && !u.hands && u.frozenUntil == null;
