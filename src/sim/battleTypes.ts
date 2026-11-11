@@ -144,6 +144,8 @@ export type BattleEvent =
   | { t: number; kind: 'panic'; unit: string; how: 'freeze' | 'shelter'; secs: number; kin: boolean }
   /** A defender steps in: `cover` shields someone hurt while they are dragged in, `drag` carries them, `avenge` goes at the one who shot their own. */
   | { t: number; kind: 'heroic'; unit: string; act: 'cover' | 'drag' | 'avenge'; for?: string }
+  /** A man carries a white flag (a cloth on a stick) from now on: the envoy of a parley. */
+  | { t: number; kind: 'flag'; unit: string }
   /** A flare goes up and lights the yard for `secs`. */
   | { t: number; kind: 'flare'; x: number; z: number; by: string; secs: number }
   | { t: number; kind: 'end'; result: 'repelled' | 'fled' | 'breached' | 'overrun' };

@@ -83,7 +83,7 @@ export function FleetPanel() {
             <select value={bo.dest} onChange={e => setDest(e.target.value as BugDest)} style={{ width: '100%', marginBottom: 4 }} aria-label="Where to">
               {bo.options.map(o => <option key={o.dest} value={o.dest}>{o.name}{o.miles ? ` (${pluralize(o.miles, 'mile')})` : ''}</option>)}
             </select>
-            <Row label="Carrying" value={`${bo.mode === 'foot' ? `${poundsText(bo.carryKg)}, ${bo.bags} bug-out bag${bo.bags === 1 ? '' : 's'}` : `${poundsText(bo.carryKg)} in ${bo.vehicles.length} vehicle${bo.vehicles.length === 1 ? '' : 's'}`}`} title="Weight the party can carry. A packed bug-out bag (Shop, Defense) is 40 lb of the right things; a snatched pack is 3-13 lb." />
+            <Row label="Carrying" value={`${bo.mode === 'foot' ? `${poundsText(bo.carryKg)}, ${bo.bags} bug-out bag${bo.bags === 1 ? '' : 's'}` : `${poundsText(bo.carryKg)} in ${bo.vehicles.length} vehicle${bo.vehicles.length === 1 ? '' : 's'}${bo.air ? ` + a chartered helicopter (${bo.air} seats, $${bo.airUsd.toLocaleString('en-US')})` : ''}`}`} title="Weight the party can carry. A packed bug-out bag (Shop, Defense) is 40 lb of the right things; a snatched pack is 3-13 lb." />
             <Row label="Food and water" value={`${pluralize(bo.foodDays, 'day')}${bo.cacheDays ? ` + ${bo.cacheDays} in the cache` : ''}`} />
             <Row label={bo.mode === 'foot' ? 'Walk' : 'Fuel'} value={`about ${kmText(bo.rangeKm)}`} />
             <Row label="Time to leave" value={`${bo.hours} h${bo.covered ? ', under cover' : bo.mode === 'foot' ? '' : ', in plain view'}`} />

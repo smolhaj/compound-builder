@@ -20,11 +20,12 @@ import type { RaiderTemper } from './battle';
 import type { CrewStyle } from './raiderKinds';
 import { mulberry32 } from './rng';
 import { INTERIOR_LINES, type InteriorCtx } from './raidLinesInterior';
+import { MOMENT_LINES, type MomentCtx } from './raidLinesMoments';
 
 export type Ctx = 'approach' | 'first_shots' | 'fight' | 'defender_hit' | 'mate_down' | 'raider_down' | 'retreat' | 'fire' | 'breach' | 'aftermath'
   | 'grief' | 'tend' | 'tended' | 'prisoner' | 'prisoner_reply' | 'looting' | 'held'
   // the invasion (sim/breach.ts, sim/houseAssault.ts): the truck, the charge, the door, the rooms, the dragging, the search, the leaving
-  | 'ram_run' | 'ram_hit' | 'charge_set' | 'charge_call' | 'stack_door' | 'clear_room' | 'hold_room' | 'drag' | 'search' | 'leaving' | InteriorCtx;
+  | 'ram_run' | 'ram_hit' | 'charge_set' | 'charge_call' | 'stack_door' | 'clear_room' | 'hold_room' | 'drag' | 'search' | 'leaving' | InteriorCtx | MomentCtx;
 export type Role = 'raider' | 'defender';
 export const RETREAT_CTX: ReadonlySet<Ctx> = new Set<Ctx>(['retreat', 'aftermath']);
 
@@ -122,7 +123,7 @@ export const LINES: Record<Role, Partial<Record<Ctx, Variants>>> = {
 
 // the interior fight and the aftermath pools join the rest (a context both files define keeps both pools' keys)
 for (const role of ['raider', 'defender'] as const) {
-  for (const [ctx, pool] of Object.entries(INTERIOR_LINES[role])) {
+  for (const [ctx, pool] of [...Object.entries(INTERIOR_LINES[role]), ...Object.entries(MOMENT_LINES[role])]) {
     const have = (LINES[role] as Record<string, Variants | undefined>)[ctx] ?? {};
     const merged: Record<string, string[]> = {};
     for (const [k, v] of [...Object.entries(have), ...Object.entries(pool as Variants)]) merged[k] = [...new Set([...(merged[k] ?? []), ...(v ?? [])])];

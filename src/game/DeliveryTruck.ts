@@ -12,6 +12,7 @@ import { emptyStock, type Stock } from '../sim/materials';
 import type { OrderLine } from '../sim/state';
 import { lineLength, type Pt } from './region/access';
 import { inCorridorAt, sampleRoute } from './paths/deckWalk';
+import { surfacePitch } from './paths/driveHeight';
 import type { Wp } from './paths/linkRoute';
 import { drivablePrefix } from './paths/groundMovers';
 
@@ -138,7 +139,7 @@ export class DeliveryTruck {
       const p = sampleRoute(path, Math.min(c.d, len));
       this._truck.position.set(p.x, p.y ?? this._ground(p.x, p.z), p.z);
       this._truck.rotation.order = 'YXZ';
-      this._truck.rotation.set(-p.pitch, p.rot, 0);
+      this._truck.rotation.set(-(p.y !== null ? p.pitch : surfacePitch(this._ground, p.x, p.z, p.rot)), p.rot, 0);   // (on a deck the route's own pitch; on the road, and in a bore, the surface it drives)
       this._truck.visible = true;
       if (c.d >= len) {
         if (c.phase === 'in') { c.phase = 'unload'; c.t = 0; }

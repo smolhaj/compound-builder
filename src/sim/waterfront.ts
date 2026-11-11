@@ -148,3 +148,14 @@ export function waterLaneCost(dist: number, landing: 'dock' | 'shore' | 'cliff',
   const land = landing === 'dock' ? 1 : landing === 'shore' ? 6 : 30;
   return dist * 2.2 + land * (guarded ? 1.5 : 1);
 }
+
+/** Raw lake or river water a dock's intake line gives the garden, the orchard and the tunnels (irrigation only, never drinking):
+ *  a 12 V transfer pump moves about 1,000 L an hour on a tenth of a kilowatt, so a dock covers 2,000 L a day and a marina 5,000;
+ *  nothing while the water is skimmed or iced over, and no pond or reservoir is needed. */
+export const INTAKE_LPD = { boat_dock: 2_000, marina: 5_000 } as const;
+export function lakeIntakeL(s: GameState): number {
+  if (!waterBody(s) || lakeIce(s) !== 'open') return 0;
+  let l = 0;
+  for (const st of s.structures) if (isFinished(st) && st.kind in INTAKE_LPD) l += INTAKE_LPD[st.kind as keyof typeof INTAKE_LPD];
+  return l;
+}

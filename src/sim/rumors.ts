@@ -76,7 +76,7 @@ export function scoutDay(s: GameState): string[] {
     if (h.kind === 'raiders') { st.warnedUntil = Math.max(st.warnedUntil, day + 5); st.bonus = Math.max(st.bonus, 12); out.push('The watch is up for the week.'); }
   } else {
     h.status = 'false';
-    out.push(`${p.first} found nothing to it. ${h.kind === 'raiders' ? 'No burned place, no tracks.' : h.kind === 'poison' ? 'The creek runs clear.' : h.kind === 'relief' || h.kind === 'city' ? 'Nobody has seen a truck or a convoy.' : 'Nobody had heard of it.'} Put it out of mind.`);
+    out.push(`${p.first} found nothing to it. ${h.kind === 'raiders' ? 'No burned place, no tracks.' : h.kind === 'poison' ? 'The creek runs clear.' : h.kind === 'travelers' ? 'Nobody has come up the valley on foot.' : h.kind === 'relief' || h.kind === 'city' ? 'Nobody has seen a truck or a convoy.' : 'Nobody had heard of it.'} Put it out of mind.`);
   }
   return out;
 }

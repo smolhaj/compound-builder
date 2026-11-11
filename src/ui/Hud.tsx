@@ -20,7 +20,10 @@ import { CompoundBoardPanel } from './CompoundBoard';
 import { WaveChip } from './WaveClock';
 import { CollapseChip } from './CollapseChip';
 import { KinPanel } from './KinPanel';
+import { RoadSection } from './RoadPanel';
 import { NewcomersPanel } from './NewcomersPanel';
+import { HouseRulesPanel } from './HouseRulesPanel';
+import { COMFORT, comfortMonthly, comfortTier, hasEstate } from '../sim/estate';
 import { originLabel } from '../sim/newcomers';
 import { WeekenderPanel } from './WeekenderPanel';
 import { isAbsent, whereIs, WHERE_TEXT } from '../sim/weekender';
@@ -35,7 +38,7 @@ import { keeping, KEPT } from '../sim/shelf';
 import { CONDITION, pharmacyOpen, rxDaysOf } from '../sim/body';
 import { netWorth } from '../sim/finance';
 import { campNeed, trialCamps } from '../sim/trial';
-import { JUG_L, orderTanker } from '../sim/water';
+import { HAND_PUMP_MAX_M, JUG_L, orderTanker } from '../sim/water';
 import { FleetPanel } from './FleetPanel';
 import { buyLicense, hasLicense, inSeason, lawful, TAG_USD, type License } from '../sim/wildfood';
 import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep';
@@ -47,6 +50,7 @@ import { roadLine } from '../sim/roadFx';
 import { crossingLine } from '../sim/roadWildlife';
 import { roadPlanOf } from '../sim/roadState';
 import { SaveMenu } from './SaveMenu';
+import { Album, PhotoShutter, Thumb } from './PhotoAlbum';
 import { EntranceCard } from './hud/EntranceCard';
 import { PlowNote } from './hud/PlowNote';
 import { DRIVE_PER_FT, driveQuote, hookupProblem, POLE_PER_FT, powerQuote } from '../sim/improvements';
@@ -66,6 +70,8 @@ import { THREAT_NAME } from '../sim/threatState';
 import { MILESTONE_COUNT, MILESTONE_NAME, PART_LABEL, generations } from '../sim/lineage';
 import { daysOfFood, KCAL, needOf } from '../sim/needs';
 import { starveWarning } from '../sim/starvation';
+import { effectiveDose } from '../sim/radiation';
+import { drinkShare } from '../sim/thirst';
 import { barterPrices, moneyWorks, type Good } from '../sim/barter';
 import { MarketSection, NeighborsSection, RumorsSection, ScavengeSection } from './WorldPanels';
 import { alliesFor, canGo, FAR_COLD, isAway, latestFarLead, latestLead, LEAD_COLD, LEAD_WARM, leadAge, openCaptives, raidProblem, rescueOdds, tripFuel, tripProblem } from '../sim/rescue';
@@ -279,7 +285,7 @@ export function Hud() {
               const st = game.personState[i], n = st?.needs;
               if (n?.left) return null;   // moved away (sim/newcomers.ts): not on the roll, noted under Newcomers
               const bar = (v: number, c: string, t: string) => <div title={t} style={{ flex: 1, height: 4, background: '#333', borderRadius: 2 }}><div style={{ width: `${Math.max(0, v)}%`, height: '100%', background: c, borderRadius: 2 }} /></div>;
-              const notes = n && n.died == null ? [n.hunger > 5000 ? 'hungry' : '', ...n.hurt.map(h => h.med ? `${h.what} (${h.med.care})` : h.trauma ? `${h.what}: ${treating ? 'being treated' : 'needs dressings and antibiotics'}` : h.what), n.dose > 0.05 ? `${n.dose.toFixed(2)} Sv` : ''].filter(Boolean).join(', ') : '';
+              const notes = n && n.died == null ? [n.hunger > 5000 ? 'hungry' : '', ...n.hurt.map(h => h.med ? `${h.what} (${h.med.care})` : h.trauma ? `${h.what}: ${treating ? 'being treated' : 'needs dressings and antibiotics'}` : h.what), n.dose > 0.05 ? `${n.dose.toFixed(2)} Sv (${effectiveDose(n).toFixed(2)} not yet repaired)` : ''].filter(Boolean).join(', ') : '';
               return <div key={p.id} style={{ padding: '5px 0', borderBottom: `1px solid ${LINE}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
                   <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#' + p.shirt.toString(16).padStart(6, '0'), marginRight: 6 }} />{fullName(p)}, {p.age}{p.rel && <span style={{ color: DIM, fontSize: 11 }}> · {kinTitle(p, game.people)}</span>}{p.origin && <span style={{ color: DIM, fontSize: 11 }}> · {originLabel(game, p)}</span>}{backgroundOf(p) && <span style={{ color: '#c9b27a', fontSize: 11 }}> · {BACKGROUND_NAME[backgroundOf(p)!]}</span>}</span>
@@ -302,6 +308,8 @@ export function Hud() {
             <DogsPanel game={game} />
             <KinPanel />
             <NewcomersPanel />
+            <HouseRulesPanel />
+            <RoadSection />
             <HousingPanel />
             <QuartersPanel />
             <PeopleSection />
@@ -456,7 +464,9 @@ export function Hud() {
                 {storageCapacity(game) - r.storedL > 1000 && game.disaster.tracks.deliveries >= 0.5 && game.disaster.tracks.banks >= 0.5 && <button style={{ ...btn(), width: '100%', marginTop: 3 }} title="A tanker load from town: 3,960 gal" onClick={() => g.money(d => orderTanker(d, storageCapacity(d)))}>Order a tanker load ($450)</button>}
                 <Row label="Well depth here" value={`${feetText(game.site.gwDepth)}`} />
                 {game.utilities.hauling && <Note tone="warn">{game.utilities.haulFar ? 'Hauling water a quarter mile from the creek on the neighbor\'s land: a well or cistern would end it.' : 'Hauling water from the creek by the bucket: a well or cistern would end it.'}</Note>}
-                {r.shortL > 0 && <Note tone="bad">Water ran short.</Note>}
+                {(r.handL ?? 0) > 0 && <Row label="Pumped by hand" value={`${gallonsText(r.handL ?? 0)} in ${(r.handH ?? 0).toFixed(1)} h`} />}
+                {r.shortL > 0 && <Note tone="bad">{drinkShare(game) < 1 ? 'Water ran short: drinking water is rationed. People dehydrate within days.' : 'Water ran short: no washing, the garden goes dry. Drinking water comes first.'}</Note>}
+                {game.structures.some(x => x.kind === 'well_drilled') && game.stock.hand_pump < 1 && game.site.gwDepth <= HAND_PUMP_MAX_M && <Note>A deep-well hand pump in the drilled well would give water with the power out.</Note>}
                 {flowLine(game) && <Note>{flowLine(game)}</Note>}
                 {game.utilities.hauling && game.stock.water_filter < 0.01 && <Note tone="warn">{game.stock.firewood >= 0.05 ? 'Boiling the creek water (firewood): a filter would save the wood.' : 'Drinking the creek water untreated: giardia. Get a filter or boil it.'}</Note>}
                 {game.site.gwQuality === 'arsenic' && game.stock.ro_system < 1 && <Note tone="warn">Arsenic in the well water: get reverse osmosis for drinking water.</Note>}
@@ -501,6 +511,10 @@ export function Hud() {
             <Section title="Paperwork">
               {countyWorks(game) ? <>
                 <Row label="Property tax" value={`${usd(yearlyTax(game))}/yr`} />
+                {hasEstate(game) && <div data-testid="comfort-tier" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
+                  <span style={{ color: DIM }} title={COMFORT[comfortTier(game)].blurb}>Comfort: {COMFORT[comfortTier(game)].name}{game.paper.comfort ? '' : ' (by savings)'}{comfortMonthly(game) ? `, ${usd(comfortMonthly(game))}/mo` : ''}</span>
+                  <button style={btn()} title="Plain, Comfortable or Gracious: morale for money" onClick={() => g.setComfort(game.paper.comfort ? ({ plain: 'comfortable', comfortable: 'gracious', gracious: null } as const)[game.paper.comfort] : 'plain')}>Change</button>
+                </div>}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
                   <span style={{ color: DIM }}>Insurance: {game.paper.insured ? (premium(game) ? `${usd(premium(game))}/yr` : 'nothing to insure yet') : <span style={{ color: TONE.warn }}>none</span>}</span>
                   <button style={btn()} title={game.paper.insured ? 'Save the premium; a fire or a collapsed roof comes out of your pocket' : 'Buildings lost to fire or ash are paid out while the banks work'} onClick={() => g.setPaper('insured', !game.paper.insured)}>{game.paper.insured ? 'Drop' : 'Insure'}</button>
@@ -675,9 +689,11 @@ export function Hud() {
         <button style={btn(w.terrainMode === 'off')} title="Hide the terrain overlay" onClick={() => w.setTerrainMode('off')}>Off</button>
         {(Object.keys(TERRAIN_LEGEND) as Array<Exclude<TerrainMode, 'off'>>).map(m => <button key={m} title={TERRAIN_LEGEND[m].tip} style={btn(w.terrainMode === m)} onClick={() => w.setTerrainMode(m)}>{TERRAIN_LEGEND[m].label}</button>)}
         {w.terrainMode !== 'off' && <div style={{ flexBasis: '100%', fontSize: 11.5, opacity: 0.85 }}>{TERRAIN_LEGEND[w.terrainMode].legend}</div>}
+        {w.terrainMode === 'shade' && w.shadeReadout && <div data-testid="shade-readout" style={{ flexBasis: '100%', fontSize: 11.5, color: '#bcd', display: 'flex', flexWrap: 'wrap', gap: '2px 14px' }}>{w.shadeReadout.length ? w.shadeReadout.map(l => <span key={l}>{l}</span>) : <span>Nothing to site yet: place a solar array or a garden bed and its shade shows here.</span>}</div>}
         {(w.terrainMode !== 'off' || w.sightMode !== 'off') && (() => { const t = fogLineFor(g.game, w.dayOfYear, w.timeOfDay, w.weatherMode); return t ? <div data-testid="fog-readout" style={{ flexBasis: '100%', fontSize: 11.5, color: '#bcd' }} title="Valley fog and low cloud (sim/fog.ts): it cuts what a watch, a camera or a night-vision tube sees; thermal sees through it. The same fog is drawn in the valley.">{t}</div> : null; })()}
         <button data-testid="blueprint-toggle" style={btn(w.blueprint)} title="Blueprint view: names and roles of the buildings, rings, gates, towers and tunnels, with the defense readouts" onClick={() => w.setBlueprint(!w.blueprint)}>Blueprint</button>
         {w.blueprint && w.blueprintReadout && (() => { const r = w.blueprintReadout; return <div data-testid="blueprint-readout" style={{ flexBasis: '100%', fontSize: 11.5, color: '#bcd', display: 'flex', flexWrap: 'wrap', gap: '2px 14px' }}>
+          {r.radiation && <span data-testid="radiation-readout" style={{ flexBasis: '100%', color: '#ffd27a' }} title="Protection factor (PF) divides the dose: PF 10 means a tenth. Every building and bunker room shows its own under its name.">☢ {r.radiation}</span>}
           <span title="The Defense tab's score">Defense <b>{r.score}</b> {r.label}</span>
           <span title="How hard the walls, gates and bars stop a crew">Line holds {r.barrierPct}%</span>
           <span title="How likely it is that a crew is seen before it reaches the wall">Chance of seeing a crew coming: {r.detectionPct}%</span>
@@ -693,6 +709,7 @@ export function Hud() {
           <span>{dateLabel(w.dayOfYear)}</span>
           <input type="range" min={1} max={365} step={1} value={w.dayOfYear} onChange={e => w.setDayOfYear(+e.target.value)} />
         </>}
+        <PhotoShutter />
       </div>}
     </>
   );
@@ -782,7 +799,7 @@ function TakenSection() {
 }
 
 const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
-const KIND_MARK: Record<string, string> = { era: '◆', birth: '✦', death: '✝', partner: '♥', coming: '▲', milestone: '★', retire: '·', home: '⌂', threat: '▼', bond: '✧' };
+const KIND_MARK: Record<string, string> = { era: '◆', birth: '✦', death: '✝', partner: '♥', coming: '▲', milestone: '★', retire: '·', home: '⌂', threat: '▼', bond: '✧', photo: '▣' };
 
 /** The long game: the family over the years, the eras, milestones and the dynasty score. */
 function Chronicle() {
@@ -820,11 +837,12 @@ function Chronicle() {
     <Section title={`Milestones ${L.milestones.length}/${MILESTONE_COUNT}`}>
       {L.milestones.length ? L.milestones.map(m => <div key={m} style={{ padding: '1px 0' }}><span style={{ color: '#d8c08a' }}>★</span> {MILESTONE_NAME[m]}</div>) : <Note>None yet. Get through the first winter.</Note>}
     </Section>
+    <Album />
     <Section title="Chronicle">
       {L.chronicle.length === 0 && <Note>Births, deaths, weddings, the eras: it all goes here.</Note>}
       {L.chronicle.slice(-40).reverse().map((e, i) => <div key={i} style={{ display: 'flex', gap: 6, padding: '3px 0', borderBottom: `1px solid ${LINE}` }}>
         <span style={{ color: DIM, width: 32, flex: 'none', fontVariantNumeric: 'tabular-nums' }}>{e.year}</span>
-        <span style={{ color: e.kind === 'death' ? '#b8a8a0' : e.kind === 'era' ? '#d8c08a' : undefined }}>{KIND_MARK[e.kind]} {e.text}</span>
+        <span style={{ color: e.kind === 'death' ? '#b8a8a0' : e.kind === 'era' ? '#d8c08a' : undefined }}>{KIND_MARK[e.kind]} {e.text}{e.photo && <Thumb id={e.photo} width={150} />}</span>
       </div>)}
     </Section>
   </>;

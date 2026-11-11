@@ -1,6 +1,9 @@
 import { moatStates } from '../sim/waterWorks';
 import { fireMarks } from '../sim/fireRisk';
 import { litTowerIds } from '../sim/towers';
+import { encodePhoto, setPhotoCapturer } from './photoCapture';
+import { shadeGrid } from '../sim/shade';
+import { shadeReadout, shadeSceneOf } from './terrain/shadeScene';
 import { TerrainOverlay } from './terrain/TerrainOverlay';
 import { BlueprintOverlay } from './blueprint/BlueprintOverlay';
 import { blueprintPlan } from './blueprint/blueprintPlan';
@@ -50,6 +53,7 @@ import { liveBreach } from './battle/liveBreach';
 import { decorateBreach } from '../sim/breach';
 import { planHouseAssault } from '../sim/houseAssault';
 import { routeScene } from '../sim/cutLive';
+import { voiceMoments } from '../sim/momentVoices';
 import { stepSegments } from '../sim/standingSurfaces';
 import { LineDirector } from '../sim/raidDialogue';
 import { fireBoxesOf } from './battle/lineOfFire';
@@ -263,9 +267,15 @@ export function GameCanvas() {
     const terrainOv = new TerrainOverlay(ws.scene, world.groundAt);
     const showTerrain = () => {
       const g = useGameStore.getState().game, m = useWorldStore.getState().terrainMode, t = terrainOf(g);
-      if (m === 'off' || !t) { terrainOv.set('off', null); return; }
+      if (m === 'off' || !t) { terrainOv.set('off', null); useWorldStore.getState().setShadeReadout(null); return; }
+      let sg = null;
+      if (m === 'shade') {
+        const { sc, own } = shadeSceneOf(g, world.groundAt, world.treeSpecs);
+        sg = shadeGrid(sc, t.grid);
+        useWorldStore.getState().setShadeReadout(shadeReadout(g, sc, own));
+      } else useWorldStore.getState().setShadeReadout(null);
       const lanes = lanesOf(g);
-      terrainOv.set(m, t, lanes, siteCandidates(t, { lot: g.site.home, camp: campOf(g) }, lanes), m === 'fire' ? fireMarks(g, world.fuelNear(g.structures)) : []);
+      terrainOv.set(m, t, lanes, siteCandidates(t, { lot: g.site.home, camp: campOf(g) }, lanes), m === 'fire' ? fireMarks(g, world.fuelNear(g.structures)) : [], sg);
     };
     // the blueprint view: names, rings, gates, towers and tunnels (game/blueprint)
     const host = canvas.parentElement ?? document.body;
@@ -279,6 +289,7 @@ export function GameCanvas() {
       blueprintOv.set(plan); useWorldStore.getState().setBlueprintReadout(plan.readout);
     };
     const refreshBlueprint = () => { if (useWorldStore.getState().blueprint) { clearTimeout(bpTimer); bpTimer = window.setTimeout(showBlueprint, 250); } };
+    setPhotoCapturer(() => { ws.renderFrame(); return encodePhoto(ws.renderer.domElement); });
     const unsub = [
       useWorldStore.subscribe(s => s.weakView, showWeak),
       useGameStore.subscribe(s => `${s.game.structures.length}|${s.game.forestry.cleared.length}|${s.game.forestry.jobs.length}|${s.game.perimeter.map(r => r.id + (r.finishedAt === null ? 'p' : 'f') + Math.round((r.brush ?? 0) * 4)).join()}`, () => { if (useWorldStore.getState().weakView) showWeak(); }),
@@ -330,7 +341,7 @@ export function GameCanvas() {
       useWorldStore.subscribe(s => s.sightMode, m => sight.set(m)),
       // the terrain overlay (sim/terrain.ts): high ground, lanes, water, sun
       useWorldStore.subscribe(s => s.terrainMode, showTerrain),
-      useGameStore.subscribe(s => s.game.structures.length + '|' + s.game.perimeter.length, () => { if (['lanes', 'fire'].includes(useWorldStore.getState().terrainMode)) showTerrain(); }),
+      useGameStore.subscribe(s => s.game.structures.length + '|' + s.game.perimeter.length, () => { if (['lanes', 'fire', 'shade'].includes(useWorldStore.getState().terrainMode)) showTerrain(); }),
       // the compound changed: recompute the overlay
       useGameStore.subscribe(s => `${s.game.structures.map(x => x.id + x.stage).join()}|${s.game.perimeter.map(r => r.id + (r.finishedAt === null ? Math.round(r.done) : 'f')).join()}`, () => sight.refresh()),
     ];
@@ -398,6 +409,10 @@ export function GameCanvas() {
             const nameOf = (id: string) => { const pid = b0.units.find(u => u.id === id)?.personId; const p = pid ? g.people.find(q => q.id === pid) : undefined; return (p as { first?: string } | undefined)?.first; };
             if (home) b = planHouseAssault(b, { box: footprint(KIT[home.kind], home.x, home.z, home.rot, false), blocked: solid, seed, dir, nameOf });
           }
+          // the human moments the sim marks (a reload, a man frozen with fear, a flare, a friend dragged in) get a voice where the sim wrote none
+          const g2 = useGameStore.getState().game, d2 = new LineDirector(g2.seed * 977 + Math.round(b0.duration * 5));
+          for (const other of useGameStore.getState().cutscene?.battles ?? []) if (other !== b0) d2.noteAll(other);
+          b = voiceMoments(b, d2, id => { const pid = b0.units.find(u => u.id === id)?.personId; const p = pid ? g2.people.find(q => q.id === pid) : undefined; return (p as { first?: string } | undefined)?.first; });
         } catch (err) { console.warn('cutscene staging failed; playing the plain scene', err); b = b0; }
         return routeScene(b, solid, undefined, stepSegments(useGameStore.getState().game.perimeter)).battle;
       },
@@ -746,7 +761,7 @@ export function GameCanvas() {
       ws.dispose();
     };
     })();
-    return () => { cancelled = true; stop(); useWorldStore.getState().setBoot(null); };
+    return () => { cancelled = true; stop(); setPhotoCapturer(null); useWorldStore.getState().setBoot(null); };
   }, []);
 
   return <canvas ref={ref} style={{ width: '100%', height: '100%' }} />;

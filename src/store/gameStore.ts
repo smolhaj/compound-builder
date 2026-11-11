@@ -1,3 +1,5 @@
+import { takePhoto as takePhotoRecord, dropPhoto } from '../sim/photos';
+import { putPhoto, removePhotos, syncVault } from '../sim/save/photoVault';
 import { wipeEnded } from '../sim/wipe';
 import { planProblem } from '../sim/construction';
 import { unscripted } from '../sim/godMode';
@@ -14,6 +16,7 @@ import { claimForWaiting, claimWaitingRig, isRig, type StayKind } from '../sim/j
 import { kinOf } from '../sim/kin';
 import { setEntrance as chooseEntrance } from '../sim/roadEntrance';
 import { applyForPermit } from '../sim/paperwork';
+import { callVote, voteProblem } from '../sim/rules';
 import { permitAffordable } from '../sim/spendGuard';
 import { sweepChimney } from '../sim/upkeep';
 import { stockUpRx } from '../sim/body';
@@ -49,6 +52,8 @@ import { addRazor } from '../sim/razor';
 import { addElectric, addBackup, trimAll, trimRun } from '../sim/wallTops';
 import { cancelResponse, subscribe as subscribeResponse } from '../sim/armedResponse';
 import { foundWatch, leaveWatch } from '../sim/watch';
+import { answerHail, buildBlock, hailPass, removeBlock, setBlockPolicy, type BlockKind, type BlockPolicy, type HailAnswer } from '../sim/roadPassers';
+import { prepare, type PrepKind } from '../sim/roadWarn';
 import { layPaths, pickUpPath, type LaidKind, type LayEdge } from '../sim/paths';
 import { compoundRegion, layFortress, planFortress, type FortressOptions } from '../sim/fortress';
 import type { RingShape } from '../sim/ringShape';
@@ -189,6 +194,10 @@ export interface GameStore {
   /** Stake starter-compound pieces (and the yard fence) in one go; each is an ordinary structure afterwards. Returns how many went in. */
   layStarter: (pieces: ReadonlyArray<{ kind: string; x: number; z: number; rot: number }>, yard: WallPlan | null, geo: PropertyGeometry) => number;
   load: (g: GameState) => void;
+  /** Keep a picture of the place in the album with a caption (sim/photos.ts). Null on success, else why not. */
+  keepPhoto: (data: string, caption: string) => string | null;
+  /** Throw an album photo away. */
+  tossPhoto: (id: string) => void;
   /** Speed to pick up again once the decision card that paused the clock is answered (null: stay paused). */
   resumeTo: Speed | null;
   /** Lay out a fence / hedge / wall run for the family to build. */
@@ -216,6 +225,12 @@ export interface GameStore {
   subscribeArmedResponse: () => string | null;
   cancelArmedResponse: () => string | null;
   foundRoadWatch: () => string | null;
+  prepareForVisitors: (kind: PrepKind) => string | null;
+  hailPasser: (id: string) => string | null;
+  answerRoadHail: (how: HailAnswer) => string | null;
+  buildRoadBlock: (kind: BlockKind) => string | null;
+  setRoadBlockPolicy: (p: BlockPolicy) => string | null;
+  removeRoadBlock: () => string | null;
   leaveRoadWatch: () => string | null;
   /** Fit an electric fence on outriggers along a finished wall (sim/wallTops.ts); `backup` adds the sealed battery. */
   addElectric: (id: string, backup: boolean) => string | null;
@@ -294,6 +309,10 @@ export interface GameStore {
   setEntrance: (z: number) => string | null;
   /** Paperwork switches: pull permits for new builds; keep the insurance. */
   setPaper: (k: 'permits' | 'insured', on: boolean) => void;
+  /** Comfort tier (Cozy; sim/estate.ts): a tier, or null to let the savings decide. */
+  setComfort: (tier: import('../sim/estate').ComfortTier | null) => void;
+  /** Put a house rule to a vote (sim/rules.ts); returns the result line, or why not. */
+  callRuleVote: (rule: import('../sim/rules').RuleId, option: string) => string;
   /** Sweep the chimney. */
   sweep: () => void;
   /** Eat what you store (rotate the pantry). */
@@ -517,7 +536,17 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     return n;
   },
   resumeTo: null,
-  load: (game) => { muteFeedback(); set({ game, welcome: false, selected: null, tool: null, cutscene: promptFor(game), resumeTo: null, dayCard: null }); },
+  keepPhoto: (data, caption) => {
+    const g = structuredClone(get().game), id = 'p' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+    const r = takePhotoRecord(g, data, caption, id);
+    if (!r.ok) return r.why;
+    if (!putPhoto(id, data)) return 'The album is full.';
+    removePhotos(r.dropped);
+    set({ game: g }); void saveGame(AUTOSAVE, g);
+    return null;
+  },
+  tossPhoto: (id) => { const g = structuredClone(get().game); if (dropPhoto(g, id)) { removePhotos([id]); set({ game: g }); void saveGame(AUTOSAVE, g); } },
+  load: (game) => { void syncVault((game.photos ?? []).map(p => p.id)); muteFeedback(); set({ game, welcome: false, selected: null, tool: null, cutscene: promptFor(game), resumeTo: null, dayCard: null }); },
   planRun: (kind, pts, gates, offLen = 0) => {
     if (locked()) return;
     if (routeProblem(get().game, kind, pts)) return;   // a tunnel-bridge needs real low ground, a slope tunnel a hillside (the tool says why)
@@ -614,6 +643,12 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   },
   subscribeArmedResponse: () => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = subscribeResponse(g); if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); } return why; },
   cancelArmedResponse: () => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = cancelResponse(g); if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); } return why; },
+  prepareForVisitors: (kind: PrepKind) => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = prepare(g, kind); if (!why) set({ game: g }); return why; },
+  hailPasser: (id: string) => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = hailPass(g, id); if (!why) set({ game: g }); return why; },
+  answerRoadHail: (how: HailAnswer) => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = answerHail(g, how); if (!why) set({ game: g }); return why; },
+  buildRoadBlock: (kind: BlockKind) => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = buildBlock(g, kind); if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); } return why; },
+  setRoadBlockPolicy: (p: BlockPolicy) => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = setBlockPolicy(g, p); if (!why) set({ game: g }); return why; },
+  removeRoadBlock: () => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = removeBlock(g); if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); } return why; },
   foundRoadWatch: () => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = foundWatch(g); if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); } return why; },
   leaveRoadWatch: () => { if (locked()) return LOCKED_WHY; const g = structuredClone(get().game); const why = leaveWatch(g); if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); } return why; },
   addElectric: (id, backup) => {
@@ -821,6 +856,22 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     g.paper[k] = on;
     log(g, k === 'permits' ? (on ? 'From now on: permits for everything that needs one.' : 'From now on: no permits. Hope the inspector doesn\'t drive by.') : (on ? 'Took out insurance on the place.' : 'Dropped the insurance.'));
     set({ game: g });
+  },
+  setComfort: (tier) => {
+    if (locked()) return;
+    const g = structuredClone(get().game);
+    if (tier) g.paper.comfort = tier; else delete g.paper.comfort;
+    log(g, tier ? `The household will live ${tier === 'plain' ? 'plainly' : tier === 'comfortable' ? 'comfortably' : 'graciously'} from now on.` : 'The household will live as the savings allow.');
+    set({ game: g });
+  },
+  callRuleVote: (rule, option) => {
+    if (locked()) return LOCKED_WHY;
+    const g = structuredClone(get().game);
+    const why = voteProblem(g, rule, option);
+    if (why) return why;
+    const r = callVote(g, rule, option)!;
+    set({ game: g });
+    return r.line;
   },
   hookup: (what) => {
     if (locked()) return LOCKED_WHY;

@@ -11,7 +11,7 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   | 'pipe' | 'cable' | 'fixtures' | 'pump' | 'drilling' | 'solar_panel' | 'battery' | 'inverter' | 'generator' | 'fuel' | 'tank' | 'septic_tank'
   | 'rebar' | 'membrane' | 'excavator' | 'blast_door' | 'nbc_filter' | 'spoil' | 'culvert' | 'egress_hatch'
   | 'lead_sheet' | 'faraday_mesh' | 'blast_valve' | 'filter_set'
-  | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning' | 'fishing_gear' | 'snares' | 'smoker' | 'goat' | 'pig' | 'steer' | 'rabbit' | 'hay' | 'feed' | 'water_jugs' | 'ibc_tote' | 'water_trailer' | 'water_filter' | 'ro_system' | 'softener' | 'greywater'
+  | 'fresh' | 'frozen' | 'canned' | 'staples' | 'meds' | 'seed' | 'lids' | 'plow' | 'stabilizer' | 'traps' | 'hygiene' | 'gun_safe' | 'gun_cleaning' | 'fishing_gear' | 'snares' | 'smoker' | 'goat' | 'pig' | 'steer' | 'rabbit' | 'hay' | 'feed' | 'water_jugs' | 'ibc_tote' | 'water_trailer' | 'water_filter' | 'ro_system' | 'softener' | 'greywater' | 'hand_pump' | 'potassium_iodide' | 'geiger_counter'
   | 'plate_carrier' | 'ifak' | 'nvg' | 'thermal' | 'radios' | 'cameras' | 'thermal_cam' | 'driveway_alarm' | 'floodlights' | 'blackout_curtains' | 'wall_insulation' | 'gen_baffles' | 'gen_vault' | 'tripwire' | 'dog' | 'puppy' | 'kibble' | 'dogbed' | 'doghouse' | 'steel_door' | 'window_bars' | 'sandbags' | 'safe_room' | 'sw_radio' | 'ham_rig' | 'helmet' | 'soft_armor'
   | 'modular_unit'
   | 'grenades' | 'rpg_launcher' | 'rpg_rounds' | 'suppressor'
@@ -35,7 +35,9 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   // medical depth (sim/medical.ts)
   | 'antibiotics' | 'splints' | 'ors' | 'dental_kit' | 'midwife_kit' | 'medical_books'
   // the herd, the bees and the sugar bush (sim/herd.ts, sim/bees.ts, sim/maple.ts)
-  | 'cow' | 'cheese_kit' | 'vet_kit' | 'bee_nuc' | 'hive_supplies' | 'beeswax' | 'maple_taps';
+  | 'cow' | 'cheese_kit' | 'vet_kit' | 'bee_nuc' | 'hive_supplies' | 'beeswax' | 'maple_taps'
+  // breeding swine and reusable canning lids (sim/swine.ts, sim/kitchen.ts)
+  | 'sow' | 'boar' | 'lids_reuse';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -199,6 +201,9 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   water_filter: { id: 'water_filter', name: 'Gravity water filter', unit: 'ceramic gravity filter, about a year of cartridges for a family', price: 350 },
   ro_system: { id: 'ro_system', name: 'Reverse osmosis', unit: 'under-sink reverse osmosis for drinking water (takes out arsenic)', price: 1200 },
   softener: { id: 'softener', name: 'Water softener', unit: 'for hard water: saves the pump and the pipes', price: 900 },
+  hand_pump: { id: 'hand_pump', name: 'Deep-well hand pump', unit: 'a Simple Pump-style hand pump fitted down the drilled well\'s casing beside the electric pump: water with no power, by hand, from as deep as 330 ft', price: 2200 },
+  potassium_iodide: { id: 'potassium_iodide', name: 'Potassium iodide', unit: 'a 14-tablet pack (130 mg): guards one person\'s thyroid against radioactive iodine for two weeks, and nothing else', price: 12 },
+  geiger_counter: { id: 'geiger_counter', name: 'Radiation meter', unit: 'a handheld survey meter (reads up to 1,000 R/h): tells the shelter the real outside dose rate, so the family comes out when it is safe', price: 450 },
   greywater: { id: 'greywater', name: 'Graywater system', unit: 'diverter, surge tank and mulch basins: sink and shower water to the garden', price: 900 },
   fishing_gear: { id: 'fishing_gear', name: 'Fishing gear', unit: 'rods, reels, tackle box, waders', price: 120 },
   snares: { id: 'snares', name: 'Snares', unit: 'a dozen wire snares for rabbits and grouse', price: 40 },
@@ -228,6 +233,9 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   gun_cleaning: { id: 'gun_cleaning', name: 'Gun cleaning kit', unit: 'rods, brushes, solvent, oil, patches: about a year', price: 60 },
   traps: { id: 'traps', name: 'Traps & bait stations', unit: 'snap traps, bait stations and bait: about two months', price: 35 },
   plow: { id: 'plow', name: 'Plow blade', unit: 'a snowplow blade for the truck (keep the drive open)', price: 3500 },
+  sow: { id: 'sow', name: 'Bred sow', unit: 'a bred gilt: eight or so piglets a litter, two litters a year with a boar on the place (feed, a pen)', price: 450 },
+  boar: { id: 'boar', name: 'Boar', unit: 'a breeding boar: sires every sow on the place (feed, a stout pen)', price: 400 },
+  lids_reuse: { id: 'lids_reuse', name: 'Reusable canning lids', unit: 'sleeve of 12 Tattler-style lids and rubber rings (one case of quarts a day; the rings wear out about every 16 uses; 4% of jars fail to seal)', price: 32 },
   lids: { id: 'lids', name: 'Canning lids', unit: 'sleeve of 12 lids (one case of quarts filled; the jars come back, the lids don\'t)', price: 6 },
   filter_set: { id: 'filter_set', name: 'HEPA filter set', unit: 'HEPA cartridges + hand-crank blower', price: 1100 },
 };

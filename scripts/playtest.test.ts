@@ -6,7 +6,7 @@
  *   PLAYTEST=1 npx vitest run scripts/playtest.test.ts
  * Report: playtest-report.md (repo root).
  * Default: each run stops at its first ending, about 400 days after the hit (the year-one measure). YEARS=6 plays on to about three years
- * after the hit (the horizon the Hardcore prepper target is measured at; docs/DECISIONS.md). Other env: SEEDS (long mode: only these seeds), STRATS, KINDS, DIFF, SEEDOFF, LIFESTYLE, WELCOME, STAY, ADMIT.
+ * after the hit (the horizon the Hardcore prepper target is measured at; docs/DECISIONS.md). Other env: SEEDS (long mode: only these seeds), STRATS, KINDS, DIFF, SEEDOFF, LIFESTYLE, WELCOME, STAY, ADMIT, STUCK_ORDERS (press the Next-step "Order it" card for a stalled project).
  */
 import { describe, expect, it } from 'vitest';
 import { appendFileSync, writeFileSync } from 'node:fs';
@@ -21,11 +21,15 @@ import { startFunds } from '../src/sim/startFunds';
 import { BLUEPRINTS, isHome } from '../src/sim/blueprints';
 import { fixBill, fixBlocked, orderHookup, pendingFixes, placeImprovements } from '../src/sim/improvements';
 import { hireCrew, hoursLeft } from '../src/sim/crews';
+import { stuckProject } from '../src/sim/stalls';
 import { applyForPermit } from '../src/sim/paperwork';
 import { sweepChimney } from '../src/sim/upkeep';
 import { stockUpRx } from '../src/sim/body';
 import { buyAmmo, buyGun, takeClass, type Caliber } from '../src/sim/armory';
 import { buyLicense } from '../src/sim/wildfood';
+import { isRadiationHurt } from '../src/sim/radiation';
+import { isColdHurt } from '../src/sim/cold';
+import { HAND_PUMP_MAX_M } from '../src/sim/water';
 import { markTree } from '../src/sim/forestry';
 import { askRansom, canPay, openCaptives } from '../src/sim/rescue';
 import { calendarOf } from '../src/sim/state';
@@ -175,6 +179,10 @@ function orderNeeds(s: GameState, strat: Strategy): void {
   if (strat === 'prepper' && s.stock.inverter + (pending.inverter ?? 0) < 1) lines.push({ material: 'inverter', qty: 1 });
   // (v2) a spare well pump on the shelf, and hardware kits to fix pumps and fit spares with, once nobody comes out to do it
   if ((strat === 'prepper' || strat === 'homestead') && s.structures.some(x => x.kind === 'well_drilled') && s.stock.pump + (pending.pump ?? 0) < 1) lines.push({ material: 'pump', qty: 1 });
+  // (survival realism) a hand pump down the drilled well for when the power's out; iodide and a radiation meter for the prepper
+  if ((strat === 'prepper' || strat === 'homestead') && s.structures.some(x => x.kind === 'well_drilled') && s.site.gwDepth <= HAND_PUMP_MAX_M && s.stock.hand_pump + (pending.hand_pump ?? 0) < 1) lines.push({ material: 'hand_pump', qty: 1 });
+  if (strat === 'prepper' && s.stock.potassium_iodide + (pending.potassium_iodide ?? 0) < heads) lines.push({ material: 'potassium_iodide', qty: heads });
+  if (strat === 'prepper' && s.stock.geiger_counter + (pending.geiger_counter ?? 0) < 1) lines.push({ material: 'geiger_counter', qty: 1 });
   // seed and fence for the fields still to come, after the shops close (v2): enough for a field per head and a few to spare
   if (PLANS[strat].some(p => p[0] === 'field')) {
     const extra = FIELD_SPARE[strat] + Math.max(0, fieldsWanted(s) - s.structures.filter(x => x.kind === 'field').length);
@@ -331,7 +339,7 @@ export function play(strat: Strategy, kind: DisasterKind, seed: number, peace: '
     const n = ps.needs, p = s.people[i];
     if (n.died == null || n.left || mourned.has(ps.id)) return;   // (people who moved away are not lost)
     mourned.add(ps.id);
-    const why = n.taken ? 'taken' : fought ? 'killed in a fight' : n.hunger > 5000 ? 'hunger' : n.hurt.some(h => h.trauma) ? 'wounds' : n.dose > 1 ? 'radiation' : s.utilities.report.shortL > s.utilities.report.useL * 0.5 ? 'thirst' : n.hurt.some(h => h.what === 'fever') ? 'sickness' : (p?.age ?? 0) >= 65 ? 'old age' : 'other';
+    const why = n.taken ? 'taken' : fought ? 'killed in a fight' : n.hunger > 5000 ? 'hunger' : n.hurt.some(h => h.trauma) ? 'wounds' : (n.dry ?? 0) >= 5 ? 'thirst' : n.hurt.some(h => isRadiationHurt(h.what)) ? 'radiation' : n.hurt.some(h => isColdHurt(h.what)) || (n.chill ?? 0) >= 10 ? 'cold' : n.hurt.some(h => h.what === 'fever') ? 'sickness' : (p?.age ?? 0) >= 65 ? 'old age' : 'other';
     causes.set(why, (causes.get(why) ?? 0) + 1);
   });
   const maxDays = afterHit ? s.disaster.hitAt + afterHit : years ? years * 365 : s.disaster.hitAt + 730;
@@ -393,6 +401,8 @@ export function play(strat: Strategy, kind: DisasterKind, seed: number, peace: '
         if (s.structures.some(x => isHome(x.kind) && isFinished(x)) && s.money > 90_000) orderNeeds(s, strat);
       } else orderNeeds(s, strat);
     }
+    // (STUCK_ORDERS=1) the Next-step card's "Order it" button, pressed: site works such as a retaining wall or a cut into the slope add materials the plans' bills do not list, and the bot never ordered them
+    if (process.env.STUCK_ORDERS && !LAZY(strat) && day % 3 === 1 && (s.clock.t < s.disaster.hitAt || payWith(s))) { const st = stuckProject(s); if (st && st.lines.length && !orderProblem(s, st.lines)) placeOrder(s, st.lines); }
     // (v2) someone taken: send word that the family will pay, whenever there's a lead to carry it
     if (!LAZY(strat) && day % 10 === 0) for (const c of openCaptives(s)) askRansom(s, c.pid);
     // (v2) a dead pump gets a hardware kit, an EMP-fried one its spare, as the HUD's buttons would
@@ -573,8 +583,8 @@ describe.skipIf(!process.env.PLAYTEST || process.env.PLAYTEST === 'long')('playt
     // (the seed is fixed by the disaster's and the strategy's place in the full table, so a filtered run replays the same game)
     const ALL_KINDS = ['grid_down', 'nuclear', 'drought', 'pandemic', 'wildfire', 'ash_winter', 'financial', 'solar_flare', 'zombies'], ALL_STRATS: Strategy[] = ['idle', 'homestead', 'prepper', 'fortress'];
     for (const kind of kinds) for (const strat of strats) { const seed = 11 + ALL_KINDS.indexOf(kind) * 4 + ALL_STRATS.indexOf(strat) + Number(process.env.SEEDOFF ?? 0), site = siteFor(seed); const t0 = Date.now(); const yrs = Number(process.env.YEARS ?? 0); const r = play(strat, kind, seed, 'medium', site, yrs); results.push(r); if (process.env.TIMING) appendFileSync(process.env.TIMING, `${kind} ${strat} seed ${seed} ${yrs}y ${((Date.now() - t0) / 1000).toFixed(1)}s ${r.days} days ${(((Date.now() - t0) / Math.max(1, r.days))).toFixed(1)} ms/day ending ${r.ending} alive ${r.alive}\n`); }
-    const md = ['# Playtest report (scripted)', '', '| Site | Disaster | Strategy | Variant | Ending | Grade | Alive | Lost to | Hungry days | Days | $ at hit | Built at hit | Fights | Hid (found) | Trials | Joiners | Bugs |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
-      ...results.map(r => `| ${r.site} | ${r.kind} | ${r.strat} | ${r.variant} | ${r.ending} | ${r.grade} | ${r.alive} | ${r.causes || '-'} | ${r.hungry} | ${r.days} | ${r.moneyAtHit.toLocaleString('en-US')} | ${r.builtAtHit} | ${r.fights.join(', ') || '-'}${r.prisoners ? ` · ${r.prisoners} held` : ''} | ${r.hides ? `${r.hides} (${r.hidFound})${r.burned ? `, ${r.burned} burned` : ''}` : '-'} | ${r.trials} | ${r.joiners} | ${r.bugs.join('; ')} |`),
+    const md = ['# Playtest report (scripted)', '', '| Site | Disaster | Strategy | Variant | Ending | Grade | Alive | Lost to | Hungry days | Days | $ at hit | $ at end | Built at hit | Fights | Hid (found) | Trials | Joiners | Bugs |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|',
+      ...results.map(r => `| ${r.site} | ${r.kind} | ${r.strat} | ${r.variant} | ${r.ending} | ${r.grade} | ${r.alive} | ${r.causes || '-'} | ${r.hungry} | ${r.days} | ${r.moneyAtHit.toLocaleString('en-US')} | ${Math.round(r.s.money).toLocaleString('en-US')} | ${r.builtAtHit} | ${r.fights.join(', ') || '-'}${r.prisoners ? ` · ${r.prisoners} held` : ''} | ${r.hides ? `${r.hides} (${r.hidFound})${r.burned ? `, ${r.burned} burned` : ''}` : '-'} | ${r.trials} | ${r.joiners} | ${r.bugs.join('; ')} |`),
       '', '## Report card lines', '', ...results.map(r => `- **${r.kind} / ${r.strat}:** ${r.lines.join(' ')}`),
       '', '## What keeps happening (log lines seen 40+ times in a run, numbers taken out)', '', ...results.filter(r => r.often.length).map(r => `- **${r.kind} / ${r.strat}:** ${r.often.map(([k, n]) => `${n}× "${k}"`).join('; ')}`),
       // (round 4: checking can dip a few dollars under zero within a day, until the next morning moves it onto the card)

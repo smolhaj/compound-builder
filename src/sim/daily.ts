@@ -38,6 +38,7 @@ import { kinPersonal } from './kin';
 import { sowingRate, weedFactor } from './crops';
 import { beeRate } from './bees';
 import { sugaringRate } from './maple';
+import { hayingRate } from './haying';
 import { putByHours } from './kitchen';
 import { wearTools, workSpeed } from './tools';
 import { absentIdx, jobDayOf } from './weekender';
@@ -48,6 +49,7 @@ import { log } from './economy';
 import { plantChoreRate } from './renewables';
 import { regionFor } from './climate';
 import { pairNudge } from './bonds';
+import { onPost } from './roadPost';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Duties
@@ -56,7 +58,7 @@ import { pairNudge } from './bonds';
 export type Duty =
   | 'sleep' | 'meal' | 'leisure' | 'school'
   | 'build' | 'garden' | 'fields' | 'livestock' | 'pets' | 'wood' | 'water' | 'kitchen' | 'cleaning' | 'laundry' | 'repairs'
-  | 'hunt' | 'medic' | 'teach' | 'mentor' | 'radio' | 'watch' | 'study' | 'drill';
+  | 'hunt' | 'medic' | 'teach' | 'mentor' | 'radio' | 'watch' | 'study' | 'drill' | 'post';
 
 export interface DutyDef {
   name: string;
@@ -95,12 +97,14 @@ export const DUTY: Record<Duty, DutyDef> = {
   radio: { name: 'Radio', short: 'Ra', color: '#7a6aa8', work: true, tire: 1.5, kid: false, hint: 'Listening on the radio for news and the net.' },
   watch: { name: 'Watch', short: '!', color: '#c8a030', work: true, tire: 4, kid: false, hint: 'On watch: the tower, the wall (or its walkway, if there is one), the gate. Helps see trouble coming.' },
   study: { name: 'Class', short: 'Cl', color: '#8a7ab8', work: true, tire: 1.5, kid: true, hint: 'An evening class (Family tab → Classes and drills): a student with a teacher, a book set or an online course. The teacher sits in on the same hours.' },
+  post: { name: 'Road post', short: 'Rp', color: '#b08a3a', work: true, tire: 2.5, kid: false, hint: 'At the drive: the roadblock or checkpoint crew in the day, or the greeter sent down to meet a visitor. Set by the road (The county road, in the Family tab), not by the planner.' },
   drill: { name: 'Drill', short: 'Dr', color: '#a05a4a', work: true, tire: 3, kid: false, hint: 'Firearms drill at the range: spends ammunition, steadies the aim and the response at the alarm (Family tab → Classes and drills).' },
 };
 export const DUTIES = Object.keys(DUTY) as Duty[];
 
 /** Duties that are an adult's job (a teen 15+ can stand watch). */
 export function canDo(p: Person, d: Duty): boolean {
+  if (d === 'post') return false;   // the road sets it (sim/roadPost.ts)
   if (d === 'study') return p.age >= 10;
   if (d === 'drill') return !p.kid || p.age >= 15;
   if (!p.kid) return d !== 'school';
@@ -113,11 +117,11 @@ export function canDo(p: Person, d: Duty): boolean {
 // Chores
 // ─────────────────────────────────────────────────────────────────────────
 
-export type ChoreId = 'weeds' | 'sowing' | 'bees' | 'sugaring' | 'harvest' | 'animals' | 'pets' | 'hauling' | 'filters' | 'woodpile' | 'kitchen' | 'house' | 'laundry' | 'fences' | 'gear' | 'orchard' | 'greenhouse' | 'pond' | 'plant';
-export const CHORES: readonly ChoreId[] = ['weeds', 'sowing', 'bees', 'sugaring', 'harvest', 'animals', 'pets', 'hauling', 'filters', 'woodpile', 'kitchen', 'house', 'laundry', 'fences', 'gear', 'orchard', 'greenhouse', 'pond', 'plant'];
+export type ChoreId = 'weeds' | 'sowing' | 'bees' | 'sugaring' | 'haying' | 'harvest' | 'animals' | 'pets' | 'hauling' | 'filters' | 'woodpile' | 'kitchen' | 'house' | 'laundry' | 'fences' | 'gear' | 'orchard' | 'greenhouse' | 'pond' | 'plant';
+export const CHORES: readonly ChoreId[] = ['weeds', 'sowing', 'bees', 'sugaring', 'haying', 'harvest', 'animals', 'pets', 'hauling', 'filters', 'woodpile', 'kitchen', 'house', 'laundry', 'fences', 'gear', 'orchard', 'greenhouse', 'pond', 'plant'];
 
 export const CHORE_NAME: Record<ChoreId, string> = {
-  weeds: 'Garden weeding', sowing: 'Spring sowing and soil work', bees: 'Looking after the bees', sugaring: 'Gathering sap and boiling syrup', harvest: 'Harvest in the fields', animals: 'Feeding the animals', pets: 'Caring for the dogs', hauling: 'Hauling water', filters: 'Water filters',
+  weeds: 'Garden weeding', sowing: 'Spring sowing and soil work', bees: 'Looking after the bees', sugaring: 'Gathering sap and boiling syrup', haying: 'Cutting and baling hay', harvest: 'Harvest in the fields', animals: 'Feeding the animals', pets: 'Caring for the dogs', hauling: 'Hauling and pumping water', filters: 'Water filters',
   woodpile: 'Splitting and stacking', kitchen: 'Cooking and washing up', house: 'Cleaning the house', laundry: 'Laundry', fences: 'Fences and roofs', gear: 'Guns, tools, the generator', orchard: 'Pruning and picking the orchard', greenhouse: 'Tending the greenhouses', pond: 'Feeding the fish', plant: 'Intake screen, turbine and tower',
 };
 /** What happens when it falls behind (the UI's tooltip). */
@@ -126,6 +130,7 @@ export const CHORE_WHY: Record<ChoreId, string> = {
   sowing: 'The spring work falls behind: the fields go in late and make a shorter crop (up to 40% less).',
   bees: 'Uninspected hives swarm more, the mites build faster and less honey is made.',
   sugaring: 'Sap left in the buckets and the tank sours; the boil falls behind and less syrup is made.',
+  haying: 'Hay left standing in the meadow spoils: fewer bales for the winter.',
   harvest: 'The crop stands in the field and spoils: less of it comes in.',
   animals: 'The hens go off lay and the animals suffer: fewer eggs, lower morale.',
   pets: 'Hungry, unwalked dogs are a poor alarm and a sad sight: their warning and deterrence slip, and the kids mind.',
@@ -144,11 +149,11 @@ export const CHORE_WHY: Record<ChoreId, string> = {
 };
 /** Which duty works which chores (first one that needs it). */
 export const DUTY_CHORES: Partial<Record<Duty, ChoreId[]>> = {
-  garden: ['weeds', 'greenhouse', 'orchard', 'bees'], fields: ['harvest', 'sowing', 'weeds', 'orchard'], livestock: ['animals', 'pond'], pets: ['pets'], water: ['hauling', 'filters'], wood: ['woodpile', 'sugaring'],
+  garden: ['weeds', 'greenhouse', 'orchard', 'bees'], fields: ['haying', 'harvest', 'sowing', 'weeds', 'orchard'], livestock: ['animals', 'pond'], pets: ['pets'], water: ['hauling', 'filters'], wood: ['woodpile', 'sugaring'],
   kitchen: ['kitchen'], cleaning: ['house'], laundry: ['laundry'], repairs: ['fences', 'gear', 'plant'],
 };
 /** Person-hours to clear a full backlog (100). */
-export const CLEAR_HOURS: Record<ChoreId, number> = { weeds: 10, sowing: 8, bees: 4, sugaring: 14, harvest: 8, animals: 2, pets: 2.5, hauling: 3, filters: 2, woodpile: 8, kitchen: 3, house: 4, laundry: 5, fences: 10, gear: 6, orchard: 12, greenhouse: 6, pond: 3, plant: 4 };
+export const CLEAR_HOURS: Record<ChoreId, number> = { weeds: 10, sowing: 8, bees: 4, sugaring: 14, haying: 20, harvest: 8, animals: 2, pets: 2.5, hauling: 3, filters: 2, woodpile: 8, kitchen: 3, house: 4, laundry: 5, fences: 10, gear: 6, orchard: 12, greenhouse: 6, pond: 3, plant: 4 };
 
 export interface ChoreState { levels: Record<ChoreId, number> }
 
@@ -177,10 +182,12 @@ export function choreRates(s: GameState): Record<ChoreId, number> {
     sowing: sowingRate(s),
     bees: beeRate(s),
     sugaring: sugaringRate(s),
+    haying: hayingRate(s),
     harvest: doy >= H[0] && doy < H[1] ? HARVEST_RATE * count('field') : 0,
     animals: animals > 0 ? 50 * Math.min(4, animals) : 0,
     pets: petDogs(s) > 0 ? Math.min(100, 40 * petDogs(s)) : 0,
-    hauling: s.utilities.hauling ? (s.utilities.haulFar ? 60 : 35) : 0,
+    // (the hand pump's hours come out of the same water chore: a full backlog is 3 person-hours, sim/water.ts handPumpHours caps the day's pumping)
+    hauling: Math.min(100, (s.utilities.hauling ? (s.utilities.haulFar ? 60 : 35) : 0) + (s.utilities.report.handH ?? 0) * 100 / CLEAR_HOURS.hauling),
     filters: filters > 0 ? 4 : 0,
     woodpile: greenRicks(s) > 0.2 ? 8 : 0,
     kitchen: 30 * heads / 4,
@@ -718,6 +725,8 @@ export function unlockPerson(s: GameState, personId: string): void {
 /** What a person's plan says at an hour (falls back to the old routine for anyone not on the roster). */
 export function dutyAt(s: GameState, p: Person, hour: number): Duty {
   const h = Math.floor(((hour % 24) + 24) % 24);
+  // the road post (sim/roadPost.ts): a named crew at the block in the day, a greeter at the drive
+  if (onPost(s, p.id, h)) return 'post';
   const row = s.daily?.plan.hours[p.id];
   return row?.[h] ?? baseRow(p)[h];
 }
@@ -729,7 +738,7 @@ export function dutyAt(s: GameState, p: Person, hour: number): Duty {
 /** Task kinds the renderer reads, per duty (build is decided by the engine: build or forestry). */
 export const DUTY_TASK: Record<Exclude<Duty, 'build'>, TaskKind> = {
   sleep: 'sleep', meal: 'meal', leisure: 'leisure', school: 'school', garden: 'garden', fields: 'fields', livestock: 'livestock', pets: 'pets', wood: 'wood',
-  water: 'water', kitchen: 'kitchen', cleaning: 'cleaning', laundry: 'laundry', repairs: 'repairs', hunt: 'hunt', medic: 'medic', teach: 'teach', mentor: 'teach', radio: 'radio', watch: 'watch', study: 'study', drill: 'drill',
+  water: 'water', kitchen: 'kitchen', cleaning: 'cleaning', laundry: 'laundry', repairs: 'repairs', hunt: 'hunt', medic: 'medic', teach: 'teach', mentor: 'teach', radio: 'radio', watch: 'watch', study: 'study', drill: 'drill', post: 'watch',
 };
 
 /** Restedness multiplier on work: full to fatigue 50, half at 100. */
@@ -1062,6 +1071,7 @@ const BEHIND_LINE: Record<ChoreId, string> = {
   sowing: 'The fields are still not sown and the window is closing. Every week of delay costs crop.',
   bees: 'The hives have not been looked at in weeks. A strong colony in May is a swarm in the woods.',
   sugaring: 'Sap is standing in the buckets and the boil is behind. Every day it sits it sours.',
+  haying: 'The hay is down in the meadow and not going up. Every dry day it waits is a day nearer rain.',
   harvest: 'The harvest is standing in the field. "If we don\'t get it in this week, we lose it."',
   animals: 'The hens are off lay and the animals are bawling. Who was supposed to feed them?',
   pets: 'The dogs have been hanging around the empty bowl. Somebody needs to feed and walk them.',

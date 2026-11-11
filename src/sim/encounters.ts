@@ -53,6 +53,7 @@ import type { Person, SkillId } from './family';
 import { dayIndex, hourOf, type GameState } from './state';
 import type { Stock } from './materials';
 import type { Battle } from './battleTypes';
+import { ruleWatch } from './rules';
 import { gateLead, isAway, recordBattle, resolveRansom, type RansomTerms } from './rescue';
 import { defenders } from './pact';
 import { genSound, glowFactor } from './blackout';
@@ -74,6 +75,8 @@ import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp }
 import { vetArrival } from './gateVetting';
 import { admitNewcomers, resolveShelter, strangerArrival, type Extras, type ShelterWhy } from './newcomers';
 import { pluralize } from './words';
+import { prepPosture } from './roadWarn';
+import { markKind, takeMark } from './roadPassers';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Neighbors
@@ -190,8 +193,9 @@ export function postureOf(s: GameState): Posture {
   const tw = towerPosture(s);
   // fog (sim/fog.ts) takes what the eyes add: the watch's own score, the towers' view and the posted guard (the gear's share is already in gear.detection)
   const kEye = fogSightK(s, 'eye');
-  const detection = Math.min(100, 25 + (watch * 5 + tw.detection + watchDetection(s)) * kEye + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + guards.detection + forewarned(s) + villageWatch(s));
-  return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier), detection, fighters, deter: gear.deter, signs: gear.signs, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
+  const pre = prepPosture(s);
+  const detection = Math.min(100, pre.detection + 25 + (watch * 5 + tw.detection + watchDetection(s)) * kEye + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + guards.detection + forewarned(s) + villageWatch(s) + ruleWatch(s));
+  return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier + pre.barrier), detection, fighters: fighters + pre.fighters, deter: gear.deter, signs: gear.signs, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -351,7 +355,7 @@ export interface GateState {
   /** A crew that found nobody home and means to come back (they know someone lives here). */
   comeBack?: ComeBack | null;
   /** A raid rolled for today that has not arrived yet: it reaches the gate at `at` (game days), at its hour of the night or day (sim/siege.ts). */
-  incoming?: { e: Encounter; at: number; /** When it was sighted (game days): the road draws the approach from here (sim/roadLead.ts). Absent on a raid, which is seen over the last LEAD days. */ from?: number } | null;
+  incoming?: { e: Encounter; at: number; /** When it was sighted (game days): the road draws the approach from here (sim/roadLead.ts). Absent on a raid, which is seen over the last LEAD days. */ from?: number; /** The family has seen them coming (game time; sim/roadWarn.ts). */ seen?: number } | null;
   /** Hardcore: the day of the last probing raid (sim/adaptive.ts). */
   lastProbe?: number;
   /** The siege-wave clock (sim/waves.ts): waves so far. Absent on a save from before v82: raids stay random. */
@@ -421,7 +425,7 @@ export function whoComes(s: GameState, p: Posture, r: () => number): EncounterKi
   return 'arrival';
 }
 
-function makeThreat(kind: EncounterKind, r: () => number, id: string, day: number, s: GameState): Encounter {
+export function makeThreat(kind: EncounterKind, r: () => number, id: string, day: number, s: GameState): Encounter {
   const e = makeThreat0(kind, r, id, day, s);
   if (kind === 'looters' || kind === 'gang' || kind === 'militia') {
     e.temper = raiderTemper(s, kind, r);
@@ -548,13 +552,29 @@ export function gateDay(s: GameState): Encounter | null {
   }
   // a crew that found the place empty last time, back for the rest
   const cb = waveKind ? null : g.comeBack;
-  const kind = waveKind ?? (cb && (cb.probed || r() < 0.7) ? cb.kind : whoComes(s, p, r));
+  const mk0 = waveKind || cb ? null : markKind(s, day);
+  const kind = waveKind ?? (cb && (cb.probed || r() < 0.7) ? cb.kind : mk0 && r() < 0.85 ? mk0.kind : whoComes(s, p, r));
   // with the clock on, the waves are the hostile visits (a crew coming back to a place it stripped excepted); travelers stay away in the days before one
-  if (wv && !waveKind && !(cb && kind === cb.kind)) {
+  // under the wave clock a mark (sim/roadPassers.ts) does not add a raid or grow a wave: it brings two or three men to look the place over, once
+  const markProbe = !!wv && !waveKind && !cb && !!mk0 && kind === mk0.kind && (kind === 'looters' || kind === 'gang');
+  if (wv && !waveKind && !(cb && kind === cb.kind) && !markProbe) {
     if (HOSTILE.has(kind)) return null;
     if (left >= 1 && left <= WAVE.WARN) return null;
   }
   const e = makeThreat(kind, r, `e${s.nextId++}`, day, s);
+  // a crew that looked the place over from the county road (sim/roadPassers.ts) comes in as the crew it saw
+  if (markProbe && mk0) {
+    const n = probeHeads(mulberry32(s.seed * 4157 + day * 23 + 7)());
+    e.size = n; e.strength = n * 9; e.armed = true;
+    e.title = 'Men who looked you over';
+    e.dossier = [`${n} men on foot along the drive and the fence at dusk, looking at the lights, the windows and the gate. Rifles slung.`, mk0.line.replace(/ has come back\b.*$/, ' came back to look again.'), 'They are not here for your supplies yet. The raids come when they come; these are looking, and will go and say.'];
+    takeMark(s);
+  } else if (mk0 && kind === mk0.kind && e.strength) {
+    const was = e.size;
+    e.size = Math.max(was, mk0.size); e.strength = Math.round(e.strength * e.size / Math.max(1, was));
+    e.dossier = [e.dossier[0]?.replace(String(was), String(e.size)) ?? '', mk0.line, ...e.dossier.slice(1)].filter(Boolean);
+    takeMark(s);
+  }
   if (cb && kind === cb.kind) {
     e.size = cb.size; e.armed = cb.armed; e.temper = cb.temper; e.back = true;
     if (cb.scouted && cb.guide) e.scouted = cb.guide;
@@ -582,7 +602,7 @@ export function gateDay(s: GameState): Encounter | null {
     wv.n = n; wv.last = day;
   }
   // (Hardcore) the world learns a defended place: a probing raid first, then bigger, better-equipped crews (sim/adaptive.ts)
-  else if (e.strength && ['looters', 'gang', 'militia'].includes(e.kind)) adaptCrew(s, e, p, day);
+  else if (e.strength && !markProbe && ['looters', 'gang', 'militia'].includes(e.kind)) adaptCrew(s, e, p, day);
   // how the raid begins: scouts ahead of it, a man under a white flag, an ambush of the people at work, a diversion (sim/raidOpeners.ts; its own random stream)
   if (['looters', 'gang', 'militia', 'patrol', 'requisition'].includes(e.kind) && !e.back && !e.dig && !e.insiderHelp) {
     const op = planOpener({ kind: crewKindOf(e.kind), temper: e.temper ?? 'desperate', size: e.size, armed: e.armed, difficulty: d.difficulty ?? 'standard' }, mulberry32(s.seed * 977 + day * 13 + 5));

@@ -18,6 +18,7 @@ import { resolve, type Outcome, type Stance } from './encounters';
 import { newDamage } from './raidDamage';
 import { decorateDefenders } from './defenderMoments';
 import { ASSAULT_EXTRA } from './houseAssault';
+import { raidClass, withPace } from './raidLength';
 import { decorateRaiders } from './raiderKinds';
 import { LineDirector, voiceCutscene, rotateRaidMemory } from './raidDialogue';
 import { dramatize, type DramaInfo } from './raidDrama';
@@ -133,6 +134,8 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?:
     scenes = fresh.scenes; battles = []; spent = [];
     for (const sc of scenes) {
       if (sc.index === scenes.length - 1) { battles.push(finalBattle()); spent.push({}); continue; }
+      // the man shot under his white flag is the opening of the siege: a murder on the drive, then the crew's answer (the scenes after it)
+      if (sc.index === 0 && stance.startsWith('flag_')) { battles.push(gateScene(game, e, stance, stance === 'flag_shoot' ? 'bad' : outcome.tone, seed)); spent.push({}); continue; }
       const p = probeBattle(game, sc.kind, e.size, seed + sc.index * 977);
       battles.push(deco(p, sc)); spent.push(p.spent);
     }
@@ -155,6 +158,8 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?:
     scenes = scenes.map((sc, i) => (i === last && ep.ending ? { ...sc, ending: ep.ending, ...(ep.wake > 0 ? { wake: ep.wake } : {}) } : sc));
     if (drama) scenes = scenes.map((sc, i) => (i === drama!.scene ? { ...sc, wake: drama!.wake } : sc));
   }
+  const broke = !!battle && battle.events.some(ev => ev.kind === 'breach') && battle.events.some(ev => ev.kind === 'end' && (ev.result === 'breached' || ev.result === 'overrun'));
+  scenes = withPace(scenes, raidClass({ scenes: scenes.length, crew: e.size, broke }));
   const plan = finishPlan(e.kind, hour, scenes, fresh.style);
   // the scenes before the assault are cosmetic fights that cost rounds, never blood
   let rounds = 0;

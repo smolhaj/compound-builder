@@ -34,8 +34,8 @@ import { fosterOut, wardsDay, type Ward } from './orphans';
 import { threatsDay } from './threats';
 import type { Threat } from './threatState';
 
-export type ChronicleKind = 'era' | 'birth' | 'death' | 'partner' | 'coming' | 'milestone' | 'retire' | 'home' | 'threat' | 'bond';
-export interface ChronicleEntry { t: number; year: number; kind: ChronicleKind; text: string }
+export type ChronicleKind = 'era' | 'birth' | 'death' | 'partner' | 'coming' | 'milestone' | 'retire' | 'home' | 'threat' | 'bond' | 'photo';
+export interface ChronicleEntry { t: number; year: number; kind: ChronicleKind; text: string; /** A photo kept with this line (sim/photos.ts). */ photo?: string }
 
 /** One era: a disaster lived through (eras.ts fills these in). */
 export interface EraRecord { n: number; kind: string; name: string; fate: string; hitDay: number; endDay: number; ending: string; grade: string; score: number; /** The report card's front-page line (older saves have none). */ headline?: string }
@@ -109,9 +109,9 @@ export function foundLineage(people: Person[], seed: number): void {
 const alive = (s: GameState, p: Person) => s.personState.find(x => x.id === p.id)?.needs.died == null;
 const kinOf = (a: Person, b: Person) => a.parents?.includes(b.id) || b.parents?.includes(a.id) || !!a.parents?.some(x => b.parents?.includes(x));
 
-export function chronicle(s: GameState, kind: ChronicleKind, text: string): void {
+export function chronicle(s: GameState, kind: ChronicleKind, text: string, photo?: string): void {
   const L = s.lineage;
-  L.chronicle.push({ t: s.clock.t, year: calendarOf(s.clock).year, kind, text });
+  L.chronicle.push({ t: s.clock.t, year: calendarOf(s.clock).year, kind, text, ...(photo ? { photo } : {}) });
   if (L.chronicle.length > 400) L.chronicle.splice(0, L.chronicle.length - 400);
 }
 

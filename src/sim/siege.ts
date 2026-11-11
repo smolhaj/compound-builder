@@ -137,6 +137,8 @@ export interface Scene {
   fight: number;
   /** Game seconds of the lull after, time-lapsed. */
   tail: number;
+  /** How much the approach and the quiet after are stretched in the playback: 1 a skirmish (about a minute whole), more for a serious raid (3-4 min) and a full invasion (up to about 6; sim/raidLength.ts). */
+  pace?: number;
   /** Who is drawn and how the scene is played (sim/raiderKinds.ts); absent on a scene from before. */
   style?: CrewStyle;
   tactic?: Tactic;
@@ -179,10 +181,11 @@ export interface SiegeInput {
 
 /** How long a scene's lead-in, fight and tail take in the playback (real seconds). */
 export function playbackLengths(sc: Scene): { lead: number; fight: number; tail: number } {
+  const k = sc.pace ?? 1;
   return {
-    lead: sc.lead > 0 ? Math.min(9, Math.max(3, sc.lead / 22)) : 0,
+    lead: sc.lead > 0 ? Math.min(9 * k, Math.max(3, sc.lead / 22 * k)) : 0,
     fight: sc.fight,
-    tail: Math.max(sc.tail > 0 ? Math.min(6, Math.max(2, sc.tail / 18)) : 0, sc.wake ? sc.wake + 3 : 0),
+    tail: Math.max(sc.tail > 0 ? Math.min(6 * k, Math.max(2, sc.tail / 18 * k)) : 0, sc.wake ? sc.wake + 3 : 0),
   };
 }
 /** The card shown over a skipped gap, in playback seconds. */
@@ -527,6 +530,41 @@ export function gateScene(s: GameState, e: Pick<Encounter, 'size' | 'kind' | 'id
     } else {
       say(26, pickOf(r, ['Nobody. Empty. Let\'s go.', 'Nothing here. Back in the truck.']), 'r0');
       for (let i = 0; i < n; i++) { const p = at(start, (i - 3) * 1.8); ev.push({ t: r2(30 + r() * 6), kind: 'move', unit: `r${i}`, x: r2(p.x), z: r2(p.z) }); }
+    }
+  } else if (stance.startsWith('flag_')) {
+    // the man under the white flag (sim/parleyChoices.ts): he walks up alone with a white cloth on a stick; what the family does with it decides the rest
+    const envoy = 'r0', who = faces[0] ? `h_${faces[0].id}` : undefined, other = faces[1] ? `h_${faces[1].id}` : undefined;
+    ev.push({ t: 14, kind: 'flag', unit: envoy });
+    const gate = at(6.2, 0), meet = at(5.0, 0);
+    ev.push({ t: 15, kind: 'move', unit: envoy, x: r2(gate.x), z: r2(gate.z), walk: true });
+    // the rest of the crew waits where it stopped, down on a knee
+    for (let i = 1; i < n; i++) { const p = at(11 + r() * 2, (i - (n - 1) / 2) * 1.2); ev.push({ t: r2(15 + r() * 2), kind: 'cover', unit: `r${i}`, x: r2(p.x), z: r2(p.z) }); }
+    say(16, pickOf(r, ['That is a white cloth. Hold your fire!', 'One man, walking. He has his hand up.', 'Nobody shoots. Let us hear what he wants.']), who);
+    say(19, pickOf(r, ['We are not here to fight. We want to talk.', 'Hold your fire! I am unarmed! Hear me out.', 'Nobody has to get hurt tonight.']), envoy);
+    if (stance === 'flag_pay') {
+      say(22, 'Here. This is the toll. Take it and go.', who);
+      if (who) ev.push({ t: 23, kind: 'move', unit: who, x: r2(meet.x), z: r2(meet.z), walk: true });
+      ev.push({ t: 26, kind: 'loot', by: envoy, what: 'food and fuel', n: 1, from: 'yard' });
+      say(27, 'That is fair. You will not see us again.', envoy);
+      for (let i = 0; i < n; i++) { const p = at(start, (i - 3) * 1.8); ev.push({ t: r2(30 + r() * 5), kind: 'move', unit: `r${i}`, x: r2(p.x), z: r2(p.z) }); }
+      if (who) ev.push({ t: 29, kind: 'move', unit: who, x: r2(wall.x), z: r2(wall.z), walk: true });
+    } else if (stance === 'flag_pass') {
+      say(22, 'You want the road? Take the road. Keep walking.', who);
+      say(26, 'Single file. Eyes front. Nobody looks at the house.', envoy);
+      for (let i = 0; i < n; i++) { const a = at(11, 7 + i * 0.7), b = at(11, -9 - i * 0.7); ev.push({ t: r2(24 + i * 0.8), kind: 'move', unit: `r${i}`, x: r2(a.x), z: r2(a.z), walk: true }); ev.push({ t: r2(34 + i * 1.2), kind: 'move', unit: `r${i}`, x: r2(b.x), z: r2(b.z), walk: true }); }
+    } else if (stance === 'flag_bluff') {
+      say(22, 'Look at the wall. Look at the tower. Count them, if you can.', who);
+      // the defenders show themselves along the wall: more of them than the crew saw
+      [who, other].forEach((id, i) => { if (!id) return; const p = at(4.6, (i ? 3.5 : -3.5)); ev.push({ t: 21 + i, kind: 'move', unit: id, x: r2(p.x), z: r2(p.z) }); });
+      say(27, tone === 'good' ? 'There are too many. Back, back to the truck.' : 'They are bluffing. Probably.', envoy);
+      for (let i = 0; i < n; i++) { const p = at(start, (i - 3) * 1.8); ev.push({ t: r2(30 + r() * 5), kind: 'move', unit: `r${i}`, x: r2(p.x), z: r2(p.z) }); }
+    } else {
+      // flag_shoot: someone shoots the man under the flag. It is not a fight yet; it is a murder in the road, and the crew runs for cover
+      if (who) { ev.push({ t: 22, kind: 'shot', from: who, to: envoy, hit: true }); }
+      ev.push({ t: 22.2, kind: 'death', unit: envoy, executed: true });
+      say(23.5, 'He had a flag! He had a white flag!', 'r1');
+      say(25, 'Get down! Get back, get back to the truck!', 'r2');
+      for (let i = 1; i < n; i++) { const p = at(start, (i - 3) * 1.8); ev.push({ t: r2(26 + r() * 4), kind: 'move', unit: `r${i}`, x: r2(p.x), z: r2(p.z) }); }
     }
   } else {
     const who = faces[0] ? `h_${faces[0].id}` : undefined;
