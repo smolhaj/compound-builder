@@ -9,7 +9,7 @@ import { resolve } from 'node:path';
 const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
-const port = Number(opt('--port', 5441)), outDir = resolve(opt('--out', 'shots/blueprint')), q = opt('--q', 'medium'), rings = Number(opt('--rings', 2));
+const port = Number(opt('--port', 5441)), outDir = resolve(opt('--out', 'shots/blueprint')), q = opt('--q', 'medium'), rings = Number(opt('--rings', 2)), layout = opt('--layout', 'shelf');
 mkdirSync(outDir, { recursive: true });
 let vite = null;
 if (args.includes('--serve')) {
@@ -21,7 +21,7 @@ const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=sw
 const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
 page.setDefaultTimeout(900000);
 page.on('pageerror', e => console.error('PAGEERROR', e.message));
-await page.goto(`http://localhost:${port}/?lowrender=0.75&clean&seed=7&${LOT}&showcase=mountain&rings=${rings}&wall=stone&layout=shelf`);
+await page.goto(`http://localhost:${port}/?lowrender=0.75&clean&seed=7&${LOT}&showcase=mountain&rings=${rings}&wall=stone&layout=${layout}`);
 await page.waitForFunction(() => window.__cb?.qa?.renderNow && window.__showcase, null, { timeout: 900000 });
 await page.evaluate(() => { const { game, store } = window.__cb; game.getState().setSpeed(0); store.getState().setQuality('low'); store.getState().setTimeOfDay(10); store.getState().setWeatherMode('clear'); store.getState().setSeasonMode('summer'); });
 if (args.includes('--razor')) {
@@ -55,6 +55,15 @@ await orbit(22, 0.9, info.up + 0.3); await shot('top');
 const eye = await page.evaluate(() => { const cb = window.__cb, w = cb.world, ag = [...w.family._agents.values()].find(a => a.x !== undefined); if (!ag) return null; const rx = Math.sin(ag.rot ?? 0), rz = Math.cos(ag.rot ?? 0); const ex = ag.x - rx * 1.1 + rz * 0.3, ez = ag.z - rz * 1.1 - rx * 0.3; cb.cam.placeEye(ex, ez, ag.x, ag.z, 0.36); return { x: ag.x, z: ag.z }; });
 console.error('eye person', JSON.stringify(eye));
 await shot('eye');
+if (args.includes('--focus')) {
+  // zoomed shots of the labels this PR adds: the ring wall (razor / patrol deck on top) and the tunnel's door
+  const marks = await page.evaluate(async () => { const m = await import('/src/game/blueprint/blueprintPlan.ts'); const g = window.__cb.game.getState().game; return m.blueprintPlan(g).marks.filter(k => /ring wall|tunnel|bridge/i.test(k.label)).map(k => ({ label: k.label, sub: k.sub, x: k.x, z: k.z })); });
+  console.error('focus marks', JSON.stringify(marks));
+  const look = (m, r, name) => page.evaluate(([m, r]) => { const { world, cam } = window.__cb; window.__cb.qa.pose = null; cam.target.set(m.x, world.groundAt(m.x, m.z) + 0.8, m.z); cam.radius = r; cam.pitch = 0.6; cam.yaw = 0.5; }, [m, r]).then(() => shot(name));
+  const ring = marks.find(k => /ring wall/i.test(k.label)), tun = marks.find(k => /tunnel|bridge/i.test(k.label));
+  if (ring) await look(ring, 7, 'focus-ring-wall');
+  if (tun) await look(tun, 7, 'focus-tunnel-door');
+}
 await page.evaluate(() => window.__cb.store.getState().setBlueprint(false));
 await orbit(40, 0.55, info.up + 0.3);
 console.error('hidden labels after off:', await page.evaluate(() => document.querySelectorAll('[data-testid=blueprint-labels] > div').length));
