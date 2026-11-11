@@ -152,8 +152,9 @@ try {
       if (window.__flags.demo === 'repair' && t > 6) {
         // QA: the sim never staged a repelled breach with a death in range, so the prop is shown by handing the live renderer the event on a real wall segment
         if (!window.__demoAt) {
-          const run = cb.game.getState().game.perimeter.find(r => r.pts.length >= 2);
-          const [a, c] = [run.pts[0], run.pts[1]];
+          const camp = cb.world.camp; let best = null;
+          for (const r of cb.game.getState().game.perimeter) for (let i = 1; i < r.pts.length; i++) { const m = [(r.pts[i - 1][0] + r.pts[i][0]) / 2, (r.pts[i - 1][1] + r.pts[i][1]) / 2], d = Math.hypot(m[0] - camp.x, m[1] - camp.z); if (!best || d < best.d) best = { d, a: r.pts[i - 1], c: r.pts[i] }; }
+          const [a, c] = [best.a, best.c];
           window.__demoAt = { t, x: (a[0] + c[0]) / 2, z: (a[1] + c[1]) / 2, h: Math.atan2(c[0] - a[0], c[1] - a[1]) };
           b.props.onEvent({ t, kind: 'repair', x: window.__demoAt.x, z: window.__demoAt.z, w: 0.8, heading: window.__demoAt.h, secs: 4 });
         }
@@ -176,9 +177,9 @@ try {
       await page.evaluate(async ([kind, q]) => {
         const g = window.__cb.world.groundAt;
         if (kind === 'wake') { window.__force = null; window.__cb.qa.skipDraw = false; window.__pump(10); return; }
-        const wide = kind === 'flare' || kind === 'fire' || kind === 'answer' || kind === 'lights' || kind === 'repair';
-        const d = wide ? 2.2 : kind === 'flag' ? 1.1 : (kind === 'panic' || kind === 'sling') ? 1.3 : 0.8;
-        window.__force = { eye: { x: q.x + d * 0.8, y: g(q.x, q.z) + (wide ? 0.9 : kind === 'flag' ? 0.42 : (kind === 'panic' || kind === 'sling') ? 0.75 : 0.28), z: q.z - d * 0.6 }, look: { x: q.x, y: g(q.x, q.z) + (wide ? 0.35 : kind === 'flag' ? q.y + 0.3 : q.y + 0.12), z: q.z }, fov: wide ? 62 : 50 };
+        const wide = kind === 'flare' || kind === 'fire' || kind === 'answer' || kind === 'lights';
+        const d = wide ? 2.2 : kind === 'repair' ? 0.9 : kind === 'flag' ? 1.1 : (kind === 'panic' || kind === 'sling') ? 1.3 : 0.8;
+        window.__force = { eye: { x: q.x + d * 0.8, y: g(q.x, q.z) + (wide ? 0.9 : kind === 'repair' ? 0.35 : kind === 'flag' ? 0.42 : (kind === 'panic' || kind === 'sling') ? 0.75 : 0.28), z: q.z - d * 0.6 }, look: { x: q.x, y: g(q.x, q.z) + (wide ? 0.35 : kind === 'flag' ? q.y + 0.3 : q.y + 0.12), z: q.z }, fov: wide ? 62 : 50 };
         window.__cb.qa.skipDraw = false; window.__pump(10);
       }, [kind, q]);
       await page.evaluate(() => new Promise(r => setTimeout(r, 30)));
