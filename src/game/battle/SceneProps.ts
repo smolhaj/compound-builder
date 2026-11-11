@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { BattleEvent } from '../../sim/battleTypes';
+import { AftermathProps } from './AftermathProps';
 
 export interface PropHooks {
   ground: (x: number, z: number) => number;
@@ -49,12 +50,14 @@ export class SceneProps {
   private _mat: THREE.Material[] = [];
   private readonly _group: THREE.Group;
   private readonly _h: PropHooks;
-  constructor(group: THREE.Group, hooks: PropHooks) { this._group = group; this._h = hooks; }
+  private readonly _after: AftermathProps;
+  constructor(group: THREE.Group, hooks: PropHooks) { this._group = group; this._h = hooks; this._after = new AftermathProps(group, { ground: hooks.ground, puff: hooks.puff }); }
 
   /** Counts for the leak test. */
   get live(): { door: boolean; packs: number; fires: number; ladders: number } { return { door: !!this._door, packs: this._packOf.length, fires: this._fires.length, ladders: this._ladders.length }; }
 
   end(): void {
+    this._after.end();
     if (this._door) this._group.remove(this._door.pivot);
     if (this._packs) this._group.remove(this._packs);
     if (this._ladderMesh) this._group.remove(this._ladderMesh);
@@ -69,6 +72,7 @@ export class SceneProps {
     if (e.kind === 'house_door') this._doorEvent(e);
     else if (e.kind === 'ladder') this._addLadder(e);
     else if (e.kind === 'flag') this._addFlag(e.unit);
+    else if (e.kind === 'tool' || e.kind === 'grave' || e.kind === 'repair') this._after.onEvent(e);
     else if (e.kind === 'alarm') this._addDog();
     else if (e.kind === 'flare') { if (this._flares.length < MAX_FLARES) this._flares.push({ x: e.x, z: e.z, age: 0, secs: e.secs, acc: 0 }); }
     else if (e.kind === 'loot') {
@@ -184,6 +188,7 @@ export class SceneProps {
 
   update(dt: number, at: (id: string) => UnitAt | null): void {
     const h = this._h;
+    this._after.update(dt, at);
     const d = this._door;
     if (d) {
       d.open += Math.sign(d.target - d.open) * Math.min(Math.abs(d.target - d.open), d.speed * dt);
