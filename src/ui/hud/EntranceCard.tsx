@@ -4,10 +4,10 @@
  * its route on the ground. The suggested entrance is marked; nothing changes until "Use this entrance" is pressed (and only until the
  * drive is ordered). Pure numbers from sim/roadEntrance.ts.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { entranceChoiceFor } from '../../sim/roadEntrance';
-import { setEntrancePreview } from '../../game/roadPreview';
+import { setEntrancePick, setEntrancePreview } from '../../game/roadPreview';
 import { DIM, TONE, btn, usd } from './style';
 import { pluralize } from '../../sim/words';
 import { lengthText } from '../../sim/units';
@@ -20,6 +20,15 @@ export function EntranceCard() {
   const haveBlade = game.stock.plow >= 1, entrance = game.site.entrance, seed = game.seed, siteId = game.site.id;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const choice = useMemo(() => (open ? entranceChoiceFor(game) : null), [open, entrance, haveBlade, seed, siteId]);
+  // while the card is open the county road itself is a button: hover it to see the nearest entrance, click it to use that one
+  useEffect(() => {
+    if (!choice || locked) { setEntrancePick(null); return; }
+    setEntrancePick({
+      spots: choice.options.map(o => ({ z: o.z, gateZ: o.gateZ })),
+      apply: z => { const why = setEntrance(z); setMsg(why ? `Not now: ${why}.` : 'Entrance marked: the drive will come in there.'); },
+    });
+    return () => { setEntrancePick(null); setEntrancePreview(null); };
+  }, [choice, locked, setEntrance]);
   if (locked || game.site.lot?.kind === 'island') return null;
   return (
     <div style={{ marginTop: 4 }}>
@@ -36,6 +45,7 @@ export function EntranceCard() {
               {!o.current && <button style={{ ...btn(i === choice.suggested), marginTop: 4 }} onClick={() => { const why = setEntrance(o.z); setMsg(why ? `Not now: ${why}.` : 'Entrance marked: the drive will come in there.'); }}>Use this entrance</button>}
             </div>
           ))}
+          <div style={{ color: DIM, fontSize: 11.5 }}>Or point at the county road on the map: it shows the nearest entrance, and a click uses it.</div>
           {msg && <div style={{ color: DIM, fontSize: 11.5 }}>{msg}</div>}
         </div>
       )}
