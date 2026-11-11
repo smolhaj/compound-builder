@@ -12,6 +12,7 @@ const require = createRequire(import.meta.url);
 let chromium;
 try { ({ chromium } = require('playwright')); } catch { ({ chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs')); }
 const args = process.argv.slice(2);
+const OPT_DOG = process.argv.includes('--dog'), OPT_TOWER = process.argv.includes('--tower');
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const port = Number(opt('--port', 5971)), hour0 = Number(opt('--hour', 2.25)), maxF = Number(opt('--max', 100000));
 const quality = opt('--quality', null), outDir = resolve(opt('--out', '/tmp/claude-0/movie/night'));
@@ -47,7 +48,7 @@ try {
   if (opt('--method', null)) await page.evaluate(async m => { (await import('/src/sim/breach.ts')).breachOptions.force = m; }, opt('--method', null));
   console.log('quality', await page.evaluate(() => window.__cb.store.getState().quality));
   const frames = async (k) => { const f0 = await page.evaluate(() => window.__cb.qa.frames); await page.waitForFunction(x => window.__cb.qa.frames >= x, f0 + k, { polling: 200 }); };
-  const info = await page.evaluate(async ([hour0, scan, wantDay, KIND, SIZE, TEMPER, STANCE]) => {
+  const info = await page.evaluate(async ([hour0, scan, wantDay, KIND, SIZE, TEMPER, STANCE, OPT_DOG, OPT_TOWER]) => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp;
     const { planSiege } = await import('/src/sim/siege.ts');
     const sp = cb.tool.findSpot('timber_cabin', c.x, c.z, 0);
@@ -63,6 +64,8 @@ try {
     g.disaster.tracks = { ...g.disaster.tracks, law: 0, stores: 0, deliveries: 0, banks: 0 };
     g.stock.canned = 20; g.stock.meds = 3; g.stock.sandbags = 3; g.stock.dog = 1; g.armory.ammo['556'] = 2000;
     for (const [i, p] of g.people.entries()) if (!p.kid || p.age >= 15) { g.armory.guns.push({ id: `g${i}`, model: 'sw_mp15', condition: 1, fired: 0, where: 'house', carrier: p.id }); g.armory.skill[p.id] = 5; }
+    if (OPT_DOG) { const { adoptDog } = await import('/src/sim/pets.ts'); adoptDog(g, { ageYears: 3, training: 60, guard: true }); }
+    if (OPT_TOWER) { for (const [i, [tx, tz]] of [[-4, 10], [4, 10]].entries()) g.structures.push({ id: 'tw' + i, kind: 'watchtower_flood', x: sp[0] + tx, z: sp[1] + tz, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 }); g.utilities.lit = ['house']; }
     let ed = 0;
     const { stageRaid } = await import('/src/sim/raidCutscene.ts');
     const mk = d => ({ id: 'e9', kind: KIND, day: d, title: 'An armed crew', dossier: ["10 of them, organized, rifles. They've been working the farms east of town.", 'They know what they want, and they think you have it.'], size: SIZE, armed: true, strength: 120, wants: { canned: 8, fuel: 4 }, stances: ['hide', 'parley', 'defend', 'trade', 'flag_pay', 'flag_pass', 'flag_bluff', 'flag_shoot'], ...(STANCE.startsWith('flag_') ? { opener: { kind: 'demand' } } : {}), temper: TEMPER });
@@ -83,7 +86,7 @@ try {
     g.gate.pending = mk(ed);
     G.getState().load(g);
     return { day: ed };
-  }, [hour0, scan, wantDay, opt('--kind', 'gang'), Number(opt('--crewsize', 10)), opt('--temper', 'hard'), opt('--stance', 'defend')]);
+  }, [hour0, scan, wantDay, opt('--kind', 'gang'), Number(opt('--crewsize', 10)), opt('--temper', 'hard'), opt('--stance', 'defend'), OPT_DOG, OPT_TOWER]);
   console.log(JSON.stringify(info), new Date().toISOString());
   if (scan) { await browser.close(); vite.kill(); process.exit(0); }
   await frames(10); console.log('frames ok', new Date().toISOString());
@@ -138,14 +141,18 @@ try {
       if (beats.includes('flag')) for (const e of ev) if (e.kind === 'flag' && t >= e.t + 3 && t <= e.t + 12) { const q = pos(e.unit); if (q) { found.flag = { ...q, key: e.unit }; const m = b.props?._flagMesh; window.__flagInfo = m ? { count: m.count, vis: m.visible, verts: m.geometry.attributes.position.count, side: m.material.side, layers: m.layers.mask, parent: !!m.parent } : null; } }
       for (const [k, f] of [['panic', u => u.frozenUntil != null], ['sling', u => u.sling && !u.dead], ['crawl', u => u.crawl && !u.dead], ['limp', u => u.limp && !u.crawl && !u.dead]]) if (beats.includes(k)) for (const u of U.values()) if (f(u) && !u.def.machine) { found[k] = { x: u.x, z: u.z, y: u.y, key: u.def.id }; break; }
       if (beats.includes('answer')) { const fe = ev.find(e => e.kind === 'flag'); if (fe && t >= fe.t + 8 && t <= fe.t + 16) { const u = U.get(fe.unit); if (u) found.answer = { x: u.x, z: u.z, y: u.y, key: 'answer' }; } }
+      if (beats.includes('dog')) for (const e of ev) if (e.kind === 'alarm' && e.what === 'dog' && t >= e.t + 2 && t <= e.t + 14) { const d = b.props?._dog; if (d) found.dog = { x: d.x, z: d.z, y: 0, key: 'dog' }; }
+      if (beats.includes('lights') && b._lightsSparked && b._floods?.length) { const f = b._floods[0].position; found.lights = { x: f.x, z: f.z, y: 0, key: 'lights' }; }
+      if (beats.includes('scout')) for (const e of ev) if (e.kind === 'scout' && t >= e.t + 1 && t <= e.t + 10) { const q = pos(e.units[0]); if (q) found.scout = { ...q, key: 'scout' }; }
       if (beats.includes('flare')) for (const e of ev) if (e.kind === 'flare' && t >= e.t + 1 && t <= e.t + e.secs - 1) found.flare = { x: e.x, z: e.z, y: 0, key: 'flare' + e.t };
       if (beats.includes('fire')) for (const e of ev) if (e.kind === 'fire' && t >= e.t + 4 && t <= e.t + 25) found.fire = { x: e.x, z: e.z, y: 0, key: 'fire' + e.structure };
-      return { phase: c?.phase, offer: c?.offer ?? null, bt: +t.toFixed(2), found, caption: b.lines?.slice(-1)[0]?.text ?? '' };
+      return { phase: c?.phase, offer: c?.offer ?? null, bt: +t.toFixed(2), found, kinds: [...new Set(ev.map(e => e.kind + (e.what ? ':' + e.what : '')))], lt: ev.filter(e => e.kind === 'lights' || e.kind === 'breach').map(e => e.kind + '@' + e.t),  dog: !!b.props?._dog, floods: b._floods?.length ?? 0, sp: b._lightsSparked, fo: b._floodsOutAt, tm: b.time, ln: b.lightNight, bn: b.battle?.night, caption: b.lines?.slice(-1)[0]?.text ?? '' };
     }, [FPS, beats]);
     p++;
     if (st.offer != null) await page.evaluate(() => window.__cb.game.getState().midStance(null));
     if (st.phase === 'aftermath') break;
     if (st.bt == null) continue;
+    for (const k of st.kinds ?? []) (globalThis.__kinds ??= new Set()).add(k); if (st.dog) globalThis.__dog = true; globalThis.__floods = Math.max(globalThis.__floods ?? 0, st.floods ?? 0); if (st.sp) globalThis.__sp = true; if (st.lt?.length && globalThis.__lt !== st.lt.join()) { globalThis.__lt = st.lt.join(); console.log('LT', st.bt, JSON.stringify(st.lt)); } if (st.bt >= 67 && !globalThis.__fo) { globalThis.__fo = 1; console.log('FLOODOUT', JSON.stringify({ fo: st.fo, tm: st.bt, ln: st.ln, bn: st.bn })); }
     let did = false;
     for (const [kind, q] of Object.entries(st.found)) {
       const key = kind + ':' + q.key;
@@ -153,9 +160,9 @@ try {
       { const last = shotLog.filter(x => x.key === key).pop(); if (last && st.bt - last.bt < 1.2) continue; }   // spread the frames over the beat
       await page.evaluate(async ([kind, q]) => {
         const g = window.__cb.world.groundAt;
-        const wide = kind === 'flare' || kind === 'fire' || kind === 'answer';
-        const d = wide ? 2.2 : kind === 'flag' ? 1.1 : 0.8;
-        window.__force = { eye: { x: q.x + d * 0.8, y: g(q.x, q.z) + (wide ? 0.9 : kind === 'flag' ? 0.42 : 0.28), z: q.z - d * 0.6 }, look: { x: q.x, y: g(q.x, q.z) + (wide ? 0.35 : kind === 'flag' ? q.y + 0.3 : q.y + 0.12), z: q.z }, fov: wide ? 62 : 50 };
+        const wide = kind === 'flare' || kind === 'fire' || kind === 'answer' || kind === 'lights';
+        const d = wide ? 2.2 : kind === 'flag' ? 1.1 : (kind === 'panic' || kind === 'sling') ? 1.3 : 0.8;
+        window.__force = { eye: { x: q.x + d * 0.8, y: g(q.x, q.z) + (wide ? 0.9 : kind === 'flag' ? 0.42 : (kind === 'panic' || kind === 'sling') ? 0.75 : 0.28), z: q.z - d * 0.6 }, look: { x: q.x, y: g(q.x, q.z) + (wide ? 0.35 : kind === 'flag' ? q.y + 0.3 : q.y + 0.12), z: q.z }, fov: wide ? 62 : 50 };
         window.__cb.qa.skipDraw = false; window.__pump(10);
       }, [kind, q]);
       await page.evaluate(() => new Promise(r => setTimeout(r, 30)));
@@ -169,5 +176,6 @@ try {
     void did;
   }
   writeFileSync(`${outDir}/shots.json`, JSON.stringify(shotLog, null, 1));
+  console.log('KINDS', [...(globalThis.__kinds ?? [])].join(','), 'dog', !!globalThis.__dog, 'floods', globalThis.__floods, 'sparked', !!globalThis.__sp);
   console.log('SHOTS', shotLog.length, JSON.stringify(shotLog.map(x => x.file + '@' + x.bt)));
 } finally { await browser.close(); vite.kill(); setTimeout(() => process.exit(0), 200); }
