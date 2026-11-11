@@ -42,6 +42,9 @@ export interface WorldState {
   seasonMode: SeasonMode;
   weatherMode: WeatherMode;
   quality: Quality;
+  /** The tilt-shift diorama look (engine/world/post/tiltShift.ts): off by default, High quality only. */
+  tiltShift: boolean;
+  setTiltShift: (on: boolean) => void;
   /** The loading screen: what the boot is doing and how far along (null once the world is up). */
   boot: { label: string; pct: number; hold?: boolean } | null;
   /** Frame-rate cap (0 = uncapped). 60 by default: a 120 Hz display otherwise does twice the work for no visible gain. */
@@ -153,6 +156,7 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   seasonMode: 'auto',
   weatherMode: 'auto',
   quality: savedQuality(),
+  tiltShift: false,
   boot: { label: 'Starting', pct: 0.02 },
   frameCap: savedFrameCap(),
   setFrameCap: (frameCap) => { try { localStorage.setItem('cb.fpscap', String(frameCap)); } catch { /* private mode */ } set({ frameCap }); },
@@ -212,6 +216,7 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   setPhoto: (photo) => set({ photo }),
   syncClock: (timeOfDay, dayOfYear, totalDays) => set({ timeOfDay, dayOfYear, totalDays }),
   setSeasonMode: (seasonMode) => set({ seasonMode }),
+  setTiltShift: (tiltShift) => set({ tiltShift }),
   setQuality: (quality, manual = false) => {
     if (manual) { try { localStorage.setItem('cb.quality', quality); } catch { /* private mode */ } }
     set({ quality });

@@ -146,10 +146,12 @@ export function planInterior(a: InteriorArgs): InteriorOut | null {
     return a.out;
   };
   const tS = tShut + 0.4;
-  const s = tS + (disc ? 4.2 : 1.5);   // when the door gives
+  // the door gives only when the crew is AT it: the longest walk of the stack (the router's path is longer than the straight line) before the kick
+  const stackWalk = Math.max(0, ...crew.slice(0, 6).map((u, i) => { const w = wallSpot(i % 2 ? 1 : -1, Math.floor(i / 2) * (disc ? 0.12 : 0.1)); const p0 = a.pos.get(u.id) ?? u; return (near(p0, w) * 1.3) / RUN + i * (disc ? 0.25 : 0.15); }));
+  const s = tS + Math.max(disc ? 4.2 : 1.5, stackWalk + (disc ? 2.2 : 0.8));   // when the door gives
   if (disc) {
     crew.slice(0, 6).forEach((u, i) => ev.push({ t: r2(tS + i * 0.25), kind: 'move', unit: u.id, x: r2(wallSpot(i % 2 ? 1 : -1, Math.floor(i / 2) * 0.12).x), z: r2(wallSpot(i % 2 ? 1 : -1, Math.floor(i / 2) * 0.12).z) }));
-    say(tS + 1.4, 'raider', 'stack_door', crew[1] ?? breacher);
+    say(Math.max(tS + 1.4, tS + stackWalk - 0.4), 'raider', 'stack_door', crew[1] ?? breacher);
     doorEv(s - 1.8, 'kick', false, breacher);
     say(s - 1.7, 'raider', 'kick_door', breacher);
     doorEv(s - 0.2, 'kick', true, breacher);
@@ -160,6 +162,9 @@ export function planInterior(a: InteriorArgs): InteriorOut | null {
   }
   // the family waits behind the door
   if (fighters[1]) say(tS + 0.9, 'defender', 'pie_corner', fighters[1]);
+  // (the sim's fates for the people found, decided up front: the search of each room needs to know who is led out and who is shot)
+  const mercyFound: Found[] = hiders.map(h => ({ id: h.u.id, child: !!h.u.civilian, armed: false, complies: true }));
+  const fate = a.explicitMercy ? decideFates(a.mercy, mercyFound, a.seed) : new Map();
   const stageLen = Math.max(disc ? 6.5 : 3.6, Math.min(disc ? 15 : 8.5, (tI + D - 14 - s) / m));
   const insideCrew = crew.slice(0, 6);
 
@@ -215,8 +220,38 @@ export function planInterior(a: InteriorArgs): InteriorOut | null {
       say(sk + 0.8, 'defender', 'funnel', holders[0]);
       shoot(sk + 0.2, sk + 3.0, 0.4, holders, crew.slice(0, 6), true);
     }
-    const clearAt = sk + (disc ? 3.6 : 2.4);
-    say(clearAt, 'raider', 'room_clear', insideCrew[0]);
+    // "clear" is a claim about the room, so it is made only when it is true. The order in a room: the family goes from it (the fallback below takes the last of
+    // them out through the far door by `leaveBy`), then the crew searches it (anyone hiding is found, and led out through the door to the porch, or is killed
+    // where the sim says), and only then, if nothing of the family is left in it, "clear". A room still held to the end, or one with someone left in it, is
+    // never called clear: the crew says what is really happening there.
+    const fbT = sk + (disc ? 3.0 : 1.8);
+    const fitN = holders.filter(u => !wounded.includes(u)).length;
+    const leaveBy = k + 1 < m ? fbT + 2.3 + Math.max(1, Math.ceil(fitN / 2)) * 0.4 + 1.3 : 0;
+    const holdersGone = Math.max(sk + (disc ? 3.6 : 2.4), k + 1 < m ? leaveBy + 0.6 : 0);
+    const hidersHere = hiders.filter(x => x.room === room || (k === m - 1 && !stages.some(s2 => s2.room === x.room)));
+    let lastGone = holdersGone;
+    hidersHere.forEach((h, n) => {
+      const i = hiders.indexOf(h), searcher = insideCrew[(i + 1) % insideCrew.length];
+      const deathT = a.deaths.get(h.u.id);
+      const tf = deathT !== undefined ? Math.max(holdersGone + 0.6, deathT - 2.2) : holdersGone + 0.8 + n * 1.1;
+      ev.push({ t: r2(tf - 1.5), kind: 'move', unit: searcher.id, x: r2(h.at.x + (a.door.x - h.at.x) * 0.12), z: r2(h.at.z + (a.door.z - h.at.z) * 0.12) });
+      say(tf - 0.9, 'raider', 'found', searcher);
+      ev.push({ t: r2(tf), kind: 'found', unit: h.u.id, by: searcher.id, how: a.mercy.temper === 'hostile' ? 'kick' : 'order' });
+      if (a.mercy.temper === 'merciful') say(tf + 0.5, 'raider', 'order_out', searcher);
+      say(tf + 1.0, 'defender', a.mercy.temper === 'merciful' ? 'come_out' : 'plead', h.u, { n: a.nameOf(searcher.id) ?? 'mister' });
+      if (deathT !== undefined) lastGone = Math.max(lastGone, deathT);
+      else if (fate.get(h.u.id) === 'killed' && !a.takenIds.has(h.u.id)) lastGone = Infinity;   // (shot at the end of the search: the room is not clear before that)
+      else {
+        // led out of the house to the porch (the crew's prisoners wait there; the ones taken are dragged off at the end)
+        const porch = { x: a.out.x + pass.x * 0.1 + perp.x * ((n % 3) - 1) * 0.12, z: a.out.z + pass.z * 0.1 + perp.z * ((n % 3) - 1) * 0.12 };
+        ev.push({ t: r2(tf + 1.4), kind: 'move', unit: h.u.id, x: r2(porch.x), z: r2(porch.z), walk: true });
+        lastGone = Math.max(lastGone, tf + 1.4 + (near(h.at, porch) * 1.4) / 0.8 + 0.8);
+      }
+      void hold;
+    });
+    const stillHeld = k + 1 >= m && holders.some(u => { const d = a.deaths.get(u.id); return d === undefined || d > lastGone; });
+    const clearAt = lastGone + 0.5;
+    if (Number.isFinite(clearAt) && clearAt <= sk + stageLen - 0.3 && !stillHeld) say(clearAt, 'raider', 'room_clear', insideCrew[0]);
     // the family falls back to the next room: wounded first, carried, with the committed covering
     if (k + 1 < m) {
       const nxt = stages[k + 1];
@@ -250,26 +285,12 @@ export function planInterior(a: InteriorArgs): InteriorOut | null {
       say(sk + 1.2, 'defender', 'last_stand', holders[0]);
       if (holders[1]) say(sk + 3.4, 'defender', 'rally', holders[1]);
     }
-    // anyone hiding in this room is found now
-    for (const h of hiders.filter(x => x.room === room || (k === m - 1 && !stages.some(s2 => s2.room === x.room)))) {
-      const i = hiders.indexOf(h), searcher = insideCrew[(i + 1) % insideCrew.length];
-      const deathT = a.deaths.get(h.u.id);
-      const tf = deathT !== undefined ? Math.max(clearAt + 0.8, deathT - 2.2) : clearAt + 1.4 + i * 1.1;
-      ev.push({ t: r2(tf - 1.5), kind: 'move', unit: searcher.id, x: r2(h.at.x + (a.door.x - h.at.x) * 0.12), z: r2(h.at.z + (a.door.z - h.at.z) * 0.12) });
-      say(tf - 0.9, 'raider', 'found', searcher);
-      ev.push({ t: r2(tf), kind: 'found', unit: h.u.id, by: searcher.id, how: a.mercy.temper === 'hostile' ? 'kick' : 'order' });
-      if (a.mercy.temper === 'merciful') say(tf + 0.5, 'raider', 'order_out', searcher);
-      say(tf + 1.0, 'defender', a.mercy.temper === 'merciful' ? 'come_out' : 'plead', h.u, { n: a.nameOf(searcher.id) ?? 'mister' });
-      void hold;
-    }
     prevStageEnd = sk + stageLen;
   }
 
   // ── 4. the sim's fates for the people found: killed (a round, drawn as any other death), taken (led off), spared ──
   const dragged: string[] = [];
-  const mercyFound: Found[] = hiders.map(h => ({ id: h.u.id, child: !!h.u.civilian, armed: false, complies: true }));
   // (only explicit mercy data may add an outcome the sim did not write; live play follows the sim's own events)
-  const fate = a.explicitMercy ? decideFates(a.mercy, mercyFound, a.seed) : new Map();
   for (const h of hiders) {
     const deathT = a.deaths.get(h.u.id);
     const searcher = insideCrew[(hiders.indexOf(h) + 1) % insideCrew.length];

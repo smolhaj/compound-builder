@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Director, STANDOFF, auditPose, figurePx, lensProblem, poseAt, shotProblems, type Actor, type Box, type Shot } from './director';
+import { Director, MAX_SURFACE_COVER, STANDOFF, auditPose, bestEye, surfaceCover, figurePx, lensProblem, poseAt, shotProblems, type Actor, type Box, type Shot } from './director';
 import { obstaclesOf, treeBoxes } from './cameraObstacles';
 import { lightLabel } from './lightLabel';
 import { planSiege, sceneCaption, segments, type SceneKind } from '../../sim/siege';
@@ -83,6 +83,7 @@ describe('every raid-cutscene shot frames its subject and stays out of the geome
           expect(au.inside, `seed ${seed} ${s.kind} t=${t} inside`).toBeNull();
           if (au.aboveGround < 1.3) expect(au.nearest, `seed ${seed} ${s.kind} t=${t} hugging a ${au.nearest}`).toBeGreaterThanOrEqual(0.25);
           expect(au.ahead, `seed ${seed} ${s.kind} t=${t} dead ahead`).toBeGreaterThanOrEqual(0.6);
+          expect(au.cover, `seed ${seed} ${s.kind} t=${t}: one surface covers ${Math.round(au.cover * 100)}% of the picture`).toBeLessThanOrEqual(MAX_SURFACE_COVER);
           if (t === 0 && au.live > 0 && s.subjects?.length) expect(au.visible, `seed ${seed} ${s.kind} shows no one`).toBeGreaterThan(0);
         }
       }
@@ -372,5 +373,26 @@ describe('every scene of every raid has a caption for each part', () => {
       expect(segments(plan).length).toBeGreaterThan(0);
     }
     for (const k of ['gate', 'probe', 'harass', 'fires', 'assault'] as const) expect(kinds.has(k), k).toBe(true);
+  });
+});
+
+
+describe('a surface close to the camera may not fill the picture', () => {
+  const roof: Box = { x0: -3, x1: 3, z0: -3, z1: 3, h: 1.3, kind: 'building' };
+  const wall: Box = { x0: -6, x1: 6, z0: 0.5, z1: 0.7, h: 0.6, kind: 'wall' };
+  it('flags a roof skimmed from just above, and a wall the camera is pressed against', () => {
+    // 0.2 above the roof, looking along it: a flat grey plane over the picture
+    expect(surfaceCover({ x: -2.8, y: 1.45, z: 0 }, { x: 2, y: 0.9, z: 0 }, 42, [roof], ground)).toBeGreaterThan(MAX_SURFACE_COVER);
+    // 0.25 from a wall, looking at it low: half the picture is wall
+    expect(surfaceCover({ x: 0, y: 0.3, z: 0.2 }, { x: 0, y: 0.25, z: 3 }, 42, [wall], ground)).toBeGreaterThan(MAX_SURFACE_COVER);
+  });
+  it('reads nothing for an open yard, and for a house seen from across it', () => {
+    expect(surfaceCover({ x: 0, y: 1, z: -12 }, { x: 0, y: 0.2, z: 0 }, 42, [roof, wall], ground)).toBe(0);
+    expect(surfaceCover({ x: 0, y: 0.8, z: -8 }, { x: 0, y: 0.3, z: -3.2 }, 42, [roof], ground)).toBeLessThan(0.1);
+  });
+  it('picks the eye with the least surface in the way', () => {
+    const look = { x: 0, y: 0.2, z: 3 };
+    const bad = { x: 0, y: 0.3, z: 0.25 }, good = { x: 0, y: 1.2, z: -3 };
+    expect(bestEye([bad, good], look, 42, [wall], ground, 0.1)).toEqual(good);
   });
 });

@@ -49,7 +49,10 @@ const SEP = 0.09;
 export interface Pt { x: number; z: number }
 export interface Clip { unit: string; t: number; from: Pt; to: Pt }
 
-interface K { id: string; x: number; z: number; tx: number; tz: number; speed: number; wound: number; dead: boolean; frozen: boolean; carriedBy?: string; y: number; ty: number; queue: Array<{ x: number; z: number; kind: 'move' | 'cover' | 'hide'; walk?: boolean; how?: string; ty?: number } | { flee: BattleEvent }> ; fleeing: boolean; moved: boolean; heldFor?: object; settleAt?: number; lastKind?: string; /** The foot of the ladder he is up (he goes back down it before going anywhere else). */ foot?: Pt; /** Where he is finally going (the end of the chain of legs). */ dest?: Pt }
+interface K { topAt?: number; id: string; x: number; z: number; tx: number; tz: number; speed: number; wound: number; dead: boolean; frozen: boolean; carriedBy?: string; y: number; ty: number; queue: Array<{ x: number; z: number; kind: 'move' | 'cover' | 'hide'; walk?: boolean; how?: string; ty?: number } | { flee: BattleEvent }> ; fleeing: boolean; moved: boolean; heldFor?: object; settleAt?: number; lastKind?: string; /** The foot of the ladder he is up (he goes back down it before going anywhere else). */ foot?: Pt; /** Where he is finally going (the end of the chain of legs). */ dest?: Pt }
+
+/** How long a raider stays on the top rungs of a ladder (battle seconds) before he comes back down. */
+const TOP_HOLD = 0.5;
 
 export interface WalkOpts {
   /** Rewrite legs through openings. */
@@ -433,6 +436,11 @@ export function walkBattle(b: Battle, w: NavWorld, o: WalkOpts): WalkResult {
         if (k.settleAt === undefined && k.lastKind === 'move') k.settleAt = t + 1.4;
         else if (k.settleAt !== undefined && t >= k.settleAt) { k.settleAt = undefined; k.lastKind = 'cover'; out.push({ t: r2(t), kind: 'cover', unit: k.id, x: r2(k.x), z: r2(k.z) }); }
       }
+      // a raider on a ladder has nothing drawn to stand on at the top (no wall-walk): he is on the rungs while he climbs, a moment to look over, then straight back down
+      if (o.route && !k.carriedBy && k.foot && side.get(k.id) === 'raider' && k.queue.length === 0 && k.y > 0.12 && Math.hypot(k.tx - k.x, k.tz - k.z) <= 0.02 && Math.abs(k.y - k.ty) < 0.03) {
+        if (k.topAt === undefined) k.topAt = t;
+        else if (t >= k.topAt + TOP_HOLD) { k.topAt = undefined; k.tx = k.foot.x; k.tz = k.foot.z; k.ty = 0; out.push({ t: r2(t), kind: 'move', unit: k.id, x: r2(k.foot.x), z: r2(k.foot.z) }); }
+      } else k.topAt = undefined;
       if (k.x !== a.x || k.z !== a.z || Math.abs(k.y - ya) > 1e-6) o.onStep?.(k.id, t, a, { x: k.x, z: k.z }, k.y);
     }
   }
