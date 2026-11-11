@@ -39,6 +39,14 @@ export interface Grid { x0: number; z0: number; nx: number; nz: number; free: Ui
 const cx = (g: Grid, i: number) => g.x0 + (i + 0.5) * CELL, cz = (g: Grid, j: number) => g.z0 + (j + 0.5) * CELL;
 const N4: ReadonlyArray<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
+/**
+ * The lines the quiet stretches of a house fight are filled with (nobody speaks for 4 s): only ones that are true whatever is happening. A call that
+ * reports a state of the fight is never filler: "the room is clear" is said only by interiorTactics when the room really is empty of the family,
+ * and "covering fire" only by a defender whose shots are in the plan (src/sim/interiorTactics.ts).
+ */
+export const FILL_RAIDER: Ctx[] = ['clear_room', 'search', 'pie_corner', 'rally'];
+export const FILL_DEFENDER: Ctx[] = ['hold_room', 'rally', 'pie_corner'];
+
 export function buildGrid(ctx: AssaultCtx): Grid | null {
   const { box } = ctx;
   const x0 = box.x0 - PAD, z0 = box.z0 - PAD, nx = Math.ceil((box.x1 - box.x0 + 2 * PAD) / CELL), nz = Math.ceil((box.z1 - box.z0 + 2 * PAD) / CELL);
@@ -288,7 +296,7 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
     // 4. the callouts
     // a new line every two or three seconds, never one repeated: the rooms are cleared, the doorways held, the house searched
     for (let t = tI + 6, k = 0; t < tI + D - 13; t += 2.4 + r() * 0.6, k++) {
-      const RC: Ctx[] = ['clear_room', 'search', 'room_clear', 'pie_corner', 'cover_fire', 'rally', 'funnel'], DC: Ctx[] = ['hold_room', 'cover_fire', 'last_stand', 'rally', 'pie_corner', 'funnel'];
+      const RC: Ctx[] = FILL_RAIDER, DC: Ctx[] = FILL_DEFENDER;
       if (k % 3 === 1) say(t, 'defender', DC[Math.floor(k / 3) % DC.length], adults[k % nHome]);
       else say(t, 'raider', RC[Math.floor(k / 3 + (k % 3)) % RC.length], breachers[k % breachers.length]);
     }
@@ -335,7 +343,7 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
       while (t - prev > 4.5) {
         prev += 3.2;
         const pick = k++ % 3;
-        const RC: Ctx[] = ['clear_room', 'search', 'room_clear', 'pie_corner', 'cover_fire', 'rally', 'funnel'], DC: Ctx[] = ['hold_room', 'cover_fire', 'last_stand', 'rally', 'pie_corner', 'funnel'];
+        const RC: Ctx[] = FILL_RAIDER, DC: Ctx[] = FILL_DEFENDER;
         if (prev > outroAt + 3) { if (pick === 1 && adults.length) say(prev, 'defender', 'aftermath', adults[k % adults.length]); else say(prev, 'raider', 'leaving', crewNow[k % crewNow.length]); }
         else if (pick === 1 && adults.length) say(prev, 'defender', DC[Math.floor(k / 3) % DC.length], adults[k % adults.length]);
         else say(prev, 'raider', RC[Math.floor(k / 3 + pick) % RC.length], crewNow[(k + pick) % crewNow.length]);
