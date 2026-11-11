@@ -326,9 +326,9 @@ export function dramatize(inp: DramaInput): { battles: Battle[]; info: DramaInfo
     }
     const shaken = living.filter(u => !u.civilian).map(u => ({ id: u.id, name: firstOf(u), trauma: inp.after.mind?.psyche[u.personId ?? '']?.trauma ?? 0 }));   // (the psyche ledger: the same trauma the sim's own panic and courage read)
     const tb = traumaBeats(shaken, seed);
-    tb.forEach((l, i) => {
+    tb.forEach(l => {
       events.push({ t: r2(end + l.dt), kind: 'panic', unit: l.who!, how: 'freeze', secs: 2.8, kin: false });
-      events.push({ t: r2(end + l.dt + 0.1), kind: 'beat', role: 'vigil', unit: l.who!, with: tb.filter((_, j) => j !== i).map(x => x.who!) });
+      events.push({ t: r2(end + l.dt + 0.1), kind: 'beat', role: 'aim', unit: l.who! });   // (a plain close shot on the frozen person: no rate, so no slow-motion)
       caption(end + l.dt + 0.3, l.text);
     });
     end += tb.length ? tb[tb.length - 1].dt + 3.6 : 0;

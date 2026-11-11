@@ -57,7 +57,7 @@ export function cleanupCaptions(raker: string, fallen: string, hammerer: string)
 }
 
 export interface Shaken { id: string; name: string; trauma: number }
-const FLINCH = ['{c} stands frozen, hands to the face.', '{c} cannot move. The shaking will not stop.', '{c} stopped where they stood, and cannot start again.', '{c} stares at nothing, hands over the mouth.'];
+const FLINCH = ['{c} stands frozen.', '{c} can\'t move.', '{c} stopped where they stood, and can\'t start again.', '{c} stares at nothing.'];
 /** The people who are still shaking: trauma at 25 or above, the worst first, at most three. */
 export function traumaBeats(people: readonly Shaken[], seed: number): Array<SceneLine & { kind: 'caption' }> {
   const r = mulberry32(seed * 13 + 5), used = new Set<string>();
