@@ -15,6 +15,7 @@ import {
 import { hourOf, type GameState } from '../sim/state';
 import { REAL_CLASSES, simHandles, trafficCtx } from '../sim/roadPassers';
 import { hasCutscene } from '../sim/siege';
+import { yieldSpeed } from './wildlife/roadCrossing';
 
 type Quality = 'high' | 'medium' | 'low';
 type Kind = MemberKind | 'walkerPack';
@@ -85,6 +86,8 @@ export class RoadTraffic {
   private _block: THREE.Group | null = null;
   private _blockKey = '';
   private _tableauId = '';
+  /** Animals on the road now (along it): the traffic stops for them (game/wildlife/roadCrossing). */
+  private _crossers: ReadonlyArray<{ z: number }> = [];
   private _qaFreeze = false;
   /** QA / tests: draw this much darkness (0-1) instead of the world's. */
   qaDark: number | null = null;
@@ -124,9 +127,18 @@ export class RoadTraffic {
     scene.add(this._lights);
   }
 
+  /** The animals on the carriageway or its shoulder (WildlifeRenderer.roadCrossers): cars and trucks slow and stop short of them. */
+  setCrossers(list: ReadonlyArray<{ z: number }>): void { this._crossers = list; }
+  /** Stats for tests and the census: vehicles held for an animal this frame. */
+  held = 0;
   setQuality(q: Quality): void { this._quality = q; }
   /** The z of the gate: parties are played this far either side of it, and the tableau of a real arrival stands here. */
   setGate(z: number): void { this._gateZ = z; }
+  /** QA: a car moving along the road from z in direction dir (it obeys the other traffic and the animals on the road). */
+  qaDrive(kind: MemberKind, z: number, dir: 1 | -1, speed = 1.6): void {
+    const member: Member = { kind, gap: 0, lat: dir * 0.17, tint: 0.3, riders: 0, loaded: false };
+    this._live.push({ spec: { id: `qa:${this._live.length}`, cls: 'traffic', dir, speed, members: [member], lights: false, heads: 1 }, z, speed, t: 0, fade: 1 });
+  }
   /** QA: stop spawning and moving (the parties already on the road stay where they are). */
   freeze(on: boolean): void { this._qaFreeze = on; }
   /** QA: clear the road and put these parties on it, `z` is the lead's position. */
@@ -226,6 +238,7 @@ export class RoadTraffic {
 
   /** Cars keep a gap behind the one ahead in their lane; everything else just goes. */
   private _follow(w: number): void {
+    this.held = 0;
     const lanes = this._live.filter(l => !l.fixed && Math.abs(l.spec.members[0].lat) < 0.3);
     for (const a of this._live) {
       if (a.fixed) continue;
@@ -237,6 +250,15 @@ export class RoadTraffic {
           if (ahead <= 0) continue;
           const rear = ahead - this._extent(b.spec);
           if (rear < 1.1) v = Math.min(v, b.spec.speed * (rear < 0.5 ? 0.3 : 0.95));
+        }
+      }
+      // an animal on the road ahead: slow, and stop short of it until it is across
+      if (this._crossers.length && Math.abs(a.spec.members[0].lat) < 0.9) {
+        const nose = LENGTH[a.spec.members[0].kind] / 2;
+        for (const c of this._crossers) {
+          const ahead = (c.z - a.z) * a.spec.dir - nose;
+          const y = yieldSpeed(ahead, a.spec.speed);
+          if (y < v) { v = y; if (y === 0) this.held++; }
         }
       }
       a.speed = v;

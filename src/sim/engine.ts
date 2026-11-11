@@ -49,6 +49,7 @@ import { hayingDay } from './haying';
 import { poultryDay } from './poultry';
 import { cellarDay, crowdDay } from './storage';
 import { vehiclesDay } from './vehicles';
+import { plowDay } from './slope';
 import { kinDay } from './kin';
 import { newcomersDay } from './newcomers';
 import { radioDay } from './radio';
@@ -229,6 +230,7 @@ function subStep(s: GameState): void {
     for (const line of petsDay(s)) log(s, line);
     for (const line of toolsDay(s)) log(s, line);
     for (const line of vehiclesDay(s)) log(s, line);
+    for (const line of plowDay(s)) log(s, line);   // the blade goes out after a heavy snow: fuel and wear from the truck that carries it (sim/plowing.ts)
     for (const line of radioDay(s)) log(s, line);
     for (const line of guardDay(s)) log(s, line);
     for (const line of insiderDay(s)) log(s, line);
