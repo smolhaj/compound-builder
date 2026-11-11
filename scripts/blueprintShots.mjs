@@ -24,6 +24,10 @@ page.on('pageerror', e => console.error('PAGEERROR', e.message));
 await page.goto(`http://localhost:${port}/?lowrender=0.75&clean&seed=7&${LOT}&showcase=mountain&rings=${rings}&wall=stone&layout=shelf`);
 await page.waitForFunction(() => window.__cb?.qa?.renderNow && window.__showcase, null, { timeout: 900000 });
 await page.evaluate(() => { const { game, store } = window.__cb; game.getState().setSpeed(0); store.getState().setQuality('low'); store.getState().setTimeOfDay(10); store.getState().setWeatherMode('clear'); store.getState().setSeasonMode('summer'); });
+if (args.includes('--razor')) {
+  // coils on the ring walls and the vetting policy on both gates, so the labels have something to say
+  await page.evaluate(() => { const st = window.__cb.game.getState(), g = structuredClone(st.game); for (const r of g.perimeter) if (r.kind === 'stone_wall') r.razor = true; g.gate.vet = 'both'; window.__cb.game.setState({ game: g }); });
+}
 for (let i = 0; i < 14; i++) { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(120); }
 const frames = async () => { await page.evaluate(q => window.__cb.qa.renderFull(q), q); await page.waitForTimeout(300); };
 const shot = async name => { await frames(); await frames(); await page.screenshot({ path: `${outDir}/${name}.png` }); console.error('shot', name); };
@@ -44,7 +48,7 @@ await setBp(true); await page.waitForTimeout(900);
 const own = await page.evaluate(() => { const cb = window.__cb, o = cb.blueprintOv; const t = []; for (let i = 0; i < 20; i++) { cb.cam.yaw += 0.01; cb.cam.apply(cb.ws.camera); const t0 = performance.now(); o.update(1e6 + i * 100); t.push(performance.now() - t0); } t.sort((a, b) => a - b); return { updateMedianMs: +t[10].toFixed(2), updateMaxMs: +t[19].toFixed(2) }; });
 const planMs = await page.evaluate(async () => { const m = await import('/src/game/blueprint/blueprintPlan.ts'); const g = window.__cb.game.getState().game; const t0 = performance.now(); m.blueprintPlan(g); return +(performance.now() - t0).toFixed(1); });
 const off = times.off, on = times.on;
-const labels = await page.evaluate(() => [...document.querySelectorAll('[data-testid=blueprint-labels] > div')].filter(d => d.style.visibility === 'visible').map(d => d.firstChild.textContent));
+const labels = await page.evaluate(() => [...document.querySelectorAll('[data-testid=blueprint-labels] > div')].filter(d => d.style.visibility === 'visible').map(d => d.firstChild.textContent + (d.children[1] ? ' | ' + d.children[1].textContent : '')));
 console.error(JSON.stringify({ frameMsOff: off, frameMsOn: on, ...own, planMs, labels: labels.length, sample: labels.slice(0, 40) }));
 await shot('aerial');
 await orbit(22, 0.9, info.up + 0.3); await shot('top');
