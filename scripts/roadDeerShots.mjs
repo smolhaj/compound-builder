@@ -25,16 +25,17 @@ await page.waitForFunction(() => window.__cb?.qa?.renderNow && window.__cb?.worl
 await page.evaluate(() => { const { game, store } = window.__cb; game.getState().setSpeed(0); store.getState().setQuality('low'); store.getState().setTimeOfDay(6.4); store.getState().setWeatherMode('clear'); store.getState().setSeasonMode('summer'); });
 for (let i = 0; i < 14; i++) { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(120); }
 const shot = async name => { for (let i = 0; i < 2; i++) { await page.evaluate(() => window.__cb.qa.renderFull('medium')); await page.waitForTimeout(250); } await page.screenshot({ path: `${outDir}/${name}.png` }); console.error('shot', name); };
-const step = (n, dt = 0.1) => page.evaluate(([n, dt]) => { const { world, game } = window.__cb; const g = game.getState().game; let held = 0, on = 0, minGap = 99; for (let i = 0; i < n; i++) { world.updateWildlife(dt, g, 1); world.updateRoadLife(dt, g, 1); held = Math.max(held, world.roadLife.held); on = Math.max(on, world.wildlife.roadCrossers().length); } return { held, on, live: world.roadLife._live.map(l => +l.z.toFixed(2)), animals: world.wildlife.animals().filter(a => a.id.startsWith('road:')).map(a => ({ x: +a.x.toFixed(2), z: +a.z.toFixed(2), vis: +a.vis.toFixed(2) })) }; }, [n, dt]);
-const gz = await page.evaluate(() => window.__cb.world.access.drive[0][1]);
+const step = (n, dt = 0.1) => page.evaluate(([n, dt]) => { const { world, game } = window.__cb; const g = game.getState().game; let held = 0, on = 0, minGap = 99; for (let i = 0; i < n; i++) { world.updateWildlife(dt, g, 1); world.updateRoadLife(dt, g, 1); held = Math.max(held, world.roadLife.held); on = Math.max(on, world.wildlife.roadCrossers().length); } return { held, on, live: world.roadLife._live.map(l => ({ z: +l.z.toFixed(2), v: +l.speed.toFixed(2) })), animals: world.wildlife.animals().filter(a => a.id.startsWith('road:')).map(a => ({ x: +a.x.toFixed(2), z: +a.z.toFixed(2), vis: +a.vis.toFixed(2) })) }; }, [n, dt]);
+const gz0 = await page.evaluate(() => window.__cb.world.access.drive[0][1]);
+const gz = gz0; console.error('gate z', gz);
 await step(3);
 // a southbound car comes down the road toward the crossing; the animals cross just south of the camera
 await page.evaluate(([gz, sp]) => { const { world } = window.__cb; world.roadLife.qaDrive('pickup', gz + 12, -1, 1.4); world.wildlife.qaCross(sp, 3, gz, 1); }, [gz, sp]);
 let seen = null;
 for (let i = 0; i < 40; i++) {
   const r = await step(5);
-  console.error(i, JSON.stringify({ held: r.held, on: r.on, live: r.live, n: r.animals.length }));
-  if (r.on > 0 && r.held > 0 && !seen) {
+  console.error(i, JSON.stringify({ on: r.on, live: r.live, n: r.animals.length }));
+  if (r.on > 0 && r.live.some(l => l.v < 0.15 && Math.abs(l.z - gz) < 9) && !seen) {
     seen = r;
     await page.evaluate(gz => { const { world, cam } = window.__cb, x = world.county.x(gz); world.qaFigure(x + 1.1, gz - 2.2); cam.placeEye(x + 0.9, gz - 5, x, gz + 4, 0.34); }, gz);
     await shot('3-crossing-eye-traffic-stopped');
