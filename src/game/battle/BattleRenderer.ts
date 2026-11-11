@@ -183,6 +183,8 @@ export class BattleRenderer {
   private readonly _projs: Proj[] = [];
   private readonly _decals: THREE.Mesh[] = [];
   private readonly _flashes: THREE.PointLight[] = [];
+  /** The steady lights of the fires (one each, a fixed four). */
+  private readonly _glows: THREE.PointLight[] = [];
   private readonly _lanternLights: THREE.PointLight[] = [];
   private _flashI = 0;
   private _alarm: THREE.PointLight | null = null;
@@ -209,7 +211,7 @@ export class BattleRenderer {
       ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c),
       boom: (x, y, z, r, dust) => this._boom(x, y, z, r, dust), shake: v => { this.shake = Math.max(this.shake, v); }, gap: (id, at, w) => this.onGap?.(id, at, w),
     });
-    this.props = new SceneProps(this._group, { ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c), shake: v => { this.shake = Math.max(this.shake, v); } });
+    this.props = new SceneProps(this._group, { ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c), glow: (i, p, k, c) => { const l = this._glows[i]; if (l) { l.position.copy(p); l.color.setHex(c); l.intensity = k; l.distance = 3 + k * 0.5; } }, shake: v => { this.shake = Math.max(this.shake, v); } });
     this.props.centerOf = () => ({ x: this._center.x, z: this._center.z });
     this._trGeo.setAttribute('position', new THREE.BufferAttribute(this._trPos, 3).setUsage(THREE.DynamicDrawUsage));
     this._trGeo.setDrawRange(0, 0);
@@ -239,6 +241,7 @@ export class BattleRenderer {
       l.castShadow = false;
       this._flashes.push(l); this._group.add(l);
     }
+    for (let i = 0; i < 4; i++) { const l = new THREE.PointLight(0xff8a30, 0, 5, 2); l.castShadow = false; this._glows.push(l); this._group.add(l); }
   }
 
   get playing(): boolean { return this.battle !== null; }
@@ -374,6 +377,7 @@ export class BattleRenderer {
     if (this._alarm) { this._group.remove(this._alarm); this._alarm.dispose(); this._alarm = null; }
     this._alarmOn = false;
     for (const f of this._flashes) f.intensity = 0;
+    for (const f of this._glows) f.intensity = 0;
     for (const l of this._lanternLights) l.intensity = 0;
     this.shake = 0;
     this._layer.commit(0, false);

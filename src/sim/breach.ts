@@ -91,7 +91,8 @@ export function decorateBreach(b: Battle, runs: readonly PerimeterRun[], home: {
   if (!br || b.invasion) { breachOptions.note = br ? 'already decorated' : 'no breach event'; return b; }
   // a battle made by the sim of save v87 or later says HOW the wall fell and WHERE (the drawn wall segment or gate), and already carries the truck / charge / gap
   // events: this only adds the voices, the lane clearing and the camera's meta on top of what the sim decided. A climbed wall is not decorated (no truck, no blast).
-  const simShown = br.method !== undefined;
+  // (QA: with a method forced - the movie recipe's --method ram - a sim that let the crew climb is overridden, so the recipe really rams; otherwise the sim's word stands)
+  const simShown = br.method !== undefined && !(breachOptions.force && br.method === 'climb');
   if (simShown && (br.method === 'climb' || !br.where)) { breachOptions.note = `sim breach by ${br.method}${br.where ? '' : ' (no drawn wall)'}: nothing to decorate`; return b; }
   const method: BreachMethod = simShown ? (br.method as BreachMethod) : breachMethod(b.units, seed, carriesCharges);
   const spot = simShown ? { runId: br.where!.runId, x: br.where!.x, z: br.where!.z, at: br.where!.at, w: br.where!.w, heading: br.where!.heading, out: br.where!.out } : breachSpot(runs, br.x, br.z, home, method);

@@ -136,7 +136,7 @@ try {
     const st = await page.evaluate(async ([FPS, beats]) => {
       const cb = window.__cb, gs = cb.game.getState(); cb.qa.skipDraw = true; window.__pump(1000 / FPS);
       const b = cb.battle, c = gs.cutscene;
-      if (!b?.playing) return { phase: c?.phase, offer: c?.offer ?? null, bt: null, dbg: b ? { dur: b.battle?.duration, time: b.time, hold: b.hold, seg: c?.segment ?? c?.seg ?? null, ev: b.battle?.events?.length, last: b.battle?.events?.slice(-2).map(e => e.kind + '@' + e.t) } : 'nob' };
+      if (!b?.playing) return { phase: c?.phase, offer: c?.offer ?? null, bt: null };
       const ev = b.battle.events, U = b._units, t = b.time, found = {};
       const pos = id => { const u = U.get(id); return u && !u.dead ? { x: u.x, z: u.z, y: u.y } : null; };
       if (beats.includes('flag')) for (const e of ev) if (e.kind === 'flag' && t >= e.t + 3 && t <= e.t + 12) { const q = pos(e.unit); if (q) { found.flag = { ...q, key: e.unit }; const m = b.props?._flagMesh; window.__flagInfo = m ? { count: m.count, vis: m.visible, verts: m.geometry.attributes.position.count, side: m.material.side, layers: m.layers.mask, parent: !!m.parent } : null; } }
@@ -145,14 +145,13 @@ try {
       if (beats.includes('dog')) for (const e of ev) if (e.kind === 'alarm' && e.what === 'dog' && t >= e.t + 2 && t <= e.t + 14) { const d = b.props?._dog; if (d) found.dog = { x: d.x, z: d.z, y: 0, key: 'dog' }; }
       if (beats.includes('lights') && b._lightsSparked && b._floods?.length) { const f = b._floods[0].position; found.lights = { x: f.x, z: f.z, y: 0, key: 'lights' }; }
       if (beats.includes('scout')) for (const e of ev) if (e.kind === 'scout' && t >= e.t + 1 && t <= e.t + 10) { const q = pos(e.units[0]); if (q) found.scout = { ...q, key: 'scout' }; }
-      if (beats.includes('wake')) for (const e of ev) if (e.kind === 'say' && e.ctx === 'aftermath' && t >= e.t + 0.8 && t <= e.t + 3) found.wake = { x: 0, z: 0, y: 0, key: e.text.slice(0, 24) };
+      if (beats.includes('wake')) for (const e of ev) if ((e.kind === 'say' && e.ctx === 'aftermath') || e.kind === 'grave' || e.kind === 'tool' || e.kind === 'clean' || e.kind === 'repair') { if (t >= e.t + 0.8 && t <= e.t + 3.2) found.wake = { x: 0, z: 0, y: 0, key: (e.kind === 'say' ? e.text.slice(0, 24) : e.kind + (e.stage ?? e.what ?? '') + e.t) }; }
       if (beats.includes('flare')) for (const e of ev) if (e.kind === 'flare' && t >= e.t + 1 && t <= e.t + e.secs - 1) found.flare = { x: e.x, z: e.z, y: 0, key: 'flare' + e.t };
       if (beats.includes('fire')) for (const e of ev) if (e.kind === 'fire' && t >= e.t + 4 && t <= e.t + 25) found.fire = { x: e.x, z: e.z, y: 0, key: 'fire' + e.structure };
       return { phase: c?.phase, offer: c?.offer ?? null, bt: +t.toFixed(2), found, kinds: [...new Set(ev.map(e => e.kind + (e.what ? ':' + e.what : '')))], lt: ev.filter(e => e.kind === 'lights' || e.kind === 'breach').map(e => e.kind + '@' + e.t),  dog: !!b.props?._dog, floods: b._floods?.length ?? 0, sp: b._lightsSparked, fo: b._floodsOutAt, tm: b.time, ln: b.lightNight, bn: b.battle?.night, caption: b.lines?.slice(-1)[0]?.text ?? '' };
     }, [FPS, beats]);
     p++;
     if (st.offer != null) await page.evaluate(() => window.__cb.game.getState().midStance(null));
-    if (p % 25 === 0) console.log('t', p, st.phase, st.bt, JSON.stringify(Object.keys(st.found ?? {})), JSON.stringify(st.dbg ?? ''));
     if (st.phase === 'aftermath') { console.log('BREAK aftermath', p, st.bt); break; }
     if (st.bt == null) continue;
     for (const k of st.kinds ?? []) (globalThis.__kinds ??= new Set()).add(k); if (st.dog) globalThis.__dog = true; globalThis.__floods = Math.max(globalThis.__floods ?? 0, st.floods ?? 0); if (st.sp) globalThis.__sp = true; if (st.lt?.length && globalThis.__lt !== st.lt.join()) { globalThis.__lt = st.lt.join(); console.log('LT', st.bt, JSON.stringify(st.lt)); } if (st.bt >= 67 && !globalThis.__fo) { globalThis.__fo = 1; console.log('FLOODOUT', JSON.stringify({ fo: st.fo, tm: st.bt, ln: st.ln, bn: st.bn })); }

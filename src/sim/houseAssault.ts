@@ -39,6 +39,14 @@ export interface Grid { x0: number; z0: number; nx: number; nz: number; free: Ui
 const cx = (g: Grid, i: number) => g.x0 + (i + 0.5) * CELL, cz = (g: Grid, j: number) => g.z0 + (j + 0.5) * CELL;
 const N4: ReadonlyArray<[number, number]> = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
+/**
+ * The lines the quiet stretches of a house fight are filled with (nobody speaks for 4 s): only ones that are true whatever is happening. A call that
+ * reports a state of the fight is never filler: "the room is clear" is said only by interiorTactics when the room really is empty of the family,
+ * and "covering fire" only by a defender whose shots are in the plan (src/sim/interiorTactics.ts).
+ */
+export const FILL_RAIDER: Ctx[] = ['clear_room', 'search', 'pie_corner', 'rally'];
+export const FILL_DEFENDER: Ctx[] = ['hold_room', 'rally', 'pie_corner'];
+
 export function buildGrid(ctx: AssaultCtx): Grid | null {
   const { box } = ctx;
   const x0 = box.x0 - PAD, z0 = box.z0 - PAD, nx = Math.ceil((box.x1 - box.x0 + 2 * PAD) / CELL), nz = Math.ceil((box.z1 - box.z0 + 2 * PAD) / CELL);
@@ -288,8 +296,9 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
     // 4. the callouts
     // a new line every two or three seconds, never one repeated: the rooms are cleared, the doorways held, the house searched
     for (let t = tI + 6, k = 0; t < tI + D - 13; t += 2.4 + r() * 0.6, k++) {
-      const RC: Ctx[] = ['clear_room', 'search', 'room_clear', 'pie_corner', 'cover_fire', 'rally', 'funnel'], DC: Ctx[] = ['hold_room', 'cover_fire', 'last_stand', 'rally', 'pie_corner', 'funnel'];
-      if (k % 3 === 1) say(t, 'defender', DC[Math.floor(k / 3) % DC.length], adults[k % nHome]);
+      const RC: Ctx[] = FILL_RAIDER, DC: Ctx[] = FILL_DEFENDER;
+      const alive0 = adults.filter(u => !b.events.some(e => e.kind === 'death' && e.unit === u.id && e.t <= t));
+      if (k % 3 === 1 && alive0.length) say(t, 'defender', DC[Math.floor(k / 3) % DC.length], alive0[k % alive0.length]);
       else say(t, 'raider', RC[Math.floor(k / 3 + (k % 3)) % RC.length], breachers[k % breachers.length]);
     }
     // 5. a wounded defender (the sim's wound, kept at its time) is dragged to the back room
@@ -328,16 +337,21 @@ export function planHouseAssault(b: Battle, ctx: AssaultCtx): Battle {
   const kept = b.events.filter(e => !mine(e) && e.kind !== 'end' && !(e.kind === 'taken' && captiveIds.has(e.unit)) && !(strip.size && (e.kind === 'move' || e.kind === 'cover') && strip.has(e.unit) && e.t > tI - 3.6) && !(e.kind === 'flee' && strip.has(e.unit) && e.t > tI - 3.6));
   // no quiet stretch in the fight: a callout whenever four and a half seconds pass without one (the crew clearing and searching, the family holding)
   if (planned) {
-    const said = [...kept.filter(e => e.kind === 'say' && e.t >= tI - 3).map(e => e.t), ...ev.filter(e => e.kind === 'say').map(e => e.t)].sort((x, y) => x - y);
+    // (a line by someone already dead is not a line: deadSilent will hand it on or drop it, so it does not count as one that was said, and no filler is given to the dead)
+    const diedAt = new Map<string, number>();
+    for (const e of [...b.events, ...ev]) if ((e.kind === 'death' || e.kind === 'taken') && !diedAt.has(e.unit)) diedAt.set(e.unit, e.t);
+    const liveAt = (id: string | undefined, t: number) => !id || !(diedAt.has(id) && diedAt.get(id)! <= t);
+    const said = [...kept, ...ev].filter(e => e.kind === 'say' && e.t >= tI - 3 && liveAt(e.who, e.t)).map(e => e.t).sort((x, y) => x - y);
     const crewNow = planned.insideCrew, from = tI - 3, to = newEnd - 1.5, outroAt = tI + D - 11;
     let prev = from, k = 0;
     for (const t of [...said, to]) {
       while (t - prev > 4.5) {
         prev += 3.2;
         const pick = k++ % 3;
-        const RC: Ctx[] = ['clear_room', 'search', 'room_clear', 'pie_corner', 'cover_fire', 'rally', 'funnel'], DC: Ctx[] = ['hold_room', 'cover_fire', 'last_stand', 'rally', 'pie_corner', 'funnel'];
-        if (prev > outroAt + 3) { if (pick === 1 && adults.length) say(prev, 'defender', 'aftermath', adults[k % adults.length]); else say(prev, 'raider', 'leaving', crewNow[k % crewNow.length]); }
-        else if (pick === 1 && adults.length) say(prev, 'defender', DC[Math.floor(k / 3) % DC.length], adults[k % adults.length]);
+        const RC: Ctx[] = FILL_RAIDER, DC: Ctx[] = FILL_DEFENDER;
+        const liveAdults = adults.filter(u => liveAt(u.id, prev));
+        if (prev > outroAt + 3) { if (pick === 1 && liveAdults.length) say(prev, 'defender', 'aftermath', liveAdults[k % liveAdults.length]); else say(prev, 'raider', 'leaving', crewNow[k % crewNow.length]); }
+        else if (pick === 1 && liveAdults.length) say(prev, 'defender', DC[Math.floor(k / 3) % DC.length], liveAdults[k % liveAdults.length]);
         else say(prev, 'raider', RC[Math.floor(k / 3 + pick) % RC.length], crewNow[(k + pick) % crewNow.length]);
       }
       prev = Math.max(prev, t);
