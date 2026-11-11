@@ -40,6 +40,8 @@ try {
     window.requestAnimationFrame = cb => { if (!window.__manual) return real(cb); window.__q.push(cb); return window.__q.length; };
     window.__pump = ms => { window.__fakeNow += ms; const q = window.__q; window.__q = []; for (const cb of q) cb(window.__fakeNow); };
   });
+  await page.addInitScript(o => { window.__opener = o; }, opt('--opener', null));
+  await page.addInitScript(f => { window.__flags = f; }, { breach: args.includes('--needbreach'), trauma: args.includes('--trauma'), demo: opt('--demo', null) });
   await page.goto(`http://localhost:${port}/?seed=7${lowrender ? '&lowrender=1&looktier=medium' : ''}`);
   await page.waitForFunction(() => window.__cb, null, { timeout: 180000 });
   if (lowrender) await page.evaluate(() => { window.__cb.qa.weather = true; });
@@ -66,9 +68,10 @@ try {
     for (const [i, p] of g.people.entries()) if (!p.kid || p.age >= 15) { g.armory.guns.push({ id: `g${i}`, model: 'sw_mp15', condition: 1, fired: 0, where: 'house', carrier: p.id }); g.armory.skill[p.id] = 5; }
     if (OPT_DOG) { const { adoptDog } = await import('/src/sim/pets.ts'); adoptDog(g, { ageYears: 3, training: 60, guard: true }); }
     if (OPT_TOWER) { for (const [i, [tx, tz]] of [[-4, 10], [4, 10]].entries()) g.structures.push({ id: 'tw' + i, kind: 'watchtower_flood', x: sp[0] + tx, z: sp[1] + tz, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 }); g.utilities.lit = ['house']; }
+    if (window.__flags.trauma && g.mind?.psyche) for (const id of Object.keys(g.mind.psyche)) g.mind.psyche[id].trauma = 60;
     let ed = 0;
     const { stageRaid } = await import('/src/sim/raidCutscene.ts');
-    const mk = d => ({ id: 'e9', kind: KIND, day: d, title: 'An armed crew', dossier: ["10 of them, organized, rifles. They've been working the farms east of town.", 'They know what they want, and they think you have it.'], size: SIZE, armed: true, strength: 120, wants: { canned: 8, fuel: 4 }, stances: ['hide', 'parley', 'defend', 'trade', 'flag_pay', 'flag_pass', 'flag_bluff', 'flag_shoot'], ...(STANCE.startsWith('flag_') ? { opener: { kind: 'demand' } } : {}), temper: TEMPER });
+    const mk = d => ({ id: 'e9', kind: KIND, day: d, title: 'An armed crew', dossier: ["10 of them, organized, rifles. They've been working the farms east of town.", 'They know what they want, and they think you have it.'], size: SIZE, armed: true, strength: 120, wants: { canned: 8, fuel: 4 }, stances: ['hide', 'parley', 'defend', 'trade', 'flag_pay', 'flag_pass', 'flag_bluff', 'flag_shoot'], ...(STANCE.startsWith('flag_') ? { opener: { kind: 'demand' } } : window.__opener ? { opener: { kind: window.__opener, spotted: true } } : {}), temper: TEMPER });
     const cands = [];
     if (wantDay) ed = wantDay;
     for (let d = 1; d < (scan ? 90 : 400) && !ed; d++) {
@@ -81,7 +84,7 @@ try {
       const hw = br ? last.events.filter(e => (e.kind === 'wound' || e.kind === 'death') && e.t >= br.t - 2 && e.unit.startsWith('h_') && !e.stopped).length : 0;
       if (scan) { if (br) cands.push({ d, res, dur: last.duration, deaths, hw, scenes: st.plan.scenes.length, br: br.t }); continue; }
       if (wantDay) { if (d === wantDay) ed = d; continue; }
-      if (WANT_WAKE) { if (st.drama && st.battles.some(bb => bb.events.some(e => e.kind === 'grave'))) ed = d; continue; }
+      if (WANT_WAKE) { if (st.drama && (window.__flags.breach ? st.battles.some(bb => bb.events.some(e => e.kind === 'repair')) : st.battles.some(bb => bb.events.some(e => e.kind === 'grave')))) ed = d; continue; }
     }
     if (scan) return { cands };
     g.gate.pending = mk(ed);
@@ -146,6 +149,16 @@ try {
       if (beats.includes('lights') && b._lightsSparked && b._floods?.length) { const f = b._floods[0].position; found.lights = { x: f.x, z: f.z, y: 0, key: 'lights' }; }
       if (beats.includes('scout')) for (const e of ev) if (e.kind === 'scout' && t >= e.t + 1 && t <= e.t + 10) { const q = pos(e.units[0]); if (q) found.scout = { ...q, key: 'scout' }; }
       if (beats.includes('wake')) for (const e of ev) if ((e.kind === 'say' && e.ctx === 'aftermath') || e.kind === 'grave' || e.kind === 'tool' || e.kind === 'clean' || e.kind === 'repair') { if (t >= e.t + 0.8 && t <= e.t + (e.kind === 'grave' ? Math.max(3.2, e.secs + 1) : 3.2)) found.wake = { x: 0, z: 0, y: 0, key: (e.kind === 'say' ? e.text.slice(0, 24) : e.kind + (e.stage ?? e.what ?? '') + e.t) }; }
+      if (window.__flags.demo === 'repair' && t > 6) {
+        // QA: the sim never staged a repelled breach with a death in range, so the prop is shown by handing the live renderer the event on a real wall segment
+        if (!window.__demoAt) {
+          const run = cb.game.getState().game.perimeter.find(r => r.pts.length >= 2);
+          const [a, c] = [run.pts[0], run.pts[1]];
+          window.__demoAt = { t, x: (a[0] + c[0]) / 2, z: (a[1] + c[1]) / 2, h: Math.atan2(c[0] - a[0], c[1] - a[1]) };
+          b.props.onEvent({ t, kind: 'repair', x: window.__demoAt.x, z: window.__demoAt.z, w: 0.8, heading: window.__demoAt.h, secs: 4 });
+        }
+        if (t < window.__demoAt.t + 7) found.repair = { x: window.__demoAt.x, z: window.__demoAt.z, y: 0, key: 'repair' };
+      }
       if (beats.includes('flare')) for (const e of ev) if (e.kind === 'flare' && t >= e.t + 1 && t <= e.t + e.secs - 1) found.flare = { x: e.x, z: e.z, y: 0, key: 'flare' + e.t };
       if (beats.includes('fire')) for (const e of ev) if (e.kind === 'fire' && t >= e.t + 4 && t <= e.t + 25) found.fire = { x: e.x, z: e.z, y: 0, key: 'fire' + e.structure };
       return { phase: c?.phase, offer: c?.offer ?? null, bt: +t.toFixed(2), found, kinds: [...new Set(ev.map(e => e.kind + (e.what ? ':' + e.what : '')))], lt: ev.filter(e => e.kind === 'lights' || e.kind === 'breach').map(e => e.kind + '@' + e.t),  dog: !!b.props?._dog, floods: b._floods?.length ?? 0, sp: b._lightsSparked, fo: b._floodsOutAt, tm: b.time, ln: b.lightNight, bn: b.battle?.night, caption: b.lines?.slice(-1)[0]?.text ?? '' };
@@ -163,7 +176,7 @@ try {
       await page.evaluate(async ([kind, q]) => {
         const g = window.__cb.world.groundAt;
         if (kind === 'wake') { window.__force = null; window.__cb.qa.skipDraw = false; window.__pump(10); return; }
-        const wide = kind === 'flare' || kind === 'fire' || kind === 'answer' || kind === 'lights';
+        const wide = kind === 'flare' || kind === 'fire' || kind === 'answer' || kind === 'lights' || kind === 'repair';
         const d = wide ? 2.2 : kind === 'flag' ? 1.1 : (kind === 'panic' || kind === 'sling') ? 1.3 : 0.8;
         window.__force = { eye: { x: q.x + d * 0.8, y: g(q.x, q.z) + (wide ? 0.9 : kind === 'flag' ? 0.42 : (kind === 'panic' || kind === 'sling') ? 0.75 : 0.28), z: q.z - d * 0.6 }, look: { x: q.x, y: g(q.x, q.z) + (wide ? 0.35 : kind === 'flag' ? q.y + 0.3 : q.y + 0.12), z: q.z }, fov: wide ? 62 : 50 };
         window.__cb.qa.skipDraw = false; window.__pump(10);

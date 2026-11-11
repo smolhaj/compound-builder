@@ -63,7 +63,7 @@ interface U {
   rot: number; phase: number; speed: number;
   wear: Wear; wound: number; dead: boolean; crouch: boolean; gone: boolean;
   /** Battle time the fall began (a body drops after the round has arrived), and when a living one was laid down. */
-  fallAt?: number; layAt?: number; /** Taken out of the picture at this time (buried: the earth has covered the fallen). */ hideAt?: number;
+  fallAt?: number; layAt?: number; /** Taken out of the picture at this time (buried: the earth has covered the fallen). */ hideAt?: number; /** Being laid into a grave: slides from where it lay to (x, z) over `secs`. */ sink?: { x: number; z: number; x0: number; z0: number; t0: number; secs: number };
   /** Who carries this unit in their arms now. */
   carriedBy?: string;
   /** Wounds to draw as patches (graphic only) and when the first-aid bandage went on. */
@@ -563,6 +563,8 @@ export class BattleRenderer {
         this.props.onEvent(e);
         // under the earth: the fallen is no longer on the ground once the filling has begun
         if (e.stage === 'fill' && e.unit) { const v = U_(e.unit); if (v) v.hideAt = this.time + 1.2; }
+        // laid in: the body is slid from where it was set down into the pit
+        if (e.stage === 'lower' && e.unit) { const v = U_(e.unit); if (v) v.sink = { x: e.x, z: e.z, x0: v.x, z0: v.z, t0: this.time, secs: Math.max(0.6, e.secs) }; }
         break;
       }
       case 'clean': this._cleanStains(e.x, e.z, e.secs); break;
@@ -730,6 +732,7 @@ export class BattleRenderer {
     let n = 0;
     for (const u of this._units.values()) {
       if (u.hideAt != null && this.time >= u.hideAt) u.gone = true;   // (buried: under the earth)
+      if (u.sink) { const k = Math.max(0, Math.min(1, (this.time - u.sink.t0) / u.sink.secs)); u.x = u.tx = u.sink.x0 + (u.sink.x - u.sink.x0) * k; u.z = u.tz = u.sink.z0 + (u.sink.z - u.sink.z0) * k; u.y = -0.004 * k; }
       if (u.gone || u.def.machine) continue;
       let moving = false;
       if (u.frozenUntil != null && this.time >= u.frozenUntil) { u.frozenUntil = undefined; u.hands = false; }
