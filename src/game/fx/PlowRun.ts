@@ -83,7 +83,7 @@ export function buildDrifts(drive: readonly Pt[], ground: (x: number, z: number)
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setIndex(idx);
   g.computeVertexNormals();
-  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0xf0f3f7, roughness: 0.95, side: THREE.DoubleSide }));
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0xf0f3f7, roughness: 0.95, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
   m.receiveShadow = true;
   m.userData.perDrift = (U - 1) * (V - 1) * 6;
   return m;
@@ -162,9 +162,12 @@ export class PlowRun {
     const m = this._drifts;
     if (!m) return;
     const per = m.userData.perDrift as number, total = (m.geometry.index?.count ?? 0) / per;
-    // drifts lie at 14%..86% of the drive; those the truck has not reached yet (further out than `from`) stay
-    const keep = Math.max(0, Math.min(total, Math.ceil(total - ((from / Math.max(1e-6, this._len)) - 0.14) / 0.72 * total)));
-    m.geometry.setDrawRange(total - keep === 0 && from <= 0 ? 0 : (total - keep) * per, keep * per);
+    // drifts lie at 14%..86% of the drive, evenly: those the truck has already passed (center <= from) are gone
+    const n = total;
+    let passed = 0;
+    for (let k = 0; k < n; k++) if (this._len * (0.14 + 0.72 * (k + 0.5) / n) <= from) passed++;
+    const keep = n - passed;
+    m.geometry.setDrawRange(passed * per, keep * per);
     m.visible = keep > 0;
   }
 
@@ -173,7 +176,10 @@ export class PlowRun {
    * The pass is once a day, after 7 a.m., on a day with snow down. While the road is shut for more than one more day the drifts lie across the
    * drive and the truck waits; on the closure's last day it goes out and pushes them away. With nothing to carry the blade the drifts stay all closure.
    */
+  /** QA shots: hold the pose set by `qaPose` (the frame loop's update would hide the truck on a summer day). */
+  qaHold = false;
   update(dt: number, o: PlowInput): void {
+    if (this.qaHold) return;
     const snowy = o.snow > 0.3, plowed = !!o.rig && snowy, drifted = snowy && o.closed > 0;
     if (this._berms) this._berms.visible = plowed;
     if (!snowy || o.closed <= 0) this._cleared = false;
@@ -207,6 +213,7 @@ export class PlowRun {
   /** QA: put the truck `d` units along the drive from the yard, going out (drifts beyond it stay). */
   qaPose(d: number, kind: VehicleKind = 'pickup', drifts = false): void {
     const truck = this._rig(kind);
+    this.qaHold = true;
     this._phase = 'out'; this._d = d;
     if (this._berms) this._berms.visible = true;
     if (drifts) this._showDrifts(d); else if (this._drifts) this._drifts.visible = false;

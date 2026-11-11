@@ -95,7 +95,7 @@ export function elevateOnProps(b: Battle, steps: readonly StepSeg[], solid: (x: 
         const foot = { x: base.x + dir.x * d1, z: base.z + dir.z * d1 };
         const r2 = (n: number) => Math.round(n * 100) / 100;
         out.push({ t: Math.max(0, r2(e.t - 1.5)), kind: 'ladder', x: r2(topAt.x), z: r2(topAt.z), h: r2(e.y!), fx: r2(foot.x), fz: r2(foot.z) });
-        out.push({ ...e, x: r2(raider || lat ? topAt.x : e.x), z: r2(raider || lat ? topAt.z : e.z), via: { x: r2(foot.x), z: r2(foot.z) } });
+        out.push({ ...e, ...(raider ? { y: r2(e.y! * 0.82) } : {}), x: r2(raider || lat ? topAt.x : e.x), z: r2(raider || lat ? topAt.z : e.z), via: { x: r2(foot.x), z: r2(foot.z) } });   // (a raider's feet stop on a rung just under the crown: he looks over the top, he does not stand on it)
         changed = true;
         continue;
       }
