@@ -1,13 +1,14 @@
 /**
  * The scenes after the shooting stops (stage D of the cutscene work). Pure and seeded; the cutscene (sim/raidDrama.ts) and the Hud call these.
  *
- *   burialBeats        the grave, the words, the quiet: timed lines (offsets from the scene's end) with the name of whoever speaks
- *   cleanupBeats       scrubbing the yard, patching the breach, hauling away what burned (from what was actually damaged)
- *   traumaBeats        the people who are still shaking: a flinch at a slammed door, a stare, hands that will not stop
+ *   burialWords        what the mourners say at the grave once it is filled
+ *   graveCaptions      the captions of the burial: each is for something drawn when it shows (the dig, the carrying, the laying in, the mound)
+ *   cleanupCaptions    the captions of the cleanup: only for work that is shown (a rake over the stain, planks across the breach)
+ *   traumaBeats        the people who are still shaking: frozen where they stand, hands to the face
  *   raiderFace         a face for the raider on the drive or in the cellar: age, scars, a story he tells (the same man always gets the same face)
  *   interrogationScene the questioning of a prisoner as a spoken conversation, with the choices kept for the player (`sim/interrogation.ts` decides the answer)
  *
- * No line is used twice in one scene, and none is empty.
+ * Rule: a caption says only what the picture shows. No line is used twice in one scene, and none is empty.
  */
 import { mulberry32 } from './rng';
 import { QUESTION_NAME, type Approach, type Question } from './interrogation';
@@ -24,51 +25,35 @@ const fill = (s: string, v: Record<string, string>) => s.replace(/\{(\w+)\}/g, (
 export interface Mourner { id: string; name: string; kid?: boolean; kin?: boolean }
 export interface BurialInput { name: string; age: number; kid: boolean; elder: boolean; mourners: readonly Mourner[]; seed: number }
 
-const DIG = ['The ground by the orchard is hard. Two of them take turns with the shovel and nobody asks to be spelled.', 'They pick a spot under the cottonwood, where {n} used to sit. The shovels ring on the stones.'];
-const LOWER = ['They lower {n} on two ropes. The cloth is a bedsheet.', '{n} goes into the ground wrapped in the good blanket.'];
 const WORDS_KIN = ['"I do not know what to say. You were here, and now you are not."', '"{n}, I will keep the place. I promise you that."', '"Thank you. For every single day."'];
 const WORDS_KID = ['"Is {n} cold down there?"', '"Can I put this on top? It was {n}\'s."', '"I will not make noise anymore. Please come back."'];
 const WORDS_ANY = ['"Rest now. We have it from here."', '"{n} did not run. Remember that."', '"Lord, take {n}. We have nothing else to give."'];
-const FILL = ['They fill it in slowly. Someone sets a flat stone at the head, and nobody leaves.', 'The last shovelful goes on. The wind comes up and takes the dust off the mound.'];
-const MOURN = ['Nobody eats that night. A single lantern stays lit by the mound.', 'One chair at the table stays empty, and nobody moves it.'];
 
-export function burialBeats(inp: BurialInput): SceneLine[] {
+export function burialWords(inp: BurialInput): SceneLine[] {
   const r = mulberry32(inp.seed * 31 + 7), used = new Set<string>(), v = { n: inp.name };
-  const out: SceneLine[] = [];
-  let dt = 0;
-  const cap = (pool: readonly string[]) => { out.push({ dt, kind: 'caption', text: fill(pickOut(pool, used, r), v) }); };
-  cap(DIG); dt += 4;
-  cap(LOWER); dt += 3.4;
   const speakers = [...inp.mourners].sort((a, b) => Number(!!b.kin) - Number(!!a.kin)).slice(0, 3);
-  speakers.forEach((m, i) => {
+  return speakers.map((m, i) => {
     const pool = m.kid ? WORDS_KID : m.kin || i === 0 ? WORDS_KIN : WORDS_ANY;
-    out.push({ dt, kind: 'say', who: m.id, text: fill(pickOut(pool, used, r), v) }); dt += 2.6;
+    return { dt: i * 2.6, kind: 'say' as const, who: m.id, text: fill(pickOut(pool, used, r), v) };
   });
-  cap(FILL); dt += 3;
-  cap(MOURN);
-  return out;
 }
 
-export interface Damage { breached?: boolean; fires?: number; blood?: boolean; fenceDown?: boolean }
-const SCRUB = ['Somebody hauls water to scrub the dark patches off the boards. It does not all come out.', 'Sand over the blood in the yard, then a rake. The chickens will not go near it.'];
-const PATCH = ['The breach in the wall gets planks nailed across it, crooked and fast. It will hold until the real repair.', 'They drag the splintered door out of the way and prop a table in the gap.'];
-const BURNT = ['What burned is hauled to the edge of the yard in a wheelbarrow. The air stays thick with it.', 'The scorched boards come down. Black marks stay on the stone.'];
-const FENCE = ['The posts that went down get stood up again and tied with wire.'];
+export function graveCaptions(name: string, diggers: readonly string[]): { dig: string; carry: string; lower: string; fill: string } {
+  const who = diggers.length > 1 ? `${diggers[0]} and ${diggers[1]}` : diggers[0] ?? 'Someone';
+  return {
+    dig: `${who} dig the grave.`,
+    carry: `They carry ${name} to the grave.`,
+    lower: `They lay ${name} in the ground.`,
+    fill: `${who} fill it in and set a marker at the head.`,
+  };
+}
 
-export function cleanupBeats(d: Damage, seed: number): SceneLine[] {
-  const r = mulberry32(seed * 17 + 3), used = new Set<string>(), out: SceneLine[] = [];
-  let dt = 0;
-  const cap = (pool: readonly string[]) => { out.push({ dt, kind: 'caption', text: pickOut(pool, used, r) }); dt += 3.2; };
-  if (d.blood !== false) cap(SCRUB);
-  if (d.breached) cap(PATCH);
-  if (d.fires) cap(BURNT);
-  if (d.fenceDown) cap(FENCE);
-  if (!out.length) cap(SCRUB);
-  return out;
+export function cleanupCaptions(raker: string, fallen: string, hammerer: string): { stain: string; repair: string } {
+  return { stain: `${raker} rakes sand over the place where ${fallen} fell.`, repair: `${hammerer} nails planks across the breach in the wall.` };
 }
 
 export interface Shaken { id: string; name: string; trauma: number }
-const FLINCH = ['{c} jumps when the door bangs, then laughs without a sound.', '{c} keeps looking at the treeline and does not hear the question.', '{c} is holding the cup in both hands and it is still shaking.', '{c} sits down on the step, rifle across the knees, and stares at nothing.', '{c} has not put the gun down since it ended.'];
+const FLINCH = ['{c} stands frozen, hands to the face.', '{c} cannot move. The shaking will not stop.', '{c} stopped where they stood, and cannot start again.', '{c} stares at nothing, hands over the mouth.'];
 /** The people who are still shaking: trauma at 25 or above, the worst first, at most three. */
 export function traumaBeats(people: readonly Shaken[], seed: number): Array<SceneLine & { kind: 'caption' }> {
   const r = mulberry32(seed * 13 + 5), used = new Set<string>();

@@ -81,7 +81,7 @@ try {
       const hw = br ? last.events.filter(e => (e.kind === 'wound' || e.kind === 'death') && e.t >= br.t - 2 && e.unit.startsWith('h_') && !e.stopped).length : 0;
       if (scan) { if (br) cands.push({ d, res, dur: last.duration, deaths, hw, scenes: st.plan.scenes.length, br: br.t }); continue; }
       if (wantDay) { if (d === wantDay) ed = d; continue; }
-      if (WANT_WAKE) { if (st.drama) ed = d; continue; }
+      if (WANT_WAKE) { if (st.drama && st.battles.some(bb => bb.events.some(e => e.kind === 'grave'))) ed = d; continue; }
     }
     if (scan) return { cands };
     g.gate.pending = mk(ed);

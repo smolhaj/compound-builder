@@ -1,25 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { burialBeats, cleanupBeats, interrogationScene, raiderFace, traumaBeats } from './aftermathScenes';
+import { burialWords, cleanupCaptions, graveCaptions, interrogationScene, raiderFace, traumaBeats } from './aftermathScenes';
 
 describe('aftermath scenes', () => {
   const m = [{ id: 'a', name: 'Ana', kin: true }, { id: 'b', name: 'Ben', kid: true }, { id: 'c', name: 'Cy' }];
-  it('burial: ordered, spoken by the mourners, nothing empty and no repeat', () => {
+  it('burial words: spoken by the mourners, nothing empty, no repeat, a child speaks as a child', () => {
     for (let seed = 1; seed < 40; seed++) {
-      const b = burialBeats({ name: 'Wren', age: 40, kid: false, elder: false, mourners: m, seed });
-      expect(b.length).toBeGreaterThanOrEqual(6);
-      expect(b.every(l => l.text.trim().length > 8 && !l.text.includes('{'))).toBe(true);
+      const b = burialWords({ name: 'Wren', age: 40, kid: false, elder: false, mourners: m, seed });
+      expect(b.length).toBe(3);
+      expect(b.every(l => l.kind === 'say' && l.text.trim().length > 8 && !l.text.includes('{') && m.some(x => x.id === l.who))).toBe(true);
       expect(new Set(b.map(l => l.text)).size).toBe(b.length);
-      expect(b.every((l, i) => i === 0 || l.dt >= b[i - 1].dt)).toBe(true);
-      expect(b.filter(l => l.kind === 'say').every(l => m.some(x => x.id === l.who))).toBe(true);
     }
+    expect(burialWords({ name: 'Wren', age: 40, kid: false, elder: false, mourners: [{ id: 'k', name: 'K', kid: true }], seed: 3 })[0].who).toBe('k');
   });
-  it('burial: the child speaks as a child', () => {
-    const b = burialBeats({ name: 'Wren', age: 40, kid: false, elder: false, mourners: [{ id: 'k', name: 'K', kid: true }], seed: 3 });
-    expect(b.some(l => l.kind === 'say' && l.who === 'k')).toBe(true);
-  });
-  it('cleanup follows the damage', () => {
-    expect(cleanupBeats({ breached: true, fires: 2 }, 4).length).toBe(3);
-    expect(cleanupBeats({ blood: false }, 4).length).toBe(1);
+  it('captions name the person and describe only an action (dig, carry, lay, fill, rake, nail)', () => {
+    const g = graveCaptions('Wren', ['Ana', 'Cy']), c = cleanupCaptions('Ben', 'Wren', 'Cy');
+    expect(g.dig).toBe('Ana and Cy dig the grave.');
+    expect(Object.values({ ...g, ...c }).every(t => t.length > 12 && !t.includes('{'))).toBe(true);
+    expect(c.stain).toContain('rakes'); expect(c.repair).toContain('nails');
   });
   it('trauma: only the shaken, worst first, at most three', () => {
     const t = traumaBeats([{ id: 'a', name: 'A', trauma: 10 }, { id: 'b', name: 'B', trauma: 60 }, { id: 'c', name: 'C', trauma: 30 }, { id: 'd', name: 'D', trauma: 40 }, { id: 'e', name: 'E', trauma: 80 }], 2);

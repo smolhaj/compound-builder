@@ -49,12 +49,46 @@ describe('the death and the wake', () => {
     for (let i = 1; i < b.events.length; i++) expect(b.events[i].t).toBeGreaterThanOrEqual(b.events[i - 1].t);
     // the tail plays long enough to see it, in playback time; the game clock is untouched
     expect(playbackLengths(st.plan.scenes[d.scene]).tail).toBeGreaterThanOrEqual(d.wake + 3);
-    expect(d.wake).toBeLessThanOrEqual(56);   // about 25 s of vigil, then the burial, the cleanup and the shaken (sim/aftermathScenes.ts)
-    expect(b.events.some(e => e.kind === 'say' && e.ctx === 'aftermath' && /grave|shovel|ground/i.test(e.text))).toBe(true);
+    expect(d.wake).toBeLessThanOrEqual(95);   // about 25 s of vigil, then the burial, the cleanup and the shaken (sim/aftermathScenes.ts)
+    // the burial is DRAWN: a pit opened by people with shovels, the fallen carried to it, laid in it, a mound heaped over them
+    type Ev = { t: number; kind: string; unit?: string; stage?: string; what?: string };
+    const ev = (k: string, f: (e: Ev) => boolean = () => true): Ev[] => (b.events as unknown as Ev[]).filter(e => e.kind === k && f(e));
+    const dig = ev('grave', e => e.stage === 'dig')[0], low = ev('grave', e => e.stage === 'lower')[0], fillE = ev('grave', e => e.stage === 'fill')[0];
+    if (dig) {
+      expect(low && fillE).toBeTruthy();
+      expect(dig.t).toBeLessThan(ev('lift', e => e.unit === d.victim.unit)[0].t);                 // dug before the body is carried
+      expect(low.t).toBeGreaterThan(ev('lower', e => e.unit === d.victim.unit)[0].t - 0.01);       // laid in after it is set down
+      expect(fillE.unit).toBe(d.victim.unit);
+      expect(ev('tool', e => e.what === 'shovel').length).toBeGreaterThanOrEqual(2);
+      for (const t of ev('tool', e => e.what === 'shovel')) expect(b.units.find(u => u.id === t.unit)?.civilian).toBeFalsy();
+    }
+    // every caption of the aftermath is for something drawn at that moment
+    const caps = b.events.filter(e => e.kind === 'say' && e.ctx === 'aftermath') as Array<{ t: number; text: string }>;
+    const near = (k: string, t: number, f: (e: Ev) => boolean = () => true) => (b.events as unknown as Ev[]).some(e => e.kind === k && f(e) && Math.abs(e.t - t) < 1.6);
+    for (const c of caps) {
+      if (/dig the grave/.test(c.text)) expect(near('grave', c.t, e => e.stage === 'dig'), c.text).toBe(true);
+      if (/to the grave/.test(c.text)) expect(near('lift', c.t, e => e.unit === d.victim.unit), c.text).toBe(true);
+      if (/in the ground/.test(c.text)) expect(near('grave', c.t, e => e.stage === 'lower'), c.text).toBe(true);
+      if (/fill it in/.test(c.text)) expect(near('grave', c.t, e => e.stage === 'fill'), c.text).toBe(true);
+      if (/rakes sand/.test(c.text)) expect(near('clean', c.t) && near('tool', c.t, e => e.what === 'rake'), c.text).toBe(true);
+      if (/nails planks/.test(c.text)) expect(near('repair', c.t) && near('tool', c.t, e => e.what === 'hammer'), c.text).toBe(true);
+      if (/frozen|cannot move|stopped where|stares at nothing/.test(c.text)) expect(near('panic', c.t), c.text).toBe(true);
+      expect(c.text).not.toMatch(/wheelbarrow|chickens|bedsheet|empty chair|scrub/i);                // (captions that have nothing behind them were cut)
+    }
     // grief is named for who died, with no pronouns assumed and no gore in the words
     const words = b.events.filter(e => e.kind === 'say').map(e => (e as { text: string }).text).join(' ');
     expect(words).toContain(d.victim.name);
     expect(words).not.toMatch(/\b(he|she|his|her)\b.*\b(blood|brains|guts)\b/i);
+  });
+  it('where there are hands free, the grave is dug, the fallen carried to it and laid in it (drawn, not captioned)', () => {
+    const a = find(st => !!st.drama && st.battles.some(bb => bb.events.some(e => e.kind === 'grave')));
+    expect(a, 'some household in range buries its dead').toBeTruthy();
+    const b = a!.st.battles[a!.st.drama!.scene], v = a!.st.drama!.victim.unit;
+    const kinds = b.events.filter(e => e.kind === 'grave').map(e => (e as { stage: string }).stage);
+    expect(kinds).toEqual(['dig', 'lower', 'fill']);
+    const dig = b.events.find(e => e.kind === 'grave')!, lift = b.events.find(e => e.kind === 'lift' && e.unit === v)!;
+    expect(dig.t).toBeLessThan(lift.t);
+    expect(b.events.filter(e => e.kind === 'tool' && e.what === 'shovel').length).toBeGreaterThanOrEqual(4);   // two diggers, twice
   });
   it('is deterministic', () => {
     const a = find(st => !!st.drama)!, g = base(a.g.seed), st2 = stageRaid(g, 'defend');
