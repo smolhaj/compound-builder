@@ -5,7 +5,7 @@
  */
 import { create } from 'zustand';
 import type { Recap } from '../sim/resumeRecap';
-import type { Celebration, ToastModel } from '../sim/feedbackDiff';
+import { queueCards, type Celebration, type ToastModel } from '../sim/feedbackDiff';
 import type { RightTab } from '../sim/tabReveal';
 import { EMPTY_MEMORY, type GoalMemory } from '../sim/firstHour';
 import { holdFactor } from '../ui/feel/quiet';
@@ -91,7 +91,7 @@ export const useFeelStore = create<FeelStore>((set, getS) => ({
     }, 2400 * holdFactor());
   },
   cards: [],
-  pushCards: (c) => set(s => ({ cards: [...s.cards, ...c] })),
+  pushCards: (c) => set(s => ({ cards: queueCards(s.cards, c) })),
   dismissCard: () => set(s => ({ cards: s.cards.slice(1) })),
   revealed: ['family'],
   fresh: [],
