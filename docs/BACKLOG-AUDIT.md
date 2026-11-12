@@ -1,5 +1,7 @@
 # Game-loop backlog audit (area F: tasks #25 #26 #27 #34)
 
+> Historical (save v70 era). `docs/DEPTH_AUDIT.md` supersedes the peacetime, survival and people rows (hunter safety is built; soap, forge, shared harvest and spare parts are done); the long-game rows still hold.
+
 Checked against GDS §10.4 to §10.6, `docs/DECISIONS.md` and `src/sim`. Status: **done**, **partial**, **missing**. "Built here" marks what this PR adds.
 
 ## Peacetime (§10.4, task #25)

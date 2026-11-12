@@ -25,8 +25,8 @@
   - the Upper Midwest;
   - and more.
 - **Farming:** medium depth. Crops depend on season and soil. You can run an orchard, a greenhouse, chickens, goats, bees and a fishpond. Food has yields and spoils unless you preserve it (canning, smoking, the root cellar). Individual plants are not micro-managed.
-- **Camera:** a diorama builder camera, plus a walk/fly mode, plus a photo mode.
-- **Difficulty:** Cozy, Standard and Hardcore presets (Hardcore has permadeath, fewer warning signs and harsher raids), plus God Mode.
+- **Camera:** a diorama builder camera, plus a walk/fly mode, plus a photo mode. The tilt-shift "miniature" look is an optional extra (see §6).
+- **Difficulty:** Cozy, Standard and Hardcore presets (Hardcore has permadeath, fewer warning signs and harsher raids; Cozy is gentle but not deathless, see §4), plus God Mode.
 
 **Modes:** Surprise (default), Scenario (choose the disaster), God Mode (choose and trigger events, unlimited money, sandbox; flagged as sandbox).
 
@@ -86,7 +86,7 @@ Each material has stats: **cost, build time, skill required, durability, protect
   - lighting.
   - A **Defense overlay** shows covered and blind zones.
 - **Visibility (OPSEC):** how noticeable the compound is from the road, from the air and at night (light, smoke, noise, generator hum). Low visibility avoids trouble; high capability attracts it. Overlay included.
-- **Flow:** walking distance between beds, kitchen, water, latrine, garden and posts, which affects daily labour and morale.
+- **Flow:** walking distance between beds, kitchen, water, latrine, garden and posts. Long carries cost extra labor hours on the chore (a few percent at most). There is no flow overlay; the Utilities panel notes the extra hours when a chore is losing 1 % or more.
 - **Fire:** spacing, firebreaks, roofing material, water access.
 - **Comfort and beauty:** gardens, views, porches, a fire pit, a kids' play area and good light all raise morale. A beautiful compound has happier people. This is the aesthetic payoff, and it's mechanical too.
 
@@ -127,7 +127,7 @@ Each disaster is a ruleset: what breaks, what is scarce, and what threat cadence
 - **Warning** varies by disaster: months for an asteroid, a season for drought, days for wildfire or a solar flare (aurora), minutes to days for nuclear war.
 - **Visibility** is a threat-type matrix: a fortress look (walls, guns, lights) deters opportunists and looters but attracts organized gangs, militia and requisitioners; staying unseen (the "gray man") avoids both but deters no one who finds you.
 - **Neighbors** are named NPC households on the surrounding farms, each with a disposition, skills, a radio net, trades and mutual aid. You can build an alliance or make enemies.
-- **Medical dependency**: some runs draw a family member on insulin, oxygen or heart medication (random). It becomes a story driver: the stockpile, fridge power, finding a medic.
+- **Medical dependency**: each person has their own chance of a chronic condition (insulin, blood pressure, thyroid, asthma). It becomes a story driver: the stockpile, fridge power, finding a medic. A run-level draw that forces one family member onto insulin or oxygen is **not built and not planned**.
 - **Nuclear war** severity is rolled; a rare large exchange adds 1–3 years of nuclear winter (cold, short seasons, famine).
 - **Government**: a help-or-hindrance roll per run and region. Either FEMA aid and restored order, or martial law, checkpoints and requisition of fuel and food. Hidden stores matter.
 - **Civil war** uses invented, non-partisan factions, never real-world parties.
@@ -160,7 +160,7 @@ Each disaster is a ruleset: what breaks, what is scarce, and what threat cadence
 - **Grid-down:**
   - **Cause:** a random cause per run (ice-storm cascade, a substation attack, a cyberattack or an aging-grid failure), each with its own hints and restoration curve, from days to months.
   - **Water depends on what you built:** the electric well pump dies unless it runs on solar plus battery or has a hand pump; the pressure tank gives about a day; a gravity cistern keeps flowing; creek water needs filtering.
-  - **Power:** solar output follows weather and season and charges the batteries, and the player sets priority loads (well pump, freezer, radio, lights). The generator burns real fuel and can be heard about 1 km away.
+  - **Power:** solar output follows weather and season and charges the batteries, and the player sets priority loads (well pump, freezer, radio, lights). The generator burns real fuel and can be heard about half a mile away.
   - **Social order follows the research curve:**
     - days 1–3: calm and neighborly;
     - week 2: shelves empty and tempers fray;
@@ -172,7 +172,7 @@ Each disaster is a ruleset: what breaks, what is scarce, and what threat cadence
 - **Encounters:** a group shows up with a dossier (size, armed or not, intent). The player picks a stance (hide, parley, warn off, defend or trade). The sim resolves it from detection, deterrence, defense and people, and a short illustrated card shows what happened and what was damaged.
 - **Food:** each person needs about 2,000–2,500 kcal a day, from stores, the garden, the coop and hunting. Preserved food lasts and fresh food spoils. Monotony hurts morale. The pantry and root cellar are built up in peacetime.
 - **Neighbors:** 4–6 named households.
-- **Injuries and death:** wounds, illness and radiation sickness need a medic, meds and the medical bay. People can die on Standard. Cozy prevents death; Hardcore is permadeath with no reloads.
+- **Injuries and death:** wounds, illness and radiation sickness need a medic, meds and the medical bay. People can die on Standard. Cozy is forgiving but not deathless: it warns first, then lets starvation kill slowly (health drains over weeks after a person has gone about 120 to 150 days badly underfed), so anyone who eats even poorly stays safe. Hardcore is permadeath. The Save menu exports and imports a JSON save in every difficulty, Hardcore included.
 - **Report card:** a newspaper-style page with a grade, the survivors, and concrete lines from the run ("Your cistern saved 4 lives", "No one knew first aid", "The tunnel was never needed").
 - **End of a run**: the region recovers, the compound reaches a self-sustaining equilibrium (over a year it grows 95 % of what everyone eats), or the family is lost; then the report card. Endless continue is optional.
 
@@ -192,7 +192,7 @@ Each disaster is a ruleset: what breaks, what is scarce, and what threat cadence
   - zoning room (more buildings allowed, fewer complaints);
   - escape-tunnel routes on your own land.
 
-**Bunker hardening** (user): fallout shielding (protection factor ~1000), Faraday cage / EMP shield, NBC air filtration (blast valve, HEPA + carbon, hand crank, overpressure) and blast hardening, each an upgrade that costs more. Radiation is a per-person dose (Sv) set by where each person is and that spot's shielding, with a radiation overlay.
+**Bunker hardening** (user): fallout shielding (protection factor ~1000), Faraday cage / EMP shield, NBC air filtration (blast valve, HEPA + carbon, hand crank, overpressure) and blast hardening, each an upgrade that costs more. Radiation is a per-person dose set by where each person is and that spot's shielding, with a radiation overlay.
 - Hardening is applied **per room**, with a "Harden whole bunker" shortcut. Each upgrade is a build job with its own stage, and existing rooms can be retrofitted.
 - Each upgrade has **3 tiers**, with price and build time climbing steeply. Fallout shielding: Basic (PF 40, extra earth) → Shelter (PF 1,000, dense concrete) → Military (PF 10,000+, lead and steel).
 - **Visible inside:**
@@ -235,10 +235,17 @@ Options: **take them in**, **trial period** (a camp outside the wall), **trade a
 - Each stage also raises visibility and threat attention: a town is a target, but also a power.
 
 ### 5.4 Governance (light, from the hamlet stage)
-Once you have outsiders, decisions aren't only yours:
-- Choose how the place is run: family patriarch/matriarch, council, vote.
-- Factions form along lines like relatives vs. newcomers, or soldiers vs. farmers.
-- Rules come up for decision: rationing, guard duty, who gets the good cabin. Unhappy groups can leave, and take things with them.
+Built scope (decided with the user, option (a): rules votes only). From the hamlet stage (15 or more people) the grown residents, not kids or guests, vote on three standing rules when the player calls a vote:
+- **Rations:** open table, shared by need, or tight and counted.
+- **Night watch:** volunteers or a rota.
+- **Who is admitted:** the family decides, open door, or kin only.
+
+Each resident leans from what they are (relative or newcomer, hungry, elder or sick, fighter) and from the play style; a majority carries it. The losing side is sore for a couple of weeks, the winners glad, and each rule has a standing effect on morale, loyalty or detection. A run that never votes is unchanged. The decisions row of 2026-11-09 has the numbers.
+
+**Not built / future (design ideas kept, not promised):**
+- Choosing how the place is run: family patriarch or matriarch, council, or vote as a standing form of government.
+- Factions along lines like relatives vs. newcomers, or soldiers vs. farmers.
+- Rules beyond the three above (who gets the good cabin) and unhappy groups leaving, taking things with them.
 
 ### 5.5 Neighbors and reputation
 Neighbors remember peacetime: who you helped, who you snubbed, whether you shared. After the collapse you can form a mutual-aid network with nearby homesteads, trade, run a militia, absorb them, or stay hidden.
@@ -251,9 +258,9 @@ Neighbors remember peacetime: who you helped, who you snubbed, whether you share
 
 ## 6. Presentation
 - Three.js procedural art, with the same approach and toolkit as University Empire: terrain, regions, seasons, weather, day/night, procedural buildings and vegetation.
-- A tilt-shift diorama camera for building, plus a walk mode to inspect your place at eye level.
+- A diorama builder camera, plus a walk mode to inspect your place at eye level. An optional **tilt-shift "miniature" look** (blur away from a sharp band, a little extra color) is available as a Diorama toggle in the View panel; it is High quality only, off by default, never applies at eye level or in walk views, and is not saved between sessions.
 - **Photo mode** with time of day and season, because the build is the star.
-- The UI stays out of the way. Overlays (defense, visibility, flow, fire, sun) are toggles.
+- The UI stays out of the way. Overlays (defense, visibility, fire, sun, shade) are toggles.
 
 ## 7. MVP (prototype slice)
 - One region (Mountain West), one parcel, a family of 4.
@@ -264,7 +271,7 @@ Neighbors remember peacetime: who you helped, who you snubbed, whether you share
 - Modes: Surprise is a stub (always grid-down for the MVP); God Mode exists from day one, since it is cheap and great for testing.
 
 ## 8. Tech
-Separate repo. Same stack as University Empire: Vite, TypeScript, React, Zustand, a custom ECS, Three.js and Vitest. Procedural art only, with no external assets.
+Separate repo. Same stack as University Empire: Vite, TypeScript, React, Zustand, Three.js and Vitest. The simulation is a pure, seeded `step(state)` over a plain `GameState` object (no entity-component system), which keeps it deterministic and easy to test. Procedural art only, with no external assets.
 
 ### 8.1 Graphics port from University Empire (the quality bar)
 **Target: Compound Builder looks at least as good as University Empire does today.** The plan is to lift UE's rendering stack into a game-agnostic package first, then build on it.
@@ -293,7 +300,7 @@ Separate repo. Same stack as University Empire: Vite, TypeScript, React, Zustand
 - **Construction stages:** scaffold → frame → clad.
 - **Damage states:** scorch, breach, rubble.
 
-**Step 3: overlays.** Defense (sightline coverage), visibility, sun and shade, fire risk and flow, as ground-projected shader layers.
+**Step 3: overlays.** Defense (sightline coverage), visibility, sun and shade, and fire risk, as ground-projected shader layers. Flow is not an overlay; it is extra labor hours (§2.4).
 
 **Performance budget** (same rules as UE): instanced and merged geometry, LOD tiers, and High / Medium / Low quality settings, aiming for 60 fps at homestead scale and 30+ fps at town scale.
 
