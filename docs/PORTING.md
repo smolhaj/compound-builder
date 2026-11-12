@@ -28,6 +28,6 @@ placement) live in `src/game/`.
 | `three/CampusTourController.ts`, `cameraOcclusion.ts` (+tests) | `engine/world/camera/TourController.ts`, `cameraOcclusion.ts` | Occupancy mask → `SiteBlockedFn`; university tour captions → generic (game supplies highlights). |
 | Playwright QA scripts (UE scratchpad) | `scripts/shots.mjs`, `scripts/shotSets.mjs` | In-repo; own Vite server without HMR; reads the canvas. |
 
-Not yet ported (later increments): instanced people (`crowd/`), living clock / window spill
-(`life/`), regional roads and rail, `mergeCompat` / building detail LOD, house rendering from
-`houseStyles` specs (the town), `streetTextures`, photo mode.
+Ported since: a figure kit for instanced people (`engine/world/people/figureKit.ts`, `crowdWear.ts`), road ribbons (`engine/world/roads/`), tilt-shift post (`post/tiltShift.ts`), valley fog (`fog/`), and building far-LOD (`game/buildkit/buildingLod.ts`). Photo capture is a game feature (`sim/photos.ts`).
+
+Not ported: UE's living clock / window spill (`life/`), regional rail, `mergeCompat`, house rendering from `houseStyles` specs for a town, `streetTextures`. Compound Builder adds its own night windows (`game/atmosphere/nightLife.ts`).

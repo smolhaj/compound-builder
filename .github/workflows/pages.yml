@@ -1,7 +1,7 @@
 name: Deploy to GitHub Pages
+# Manual only: run it from the Actions tab when you want the playable build published.
+# It used to run on every push to main, so a batch of merges started several deploys (and the occasional "0 artifacts" failure).
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read

@@ -1,5 +1,8 @@
 # Branch inventory (2026-11-04)
 
+> **Snapshot, not current.** Taken 2026-11-04 at save v78 and not regenerated since. Rows that have changed: `claude/survival-realism` and `claude/farm-kitchen` were ported to `main` (#260 radiation, thirst and hypothermia; #261 farm and kitchen part 3), and `claude/starter-compound` merged as #173. Re-run the audit (method below) before deleting branches.
+
+
 Audit of the 192 `origin/claude/*` branches against `origin/main` (save v78). Method: a branch is **merged** when a merged PR has its head ref and its tip equals that PR head; otherwise every added line of `merge-base..tip` was looked up in main's version of the same file. Squash merges mean `git branch --merged` shows nothing, so the PR list is the evidence.
 
 ## Summary

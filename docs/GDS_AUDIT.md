@@ -1,5 +1,8 @@
 # GDS audit (every section) against origin/main
 
+> **Status update (origin/main, save v95).** The audit below is a snapshot from save v78 and its rows are kept as written. Since then: tilt-shift Diorama look built (High only, off by default; DECISIONS 2026-11-11); Save / Load menu with JSON export and import (#183); flow as extra labor hours, no overlay (`sim/flow.ts`); shade overlay and radiation readout in Blueprint (#263); photo capture (#266); governance as house rules by vote at the hamlet stage (`sim/rules.ts`, #269); neighbors and strangers can join (#87, earlier); radiation sickness and real thirst (#260). Still open: room assignment inside a house, district zoning, the run-level medical-dependency draw, absorbing neighbors. Conflicts between this spec and the code are listed in the PR that last refreshed the docs, not decided here.
+
+
 Checked `COMPOUND_BUILDER_GDS.md` against the code at origin/main (save v78). Earlier audits (`BACKLOG-AUDIT.md`, `DEPTH_AUDIT.md`) covered §10.4 to §10.6, which are mostly done, so those rows are summarised. Status: **done**, **partial**, **missing**. "Built here" marks what this PR adds. Where the GDS is silent the item is listed under Open questions, not built.
 
 ## Pillars, modes, difficulty (front matter)
@@ -11,7 +14,7 @@ Checked `COMPOUND_BUILDER_GDS.md` against the code at origin/main (save v78). Ea
 | Abstract combat from the design | done | `sim/battle.ts`, `sim/encounters.ts` |
 | Kits plus customisation, freeform walls/fences/paths | done | `game/buildkit`, `sim/perimeter.ts`, `sim/paths.ts` |
 | People build over time (scaffold, frame, clad) | done | `sim/construction.ts`, `sim/crews.ts` |
-| Real time with pause, day/night, seasons | done | `sim/clock.ts`, `ui/Hud.tsx` speeds |
+| Real time with pause, day/night, seasons | done | `sim/state.ts` (calendar and clock), `sim/engine.ts`, `sim/clockResume.ts`, `ui/Hud.tsx` speeds |
 | Seven-plus regions with own terrain, climate, prices, odds | done | `sim/regions.ts`, `engine/world/terrain` |
 | Farming at medium depth, spoilage, preserving | done | `sim/crops.ts`, `sim/kitchen.ts`, `sim/shelf.ts` |
 | Camera: diorama builder | partial | `game/DioramaCamera.ts`; no tilt-shift depth-of-field look (`engine/world/post` has only grading and god rays) |
@@ -46,8 +49,8 @@ Checked `COMPOUND_BUILDER_GDS.md` against the code at origin/main (save v78). Ea
 | Defense computed from design (perimeter, chokes, sightlines, dead ground, fall-back) | done | `sim/defenseReport.ts`, `sim/towers.ts`, `sim/battle.ts` |
 | Defense overlay (covered and blind zones) | done | Sightlines: Viewshed, `game/sightlines` |
 | Visibility / OPSEC (road, air, night) and overlay | done | `sim/opsec.ts`, Sightlines: Road / Ridge / Night |
-| Flow: walking distance between beds, kitchen, water, latrine, posts affects labor and morale | **missing** | no sim effect, no overlay. Needs a design answer (Q3) |
-| Flow overlay | **missing** | see above |
+| Flow: walking distance between beds, kitchen, water, latrine, posts affects labor and morale | done (no overlay) | `sim/flow.ts`: extra labor hours, DECISIONS 2026-11-04; GDS updated 2026-11-12 |
+| Flow overlay | dropped | not built by decision; GDS no longer lists it |
 | Fire: spacing, firebreaks, roofing, water access | partial | `sim/effects.ts` fire front reads fuel round each building and `emberFactor`; nothing shows it before the fire |
 | Fire overlay | **missing -> built here** | `sim/fireRisk.ts`, Terrain: Fire |
 | Sun and shade overlay | done | Terrain: Sun shows slope/aspect; **Shade** draws noon on Dec 21 (hills, buildings, evergreens, bare broadleaves) and lists the solar arrays and beds with how much of each is shaded (`sim/shade.ts`) |
@@ -70,7 +73,7 @@ Checked `COMPOUND_BUILDER_GDS.md` against the code at origin/main (save v78). Ea
 | Collapse clock with tracks | done | `sim/disaster.ts` |
 | Warning varies; visibility threat matrix | done | `sim/disaster.ts`, `sim/encounters.ts` |
 | Named neighbor households, radio net, mutual aid | done | `sim/neighborLife.ts`, `sim/pact.ts` |
-| Medical dependency (insulin, oxygen, heart meds) as a story driver | partial | per-person chance of insulin, blood pressure, thyroid, asthma (`sim/body.ts`); no oxygen, no run-level "one family member depends on it" draw (Q5) |
+| Medical dependency (insulin, oxygen, heart meds) as a story driver | partial | per-person chance of insulin, blood pressure, thyroid, asthma (`sim/body.ts`); no oxygen, no run-level "one family member depends on it" draw. **Not built, not planned** (owner decision 2026-11-12: shipped code wins; the GDS no longer promises it) |
 | Nuclear war: four tells, strike, dash, 2-week shelter, dose, PF, fallout 7-10 | done | `sim/nuclear.ts`, `sim/bunkerLife.ts` |
 | Radiation overlay (dose by room and shielding) | done | Blueprint view in a nuclear run once the warning is out: every shelter shows PF and its 14-day dose, colored; summary line in the readout (`sim/radiation.ts`) |
 | Government help-or-hinder roll | done | `sim/disaster.ts` |
@@ -94,7 +97,7 @@ Checked `COMPOUND_BUILDER_GDS.md` against the code at origin/main (save v78). Ea
 | Settlement stages homestead, compound, hamlet, walled village, small town | **missing -> built here** | `sim/settlement.ts` (derived label), HUD chip |
 | Districts (residential, fields, workshops, defense ring) and roads | partial | roads and rings exist (`sim/rings.ts`, `sim/roadPlan.ts`); no district zoning |
 | Visibility and threat rise with size | partial | people count feeds `sim/opsec.ts` and raid size; not tied to stage |
-| Governance: patriarch / council / vote, factions, rules, people who leave | missing | Q1 |
+| Governance: patriarch / council / vote, factions, rules, people who leave | partial | house-rule votes from the hamlet stage (`sim/rules.ts`, DECISIONS 2026-11-09); council, factions and leaving are in the GDS as "Not built / future" |
 | Neighbor reputation, alliance, militia, absorb | partial | pact, alliance, shared watch done; absorbing neighbors missing |
 | Play styles Hermit / Clan / Ark / Haven | **missing -> built here** | `sim/settlement.ts` (derived, shown on card) |
 
@@ -118,7 +121,7 @@ Checked `COMPOUND_BUILDER_GDS.md` against the code at origin/main (save v78). Ea
 | Damage states (scorch, breach, rubble) | partial | breach and burn (`sim/doorBreach.ts`, `sim/construction.ts burnStructure`); scorch/rubble visuals limited |
 | Quality tiers High / Medium / Low, frame cap, perf budget | done | `ui/Hud.tsx`, `engine/perf`, `scripts/perfBudget.mjs` |
 | Playwright screenshot QA harness | done | `scripts/shots.mjs`, `src/game/qaRender.ts` |
-| Tilt-shift diorama look | missing | no DOF pass; adding one costs frame time on a tight budget (Q2) |
+| Tilt-shift diorama look | done | optional, High only, off by default (`engine/world/post/tiltShift.ts`, DECISIONS 2026-11-11) |
 
 ## §9 Open questions (answered in DECISIONS.md)
 Parcel per run (seeded, listings), family backstory (occupations, reroll), permadeath, kids age up, endless play, betrayal by joiners: all done (`sim/lineage.ts`, `sim/trial.ts`, `sim/family.ts`).
@@ -137,13 +140,13 @@ Parcel per run (seeded, listings), family backstory (occupations, reroll), perma
 | 10.11 Long game: eras, generations, chronicle, dynasty score, milestones | done | `sim/eras.ts`, `sim/lineage.ts`, `ui/ReportCard.tsx` |
 
 ## Counts
-Rows: 93. Done 74, partial 11, missing 8 (of which 5 built here: God Mode, fire overlay, comfort and beauty, settlement stage, play styles; sandbox flag on the card counted with God Mode). Still missing or partial after this PR: flow, shade, radiation overlay, governance, tilt-shift, photo capture, room assignment, districts, medical dependency draw.
+Rows: 93. Done 74, partial 11, missing 8 (of which 5 built here: God Mode, fire overlay, comfort and beauty, settlement stage, play styles; sandbox flag on the card counted with God Mode). Still missing or partial after this PR: shade, radiation overlay, governance beyond house rules, photo capture, room assignment, districts. The medical dependency draw is **not built, not planned**.
 
 ## Open questions (with a recommendation)
 1. **Governance (§5.4)** has no numbers. Which scope? (a) rules votes only: rationing, guard duty, cabin priority, with unhappy factions leaving (recommended, smallest); (b) a full council with factions; (c) skip until the settlement is a hamlet.
 2. **Tilt-shift diorama look.** (a) High quality only, off by default, a toggle in the view bar (recommended); (b) always on for the diorama camera; (c) skip.
 3. **Flow.** What should a long walk cost? (a) extra labor hours on the duty (recommended: bed to kitchen to water legs add up to a few percent); (b) morale only; (c) overlay only, no effect.
 4. **Shade overlay.** (a) tree and building shadow at noon on the winter solstice, drawn as another Terrain mode (recommended); (b) leave Sun as slope only.
-5. **Medical dependency.** (a) at setup, roll one family member (about 1 in 3 runs) on insulin, oxygen or heart medication with a stockpile and fridge-power story (recommended); (b) keep today's per-person chances only.
+5. **Medical dependency.** **Resolved 2026-11-12: not built, not planned** (shipped per-person chances stand). Original options: (a) at setup, roll one family member (about 1 in 3 runs) on insulin, oxygen or heart medication with a stockpile and fridge-power story (recommended); (b) keep today's per-person chances only.
 6. **Radiation overlay.** (a) a room-by-room PF readout in the Blueprint view (recommended); (b) a ground-projected dose map; (c) skip.
 7. **Comfort and beauty weights.** This PR adds up to +4 strain relief for a lived-in place (see `sim/comfort.ts`). Is a smaller cap (+3) wanted, or should decor become buildable (fire pit, play area, porch) so the player earns it? Recommendation: keep derived for now.

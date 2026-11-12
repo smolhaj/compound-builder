@@ -27,7 +27,7 @@ export const FUNDS_RANGE: Record<Lifestyle, [number, number]> = {
   // (round 5) the floor was $250k: with the town house's bills the weekend family could not build; two incomes and no land debt put it at $400k
   weekend: [400_000, 750_000],
   fulltime: [450_000, 1_100_000],
-  independent: [1_000_000, 2_000_000],
+  independent: [700_000, 1_400_000],   // (cash-use pass) was 1.0 to 2.0 million: independent families held 90 to 96 percent of it a year after the hit
 };
 
 const k = (n: number) => Math.round(n / 1000) * 1000;

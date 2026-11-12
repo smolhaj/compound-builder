@@ -37,7 +37,7 @@ import { bagOf, BAG_BASE, type BagGood } from './tradeGoods';
 import { findTool, TOOLS } from './tools';
 import { diffOf } from './difficulty';
 import { cargoKg, driveTrip, roadTrouble } from './vehicles';
-import { gallonsText } from './units';
+import { gallonsText, remText } from './units';
 import { pluralize } from './words';
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -443,7 +443,7 @@ export function resolveRun(s: GameState, run: Run): RunResult {
   // fallout on the ground, the sick and the dead
   if (risk.fallout > 0) {
     for (const id of run.team) { const ps = s.personState.find(x => x.id === id); if (ps) ps.needs.dose += risk.fallout; }
-    lines.push(`Gray dust on everything in town. The dosimeter says ${risk.fallout >= 0.1 ? `${risk.fallout.toFixed(2)} Sv` : `${Math.round(risk.fallout * 1000)} mSv`} each.`);
+    lines.push(`Gray dust on everything in town. The dosimeter says ${remText(risk.fallout)} each.`);
   }
   if (risk.sickness > 0 && r() < risk.sickness) { const l = infect(s, r, `caught it at ${p.name}`); if (l) { lines.push('Bodies in the rooms. Nobody had come for them.'); lines.push(l); } }
   // the search

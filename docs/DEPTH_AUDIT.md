@@ -1,6 +1,6 @@
 # Depth audit: tasks #25, #26, #27 (GDS §10.4 to §10.6)
 
-Checked against `src/sim` at origin/main (save v73). Supersedes the older `docs/BACKLOG-AUDIT.md` rows for these items. Status: done / partial / missing. "Built here" = this PR.
+Checked against `src/sim` at origin/main (save v73; still accurate at v95 except that radiation sickness and thirst are now built, #260). Supersedes the older `docs/BACKLOG-AUDIT.md` rows for these items. Status: done / partial / missing. "Built here" = this PR.
 
 ## #25 Peacetime (§10.4)
 | Item | Status | Where |
