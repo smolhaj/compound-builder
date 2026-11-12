@@ -1,7 +1,8 @@
 /** The purchase toast (one line: what you got, what it cost, what is left) and the milestone card. */
 import { useEffect } from 'react';
+import { useGameStore } from '../../store/gameStore';
 import { useFeelStore } from '../../store/feelStore';
-import { toastText } from '../../sim/feedbackDiff';
+import { compactCard, toastText } from '../../sim/feedbackDiff';
 import { TONE } from '../hud/style';
 import { holdFactor } from './quiet';
 
@@ -14,12 +15,18 @@ export function PurchaseToast() {
 /** A small card for a real milestone. Not a modal: the game keeps running, and it goes by itself after a while. */
 export function MilestoneCard() {
   const c = useFeelStore(s => s.cards[0]), more = useFeelStore(s => s.cards.length - 1), dismiss = useFeelStore(s => s.dismissCard);
+  const running = useGameStore(g => g.game.clock.speed > 0);
+  const compact = !!c && compactCard(c, running);
   useEffect(() => {
     if (!c) return;
-    const id = setTimeout(dismiss, 12000 * holdFactor());
+    const id = setTimeout(dismiss, (compact ? 7000 : 12000) * holdFactor());
     return () => clearTimeout(id);
-  }, [c, dismiss]);
+  }, [c, dismiss, compact]);
   if (!c) return null;
+  if (compact) return <div key={c.id} className="cb-rise" role="status" aria-live="polite" data-testid="milestone-card" style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 108, zIndex: 26, maxWidth: 'min(560px, calc(100vw - 40px))', background: '#ece4d0', color: '#1d1b16', borderRadius: 6, padding: '6px 12px', border: '1px solid #8a7a52', boxShadow: '0 4px 16px rgba(0,0,0,0.5)', fontSize: 13, display: 'flex', gap: 10, alignItems: 'center' }}>
+    <span><b>{c.kicker}:</b> {c.title}. {c.footer ?? ''}{more > 0 ? ` (${more} more)` : ''}</span>
+    <button style={{ padding: '2px 10px', border: 0, borderRadius: 5, background: '#1d1b16', color: '#ece4d0', cursor: 'pointer' }} onClick={dismiss}>OK</button>
+  </div>;
   return <div key={c.id} className="cb-rise" role="status" aria-live="polite" data-testid="milestone-card" style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', top: 124, zIndex: 26, width: 320, background: '#ece4d0', color: '#1d1b16', borderRadius: 4, padding: '10px 14px 10px', boxShadow: '0 8px 30px rgba(0,0,0,0.55)', border: '1px solid #8a7a52', fontFamily: 'Georgia, "Times New Roman", serif' }}>
     <div style={{ fontSize: 10.5, letterSpacing: 2, textTransform: 'uppercase', opacity: 0.65, fontFamily: 'system-ui, sans-serif' }}>{c.kicker ?? 'A milestone'}</div>
     <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.15, margin: '3px 0 4px' }}>{c.title}</div>

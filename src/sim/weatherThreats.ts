@@ -60,6 +60,8 @@ export interface WeatherState {
   hail?: { year: number; doy: number };
   /** The last day the snow-shut road was told of (sim/slope.ts roadClosedFor; so it is said once per closing). */
   shutLogged?: number;
+  /** A blizzard has already brought a roof down this run (it happens once). */
+  snowCollapsed?: boolean;
 }
 
 /** Days of quiet after a storm before another can come. */
@@ -190,7 +192,7 @@ function hit(s: GameState, e: WeatherEvent, r: () => number, out: string[]): voi
   tunnelStorm(s, e.kind, r, out);
   if (e.kind === 'blizzard') {
     out.push('Blizzard: the roads are drifted shut and we are snowed in.');
-    for (const st of fin) if ((st.fixes ?? []).some(f => f.part === 'roof' && f.done < f.hours) && r() < 0.5) { damage(s, st, 0.3, 'The snow load was too much for the old roof.', out); break; }
+    for (const st of fin) if (!weatherOf(s).snowCollapsed && !s.structures.some(x => x.roofLost) && (st.fixes ?? []).some(f => f.part === 'roof' && f.done < f.hours) && r() < 0.5) { damage(s, st, 0.3, 'The snow load was too much for the old roof.', out); weatherOf(s).snowCollapsed = true; break; }
   } else if (e.kind === 'tornado' || e.kind === 'derecho') {
     const targets = fin.filter(st => !st.kind.startsWith('bunker_') && st.kind !== 'root_cellar');
     if (targets.length) damage(s, pick(r, targets), 0.4, e.kind === 'tornado' ? 'A tornado came through!' : 'A derecho tore through: 90 mph straight-line winds.', out);
