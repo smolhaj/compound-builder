@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Director, MAX_SURFACE_COVER, STANDOFF, auditPose, bestEye, surfaceCover, figurePx, lensProblem, poseAt, shotProblems, type Actor, type Box, type Shot } from './director';
+import { Director, MAX_SURFACE_COVER, MAX_WALL_COVER, wallCover, STANDOFF, auditPose, bestEye, surfaceCover, figurePx, lensProblem, poseAt, shotProblems, type Actor, type Box, type Shot } from './director';
 import { obstaclesOf, treeBoxes } from './cameraObstacles';
 import { lightLabel } from './lightLabel';
 import { planSiege, sceneCaption, segments, type SceneKind } from '../../sim/siege';
@@ -84,6 +84,7 @@ describe('every raid-cutscene shot frames its subject and stays out of the geome
           if (au.aboveGround < 1.3) expect(au.nearest, `seed ${seed} ${s.kind} t=${t} hugging a ${au.nearest}`).toBeGreaterThanOrEqual(0.25);
           expect(au.ahead, `seed ${seed} ${s.kind} t=${t} dead ahead`).toBeGreaterThanOrEqual(0.6);
           expect(au.cover, `seed ${seed} ${s.kind} t=${t}: one surface covers ${Math.round(au.cover * 100)}% of the picture`).toBeLessThanOrEqual(MAX_SURFACE_COVER);
+          if (t === 0) expect(au.wall, `seed ${seed} ${s.kind}: a wall covers ${Math.round(au.wall * 100)}% of the picture at the cut`).toBeLessThanOrEqual(MAX_WALL_COVER);
           if (t === 0 && au.live > 0 && s.subjects?.length) expect(au.visible, `seed ${seed} ${s.kind} shows no one`).toBeGreaterThan(0);
         }
       }
@@ -394,5 +395,25 @@ describe('a surface close to the camera may not fill the picture', () => {
     const look = { x: 0, y: 0.2, z: 3 };
     const bad = { x: 0, y: 0.3, z: 0.25 }, good = { x: 0, y: 1.2, z: -3 };
     expect(bestEye([bad, good], look, 42, [wall], ground, 0.1)).toEqual(good);
+  });
+});
+
+describe('a house wall a few metres off may not fill a third of the picture (the "Probing the line" gable)', () => {
+  // the night invasion at 2:21 AM: an over-the-shoulder shot from beside the house, a gable wall 1.8 units off the lens and nothing of it touching the eye
+  const gable: Box = { x0: -1, x1: 4, z0: 1.8, z1: 6, h: 1.1, kind: 'building' };
+  const eye = { x: 0.2, y: 0.5, z: 0 }, aim = { x: 4, y: 0.4, z: 6 };
+  it('reads a gable wall beside the lens as a wall, though the old near-surface test passes it', () => {
+    expect(surfaceCover(eye, aim, 50, [gable], ground)).toBeLessThanOrEqual(MAX_SURFACE_COVER);
+    expect(wallCover(eye, aim, 50, [gable], ground)).toBeGreaterThan(MAX_WALL_COVER);
+  });
+  it('reads a house across the yard, and a tree crown close by, as nothing', () => {
+    expect(wallCover({ x: 0, y: 0.8, z: -8 }, { x: 0, y: 0.3, z: -3.2 }, 50, [gable], ground)).toBe(0);
+    expect(wallCover(eye, aim, 50, [{ x0: 0, x1: 3.5, z0: 1.8, z1: 6, h: 1.1, kind: 'tree' }], ground)).toBe(0);
+  });
+  it('shotProblems refuses the shot, and bestEye prefers the eye with the wall out of the picture', () => {
+    const shot: Shot = { kind: 'wall', eye, look: aim, fov: 50, since: 0, hold: 4, drift: { x: 0, y: 0, z: 0 } };
+    expect(shotProblems(shot, { boxes: [gable], ground, actors: new Map() }).some(p => p.includes('a wall covers'))).toBe(true);
+    const away = { x: 0.2, y: 0.5, z: -8 };
+    expect(bestEye([eye, away], aim, 50, [gable], ground, 0.1)).toEqual(away);
   });
 });

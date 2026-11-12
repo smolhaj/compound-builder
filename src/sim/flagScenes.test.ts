@@ -25,7 +25,8 @@ describe('the man under the white flag: all four answers are shown', () => {
       g.gate.pending = { ...enc('gang', 6, 'hard', Math.floor(g.clock.t)), stances: ['flag_pay', 'flag_pass', 'flag_bluff', 'flag_shoot', 'defend'] as Stance[] };
       const st = stageRaid(g, stance);
       const b = st.battles.find(x => x.events.some(e => e.kind === 'flag'));
-      if (!b) return;   // (a one-scene fight: the answer turned the parley into the fight at once)
+      expect(b, `${stance}: the exchange under the flag is a scene of its own, even when the answer ends in a fight`).toBeTruthy();
+      if (!b) return;
       expect(b.events.some(e => e.kind === 'flag' && e.unit === 'r0')).toBe(true);
       expect(b.events.some(e => e.kind === 'say' && e.who === 'r0')).toBe(true);
       if (stance === 'flag_pay') expect(b.events.some(e => e.kind === 'loot')).toBe(true);
@@ -35,4 +36,24 @@ describe('the man under the white flag: all four answers are shown', () => {
       expect(findClips(out, navFor(out, yardSolid(g, [HOUSE], 0.012)))).toEqual([]);
     }, 60000);
   }
+});
+
+describe('a flag answer that ends in a fight is staged as the exchange, then the assault', () => {
+  it('bluff and shoot: the first scene is the gate, the last the assault, and the clock accounting holds', () => {
+    let fights = 0;
+    for (const stance of ['flag_bluff', 'flag_shoot'] as Stance[]) for (let seed = 1; seed <= 12; seed++) {
+      const g = game(seed, 14);
+      g.gate.pending = { ...enc('gang', 8, 'hard', Math.floor(g.clock.t)), stances: ['flag_pay', 'flag_pass', 'flag_bluff', 'flag_shoot', 'defend'] as Stance[] };
+      const st = stageRaid(g, stance);
+      const sc = st.plan.scenes;
+      if (sc[sc.length - 1].kind !== 'assault') continue;   // (the answer ended it: bluff worked, or the crew scattered)
+      fights++;
+      expect(sc.length).toBeGreaterThanOrEqual(2);
+      expect(sc[0].kind).toBe('gate');
+      expect(st.battles[0].events.some(e => e.kind === 'flag')).toBe(true);
+      expect(st.battles.length).toBe(sc.length);
+      sc.forEach((x, i) => expect(x.index).toBe(i));
+    }
+    expect(fights).toBeGreaterThan(0);
+  }, 120000);
 });

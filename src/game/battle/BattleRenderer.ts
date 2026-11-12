@@ -777,6 +777,12 @@ export class BattleRenderer {
         this._q.setFromEuler(this._e);
         this._m.compose(this._v.set(u.x, gy + 0.025, u.z), this._q, this._s.setScalar(FIG_SCALE * gs));
         this._m.toArray(this._layer.mesh.instanceMatrix.array as Float32Array, n * 16);
+      } else if (u.y > 0.06 && u.def.side === 'raider' && !u.dead && u.layAt == null && !u.carriedBy) {
+        // on a ladder's rungs: pitched into the ladder with both arms up (the reach pose), feet on a rung, bobbing a little as he climbs: never upright at the top
+        this._e.set(0.32 + (moving ? Math.sin(u.phase + this.time * 7) * 0.05 : 0), u.rot, 0, 'YXZ');
+        this._q.setFromEuler(this._e);
+        this._m.compose(this._v.set(u.x, gy, u.z), this._q, this._s.setScalar(FIG_SCALE * gs));
+        this._m.toArray(this._layer.mesh.instanceMatrix.array as Float32Array, n * 16);
       } else if (u.lean && !(u.duckUntil != null && this.time < u.duckUntil) && !u.dead && u.layAt == null && !u.carriedBy && !moving) {
         // standing back from something tall and leaning out round the edge of it to fire
         this._e.set(0, u.rot, -u.lean * 0.42, 'YXZ');

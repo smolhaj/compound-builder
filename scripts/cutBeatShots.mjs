@@ -146,7 +146,13 @@ try {
       for (const [k, f] of [['panic', u => u.frozenUntil != null], ['sling', u => u.sling && !u.dead], ['crawl', u => u.crawl && !u.dead], ['limp', u => u.limp && !u.crawl && !u.dead]]) if (beats.includes(k)) for (const u of U.values()) if (f(u) && !u.def.machine) { found[k] = { x: u.x, z: u.z, y: u.y, key: u.def.id }; break; }
       if (beats.includes('answer')) { const fe = ev.find(e => e.kind === 'flag'); if (fe && t >= fe.t + 8 && t <= fe.t + 16) { const u = U.get(fe.unit); if (u) found.answer = { x: u.x, z: u.z, y: u.y, key: 'answer' }; } }
       if (beats.includes('dog')) for (const e of ev) if (e.kind === 'alarm' && e.what === 'dog' && t >= e.t + 2 && t <= e.t + 14) { const d = b.props?._dog; if (d) found.dog = { x: d.x, z: d.z, y: 0, key: 'dog' }; }
-      if (beats.includes('lights') && b._lightsSparked && b._floods?.length) { const f = b._floods[0].position; found.lights = { x: f.x, z: f.z, y: 0, key: 'lights' }; }
+      if (beats.includes('lights') && b._floods?.length) {
+        const f = b._floods[0].position;
+        // QA hook (--demo lights): a crew that breaches shoots the floodlights out a beat later (the renderer's `breach` handler); the natural runs with towers repel the crew, so the
+        // breach reaction is set off by hand: the same field the handler sets (floods out 1.4 s after the breach)
+        if (window.__flags.demo === 'lights' && b._floodsOutAt < 0 && t > 6) b._floodsOutAt = t + 1.4;
+        if (b._lightsSparked || (b._floodsOutAt >= 0 && t >= b._floodsOutAt - 2.4 && t <= b._floodsOutAt + 3)) found.lights = { x: f.x, z: f.z, y: 0, key: 'lights' + (b._floodsOutAt >= 0 && t < b._floodsOutAt ? 'a' : 'b') };
+      }
       if (beats.includes('scout')) for (const e of ev) if (e.kind === 'scout' && t >= e.t + 1 && t <= e.t + 10) { const q = pos(e.units[0]); if (q) found.scout = { ...q, key: 'scout' }; }
       if (beats.includes('wake')) for (const e of ev) if ((e.kind === 'say' && e.ctx === 'aftermath') || e.kind === 'grave' || e.kind === 'tool' || e.kind === 'clean' || e.kind === 'repair') { if (t >= e.t + 0.8 && t <= e.t + (e.kind === 'grave' ? Math.max(3.2, e.secs + 1) : 3.2)) found.wake = { x: 0, z: 0, y: 0, key: (e.kind === 'say' ? e.text.slice(0, 24) : e.kind + (e.stage ?? e.what ?? '') + e.t) }; }
       if (window.__flags.demo === 'repair' && t > 6) {

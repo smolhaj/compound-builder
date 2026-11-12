@@ -108,12 +108,39 @@ export function surfaceCover(eye: V3, look: V3, fov: number, boxes: readonly Box
   return hit / total;
 }
 
+/** A house or wall within this many units (about 18 m) of the eye may not cover more than MAX_WALL_COVER of the picture: a gable wall filling a third of the frame is a bad frame even when the camera is not touching it. */
+export const WALL_REACH = 3;
+export const MAX_WALL_COVER = 0.25;
+
+/**
+ * The share of the picture a building or wall covers within WALL_REACH of the eye (the same 9 x 5 rays as `surfaceCover`, marched further and counting only
+ * buildings only: a tree crown or a bush is not a flat grey slab, and a fence is thin enough for `surfaceCover` to deal with). Pure.
+ */
+export function wallCover(eye: V3, look: V3, fov: number, boxes: readonly Box[], ground: Ground): number {
+  const near = boxes.filter(b => b.kind === 'building' && flatDist(eye.x, eye.z, b) < WALL_REACH + 0.2);
+  if (!near.length) return 0;
+  const f = norm3(sub(look, eye)), r = norm3({ x: f.z, y: 0, z: -f.x });
+  const u = { x: r.y * f.z - r.z * f.y, y: r.z * f.x - r.x * f.z, z: r.x * f.y - r.y * f.x };
+  const th = Math.tan(fov * Math.PI / 360);
+  let hit = 0, total = 0;
+  for (let ix = -4; ix <= 4; ix++) for (let iy = -2; iy <= 2; iy++) {
+    total++;
+    const a = ix / 4 * th * FRAME.aspect * FRAME.h, c = iy / 2 * th * FRAME.v;
+    const d = norm3({ x: f.x + r.x * a + u.x * c, y: f.y + r.y * a + u.y * c, z: f.z + r.z * a + u.z * c });
+    for (let k = 0.25; k <= WALL_REACH; k += 0.25) {
+      const q = { x: eye.x + d.x * k, y: eye.y + d.y * k, z: eye.z + d.z * k };
+      if (near.some(b => insideAny(q, b, ground, 0))) { hit++; break; }
+    }
+  }
+  return hit / total;
+}
+
 /**
  * The best of a few candidate eyes for a shot that looks at `look`: out of every obstacle by `margin`, and the one with the least surface in the way (a wall or
  * roof filling the picture is the worst frame there is). When none is clear of the obstacles, the least covered of all of them.
  */
 export function bestEye(list: readonly V3[], look: V3, fov: number, boxes: readonly Box[], ground: Ground, margin: number): V3 {
-  const scored = list.map(p => ({ p, clear: !boxes.some(b => nearBox(p, b, ground, margin)), cover: surfaceCover(p, look, fov, boxes, ground) }));
+  const scored = list.map(p => ({ p, clear: !boxes.some(b => nearBox(p, b, ground, margin)), cover: Math.max(surfaceCover(p, look, fov, boxes, ground), wallCover(p, look, fov, boxes, ground) * MAX_SURFACE_COVER / MAX_WALL_COVER) }));
   const pool = scored.some(c => c.clear) ? scored.filter(c => c.clear) : scored;
   const ok = pool.find(c => c.cover <= MAX_SURFACE_COVER);
   return (ok ?? pool.reduce((a, c) => (c.cover < a.cover ? c : a))).p;
@@ -194,7 +221,7 @@ export function lensProblem(eye: V3, look: V3, fov: number, trees: readonly Box[
   return hit / n >= LENS_FILL ? 'trees or a hillside fill the picture' : null;
 }
 
-export interface ShotCtx { boxes: readonly Box[]; ground: Ground; /** Everyone alive, by id. */ actors: ReadonlyMap<string, Actor> }
+export interface ShotCtx { boxes: readonly Box[]; ground: Ground; /** A shot already running is being re-checked: the wall rule (a choice made at the cut) is left out. */ live?: boolean; /** Everyone alive, by id. */ actors: ReadonlyMap<string, Actor> }
 
 /** The pose of a shot `t` seconds in. */
 const poseOf = (s: Shot, t: number): { eye: V3; look: V3 } => {
@@ -222,6 +249,7 @@ export function shotProblems(s: Shot, ctx: ShotCtx): string[] {
     if (eye.y - ctx.ground(eye.x, eye.z) < EYE_MIN - 1e-6) out.push(`eye on the ground at t=${t.toFixed(1)}`);
     for (const b of ctx.boxes) if (nearBox(eye, b, ctx.ground, CLEAR)) { out.push(`eye ${insideBox(eye, b, ctx.ground) ? 'inside' : 'against'} a ${b.kind} at t=${t.toFixed(1)}`); break; }
     { const cov = surfaceCover(eye, look, s.fov, ctx.boxes, ctx.ground); if (cov > MAX_SURFACE_COVER) out.push(`a surface covers ${Math.round(cov * 100)}% of the picture at t=${t.toFixed(1)}`); }
+    if (t === 0 && !out.length && !ctx.live) { const wc = wallCover(eye, look, s.fov, ctx.boxes, ctx.ground); if (wc > MAX_WALL_COVER) out.push(`a wall covers ${Math.round(wc * 100)}% of the picture at t=${t.toFixed(1)}`); }
     // dead ahead: nothing solid within VIEW_CLEAR (or before the look target, whichever is nearer)
     const f = norm3(sub(look, eye)), dist = Math.hypot(look.x - eye.x, look.y - eye.y, look.z - eye.z);
     for (const d of [0.1, 0.25, 0.5, 0.75, 1]) {
@@ -276,6 +304,8 @@ export interface PoseAudit {
   raiderPx: number;
   /** The share of the picture covered by one near solid (a roof or a wall the camera is up against): over MAX_SURFACE_COVER is a bad frame. */
   cover: number;
+  /** The share of the picture a building or wall covers within WALL_REACH (over MAX_WALL_COVER is a bad frame). */
+  wall: number;
 }
 
 /** A measurement of a camera pose against the world, independent of how the shot was chosen (the tests and the screenshot harness use it). */
@@ -300,7 +330,7 @@ export function auditPose(eye: V3, look: V3, fov: number, boxes: readonly Box[],
     inPicture++;
     if (!blockedBetween(eye, c, boxes, ground)) { visible++; if (a.side === 'raider') raiderPx = Math.max(raiderPx, figurePx(eye, c, fov, viewH)); }
   }
-  return { inside, nearest: Math.round(nearest * 100) / 100, aboveGround: Math.round((eye.y - ground(eye.x, eye.z)) * 100) / 100, ahead: Math.round(ahead * 100) / 100, live: live.length, inPicture, visible, raiderPx: Math.round(raiderPx), cover: Math.round(surfaceCover(eye, look, fov, boxes, ground) * 100) / 100 };
+  return { inside, nearest: Math.round(nearest * 100) / 100, aboveGround: Math.round((eye.y - ground(eye.x, eye.z)) * 100) / 100, ahead: Math.round(ahead * 100) / 100, live: live.length, inPicture, visible, raiderPx: Math.round(raiderPx), cover: Math.round(surfaceCover(eye, look, fov, boxes, ground) * 100) / 100, wall: Math.round(wallCover(eye, look, fov, boxes, ground) * 100) / 100 };
 }
 
 export class Director {
@@ -423,7 +453,7 @@ export class Director {
     if (cur?.pinUntil !== undefined && time < cur.pinUntil) due = false;
     if (!due && cur && held >= 1.2 && time - this._lastCheck >= 0.5 && !(cur.pinUntil !== undefined && time < cur.pinUntil)) {
       this._lastCheck = time;
-      const ctx: ShotCtx = { boxes: this._shotBoxes(), ground, actors: new Map(live.map(a => [a.id, a])) };
+      const ctx: ShotCtx = { boxes: this._shotBoxes(), ground, live: true, actors: new Map(live.map(a => [a.id, a])) };
       const now: Shot = { ...cur, since: 0, hold: 0, drift: { x: 0, y: 0, z: 0 }, ...poseAt(cur, time), minPx: cur.minPx ? cur.minPx * 0.5 : undefined };
       if (cur.subjects?.length && shotProblems(now, ctx).length) due = true;   // (a subject that fell or left counts: nobody left to show)
     }

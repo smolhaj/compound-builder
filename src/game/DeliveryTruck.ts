@@ -5,6 +5,7 @@
  * in real time (a little faster at fast-forward). One truck at a time,
  * further loads queue.
  */
+import { yieldSpeed } from './wildlife/roadCrossing';
 import * as THREE from 'three';
 import { buildTruck } from './props/truckGeometry';
 import { buildStockpile } from './props/stockpileGeometry';
@@ -34,11 +35,16 @@ export class DeliveryTruck {
   private _inLen = 0;
   private _outLen = 0;
   private _held = false;
+  private _roadX: (z: number) => number;
+  /** Animals on the county road now (along it): the truck stops short of them on the road (game/wildlife/roadCrossing). */
+  private _crossers: ReadonlyArray<{ z: number }> = [];
+  setCrossers(list: ReadonlyArray<{ z: number }>): void { this._crossers = list; }
 
   private readonly _ground: (x: number, z: number) => number;
 
   constructor(scene: THREE.Scene, drive: readonly Pt[], ground: (x: number, z: number) => number, roadX: (z: number) => number, roadY: (x: number, z: number) => number | null = () => null) {
     this._scene = scene;
+    this._roadX = roadX;
     this._ground = (x, z) => roadY(x, z) ?? ground(x, z);   // (over a bridge deck the truck rides the deck, not the creek bed)
     this._truck = buildTruck();
     this._truck.visible = false;
@@ -135,7 +141,13 @@ export class DeliveryTruck {
       // fast on the road, slow on the driveway
       const onDrive = c.phase === 'in' ? c.d > this._inLen - lineLength(this._in.slice(-Math.ceil(this._in.length / 3)) as unknown as Pt[]) : c.d < 40;
       const inside = inCorridorAt(path, c.d);
-      c.d += dt * k * (inside ? 1.2 : onDrive ? 1.4 : 5);
+      // an animal on the county road ahead: slow and stop short of it (the road runs north, +z, both ways of the delivery)
+      let yieldK = 1;
+      if (this._crossers.length && !onDrive && !inside) {
+        const here = sampleRoute(path, Math.min(c.d, len));
+        if (Math.abs(here.x - this._roadX(here.z)) < 0.7) for (const a of this._crossers) yieldK = Math.min(yieldK, yieldSpeed(a.z - here.z - 0.4, 1));
+      }
+      c.d += dt * k * (inside ? 1.2 : onDrive ? 1.4 : 5) * yieldK;
       const p = sampleRoute(path, Math.min(c.d, len));
       this._truck.position.set(p.x, p.y ?? this._ground(p.x, p.z), p.z);
       this._truck.rotation.order = 'YXZ';
