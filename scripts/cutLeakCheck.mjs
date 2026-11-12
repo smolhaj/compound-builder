@@ -104,7 +104,7 @@ try {
       slowest = Math.max(slowest, maxStep);
       cb.battle.stop();
       await gc();
-      rows.push({ k, day: d, prepMs: Math.round(prep), split, nav: { ...Object.fromEntries(['cores', 'direct', 'grids', 'expanded', 'skipped'].map(a => [a, navStats[a] - ns0[a]])), pad: Object.fromEntries([3, 8, 24].map(q => [q, [navStats.pad[q].tries - ns0.pad[q].tries, navStats.pad[q].ok - ns0.pad[q].ok, navStats.pad[q].expanded - ns0.pad[q].expanded]])) }, unrouted: r.unrouted, ok: r.ok, steps, maxStepMs: +maxStep.toFixed(1), frame: drawn, heap: Math.round(performance.memory.usedJSHeapSize / 1e6), ...info(), props: cb.battle.props.live });
+      rows.push({ k, day: d, prepMs: Math.round(prep), split, nav: { ...Object.fromEntries(['cores', 'direct', 'grids', 'expanded', 'skipped'].map(a => [a, navStats[a] - ns0[a]])), pad: Object.fromEntries([3, 8, 24].map(q => [q, [navStats.pad[q].tries - ns0.pad[q].tries, navStats.pad[q].ok - ns0.pad[q].ok, navStats.pad[q].expanded - ns0.pad[q].expanded]])) }, unrouted: r.unrouted, lost: (r.lost || []).slice(0, 4), ok: r.ok, steps, maxStepMs: +maxStep.toFixed(1), frame: drawn, heap: Math.round(performance.memory.usedJSHeapSize / 1e6), ...info(), props: cb.battle.props.live });
     }
     return { base, rows, slowestStepMs: +slowest.toFixed(1) };
   }, [hour0, N, wantDay]);
