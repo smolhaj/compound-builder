@@ -13,10 +13,10 @@ import { ResidentsLine } from '../QuartersPanel';
 import { useSpendGuard } from './useSpendGuard';
 import { FIT, FUEL_UNIT_L, fitProblem, plant, serviceOf, UTILITY, SPARE_FOR } from '../../sim/utilities';
 import { HARDEN, HARDEN_IDS, type TierDef, hardenCost, hardenProblem, isBunkerRoom, protectionOf, tierOf } from '../../sim/hardening';
-import { PERIMETER, runBlocked, runFinished, runGrowth, runProgress } from '../../sim/perimeter';
-import { eta, paceOf, slowHint, totalHoursLeft, weeksFor, weeksUntil } from '../../sim/pace';
+import { runFinished, runGrowth } from '../../sim/perimeter';
+import { crewWeeksFor, eta, paceOf, slowHint, totalHoursLeft, weeksFor, weeksUntil } from '../../sim/pace';
 import { hookupsFor, fitRows, needsHookup, drawLabel } from '../../sim/hookups';
-import { projectRows } from '../../sim/priority';
+import { lineRows, projectRows } from '../../sim/priority';
 import { litersText } from '../../sim/format';
 import { setBelt } from '../../sim/weekender';
 import { CREW_DAY_USD, crewIdea, nextLongStay, nextStageOrder, weekendBudget, weekendsFor } from '../../sim/weekendPlan';
@@ -33,6 +33,7 @@ export function ProjectsTab() {
   const game = g.game;
   const sel = game.structures.find(s => s.id === g.selected) ?? game.structures.find(s => !isFinished(s)) ?? null;
   const pace = paceOf(game), left = totalHoursLeft(game), weeks = weeksFor(left, pace);
+  const crewIds = (game.crews ?? []).map(c => c.target), crewWeeks = Math.max(0, ...crewIds.map(id => crewWeeksFor(game, id) ?? 0)), crewLeft = crewIds.length ? crewWeeks : 0;
   const selWeeks = sel && !isFinished(sel) ? weeksUntil(game, sel.id, pace) : null;
   const hint = left > 0 ? slowHint(game, weeks, pace) : null;
   const rows = projectRows(game), todo = needsHookup(game);
@@ -53,9 +54,10 @@ export function ProjectsTab() {
       {wkStay && <Row label="Next long stay" value={`${wkStay.name}, ${pluralize(wkStay.days, 'day')} from ${wkStay.label}`} title="More building than three ordinary weekends: have the next stage on site before it" />}
       {wkCrew && <button style={{ ...btn(), width: '100%', marginTop: 3 }} title={`${usd(CREW_DAY_USD)} a day for four, billed only for the hours they work; they build the weekdays while you are at the jobs`} onClick={() => g.hire(wkCrew.st.id)}>Hire a crew for the weekdays: ~{usd(wkCrew.usd)}, {wkCrew.weeks} week{wkCrew.weeks === 1 ? '' : 's'}</button>}
     </Section>}
-    {left > 0 && <Section title="Pace">
-      <Row label="Work left" value={`${Math.round(left).toLocaleString('en-US')} h`} />
-      <Row label="At the family's pace" value={eta(weeks)} tone={weeks !== null && weeks > 26 ? 'warn' : undefined} title={`${Math.round(pace.perWeek)} effective hours of building a week`} />
+    {(left > 0 || crewLeft > 0) && <Section title="Pace">
+      {left > 0 && <Row label="Work left" value={`${Math.round(left).toLocaleString('en-US')} h`} />}
+      {left > 0 && <Row label="At the family's pace" value={eta(weeks)} tone={weeks !== null && weeks > 26 ? 'warn' : undefined} title={`${Math.round(pace.perWeek)} effective hours of building a week`} />}
+      {crewLeft > 0 && <Row label={`With the ${(game.crews ?? []).length === 1 ? 'crew' : 'crews'}`} value={eta(crewWeeks)} title="The longest of the hired crews, at four people on weekdays; they work alongside the family" />}
       {selWeeks !== null && sel && <Row label={`${KIT[sel.kind].name} done in`} value={eta(selWeeks)} title="Counting what the family finishes first, in the order of the list" />}
       {hint && <Clamp text={hint}><span style={{ color: TONE.warn }}>{hint}</span></Clamp>}
     </Section>}
@@ -195,8 +197,7 @@ export function ProjectsTab() {
       )}
       {game.perimeter.some(r => !runFinished(r) || runGrowth(r, game.clock.t) < 1) && (
         <Section title="Lines going in">
-          {game.perimeter.filter(r => !runFinished(r) || runGrowth(r, game.clock.t) < 1).slice(0, 6).map(r => (
-            <Row key={r.id} label={PERIMETER[r.kind].name} value={runFinished(r) ? `growing ${Math.round(runGrowth(r, game.clock.t) * 100)}%` : runBlocked(game, r) ?? `${Math.round(runProgress(r) * 100)}%`} />))}
+          {lineRows(game).slice(0, 6).map(r => <Row key={r.key} label={r.label} value={r.value} />)}
         </Section>
       )}
       {game.forestry.jobs.length > 0 && (

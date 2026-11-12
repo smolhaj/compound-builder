@@ -78,7 +78,8 @@ export function startFeedback(): () => void {
     const acted = prev.clock.t === next.clock.t;
     // the tab reveals are looked at when the player acts and once a day (not every frame)
     const dayRolled = dayIndex(next.clock.t) !== dayIndex(prev.clock.t);
-    if (acted || dayRolled) { reveal(next); goals(next); }
+    const built = next.structures.filter(x => x.finishedAt !== null).length !== prev.structures.filter(x => x.finishedAt !== null).length;   // (a goal done mid-day shows then, not at the next sunrise)
+    if (acted || dayRolled || built) { reveal(next); goals(next); }
     if (acted) {
       const evs = diffAction(prev, next);
       if (evs.length) {

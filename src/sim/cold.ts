@@ -35,6 +35,12 @@ export function coldExposure(s: GameState): number {
   return Math.min(1, (d - COLD_FLOOR) / 1.0);
 }
 
+/** Chill gain while a home has lost its roof and the stove is lit: the family huddles in the wall tent and the shop, not outdoors (half). */
+export const ROOFLESS_CHILL = 0.5;
+export function rooflessGain(s: GameState, stoveLit: boolean): number {
+  return stoveLit && s.structures.some(x => isHome(x.kind) && x.roofLost) ? ROOFLESS_CHILL : 1;
+}
+
 /** Housed (a finished home) or camping. */
 export const sheltered = (s: GameState): boolean => s.structures.some(x => isHome(x.kind) && isFinished(x) && !x.roofLost);
 
@@ -82,11 +88,11 @@ export const isColdHurt = (what: string) => what.startsWith(HYPO);
  * One person's night in bed: returns the change to health today (needs.ts adds it). `effF` is how warm it was
  * in bed (sim/housing.ts); absent (nobody counted them in) lets strain ease. Cozy never kills.
  */
-export function coldDay(p: Person, n: Needs, effF: number | undefined, cozy: boolean, out: string[]): number {
+export function coldDay(p: Person, n: Needs, effF: number | undefined, cozy: boolean, out: string[], gain = 1): number {
   const f = frailty(p, 'cold');
   const chill0 = n.chill ?? 0;
   // strain builds a half a point a degree C below freezing (×frailty); warmth eases it
-  n.chill = effF !== undefined && effF < HYPOTHERMIA_F ? chill0 + (HYPOTHERMIA_F - effF) / 1.8 * 0.5 * f : Math.max(0, chill0 - (effF === undefined || effF >= 41 ? 10 : 2));
+  n.chill = effF !== undefined && effF < HYPOTHERMIA_F ? chill0 + (HYPOTHERMIA_F - effF) / 1.8 * 0.5 * f * gain : Math.max(0, chill0 - (effF === undefined || effF >= 41 ? 10 : 2));
   const h = n.hurt.find(x => isColdHurt(x.what));
   if (n.chill >= 10) {
     const sev = Math.min(90, 20 + n.chill * 1.5);

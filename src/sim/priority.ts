@@ -8,7 +8,7 @@
  */
 import { blockedReason, canGoOn, isFinished, progress } from './construction';
 import { hoursLeft } from './crews';
-import { runBlocked, runFinished, runProgress, PERIMETER, type PerimeterRun } from './perimeter';
+import { runBlocked, runFinished, runGrowth, runProgress, PERIMETER, type PerimeterRun } from './perimeter';
 import type { GameState, Structure } from './state';
 
 export interface Focused { st: Structure | null; run: PerimeterRun | null }
@@ -62,4 +62,20 @@ export function projectRows(s: GameState): ProjectRow[] {
   if (f > 0) { const [x] = rows.splice(f, 1); rows.unshift(x); }
   if (rows.length && f >= 0) rows[0].first = true;
   return rows;
+}
+
+export interface LineRow { key: string; label: string; value: string }
+
+/** The "Lines going in" list: one row per kind of line (a wall in several runs, or bars at two creek crossings, is one row "x2" with the runs' joint state), not a row for each run. */
+export function lineRows(s: GameState): LineRow[] {
+  const groups = new Map<string, PerimeterRun[]>();
+  for (const r of s.perimeter) if (!runFinished(r) || runGrowth(r, s.clock.t) < 1) groups.set(r.kind, [...(groups.get(r.kind) ?? []), r]);
+  return [...groups.entries()].map(([kind, runs]) => {
+    const open = runs.filter(r => !runFinished(r));
+    const label = PERIMETER[kind as keyof typeof PERIMETER].name + (runs.length > 1 ? ` (${runs.length} runs)` : '');
+    const why = open.map(r => runBlocked(s, r)).find((b): b is string => !!b);
+    const value = !open.length ? `growing ${Math.round(Math.min(...runs.map(r => runGrowth(r, s.clock.t))) * 100)}%`
+      : `${Math.round(open.reduce((a, r) => a + runProgress(r), 0) / open.length * 100)}%${why ? `: ${why[0].toLowerCase()}${why.slice(1)}` : ''}`;
+    return { key: kind, label, value };
+  });
 }
