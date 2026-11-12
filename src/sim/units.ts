@@ -128,3 +128,24 @@ export function caloriesShort(kcal: number): string {
 /* ---------- money per length ---------- */
 /** A cost quoted per 100 m in the sim, as dollars per 100 ft. */
 export const perHundredFeet = (usdPer100m: number): number => usdPer100m / FT_PER_M;
+
+/* ---------- radiation ---------- */
+/** rem per sievert (1 Sv = 100 rem; 1 mSv = 100 mrem). The sim keeps sieverts; only the formatters convert. */
+export const REM_PER_SV = 100;
+/** Becquerels per curie (1 Ci = 3.7 × 10¹⁰ Bq). */
+export const BQ_PER_CI = 3.7e10;
+/** A dose given in sieverts, in rem (U.S. civil-defense units): millirem below 1 rem. "12 rem", "340 mrem", "2.5 rem". */
+export function remText(sv: number): string {
+  const rem = Math.max(0, sv) * REM_PER_SV;
+  if (rem < 1) return `${Math.round(rem * 1000).toLocaleString('en-US')} mrem`;
+  return `${rem < 10 ? (Math.round(rem * 10) / 10).toFixed(1).replace(/\.0$/, '') : Math.round(rem).toLocaleString('en-US')} rem`;
+}
+/** A dose rate given in sieverts an hour: "rem/h" (millirem/h below 1 rem/h). */
+export const remRateText = (svPerHour: number): string => `${remText(svPerHour)}/h`;
+/** An activity given in becquerels, in curies (mCi / µCi below a curie). */
+export function curieText(bq: number): string {
+  const ci = bq / BQ_PER_CI;
+  if (ci >= 1) return `${num(ci)} Ci`;
+  if (ci >= 1e-3) return `${num(ci * 1e3)} mCi`;
+  return `${num(ci * 1e6)} µCi`;
+}

@@ -12,6 +12,9 @@ const FILES = import.meta.glob<string>('/src/**/*.{ts,tsx}', { query: '?raw', im
 const UNIT = '(?:km|kg|mm|cm|ml|mL|m²|m³|m2|m3|kcal|°C|ha|L|m|g)';
 /** "30 m", "${x} km", "12cm": a number or a placeholder next to a metric unit. */
 const NUM_UNIT = new RegExp(`(?:\\d|§|\\))\\s?${UNIT}(?![A-Za-z0-9_²³])`);
+/** Metric / SI radiation units (sievert, gray, becquerel); the player reads rem, mrem and curies (sim/units.ts remText, curieText). */
+const RAD_UNIT = new RegExp(`(?:\\d|§|\\))\\s?(?:[mµuk]?Sv|[mµu]?Gy|[kMG]?Bq)(?:/h)?(?![A-Za-z0-9_])`);
+const RAD_WORDS = /\b(?:sieverts?|millisieverts?|microsieverts?|becquerels?)\b|\b(?:mSv|µSv|Sv)\/h\b/i;
 const WORDS = /\b(?:meters|metres|liters?|litres?|kilometers?|kilograms?|centimeters?|millimeters?|hectares?|Celsius|tonnes?|kcal)\b|\b(?:a|one|per|\d+)\s+meter\b|km\/h|\bm\/s\b/i;
 
 /** Things that are metric in U.S. usage, or code that only looks like a unit. Each entry says why. */
@@ -90,7 +93,7 @@ export function metricHits(src: string): Array<{ line: number; text: string }> {
     if (/^\s*(\/\/|\*|\/\*)/.test(ln)) return;
     for (const lit of literals(ln).flatMap(l => [l, ...nestedLiterals(l)])) {
       const m = mask(lit);
-      if ((NUM_UNIT.test(m) || WORDS.test(m)) && !ALLOW.some(a => a.re.test(lit) || a.re.test(m))) { hits.push({ line: i + 1, text: lit.slice(0, 120) }); break; }
+      if ((NUM_UNIT.test(m) || WORDS.test(m) || RAD_UNIT.test(m) || RAD_WORDS.test(m)) && !ALLOW.some(a => a.re.test(lit) || a.re.test(m))) { hits.push({ line: i + 1, text: lit.slice(0, 120) }); break; }
     }
     // JSX text: `{value} m</b>`, `12 km<`
     const bare = ln.replace(/'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g, '""');
@@ -110,6 +113,11 @@ describe('no metric units in player-facing text', () => {
     expect(metricHits('<b>{len} m</b>').length).toBe(1);
     expect(metricHits("const a = '30 ft and 2 gal and 40 lb and 72°F';").length).toBe(0);
     expect(metricHits("const a = `x ${ok ? ` water at ${d} m` : ''}`;").length).toBe(1);   // (QA run 6: the nested template hid it)
+    expect(metricHits("const a = `${x} mSv/h`;").length).toBe(1);
+    expect(metricHits("const a = 'the worst dose was 2 sieverts';").length).toBe(1);
+    expect(metricHits("const a = `${d.toFixed(2)} Sv`;").length).toBe(1);
+    expect(metricHits("const a = '5 Bq of fallout';").length).toBe(1);
+    expect(metricHits("const a = '12 rem, 300 mrem, 2 mCi, 1,000 R/h';").length).toBe(0);
     expect(metricHits("const a = 'ammo:9mm';").length).toBe(0);
     expect(metricHits("const a = 'M10 5 l-3 4 z';").length).toBe(0);
   });

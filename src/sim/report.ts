@@ -51,7 +51,7 @@ import { isGod } from './godMode';
 import { declareWipe, wipeSummary } from './wipe';
 import { CAUSE_TEXT, inferCause } from './deaths';
 import { pluralize } from './words';
-import { kmText } from './units';
+import { kmText, remText } from './units';
 const living = (s: GameState) => s.personState.filter(ps => ps.needs.died == null).length;
 
 /** Once a day after the hit: tally, then see whether the run is over. */
@@ -156,7 +156,7 @@ export function reportCard(s: GameState): ReportCard {
   // shelter and fallout
   if (d.kind === 'nuclear') {
     if (st.maxDose < 0.1) lines.push('The shelter held: nobody took more than a chest X-ray\'s worth of radiation.');
-    else if (st.maxDose > 1) lines.push(`Radiation sickness: the worst dose was ${st.maxDose.toFixed(1)} sieverts.`);
+    else if (st.maxDose > 1) lines.push(`Radiation sickness: the worst dose was ${remText(st.maxDose)}.`);
     if (s.utilities.fried.length) lines.push('The EMP fried the electronics and there were no spares to put in.');
   }
   // food
