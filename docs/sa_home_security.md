@@ -1,5 +1,8 @@
 # South African home security, as a design reference
 
+> Status: PRs A, B and C are built (wall tops and weak spots #207, gate and house kit #209, armed response and neighborhood watch #210), plus insider threat (#212), stealth (#214) and fortress reputation (#215). Code: `sim/wallTops.ts`, `gateSecurity.ts`, `armedResponse.ts`, `insider.ts`, `stealth.ts`, `reputation.ts`.
+
+
 Why: South African homes and estates are the best-known real example of a household building defenses in a high-crime place where the state's response is slow, patchy or sold as a subscription. The game's collapse is the same problem with the subscription gone. This note records the principles (from vendor, press and government guidance; see Sources) and what each means for the sim. **No measured armed-response times were found, so no number here is a fact: every balance number is marked tunable and lives in one table per module.**
 
 ## Principles

@@ -2,6 +2,8 @@
 
 Living list of features beyond the current milestone. The GDS stays the source of truth;
 items here get folded into it (with the user) before they are built.
+> **Status (save v95).** This is an ideas list, not a build log; many items are built and their tags are not updated line by line. Built since it was written (see `docs/DECISIONS.md`): barbed wire, razor wire, thorn hedges, container and stone walls, moats, ring shapes, towers with floodlights, sightline and terrain overlays, bunkers with an escape tunnel, rock tunnels and tunnel-bridges, wells and water treatment, itemized food, canning, smokehouse, orchard, bees, forge, soap, solar, micro-hydro, wind, radio and rumors, barter, a black market, tool wear, vehicles, dogs, light discipline, a gate house and armed response. Still ideas: sawmill and kiln, fuel depot, biogas, camouflage netting and decoy buildings, a school or chapel building, off-site caches and rally points.
+
 Legend: **[user]** asked for by the user · **[gds]** already in the GDS · **[idea]** suggested, needs a yes.
 
 ## Perimeter & surroundings (GDS §2.4 defense / visibility)
