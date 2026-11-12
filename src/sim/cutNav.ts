@@ -92,7 +92,7 @@ export function nearestFree(w: NavWorld, x: number, z: number, t: number, r = 1.
 
 
 /** How many corner rescues a leg may try before it is given up (each failed try floods a whole search box). */
-const RESCUES = 24;
+const RESCUES = 14;
 
 /** A path from a to b through the open ground at time t, as waypoints (b last), or null. */
 export function findPath(w: NavWorld, a: Pt, b: Pt, t: number, speed = RUN): Pt[] | null {
