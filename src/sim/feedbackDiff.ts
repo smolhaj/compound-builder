@@ -125,6 +125,26 @@ export interface ToastModel { id: number; at: number; events: FeedbackEvent[]; c
 /** A first-hour goal card (it has a kicker) is a small strip at the bottom while the clock runs, so it never covers the map; the parchment card is for a paused game. */
 export const compactCard = (c: Pick<Celebration, 'kicker'>, running: boolean): boolean => !!c.kicker && running;
 
+/**
+ * Add cards to the queue. A first-hour goal card (id `goal_*`) that would wait behind the one on screen is folded into the one
+ * already waiting, so five goals met in a stretch of fast-forward read as one card instead of a 12-second queue each.
+ */
+export function queueCards(queue: readonly Celebration[], incoming: readonly Celebration[]): Celebration[] {
+  const out = [...queue];
+  for (const c of incoming) {
+    const i = out.findIndex((x, k) => k >= 1 && x.id.startsWith('goal_'));
+    if (c.id.startsWith('goal_') && i >= 1) out[i] = { ...c, title: `${out[i].title} and ${c.title.charAt(0).toLowerCase()}${c.title.slice(1)}`, line: `${out[i].line} ${c.line}`.trim(), bornDay: out[i].bornDay ?? c.bornDay };
+    else out.push(c);
+  }
+  return out;
+}
+
+/** "done 3 days ago" for a card that was not on screen the day it was earned (it waited behind other cards or a pause); empty when it is fresh. */
+export function staleNote(c: Pick<Celebration, 'bornDay'>, today: number): string {
+  const d = c.bornDay === undefined ? 0 : today - c.bornDay;
+  return d >= 2 ? `done ${d} days ago` : '';
+}
+
 export const COALESCE_MS = 1200;
 
 /** Fold a new event into the toast on screen when it came right after (a burst), else start a fresh one. */
@@ -145,7 +165,7 @@ export function toastText(t: ToastModel): string {
 
 // ---- celebrations ------------------------------------------------------------------------------------------------------
 
-export interface Celebration { id: string; title: string; line: string; points: number; flash: string[]; /** Small heading in place of "A milestone" (a first-hour goal: "Goal 2 of 6"). */ kicker?: string; /** Foot line in place of the points ("Next: water"). */ footer?: string }
+export interface Celebration { id: string; title: string; line: string; points: number; flash: string[]; /** Small heading in place of "A milestone" (a first-hour goal: "Goal 2 of 6"). */ kicker?: string; /** Foot line in place of the points ("Next: water"). */ footer?: string; /** The game day it was earned (a card that waited behind others says so). */ bornDay?: number }
 
 /** One line of why each lineage milestone matters (plain words); others fall back to the points. */
 const MILESTONE_LINE: Record<string, string> = {

@@ -48,7 +48,7 @@ function goals(g: GameState): void {
     const next = fh.current;
     shown.add(x.id === 'roof' ? 'first_roof' : `goal_${x.id}`);
     if (x.id === 'roof') shown.add('a_home');   // (the same moment: one card, not two)
-    return { id: `goal_${x.id}`, title: x.reward.title, line: x.reward.line, points: 0, flash: [] as string[], kicker: `Goal ${fh.done} of ${fh.total} done`, ...(next ? { footer: `Next: ${next.title.toLowerCase()}` } : {}) };
+    return { id: `goal_${x.id}`, title: x.reward.title, line: x.reward.line, points: 0, flash: [] as string[], kicker: `Goal ${fh.done} of ${fh.total} done`, bornDay: dayIndex(g.clock.t), ...(next ? { footer: `Next: ${next.title.toLowerCase()}` } : {}) };
   });
   if (cards.length) { saveShown(world, shown); f.pushCards(cards); }
 }

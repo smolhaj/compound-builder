@@ -83,7 +83,8 @@ export function crewStep(s: GameState, days: number): void {
     const ph = CREW_SIZE * days * 24;
     const bill = ph * CREW_RATE;
     // a delivery left at the road (no drive in) is carried in by the crew before anything else, on their hours
-    if (s.roadside?.length) {
+    // (a crew whose building can go on works on it; it carries the pile in only while the building waits, or has nothing to do)
+    if (s.roadside?.length && (isFinished(st) ? !fix : blockedReason(s, st) !== null)) {
       if (s.money < bill) { gone('The crew went home: there was no money to pay them.'); continue; }
       const carried = addCarryWork(s, ph, wantedNow(s));
       s.money -= carried * CREW_RATE; c.hours += carried; c.paid += carried * CREW_RATE;

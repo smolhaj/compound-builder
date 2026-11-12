@@ -9,7 +9,7 @@
  */
 import { shortfall, MATERIALS, MATERIAL_IDS, billText, type MaterialId, type Stock } from './materials';
 import { onOrder, orderCost, orderProblem, prices } from './economy';
-import { blueprintOf, isFinished } from './construction';
+import { blueprintOf, isFinished, roadWaiting } from './construction';
 import { runFinished, runBill, wallLength } from './perimeter';
 import { fixBill, pendingFixes } from './improvements';
 import { FIT } from './utilities';
@@ -86,10 +86,12 @@ export function noteStalls(s: GameState): Array<{ w: Waiter; days: number }> {
   const fresh: Array<{ w: Waiter; days: number }> = [];
   for (const w of cur) {
     const was = old[w.key];
-    next[w.key] = was ?? { since: now };
+    next[w.key] = { ...(was ?? { since: now }), seen: now };
     const days = now - next[w.key].since;
     if (days >= STALL_DAYS && !next[w.key].said) fresh.push({ w, days });
   }
+  // a wait that broke for a moment (a unit came in from the road and went straight into a neighbor project) is the same wait: keep it two days
+  for (const [k, m] of Object.entries(old)) if (!next[k] && !(NEED_KEYS as readonly string[]).includes(k) && now - (m.seen ?? m.since) < 2 && m.seen !== undefined) next[k] = m;
   // food, beds and medicine are tracked in the same table once they are short (sim/needsStuck.ts)
   for (const k of activeNeeds(s)) next[k] = old[k] ?? { since: now };
   s.stalls = next;
@@ -134,6 +136,20 @@ export function logWait(s: GameState): LogWait | null {
   const short = Math.ceil(c.w.miss.logs ?? 0);
   return { key: c.w.key, at: c.w.at, label: c.w.label, home: c.w.home, days: Math.floor(c.days), short, queued, need: Math.max(0, Math.ceil(short - queued)),
     crewed: !!c.w.at && (s.crews ?? []).some(x => x.target === c.w.at) };
+}
+
+/**
+ * A project whose materials were delivered but sit at the road (no drive in): nothing is missing from the order, the family has
+ * to carry the load in by hand. Without this the stuck card stays silent (the pile counts as "on order") and the player sees
+ * "Waiting for 9 fieldstone" for weeks with a full bank. A home first, then the longest wait.
+ */
+export function roadWait(s: GameState): { label: string; at: string | null; days: number; what: string } | null {
+  if (!(s.roadside ?? []).length) return null;
+  const marks = s.stalls ?? {};
+  const c = waiters(s).filter(w => roadWaiting(s, w.miss))
+    .map(w => ({ w, days: Math.max(0, s.clock.t - (marks[w.key]?.since ?? s.clock.t)) }))
+    .sort((a, b) => Number(b.w.home) - Number(a.w.home) || b.days - a.days)[0];
+  return c ? { label: c.w.label, at: c.w.at, days: Math.floor(c.days), what: billText(c.w.miss) } : null;
 }
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
