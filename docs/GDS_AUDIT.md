@@ -1,5 +1,8 @@
 # GDS audit (every section) against origin/main
 
+> **Status update (origin/main, save v95).** The audit below is a snapshot from save v78 and its rows are kept as written. Since then: tilt-shift Diorama look built (High only, off by default; DECISIONS 2026-11-11); Save / Load menu with JSON export and import (#183); flow as extra labor hours, no overlay (`sim/flow.ts`); shade overlay and radiation readout in Blueprint (#263); photo capture (#266); governance as house rules by vote at the hamlet stage (`sim/rules.ts`, #269); neighbors and strangers can join (#87, earlier); radiation sickness and real thirst (#260). Still open: room assignment inside a house, district zoning, the run-level medical-dependency draw, absorbing neighbors. Conflicts between this spec and the code are listed in the PR that last refreshed the docs, not decided here.
+
+
 Checked `COMPOUND_BUILDER_GDS.md` against the code at origin/main (save v78). Earlier audits (`BACKLOG-AUDIT.md`, `DEPTH_AUDIT.md`) covered §10.4 to §10.6, which are mostly done, so those rows are summarised. Status: **done**, **partial**, **missing**. "Built here" marks what this PR adds. Where the GDS is silent the item is listed under Open questions, not built.
 
 ## Pillars, modes, difficulty (front matter)
@@ -11,7 +14,7 @@ Checked `COMPOUND_BUILDER_GDS.md` against the code at origin/main (save v78). Ea
 | Abstract combat from the design | done | `sim/battle.ts`, `sim/encounters.ts` |
 | Kits plus customisation, freeform walls/fences/paths | done | `game/buildkit`, `sim/perimeter.ts`, `sim/paths.ts` |
 | People build over time (scaffold, frame, clad) | done | `sim/construction.ts`, `sim/crews.ts` |
-| Real time with pause, day/night, seasons | done | `sim/clock.ts`, `ui/Hud.tsx` speeds |
+| Real time with pause, day/night, seasons | done | `sim/state.ts` (calendar and clock), `sim/engine.ts`, `sim/clockResume.ts`, `ui/Hud.tsx` speeds |
 | Seven-plus regions with own terrain, climate, prices, odds | done | `sim/regions.ts`, `engine/world/terrain` |
 | Farming at medium depth, spoilage, preserving | done | `sim/crops.ts`, `sim/kitchen.ts`, `sim/shelf.ts` |
 | Camera: diorama builder | partial | `game/DioramaCamera.ts`; no tilt-shift depth-of-field look (`engine/world/post` has only grading and god rays) |
