@@ -114,6 +114,7 @@ export class ForestRenderer {
         castShadow: quality !== 'low',
         shadowMargin: 10,
         noSSAOFromLevel: 1,
+        peelable: true,
       });
       applyVegetationDepth(inst.meshes, mat); // bare winter crowns cast branch shadows
       const pal = palettes[kind] ?? (evergreen ? FOREST_CONIFER : FOREST_DECID);

@@ -8,7 +8,7 @@
  */
 import { buildRate, workHoursPerDay } from './family';
 import { isFinished } from './construction';
-import { hoursLeft } from './crews';
+import { CREW_SIZE, hoursLeft } from './crews';
 import { isAway } from './rescue';
 import { runFinished, type PerimeterRun } from './perimeter';
 import type { GameState } from './state';
@@ -52,10 +52,22 @@ const runLeft = (r: PerimeterRun) => (runFinished(r) ? 0 : Math.max(0, r.hours -
 /** The queue the family works through, oldest first: structures, then lines, then hardening (as engine.subStep picks them). */
 export interface QueueItem { id: string; name: string; hours: number }
 
+/** Hours a week a hired crew puts in (four people, 9 hours, 5 weekdays). */
+export const CREW_WEEK_HOURS = CREW_SIZE * 9 * 5;
+
+const crewed = (s: GameState, id: string): boolean => (s.crews ?? []).some(c => c.target === id);
+
+/** Weeks a hired crew needs for what is left on a building (null: no crew on it). */
+export function crewWeeksFor(s: GameState, id: string): number | null {
+  const st = s.structures.find(x => x.id === id);
+  return st && crewed(s, id) ? hoursLeft(st) / CREW_WEEK_HOURS : null;
+}
+
 export function workQueue(s: GameState): QueueItem[] {
   const out: QueueItem[] = [];
   const first = s.focus;
-  for (const st of s.structures) if (!isFinished(st)) out.push({ id: st.id, name: st.kind, hours: hoursLeft(st) });
+  // a building with a hired crew on it is the crew's work, not the family's
+  for (const st of s.structures) if (!isFinished(st) && !crewed(s, st.id)) out.push({ id: st.id, name: st.kind, hours: hoursLeft(st) });
   for (const r of s.perimeter) if (!runFinished(r)) out.push({ id: r.id, name: r.kind, hours: runLeft(r) });
   for (const j of s.hardenJobs) if (j.finishedAt === null) out.push({ id: j.id, name: 'hardening', hours: Math.max(0, j.hours - j.done) });
   // "work on this first" (sim/priority.ts) jumps the queue
@@ -68,6 +80,8 @@ export const totalHoursLeft = (s: GameState): number => workQueue(s).reduce((a, 
 
 /** Weeks until the queue has worked through `id` (inclusive), at the family's pace. */
 export function weeksUntil(s: GameState, id: string, pace = paceOf(s)): number | null {
+  const cw = crewWeeksFor(s, id);
+  if (cw !== null) return cw;
   if (pace.perWeek <= 0) return null;
   let h = 0;
   for (const q of workQueue(s)) { h += q.hours; if (q.id === id) return h / pace.perWeek; }

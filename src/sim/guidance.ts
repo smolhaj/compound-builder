@@ -28,6 +28,7 @@ import { anyBearing } from './orchard';
 import { drawLabel, hookupTone, needsHookup, storageTip } from './hookups';
 import { MATERIAL_IDS, MATERIALS, type MaterialId } from './materials';
 import { isAre, materialCount, pluralize } from './words';
+import { crewProblem, crewQuote } from './crews';
 import { crewNudge } from './crewNudge';
 import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind, type Pt } from './perimeter';
 import { MAX_TOWERS, ringStatus } from './fortress';
@@ -167,7 +168,8 @@ export type SuggestionAct =
   | { type: 'belt'; on: boolean }
   /** All hands on the fires a raid set (sim/raidFire.ts), or back to the usual share. */
   | { type: 'fire'; on: boolean }
-  | { type: 'crew'; id: string }
+  /** Hire the crew for a project; with `lines`, order those materials first (one tap). */
+  | { type: 'crew'; id: string; lines?: OrderLine[] }
   /** Hire the contractor for the gravel drive (or the power line). */
   | { type: 'hookup'; what: 'drive' | 'power' }
   | { type: 'open'; right: 'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle'; supplies?: 'stores' | 'farm' }
@@ -216,10 +218,12 @@ export function landSuggestions(s: GameState): Suggestion[] {
     const cut = s.structures.find(st => !isFinished(st) && bucket(st) >= 2 && st.stage <= 1);
     if (cut) {
       const extra = 2 * bucket(cut) ** 2, name = cut.kind.replace(/_/g, ' '), pending = onOrder(s), wall = wallOf(s, cut);
-      const short = Math.max(0, Math.ceil(extra - Math.max(0, s.stock.fieldstone - 0) - (pending.fieldstone ?? 0)));
+      // short of stone for every plan, not just this wall: the yard's stone is spoken for by all the foundations, and what is on order is not yet in the yard
+      const short = Math.max(0, plansNeed(s).fieldstone ?? 0);
+      const have = s.stock.fieldstone >= extra && short === 0, coming = !have && short === 0 && (pending.fieldstone ?? 0) > 0;
       const lines: OrderLine[] = short > 0 ? [{ material: 'fieldstone', qty: short }] : [];
       out.push({ id: 'retaining', kind: '', title: 'This slope needs a retaining wall', urgency: 94,
-        why: `the ${name} is staked on a ${Math.round((cut.grade ?? 0) * 100)}% slope: the pad is cut into the hill and held by a dry-stack wall${wall ? ` (up to ${lengthText(wall.heightM)} high and ${lengthText(wall.lenM)} long, with ${wall.stairs ? 'a stair' : 'no stair'} set in it${wall.tall ? '; a wall that tall needs a drainage channel above it' : ''})` : ''}, about ${extra} pallets of fieldstone more than level ground${short > 0 ? '' : ' (you have them)'}. The wall goes up with the foundation and is paid for by those pallets`,
+        why: `the ${name} is staked on a ${Math.round((cut.grade ?? 0) * 100)}% slope: the pad is cut into the hill and held by a dry-stack wall${wall ? ` (up to ${lengthText(wall.heightM)} high and ${lengthText(wall.lenM)} long, with ${wall.stairs ? 'a stair' : 'no stair'} set in it${wall.tall ? '; a wall that tall needs a drainage channel above it' : ''})` : ''}, about ${extra} pallets of fieldstone more than level ground${short > 0 ? '' : have ? ' (you have them)' : coming ? ' (they are on order)' : ''}. The wall goes up with the foundation and is paid for by those pallets`,
         acts: [...(lines.length ? [{ label: `Order ${short} pallet${short > 1 ? 's' : ''} of fieldstone (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []), { label: 'Show me', act: { type: 'select', id: cut.id } }] });
     }
     // a retaining wall that let go (sim/retaining.ts): the stone to put it back
@@ -317,7 +321,9 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
       const name = bare.kind.replace(/_/g, ' ');
       out.push({ id: 'reroof', kind: '', title: 'Re-roof your home', urgency: 97,
         why: lines.length ? `the ${name} lost its roof and the family cannot live in it; the roof needs ${lines.map(l => materialCount(l.material, l.qty, MATERIALS[l.material].name, String(l.qty))).join(' and ')} more` : `the ${name} lost its roof; the crew is on it, and it is the first thing to finish`,
-        acts: [...(lines.length ? [{ label: `Order the roof materials (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []), { label: 'Show me', act: { type: 'select', id: bare.id } }] });
+        acts: [...(lines.length ? [{ label: `Order the roof materials (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []),
+          ...(!(s.crews ?? []).some(c => c.target === bare.id) && !crewProblem(s, bare) ? [{ label: `${lines.length ? 'Order and hire a crew' : 'Hire a crew'} (~${usd(crewQuote(bare).usd + (lines.length ? orderCost(lines, prices(s)) : 0))})`, act: { type: 'crew' as const, id: bare.id, ...(lines.length ? { lines } : {}) } }] : []),
+          { label: 'Show me', act: { type: 'select', id: bare.id } }] });
     } }
   const growing = hasKind(s, 'garden', 'field', 'greenhouse', 'orchard');
   if (!growing) add('food', 'garden', daysOfFood(s) < 90 ? 'little food stored and nothing growing' : 'nothing growing yet', daysOfFood(s) < 90 ? 70 : 45);

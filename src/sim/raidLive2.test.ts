@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { applyBattle, planBattle, type BattleOptions } from './battle';
-import { gateDay, resolve, type Encounter } from './encounters';
+import { demandLine, gateDay, resolve, type Encounter } from './encounters';
 import { stageRaid, restageRaid } from './raidCutscene';
 import { fightClock, planSiege, segments } from './siege';
 import { step } from './engine';
@@ -31,7 +31,7 @@ describe('openers are rolled when the raid is made and read by the fight', () =>
       n++;
       if (!e.opener) { none++; continue; }
       kinds[e.opener.kind] = (kinds[e.opener.kind] ?? 0) + 1;
-      if (e.opener.kind === 'demand') { demandCards++; expect(e.stances).toContain('flag_pay'); expect(e.wants && Object.keys(e.wants).length).toBeGreaterThan(0); expect(e.dossier.join(' ')).toMatch(/white/); }
+      if (e.opener.kind === 'demand') { demandCards++; expect(e.stances).toContain('flag_pay'); expect(e.wants && Object.keys(e.wants).length).toBeGreaterThan(0); expect(e.dossier.join(' ')).toContain(demandLine(e.kind)); if (!['requisition', 'patrol'].includes(e.kind)) expect(e.dossier.join(' ')).toMatch(/white/); }
       else expect(e.stances).not.toContain('flag_pay');
     }
     expect(n).toBeGreaterThan(15); expect(none).toBeGreaterThan(n / 3); expect(Object.keys(kinds).length).toBeGreaterThanOrEqual(3); expect(demandCards).toBeGreaterThan(0);

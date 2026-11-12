@@ -122,6 +122,9 @@ export function messageText(e: FeedbackEvent, cashLeft: number): string {
 export interface ToastModel { id: number; at: number; events: FeedbackEvent[]; cashLeft: number; flash: string[] }
 
 /** A burst of actions inside this many milliseconds is one toast. */
+/** A first-hour goal card (it has a kicker) is a small strip at the bottom while the clock runs, so it never covers the map; the parchment card is for a paused game. */
+export const compactCard = (c: Pick<Celebration, 'kicker'>, running: boolean): boolean => !!c.kicker && running;
+
 export const COALESCE_MS = 1200;
 
 /** Fold a new event into the toast on screen when it came right after (a burst), else start a fresh one. */
