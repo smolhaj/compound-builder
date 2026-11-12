@@ -69,7 +69,7 @@ describe('planPropertyWall', () => {
     const e = enclosure(g);
     expect(e.openShare).toBe(0);
     expect(e.creekOpen).toBe(0);
-    expect(e.barrier).toBeGreaterThan(40);
+    expect(e.barrier).toBeGreaterThan(20);   // (chain-link now reads its toughness: 0.55 x 0.45 of the line, not 0.55)
   });
 
   it('with no creek on the land it never plans bars, even if the world has a creek line elsewhere', () => {

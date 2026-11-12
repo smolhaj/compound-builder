@@ -72,8 +72,8 @@ export const PERIMETER: Record<PerimeterKind, PerimeterDef> = {
   split_rail: { id: 'split_rail', name: 'Split-rail fence', blurb: 'Keeps stock in and marks the line. Stops no one.', hours: 3, materials: { lumber: 0.08 }, height: 0.2, blocks: { people: 0.1, animals: 0.5, vehicles: 0.2 }, sight: 0, growYears: 0 },
   barbed_wire: { id: 'barbed_wire', name: 'Barbed-wire fence', blurb: 'Four strands on steel T-posts. Slows walkers, turns cattle.', hours: 2.5, materials: { wire: 0.08, hardware: 0.06 }, height: 0.22, blocks: { people: 0.35, animals: 0.6, vehicles: 0.25 }, sight: 0, growYears: 0 },
   woven_wire: { id: 'woven_wire', name: 'Game fence (woven wire)', blurb: '8 ft woven wire on wood posts: deer, coyotes and dogs stay out.', hours: 4, materials: { wire: 0.2, lumber: 0.2 }, height: 0.4, blocks: { people: 0.5, animals: 0.95, vehicles: 0.3 }, sight: 0.1, growYears: 0 },
-  thorn_hedge: { id: 'thorn_hedge', name: 'Thorn hedge', blurb: 'Hawthorn and wild rose whips, double row. Cheap, but 4 years to become a wall you can\'t see through.', hours: 2, materials: { seedlings: 0.5 }, height: 0.42, blocks: { people: 0.9, animals: 0.75, vehicles: 0.6 }, sight: 0.85, growYears: 4 },
-  log_palisade: { id: 'log_palisade', name: 'Log palisade', blurb: 'Your own logs set upright in a trench and pointed. Heavy work, solid wall.', hours: 14, materials: { logs: 3 }, height: 0.5, blocks: { people: 0.85, animals: 0.95, vehicles: 0.7 }, sight: 1, growYears: 0 },
+  thorn_hedge: { id: 'thorn_hedge', name: 'Thorn hedge', blurb: 'Hawthorn and wild rose whips, double row. Cheap, but 4 years to become a wall you can\'t see through, and even grown it turns walkers rather than a crew that means it.', hours: 2, materials: { seedlings: 0.5 }, height: 0.42, blocks: { people: 0.6, animals: 0.75, vehicles: 0.6 }, sight: 0.85, growYears: 4 },
+  log_palisade: { id: 'log_palisade', name: 'Log palisade', blurb: 'Your own logs set upright in a trench and pointed. Heavy work and nearly free, but it only turns a crowd: a crew with ladders is over it, and a rifle round goes through some of the logs. Stone, steel and concrete hold a crew that has no truck or charge.', hours: 14, materials: { logs: 3 }, height: 0.5, blocks: { people: 0.6, animals: 0.95, vehicles: 0.7 }, sight: 1, growYears: 0 },
   container_wall: { id: 'container_wall', name: 'Container wall', blurb: 'Used 40 ft shipping containers end to end (each is also storage). Fast with a rented crane; costly.', hours: 3, materials: { container: 0.5 }, height: 0.43, blocks: { people: 0.9, animals: 1, vehicles: 1 }, sight: 1, growYears: 0 },
   earth_berm: { id: 'earth_berm', name: 'Earth berm', blurb: 'A 6.5 ft bank of earth. Stops vehicles and bullets and hides what\'s behind it. Weeks of shovel work.', hours: 30, materials: {}, height: 0.3, blocks: { people: 0.35, animals: 0.2, vehicles: 0.9 }, sight: 1, growYears: 0 },
   water_pipe: { id: 'water_pipe', name: 'Water line (buried)', blurb: 'PEX pipe in a trench below the frost line (4 ft) so it never freezes. Joins wells, cisterns and towers to the houses.', hours: 5, materials: { pipe: 0.2 }, height: 0, blocks: { people: 0, animals: 0, vehicles: 0 }, sight: 0, growYears: 0 },
@@ -230,6 +230,39 @@ export function peopleBlock(s: GameState, r: Pick<PerimeterRun, 'kind'>): number
   if ((r as PerimeterRun).electric) return base + topBonus(s, r as PerimeterRun, base);
   return (r as { razor?: boolean }).razor && base >= RAZOR.MIN_BLOCK ? Math.min(RAZOR.CAP, base + RAZOR.PEOPLE) : base;
 }
+
+/**
+ * How much punishment a wall takes before a crew is through (hit points, a rough relative scale: a split-rail fence is 10, poured concrete 250).
+ * `blocks.people` says whether a stretch turns a person round at all; this says how long it holds against a crew that means it (ladders, bolt
+ * cutters, a pry bar, a vehicle). Balance pass "wall quality matters": a log palisade used to score within noise of a concrete wall because both
+ * "stop" 85-97 % of people and the ring saturated; now the posture's barrier, the climb rate in the battle sim and the give-up time all read this.
+ */
+export const WALL_HP: Partial<Record<PerimeterKind, number>> = {
+  split_rail: 10, barbed_wire: 25, woven_wire: 40, thorn_hedge: 45, chain_link: 55, earth_berm: 60, log_palisade: 70, creek_bars: 85,
+  bar_fence: 90, wrought_iron: 90, covered_walkway: 90, iron_barbed: 105, container_wall: 140, container_stack: 190, stone_wall: 200,
+  steel_wall: 210, electric_steel: 220, concrete_wall: 250,
+};
+/** The toughest wall in the table (concrete): the top of the scale. */
+export const WALL_HP_TOP = 250;
+/** Hit points of a wall kind (an unknown one counts as the weakest). */
+export const wallHp = (kind: PerimeterKind): number => WALL_HP[kind] ?? WALL_HP.split_rail!;
+/**
+ * 0-1 how good a run of this kind is as a barrier against a determined crew: its hit points on the scale of the top wall. A wall that grows
+ * (a hedge) has only the grown share of it. The posture's wall strength is the people-block times this, so the tiers spread from about 5 % (split rail)
+ * to 97 % (concrete) and a free palisade no longer reads as a $2,800 a unit wall.
+ */
+export const wallToughness = (kind: PerimeterKind, growth = 1): number => Math.min(1, wallHp(kind) / WALL_HP_TOP) * growth;
+/** The share of the people-block that counts toward the ring's wall strength: a floor (any wall slows a walker) rising to the full block at the top tier. */
+export const holdScale = (kind: PerimeterKind): number => 0.3 + 0.7 * wallToughness(kind);
+/** Walls a crew cannot get over with ladders and hand tools in the time it will stay: they need a truck or a charge (breachMeans.ts) or they give up. */
+export const needsMeans = (kind: PerimeterKind): boolean => wallHp(kind) >= 190;
+/**
+ * Multiplier on how fast a crew at the line gets over a wall kind (1 = the old flat rate; the sim's climb chance per second is 0.02 per raider at the line
+ * times this). Tougher walls hold much longer; a wall that needs means is almost never climbed. `growth` is a hedge's grown share.
+ */
+export const climbRateK = (kind: PerimeterKind, growth = 1): number => (needsMeans(kind) ? 0.12 : Math.max(0.35, Math.min(1.6, 60 / Math.max(10, wallHp(kind) * Math.max(0.2, growth)))));
+/** Extra seconds a crew spends at a wall before the first can be across (ladders, cutters): longer for a tougher wall. */
+export const climbHoldS = (kind: PerimeterKind, growth = 1): number => Math.min(8, wallHp(kind) * growth / 30);
 
 /**
  * Razor wire along the top of a wall or fence (docs/DECISIONS.md, "Motor court, bar fence and razor wire"): concertina coils on brackets. Priced per

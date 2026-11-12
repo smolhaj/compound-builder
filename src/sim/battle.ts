@@ -38,7 +38,7 @@ import { sleepSpotFor } from './housing';
 import { gatePoint, raidDelta } from './quarters';
 import { houseCoverK } from './houseHardening';
 import { isFinished } from './construction';
-import { PERIMETER, fenceLive, runFinished, withKnownWalls, type PerimeterRun } from './perimeter';
+import { PERIMETER, climbHoldS, climbRateK, fenceLive, runFinished, runGrowth, wallToughness, withKnownWalls, type PerimeterKind, type PerimeterRun } from './perimeter';
 import { climbPenaltyK, topClimb } from './wallTops';
 import { ARMORY_LIGHTS, floodlightLit } from './lights';
 import { DOOR_DELAY, doorsLocked, raidAngle } from './terrainFx';
@@ -48,7 +48,7 @@ import { doorTierOf, planBreach, type DoorPlan } from './doorBreach';
 import { sapperBreach } from './corridors';
 import { roadStart } from './roadFx';
 import { WALK_CLIMB_FACTOR, WALK_POST, deckSpots, walkLength, walkRuns } from './walkway';
-import { TURRET_JAM, highBonus, litTowerIds, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
+import { TURRET_JAM, battleTowerPosts, highBonus, litTowerIds, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
 import { enclosure } from './enclosure';
 import { mulberry32 } from './rng';
 import { diffOf } from './difficulty';
@@ -110,6 +110,13 @@ const MOUNT_GUN: Omit<Arm, 'cal'> = { range: 70, rate: 0.9, acc: 0.95, auto: tru
 /** The remote turret: fast, steady, accurate, fed from a 200-round can. */
 export const TURRET_GUN: Omit<Arm, 'cal'> = { range: 60, rate: 0.75, acc: 1.0, auto: true, mag: 200, feed: 'mag' };
 export const FISTS: Arm = { range: 0.6, rate: 0.5, acc: 0.8, auto: false, cal: null, mag: 0, feed: 'mag' };
+/**
+ * A militia is not a gang (balance pass: the two battle rows were identical): drilled and better armed, so more of them carry a rifle and soft armor,
+ * they shoot a point better, they hold their ranks after the first man falls and take heavier losses before they break. A gang is the baseline.
+ */
+export const MILITIA = { rifleShare: [0.55, 0.8] as const, skill: 1, soft: 0.2, helmet: 0.12, morale: 0.1 } as const;
+/** The share of hits that still land on a defender at a wall post (lower is better cover): thin fences hide a man, a heavy wall shelters him (it was 0.22 for every wall: now 0.25 for a rail fence down to 0.16 for poured concrete). */
+export const wallPostCover = (kind: string): number => (kind in PERIMETER ? 0.25 - 0.09 * wallToughness(kind as PerimeterKind) : 0.22);
 /** What a wall does to the crew getting over it, a chance per raider at the line each second, and how badly (hp). */
 const WALL_HAZARD: Record<string, { p: number; min: number; max: number; what: string; lines: string[] }> = {
   barbed_wire: { p: 0.07, min: 10, max: 35, what: 'barbed wire', lines: ['AGH — the wire — it\'s in my — FUCK!', 'Cut — I\'m cut — get me off this —', 'The barbs — oh Jesus, my hands —'] },
@@ -391,7 +398,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   // cover (the share of hits that still land): a prepared position beats what a raider finds in a ditch or behind a tree (0.4).
   // (round 4: a wall post was 0.55 and a log house 0.5–0.6, worse than the raiders' 0.3, so they out-shot a fortified family)
   const posts: PostSpot[] = [];
-  for (const tp of towerPosts(s)) posts.push({ kind: 'tower', x: tp.st.x, z: tp.st.z, y: tp.post.y, cover: tp.post.cover, value: tp.post.value, cap: 1, wrecked: false, fire: 0, reach: tp.post.reach + (tp.def ? highBonus(tp.st, tp.def.kind).reach : 0), acc: tp.post.acc, mount: !!(tp.def?.mount && mount) });
+  for (const tp of battleTowerPosts(s)) posts.push({ kind: 'tower', x: tp.st.x, z: tp.st.z, y: tp.post.y, cover: tp.post.cover, value: tp.post.value, cap: 1, wrecked: false, fire: 0, reach: tp.post.reach + (tp.def ? highBonus(tp.st, tp.def.kind).reach : 0), acc: tp.post.acc, mount: !!(tp.def?.mount && mount) });
   const isPostKind = (k: string) => k.includes('tower') || isTower(k);
   for (let i = 0; i < Math.min(3, n('sandbags')); i++) { const p = at(3, (i - 1) * 2.5); posts.push({ kind: 'sandbags', ...p, y: 0, cover: 0.22, value: 3, cap: 1, wrecked: false, fire: 0 }); }
   // a wall only delays a crew that has to come over it: a gap, an open gate or an unbarred creek in the property line is the way round
@@ -453,13 +460,16 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   const stepY = (p: { x: number; z: number }): number => stepHeightAt(steps, p.x, p.z) ?? 0;
   /** A post just inside the wall, where a defender stands behind it (or the spot itself where there is no solid wall near). */
   const behindWall = (p: { x: number; z: number }): { x: number; z: number } => { const q = snapWall(p.x, p.z, 7); return q ? { x: q.x + q.ix * 0.3, z: q.z + q.iz * 0.3 } : p; };
+  // (walls matter) how the wall's own toughness slows the crew at it: a free palisade, a chain-link fence and a poured wall are no longer one climb rate
+  const wallGrowth = wallRun ? runGrowth(wallRun, s.clock.t) : 1;
+  let wallClimbK = wallKind in PERIMETER ? climbRateK(wallKind as PerimeterKind, wallGrowth) : 1, wallClimbHold = wallKind in PERIMETER ? climbHoldS(wallKind as PerimeterKind, wallGrowth) : 0;
   const wallTop = topClimb(s, wallRun), climbWeak = climbPenaltyK(s, wallRun);   // a moat with no wall behind it is the line itself
   // a patrol deck on the wall (sim/walkway.ts): the posts on it are on the real deck where the raid meets the wall, higher and better covered than a spot behind it
   const decks = walkRuns(s), deckPosts = decks.length ? deckSpots(s, wallR ? [at(wallR, 0).x, at(wallR, 0).z] : [C.x, C.z], 3 + Math.min(2, Math.floor(walkLength(s) / 20))) : [];
   const deck = deckPosts.length > 0;
   if (wallR) {
     if (deck) for (const p of deckPosts) posts.push({ kind: 'wall', x: p.x, z: p.z, y: p.y, cover: WALK_POST.cover, value: WALK_POST.value, cap: 1, wrecked: false, fire: 0, reach: WALK_POST.reach, acc: WALK_POST.acc });
-    else for (let i = 0; i < 3; i++) { const p = behindWall(at(wallR, (i - 1) * 4)); posts.push({ kind: 'wall', ...p, y: stepY(p), cover: 0.22, value: 2, cap: 1, wrecked: false, fire: 0 }); }
+    else for (let i = 0; i < 3; i++) { const p = behindWall(at(wallR, (i - 1) * 4)); posts.push({ kind: 'wall', ...p, y: stepY(p), cover: wallPostCover(wallKind), value: 2, cap: 1, wrecked: false, fire: 0 }); }
   }
   // sandbags are laid on the firing step behind a wall that has one (that is where the cover is), not out in the yard where the wall hides what they could shoot at
   if (wallR && !deck && stepHeight(wallKind, 1) > 0) {
@@ -552,10 +562,10 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       : arc0 !== undefined ? onRoute(arc0, (r() - 0.5) * 8)
       : at(start + r() * 4, (r() - 0.5) * 8);
     const autoR = armedR && late > 0.5 && r() < 0.3 + kit.auto;
-    const arm: Arm = !armedR ? FISTS : peace ? { ...ARMS.pistol, cal: null } : { ...(autoR ? ARMS.auto_rifle : r() < 0.55 ? ARMS.semi_rifle : r() < 0.6 ? ARMS.pump : ARMS.pistol), cal: null };
+    const arm: Arm = !armedR ? FISTS : peace ? { ...ARMS.pistol, cal: null } : { ...(autoR ? ARMS.auto_rifle : r() < MILITIA.rifleShare[crewKind === 'militia' ? 1 : 0] ? ARMS.semi_rifle : r() < 0.6 ? ARMS.pump : ARMS.pistol), cal: null };
     const gr = gLeft > 0 ? 1 : 0; gLeft -= gr;
     const rk = rLeft > 0 && i > 0 ? 1 : 0; rLeft -= rk;
-    const f: Fighter = { id: `r${i}`, side: 'raider', ...p, ...(arc0 !== undefined ? { rd: arc0 } : {}), y: 0, hp: 100, out: false, dead: false, arm, skill: 3 + Math.floor(r() * 4), readyAt: opts.ambush ?? (lane?.via ? DOOR_DELAY : isScout ? 7 : isDecoy ? 0 : mainDelay), ...(isDecoy ? { decoy: true } : {}), post: null, cover: 1, moving: true, nextMove: 0, shelter: false, grenades: gr, rockets: rk, leader: i === 0, armor: { plate: armedR && !peace && r() < late * 0.35 + kit.plate, soft: armedR && !peace && r() < 0.15 + late * 0.2, helmet: armedR && !peace && r() < late * 0.3 }, inGun: arm.mag, spare: 2 + Math.round(late * 3), bleed: 0, supp: 0, nvg: armedR && !peace && late > 0.6 && r() < 0.25, wear: 0.5 + r() * 0.4 };
+    const f: Fighter = { id: `r${i}`, side: 'raider', ...p, ...(arc0 !== undefined ? { rd: arc0 } : {}), y: 0, hp: 100, out: false, dead: false, arm, skill: 3 + Math.floor(r() * 4) + (crewKind === 'militia' && !peace ? MILITIA.skill : 0), readyAt: opts.ambush ?? (lane?.via ? DOOR_DELAY : isScout ? 7 : isDecoy ? 0 : mainDelay), ...(isDecoy ? { decoy: true } : {}), post: null, cover: 1, moving: true, nextMove: 0, shelter: false, grenades: gr, rockets: rk, leader: i === 0, armor: { plate: armedR && !peace && r() < late * 0.35 + kit.plate, soft: armedR && !peace && r() < 0.15 + late * 0.2 + (crewKind === 'militia' ? MILITIA.soft : 0), helmet: armedR && !peace && r() < late * 0.3 + (crewKind === 'militia' ? MILITIA.helmet : 0) }, inGun: arm.mag, spare: 2 + Math.round(late * 3), bleed: 0, supp: 0, nvg: armedR && !peace && late > 0.6 && r() < 0.25, wear: 0.5 + r() * 0.4 };
     F.push(f); units.push({ id: f.id, side: 'raider', x: r2(p.x), z: r2(p.z), post: 'open' });
   }
   const H = F.filter(f => f.side === 'home'), R = F.filter(f => f.side === 'raider');
@@ -930,7 +940,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   /** The crew has broken the line and there is another ring behind it: the defenders fall back, carrying the wounded in to the sickbay. */
   const fallBack = (t: number) => {
     const ring = ringRs[ringK]; ringK++; fallTimes.push(t);
-    lineR = ring.r; wallKind = ring.kind; wallDown = false; gapOnly = false; pendingHow = 'climb'; lineSince = -1;
+    lineR = ring.r; wallKind = ring.kind; wallClimbK = ring.kind in PERIMETER ? climbRateK(ring.kind as PerimeterKind) : 1; wallClimbHold = ring.kind in PERIMETER ? climbHoldS(ring.kind as PerimeterKind) : 0; wallDown = false; gapOnly = false; pendingHow = 'climb'; lineSince = -1;
     const here = at(lineR, 0);
     ev.push({ t, kind: 'fallback', ring: ringK, of: ringRs.length, x: r2(here.x), z: r2(here.z) });
     say(t, v(lead(), ['Fall back! Fall back to the inner wall — go, go!', 'They\'re over the outer wall — back, BACK to the next gate!'], ['Outer line is gone. Fall back to the inner ring.']), lead());
@@ -1001,7 +1011,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   const fallToStage = (t: number, st: RaidStage) => {
     stageT = t;
     if (ringK < ringRs.length) { fallBack(t); stage = nextStage(stage); return; }
-    stage = st; synth = true; lineR = stageRadius(st, wallR0); wallKind = ''; wallDown = false; gapOnly = false; pendingHow = 'climb'; lineSince = -1;
+    stage = st; synth = true; lineR = stageRadius(st, wallR0); wallKind = ''; wallClimbK = 1; wallClimbHold = 0; wallDown = false; gapOnly = false; pendingHow = 'climb'; lineSince = -1;
     const here = at(lineR, 0);
     ev.push({ t, kind: 'fallback', ring: st === 'yard' ? 1 : 2, of: 2, x: r2(here.x), z: r2(here.z) });
     say(t, st === 'yard' ? v(lead(), ['Back to the yard — behind the cars, the woodpile, GO!', 'Leave the wall — fall back to the yard cover!'], ['Fall back to the yard cover. Keep your lanes.']) : v(lead(), ['Everybody in the house! Bar the doors — NOW!', 'Into the house! Furniture against the doors!'], ['Final line is the house. Barricade the doors.']), lead());
@@ -1267,11 +1277,11 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     // a savage crew doesn't scare: they take more losses before they quit
     // the post-breach fight: a crew in the yard is winning, so it takes more to break it, but a family that holds (or counterattacks) can still beat it back out
     const upArmed = hUp.filter(h => h.arm !== FISTS).length;
-    const lossLimit = Math.max(1, raiders * (0.25 + 0.3 * org + (temper === 'savage' ? 0.2 : 0) + (breached ? 0.2 : 0) + (opts.angry ? 0.15 : 0)) * ordFx.morale);
+    const lossLimit = Math.max(1, raiders * (0.25 + 0.3 * org + (crewKind === 'militia' ? MILITIA.morale : 0) + (temper === 'savage' ? 0.2 : 0) + (breached ? 0.2 : 0) + (opts.angry ? 0.15 : 0)) * ordFx.morale);
     const leaderBreak = R[0].out && temper !== 'savage' && (!breached || losses >= Math.ceil(raiders * 0.3));
     let rallied = false;
     if (leaderBreak && !leaderRallied && !fled && org > 0.3 && mr() < 0.3 + 0.3 * org) { leaderRallied = true; rallied = true; const lt = rUp.find(f => f !== R[0]); if (lt) { ev.push({ t, kind: 'rally', unit: lt.id }); say(t + 0.3, pick(['I\'ve got them! Hold, HOLD — we\'re not leaving!', 'Stay on it! He\'s down, I\'m in charge — keep moving!']), lt); } }
-    if (!fled && (!breached || upArmed > 0) && rUp.length && (losses >= lossLimit || (leaderBreak && !rallied && !leaderRallied) || (!breached && firstBlood && temper === 'desperate') || peaceBreak)) {
+    if (!fled && (!breached || upArmed > 0) && rUp.length && (losses >= lossLimit || (leaderBreak && !rallied && !leaderRallied) || (!breached && firstBlood && temper === 'desperate' && crewKind !== 'militia') || peaceBreak)) {
       // a crew that has lost heavily and has no way out (cut off, pinned, outgunned) may lay down its arms instead of running (sim/surrender.ts)
       if (!peace && crewSurrenders({ temper, kind: crewKind, lossShare: losses / Math.max(1, R.length), pinnedShare: rUp.filter(f => f.supp > 3).length / Math.max(1, rUp.length), outnumbered: upArmed / Math.max(1, rUp.length), trapped: opts.ambush !== undefined || !!opts.insideBreach, leaderDown: R[0].out }, r)) { giveUp(t, rUp); break; }
       // a hurt crew that still has teeth may offer terms instead of running (sim/raidOutcomes.ts): tribute for leaving, or passage
@@ -1319,7 +1329,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     }
     if (!rUp.length) { end = 'repelled'; endT = t + 3; break; }
     // they can't get over the wall and give up
-    if (!breached && wallR && !synth && !wallDown && opts.ambush === undefined && lineSince >= 0 && t - lineSince > 40 && (lineClosed || !propLine.onLine.size)) { say(t, v(lead(), ['They can\'t get over the wall — they\'re giving up — oh my God —'], ['They can\'t breach. They\'re pulling out.']), lead()); for (const f of rUp) { f.fled = true; ev.push({ t: r2(t + r()), kind: 'flee', unit: f.id }); } end = 'fled'; endT = t + 6; break; }
+    if (!breached && wallR && !synth && !wallDown && opts.ambush === undefined && lineSince >= 0 && t - lineSince > 40 && (lineClosed || !propLine.onLine.size)) { say(t, v(lead(), ['They can\'t get over the wall — they\'re giving up — oh my God —'], ['They can\'t breach. They\'re pulling out.']), lead()); for (const f of rUp) { f.fled = true; ev.push({ t: r2(t + r()), kind: 'flee', unit: f.id }); } end = 'repelled'; endT = t + 6; break; }   // (the wall held: nobody was across, so it is a repelled raid, not just a crew that ran)
     const climbing0 = wallR > 0 && !synth && !wallDown && opts.ambush === undefined && (lineClosed || !propLine.onLine.size);
     // the weak side: which flank has fewer defenders
     const leftDef = hUp.filter(h => (h.x - C.x) * lx + (h.z - C.z) * lz > 0).length;
@@ -1445,7 +1455,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     // (round 4) clubs against rifles need far more of them to rush the line; going over a wall, every rifle at a post on it slows them
     const outnumber = armedR ? 2 : 4;
     const onWall = H.filter(f => !f.out && !f.shelter && f.arm !== FISTS && t >= f.readyAt && f.post?.kind !== 'open' && atLine.some(x => sight(f, x) !== 'blocked')).length;   // (every rifle that bears on the climbers)
-    if (!breached && !peace && atLine.length && ((wallDown && !gapOnly) || hNow === 0 || rUp.length > hNow * outnumber) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (hNow === 0 || t - lineSince >= (synth ? STAGE_HOLD[stage] : ringK === 0 ? ringHold : ringStay)) && (!climbing || (t - lineSince >= 10 + (moat && ringK === 0 ? moat.holdS : 0) && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) * wallTop.climb * climbWeak / (1 + onWall)))) {
+    if (!breached && !peace && atLine.length && ((wallDown && !gapOnly) || hNow === 0 || rUp.length > hNow * outnumber) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (hNow === 0 || t - lineSince >= (synth ? STAGE_HOLD[stage] : ringK === 0 ? ringHold : ringStay)) && (!climbing || (t - lineSince >= 10 + wallClimbHold + (moat && ringK === 0 ? moat.holdS : 0) && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) * wallTop.climb * climbWeak * wallClimbK / (1 + onWall)))) {
       if (ringK < ringRs.length) fallBack(t);
       else openLine(t, pendingHow, rUp);
     }

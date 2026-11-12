@@ -63,7 +63,8 @@ describe('whole scenes', () => {
         const b = i === battles.length - 1 ? prepared(b0, g, seed * 31) : b0;
         const shots = b.events.filter(e => e.kind === 'shot');
         if (!shots.length) return;
-        const t0 = shots[0].t, end = (b.events.find(e => e.kind === 'end')?.t ?? b.duration) - 1;
+        // (walls/hide balance pass: the fight itself, not the wake after it: a stronger wall means more raids end with the family holding and burying its dead, a slow quiet scene of its own)
+        const t0 = shots[0].t, lastShot = shots[shots.length - 1].t, end = Math.min((b.events.find(e => e.kind === 'end')?.t ?? b.duration) - 1, lastShot + 8);
         const ts = spoken(b).map(e => e.t).filter(t => t >= t0 - 1 && t <= end).sort((p, q) => p - q);
         let prev = t0, worst = 0, at = 0;
         for (const t of [...ts, end]) { if (t - prev > worst) { worst = t - prev; at = prev; } prev = t; }

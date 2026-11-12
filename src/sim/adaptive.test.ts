@@ -92,7 +92,8 @@ function late(l: Difficulty, daysAfter: number, seed = 3): GameState {
   g.clock.t = g.disaster.hitAt + daysAfter;
   g.disaster.tracks = { ...g.disaster.tracks, law: 0, stores: 0, deliveries: 0, banks: 0 };
   delete g.gate.waves;   // the random-visit adaptation is under test here; waves have their own tests (waves.test.ts)
-  const r = planRun(g, 'container_wall', [[0, 0], [20, 0], [20, 20], [0, 20], [0, 0]]);
+  // (walls/hide balance pass: a defended place is read from the wall's toughness now, so the test place has a concrete wall; a container ring reads about half as strong)
+  const r = planRun(g, 'concrete_wall', [[0, 0], [20, 0], [20, 20], [0, 20], [0, 0]]);
   r.done = r.hours; r.supplied = true; r.finishedAt = 0;
   return g;
 }

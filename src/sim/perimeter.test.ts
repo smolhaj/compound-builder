@@ -31,7 +31,7 @@ describe('perimeter', () => {
     const t0 = r.finishedAt!;
     expect(runStops(r, 'people', t0)).toBeLessThan(0.1);
     expect(runGrowth(r, t0 + 2 * 365)).toBeCloseTo(0.5, 1);
-    expect(runStops(r, 'people', t0 + 5 * 365)).toBeCloseTo(0.9);
+    expect(runStops(r, 'people', t0 + 5 * 365)).toBeCloseTo(0.6);   // (a grown hedge turns most walkers, not 9 in 10: capped at 0.6 in the walls/hide balance pass)
   });
 
   it('the crew builds houses before fences', () => {

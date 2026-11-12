@@ -53,9 +53,9 @@ export function crewMeans(c: { kind: CrewKind; men: number; organized: boolean; 
 /** A wall's resistance: the chance ONE truck hit (ram) or ONE satchel (blast) opens it, before the counters. */
 export const WALL_RESIST: Record<PerimeterKind, { ram: number; blast: number }> = {
   split_rail: { ram: 0.95, blast: 0.95 }, barbed_wire: { ram: 0.9, blast: 0.95 }, woven_wire: { ram: 0.85, blast: 0.95 }, chain_link: { ram: 0.8, blast: 0.92 },
-  thorn_hedge: { ram: 0.55, blast: 0.85 }, log_palisade: { ram: 0.55, blast: 0.8 }, wrought_iron: { ram: 0.4, blast: 0.7 }, iron_barbed: { ram: 0.4, blast: 0.7 },
-  bar_fence: { ram: 0.4, blast: 0.7 }, container_wall: { ram: 0.28, blast: 0.6 }, container_stack: { ram: 0.14, blast: 0.5 }, steel_wall: { ram: 0.28, blast: 0.5 },
-  electric_steel: { ram: 0.28, blast: 0.5 }, concrete_wall: { ram: 0.18, blast: 0.55 }, stone_wall: { ram: 0.24, blast: 0.5 }, earth_berm: { ram: 0.12, blast: 0.45 },
+  thorn_hedge: { ram: 0.6, blast: 0.9 }, log_palisade: { ram: 0.6, blast: 0.85 }, wrought_iron: { ram: 0.4, blast: 0.7 }, iron_barbed: { ram: 0.4, blast: 0.7 },
+  bar_fence: { ram: 0.4, blast: 0.7 }, container_wall: { ram: 0.3, blast: 0.65 }, container_stack: { ram: 0.14, blast: 0.5 }, steel_wall: { ram: 0.16, blast: 0.42 },
+  electric_steel: { ram: 0.16, blast: 0.42 }, concrete_wall: { ram: 0.12, blast: 0.45 }, stone_wall: { ram: 0.2, blast: 0.45 }, earth_berm: { ram: 0.12, blast: 0.45 },
   creek_bars: { ram: 0.35, blast: 0.6 }, covered_walkway: { ram: 0.5, blast: 0.7 }, covered_bridge: { ram: 0.5, blast: 0.7 },
   // a trench no truck crosses; a charge only fills it in a little
   ditch: { ram: 0, blast: 0.1 }, moat: { ram: 0, blast: 0.05 },

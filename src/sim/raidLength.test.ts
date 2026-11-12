@@ -28,7 +28,8 @@ describe('how long a raid plays', () => {
     expect(sk.length).toBeGreaterThan(0); expect(se.length).toBeGreaterThan(0); expect(inv.length).toBeGreaterThan(0);
     const med = (a: Array<{ s: number }>) => a.map(x => x.s).sort((p, q) => p - q)[Math.floor(a.length / 2)];
     expect(med(sk), 'skirmish').toBeGreaterThan(40); expect(med(sk), 'skirmish').toBeLessThan(100);
-    expect(med(se), 'serious').toBeGreaterThan(150); expect(med(se), 'serious').toBeLessThan(270);
+    expect(med(se), 'serious').toBeGreaterThan(120);   // (walls/hide balance pass: 150 before; a wall that holds ends a serious raid in a standoff that plays shorter than the old climb-and-breach, a median near 135 s)
+    expect(med(se), 'serious').toBeLessThan(270);
     expect(med(inv), 'invasion').toBeGreaterThan(210); expect(med(inv), 'invasion').toBeLessThan(360);
     for (const r of inv) expect(r.s).toBeLessThan(380);
   }, 240000);

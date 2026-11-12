@@ -125,6 +125,18 @@ export function towerPosts(s: GameState): Array<{ st: Structure; post: TowerDef[
   return out;
 }
 
+/** How many tower cabs fight at full strength in a raid (a cab covers an arc; a fourth tower on the same lot is redundant). Heavier tiers (a mounted gun, a turret) always count. */
+export const TOWER_POSTS_CAP = 2;
+/** The tower posts that take part in a fight: the best `TOWER_POSTS_CAP` cabs (by tier, then cover), plus every manned-gun or turret tower. Pure. */
+export function battleTowerPosts(s: GameState): ReturnType<typeof towerPosts> {
+  const all = towerPosts(s);
+  if (all.length <= TOWER_POSTS_CAP) return all;
+  const rank = (t: (typeof all)[number]) => (t.def?.tier ?? 1) * 10 - t.post.cover * 5 + t.post.y;
+  const heavy = all.filter(t => (t.def?.tier ?? 0) >= 5);
+  const light = all.filter(t => (t.def?.tier ?? 0) < 5).sort((a, b) => rank(b) - rank(a)).slice(0, Math.max(0, TOWER_POSTS_CAP - heavy.length));
+  return [...heavy, ...light];
+}
+
 /** The caliber with the most rounds on hand (at least `need`), or null. */
 export function heavyCaliber(s: GameState, need: number): Caliber | null {
   let best: Caliber | null = null;
