@@ -41,10 +41,16 @@ export async function play(A) {
   note('defend clicked ' + clicked);
   await page.getByRole('button', { name: 'Watch', exact: true }).click();
   const peel = on => page.evaluate(async on => { const m = await import('/src/engine/world/trees/viewPeel.ts'); m.setViewPeelEnabled(on); }, on);
-  for (let k = 0; k < 8; k++) {
-    await page.waitForTimeout(3500);
+  // freeze the playhead and camera, then draw the same frame with the peel off and on
+  const freeze = on => page.evaluate(on => { const cb = window.__cb;
+    if (on) { const pose = cb.player.update.call(cb.player, 0); cb.player.__o = cb.player.update; cb.battle.__o = cb.battle.update; cb.player.update = () => pose; cb.battle.update = () => {}; }
+    else { cb.player.update = cb.player.__o; cb.battle.update = cb.battle.__o; } }, on);
+  for (let k = 0; k < 10; k++) {
+    await page.waitForTimeout(2500);
     const c = await st(); if (c.cutscene !== 'playing') { note('cutscene state ' + c.cutscene); break; }
+    await freeze(true); await page.waitForTimeout(600);
     await peel(false); await shot(`cut${k}-before`);
     await peel(true); await shot(`cut${k}-after`);
+    await freeze(false);
   }
 }
