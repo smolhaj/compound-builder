@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
-import { LivestockRenderer } from './LivestockRenderer';
+import { LivestockRenderer, LOOK } from './LivestockRenderer';
 import type { Home } from './livestockPlan';
 import { animalRoute } from '../paths/groundMovers';
 
@@ -69,5 +69,22 @@ describe('the herd is spread out', () => {
     let min = Infinity;
     for (let i = 0; i < out.length; i++) for (let j = i + 1; j < out.length; j++) min = Math.min(min, Math.hypot(out[i].x - out[j].x, out[i].z - out[j].z));
     expect(min).toBeGreaterThan(0.12);
+  });
+});
+
+describe('48 animals at one barn', () => {
+  it('end up with no two bodies overlapping', () => {
+    const r = new LivestockRenderer(new THREE.Scene());
+    const one: Home[] = [{ id: 'b', kind: 'barn', x: 10, z: 0, rot: 0, w: 3, d: 4, depth: 0 }];
+    const stock = { cow: 8, steer: 8, sheep: 8, pig: 8, goat: 8, rabbit: 8 };
+    for (let i = 0; i < 2500; i++) r.update(0.1, stock, 0, one, c({ clock: 5 + i * 0.001 }), ctx, 1);
+    const out = r.animals().filter(a => !a.inside);
+    let worst = Infinity;
+    for (let i = 0; i < out.length; i++) for (let j = i + 1; j < out.length; j++) {
+      const need = (LOOK[out[i].kind].len + LOOK[out[j].kind].len) * 0.42;
+      worst = Math.min(worst, Math.hypot(out[i].x - out[j].x, out[i].z - out[j].z) / need);
+    }
+    expect(out.length).toBe(48);
+    expect(worst).toBeGreaterThan(0.85);
   });
 });

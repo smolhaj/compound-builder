@@ -46,9 +46,9 @@ const hash = (s: string, k: number): number => { let h = 2166136261 ^ k; for (le
 export function spreadGoals(herd: ReadonlyArray<{ id: string; kind: StockKind }>, goals: AnimalGoal[], homes: readonly Home[]): void {
   const idx: number[] = [];
   for (let i = 0; i < goals.length; i++) if (!goals[i].inside && !goals[i].panic) idx.push(i);
-  const rad = (i: number): number => LOOK[herd[i].kind].len * 0.5 + 0.04;
+  const rad = (i: number): number => LOOK[herd[i].kind].len * 0.5 + 0.09;
   const byId = new Map(homes.map(h => [h.id, h]));
-  for (let it = 0; it < 14; it++) {
+  for (let it = 0; it < 40; it++) {
     for (let p = 0; p < idx.length; p++) for (let q = p + 1; q < idx.length; q++) {
       const A = goals[idx[p]], B = goals[idx[q]];
       let dx = B.x - A.x, dz = B.z - A.z, d = Math.hypot(dx, dz);
@@ -126,7 +126,21 @@ export class LivestockRenderer {
       }
       this._step(a, goal, dt, k, ctx);
     }
+    this._separate(dt * k);
     this._draw(herd, ctx, cam);
+  }
+
+  /** Bodies in the field never stand inside each other: two that meet (one walked up to the other's spot) ease apart. */
+  private _separate(dt: number): void {
+    const out = [...this._agents.values()].filter(a => !a.inside);
+    for (let i = 0; i < out.length; i++) for (let j = i + 1; j < out.length; j++) {
+      const A = out[i], B = out[j], need = (LOOK[A.kind].len + LOOK[B.kind].len) * 0.42;
+      let dx = B.x - A.x, dz = B.z - A.z, d = Math.hypot(dx, dz);
+      if (d >= need) continue;
+      if (d < 1e-4) { dx = 1; dz = 0; d = 1; }
+      const m = Math.min(need - d, 1.0 * dt + 0.002) / 2;
+      A.x -= dx / d * m; A.z -= dz / d * m; B.x += dx / d * m; B.z += dz / d * m;
+    }
   }
 
   private _step(a: Agent, goal: AnimalGoal, dt: number, k: number, ctx: LivestockCtx): void {
