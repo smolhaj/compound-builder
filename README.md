@@ -6,7 +6,7 @@ A browser-based builder and survival management game. In peacetime you design an
 
 - Design spec (the contract): [`COMPOUND_BUILDER_GDS.md`](COMPOUND_BUILDER_GDS.md)
 - Stack: Vite, TypeScript (strict), React, Zustand, Three.js and Vitest. The simulation is a pure, seeded step function over one plain `GameState` (`src/sim/engine.ts`); saves go to IndexedDB with JSON export and import. Everything is procedural; there are no external art assets.
-- Play the latest `main` on GitHub Pages (`.github/workflows/pages.yml`).
+- Play the published build on GitHub Pages (`.github/workflows/pages.yml`; deploys are manual: run the workflow from the Actions tab).
 
 ## Running it
 
@@ -20,7 +20,7 @@ npm run perf:budget  # draw-call / triangle / heap budget per quality tier (need
 npm run shots -- terrain   # Playwright screenshots into shots/<set>/ (sets in scripts/shotSets.mjs)
 ```
 
-CI (`.github/workflows/ci.yml`) runs two jobs on every PR and on `main`: `check` (`npm ci`, `npm run lint`, `npm test`, `npm run build`) and `perf-budget` (build, Playwright 1.63 with Chromium, `npm run perf:budget`). The Pages workflow builds and deploys `main`.
+CI (`.github/workflows/ci.yml`) runs two jobs on every pull request (not again after the merge): `check` (`npm ci`, `npm run lint`, `npm test`, `npm run build`) and `perf-budget` (build, Playwright 1.63 with Chromium, `npm run perf:budget`). The Pages workflow builds and deploys `main` only when you start it by hand.
 
 **URL parameters** (QA and development): `seed=N` (new game on that seed), `new`, `clean` (no HUD), `region=<id>`, `lot=<kind>&relief=N&acres=N&lotseed=N&elev=N`, `showcase=mountain` (the north-star compound assembled with the real build actions), `lowrender` and `looktier=low|medium|high` (draw only on request; used by the screenshot and budget scripts).
 

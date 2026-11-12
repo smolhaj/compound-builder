@@ -1,8 +1,7 @@
 name: CI
+# Runs on pull requests, which is what gates a merge. It does not re-run on the merge commit: a squash merge is the tree the PR already tested.
 on:
   pull_request:
-  push:
-    branches: [main]
 # a newer push to the same branch supersedes the older run (cancelled runs are not failures, so no failure mail)
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
