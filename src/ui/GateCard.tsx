@@ -57,7 +57,7 @@ const RANSOM: Partial<Record<Stance, [string, string]>> = {
 
 const box: CSSProperties = { position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 460, maxWidth: 'calc(100vw - 32px)', background: 'rgba(24,22,18,0.97)', color: '#eee', borderRadius: 12, padding: '18px 20px', zIndex: 12, boxShadow: '0 10px 40px rgba(0,0,0,0.5)', fontSize: 13.5 };
 /** The raid prompt: to the right, so the view down the drive stays open between the bars. */
-const raidBox: CSSProperties = { ...box, left: 'auto', right: 'clamp(12px, 3vw, 40px)', top: 'calc(clamp(54px, 12vh, 120px) + 12px)', transform: 'none', width: 'min(400px, calc(100vw - 24px))', maxHeight: 'calc(100vh - 2 * clamp(54px, 12vh, 120px) - 24px)', overflowY: 'auto', zIndex: 40, padding: '14px 16px' };
+const raidBox: CSSProperties = { ...box, left: 'auto', right: 'clamp(12px, 3vw, 40px)', top: 'calc(clamp(54px, 12vh, 120px) + 12px)', transform: 'none', width: 'min(400px, calc(100vw - 24px))', maxHeight: 'calc(100vh - 2 * clamp(54px, 12vh, 120px) - 24px)', overflowY: 'hidden', display: 'flex', flexDirection: 'column', zIndex: 40, padding: '14px 16px' };
 const button = (primary: boolean): CSSProperties => ({ padding: '7px 12px', borderRadius: 7, border: 0, cursor: 'pointer', background: primary ? '#d8c9a0' : '#3a3d34', color: primary ? '#1c1d18' : '#eee', fontSize: 13, textAlign: 'left' });
 
 const CLAMP2: CSSProperties = { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
@@ -106,6 +106,7 @@ export function GateCard() {
     const picked = cut ? cut.stance ?? e.stances[0] : null;
     return (
       <div style={cut ? raidBox : box}>
+        <div data-testid={cut ? 'raid-card-scroll' : undefined} style={cut ? { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', paddingRight: 4 } : undefined}>
         <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>{e.kind === 'break_in' ? 'In the night' : e.kind === 'ransom' ? 'Word about your child' : e.kind === 'trial_end' ? 'The camp outside the wall' : e.kind === 'guard_stay' ? 'The guard asks to stay' : e.kind === 'insider' ? 'Someone on the inside' : e.kind === 'kin' ? 'Family' : e.kind === 'shelter' ? 'Neighbors at the door' : e.kind === 'move_in' ? (e.title.startsWith('Time') ? 'The warning signs' : 'A decision') : e.kind === 'stranded' ? 'Caught in town' : e.neighbor ? 'A neighbor at the gate' : 'At the gate'}</div>
         <div style={{ fontSize: 19, fontWeight: 700, margin: '2px 0 8px' }}>{e.title}</div>
         <Dossier e={e} />
@@ -173,7 +174,10 @@ export function GateCard() {
             {picked && isTalk(picked) && <div style={{ fontSize: 11.5, opacity: 0.7, marginTop: 5 }}>If it fails, the fight is on, and a trap means they are through the gate before it starts.</div>}
           </div>;
         })()}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10 }}>
+        {cut && (picked === 'defend' || picked === 'warn') && e.opener?.kind === 'scouts' && e.opener.spotted && <ScoutChoices />}
+        {cut && picked === 'defend' && <RaidOrders />}
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, ...(cut ? { flex: '0 0 auto', maxHeight: '45%', overflowY: 'auto' } : {}) }}>
           {e.stances.filter(st => !(e.kind === 'kin' && st === 'build_first')).map((st, i) => (
             <button key={st} style={cut ? { ...button(st === picked), outline: st === picked ? '2px solid #d8c9a0' : undefined, background: st === picked ? '#4a4a3c' : '#2e302a', color: '#eee' } : button(i === 0)} title={label(st)[1]} onClick={() => (cut ? g.chooseStance(st) : g.answer(st))}>
               <div style={{ fontWeight: 600 }}>{label(st)[0]}</div>
@@ -181,9 +185,7 @@ export function GateCard() {
             </button>
           ))}
         </div>
-        {cut && (picked === 'defend' || picked === 'warn') && e.opener?.kind === 'scouts' && e.opener.spotted && <ScoutChoices />}
-        {cut && picked === 'defend' && <RaidOrders />}
-        {cut && <button style={{ ...button(true), position: 'sticky', bottom: 0, marginTop: 12, width: '100%', textAlign: 'center', fontSize: 15, padding: '10px 12px', fontWeight: 700, letterSpacing: 0.5 }} onClick={g.watchRaid}>Watch</button>}
+        {cut && <button style={{ ...button(true), flex: '0 0 auto', marginTop: 10, width: '100%', textAlign: 'center', fontSize: 15, padding: '10px 12px', fontWeight: 700, letterSpacing: 0.5 }} onClick={g.watchRaid}>Watch</button>}
       </div>
     );
   }

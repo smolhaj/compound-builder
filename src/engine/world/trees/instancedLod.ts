@@ -20,6 +20,7 @@
  * so the cull sphere is inflated by `shadowMargin` for sets that cast.
  */
 import * as THREE from 'three';
+import { getViewPeel, peelScale, viewPeelEpoch } from './viewPeel';
 
 // ── Scene render hook (chained Scene.onBeforeRender) ─────────────────────────
 
@@ -77,6 +78,8 @@ export interface InstancedLodOptions {
   instanceAttributes?: Array<{ name: string; itemSize: number; data: Float32Array }>;
   /** Whether per-instance colors are used (allocates instanceColor). */
   colors?: boolean;
+  /** Trees that shrink out of the cutscene camera's way (engine/world/trees/viewPeel). */
+  peelable?: boolean;
 }
 
 const _frustum = new THREE.Frustum();
@@ -114,6 +117,8 @@ export class InstancedLodSet {
   private _dirty = true;
   private _epoch = -1;
   private _lodScale = 1;
+  private readonly _peelable: boolean;
+  private _peelEpoch = -1;
   private _visible = true;
   private readonly _shown: boolean[] = [];
   private _unhook: (() => void) | null = null;
@@ -127,6 +132,7 @@ export class InstancedLodSet {
     opts: InstancedLodOptions = {},
   ) {
     this._scene = scene;
+    this._peelable = !!opts.peelable;
     this._levels = levels;
     const n = matrices.length;
     this.count = n;
@@ -214,6 +220,7 @@ export class InstancedLodSet {
     const cm = camera.matrixWorld.elements, pm = camera.projectionMatrix.elements;
     const last = this._lastCam;
     if (this._epoch !== InstancedLodSet._epoch) { this._epoch = InstancedLodSet._epoch; this._dirty = true; }
+    if (this._peelable && this._peelEpoch !== viewPeelEpoch()) { this._peelEpoch = viewPeelEpoch(); this._dirty = true; }
     if (!this._dirty) {
       let same = true;
       for (let k = 0; k < 16; k++) {
@@ -242,6 +249,7 @@ export class InstancedLodSet {
     const margin = noCull ? Infinity : this._margin, maxD2 = noCull ? Infinity : this._maxDraw2;
     if (noCull) lim2[0] = Infinity;
     const cx = _camPos.x, cy = _camPos.y, cz = _camPos.z;
+    const peel = this._peelable ? getViewPeel() : null;
 
     for (let i = 0; i < this.count; i++) {
       const x = b[i * 4], y = b[i * 4 + 1], z = b[i * 4 + 2];
@@ -257,8 +265,12 @@ export class InstancedLodSet {
       if (d2 > maxD2) continue;
       let li = 0;
       while (li < L - 1 && d2 >= lim2[li]) li++;
+      let ps = 1;
+      if (peel) { ps = peelScale(x, y, z, b[i * 4 + 3], cx, cy, cz, peel); if (ps === 0) continue; }
       const k = counts[li]++;
-      mArr[li].set(src.subarray(i * 16, i * 16 + 16), k * 16);
+      const dst = mArr[li];
+      dst.set(src.subarray(i * 16, i * 16 + 16), k * 16);
+      if (ps < 1) { const o = k * 16; for (const e of [0, 1, 2, 4, 5, 6, 8, 9, 10]) dst[o + e] *= ps; }   // shrink about the trunk's foot
       const ca = cArr[li];
       if (ca && col) { ca[k * 3] = col[i * 3]; ca[k * 3 + 1] = col[i * 3 + 1]; ca[k * 3 + 2] = col[i * 3 + 2]; }
       for (let e = 0; e < this._extra.length; e++) {
