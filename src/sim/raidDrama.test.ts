@@ -81,7 +81,8 @@ describe('the death and the wake', () => {
     expect(words).not.toMatch(/\b(he|she|his|her)\b.*\b(blood|brains|guts)\b/i);
   });
   it('where there are hands free, the grave is dug, the fallen carried to it and laid in it (drawn, not captioned)', () => {
-    const a = find(st => !!st.drama && st.battles.some(bb => bb.events.some(e => e.kind === 'grave')));
+    // (a household where two or more are free to dig: with one survivor, one digger shovels once for each stage, which is a different scene)
+    const a = find(st => !!st.drama && st.battles.some(bb => bb.events.some(e => e.kind === 'grave') && new Set(bb.events.filter(e => e.kind === 'tool' && e.what === 'shovel').map(e => (e as { unit: string }).unit)).size >= 2));
     expect(a, 'some household in range buries its dead').toBeTruthy();
     const b = a!.st.battles[a!.st.drama!.scene], v = a!.st.drama!.victim.unit;
     const kinds = b.events.filter(e => e.kind === 'grave').map(e => (e as { stage: string }).stage);

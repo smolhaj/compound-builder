@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newGame } from './state';
-import { planRun, PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, type PerimeterKind } from './perimeter';
+import { planRun, PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, holdScale, type PerimeterKind } from './perimeter';
 import { postureOf } from './encounters';
 
 /** A closed ring of 100 units of one kind, finished, round the compound. */
@@ -26,10 +26,11 @@ describe('the barrier reads the wall tier', () => {
     }
   });
 
-  it('a closed ring holds as well as its people-block rating, and a short one only in proportion', () => {
+  // (walls/hide balance pass) the ring's strength is its people-block times the tier's toughness (holdScale), so a palisade no longer reads like concrete
+  it('a closed ring holds as well as its people-block rating times its toughness, and a short one only in proportion', () => {
     for (const k of ['woven_wire', 'chain_link', 'steel_wall'] as PerimeterKind[]) {
-      expect(postureOf(ring(k, 100)).barrier).toBeCloseTo(PERIMETER[k].blocks.people * 100, 5);
-      expect(postureOf(ring(k, 20)).barrier).toBeCloseTo(PERIMETER[k].blocks.people * 50, 5);
+      expect(postureOf(ring(k, 100)).barrier).toBeCloseTo(PERIMETER[k].blocks.people * holdScale(k) * 100, 5);
+      expect(postureOf(ring(k, 20)).barrier).toBeCloseTo(PERIMETER[k].blocks.people * holdScale(k) * 50, 5);
     }
     expect(PERIMETER_ORDER.length).toBeGreaterThan(0);
   });

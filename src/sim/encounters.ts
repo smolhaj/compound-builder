@@ -23,7 +23,7 @@ import { nobodyHome } from './orphans';
 import { ringPoints } from './rings';
 import { terrainPoints } from './terrainFx';
 import { mulberry32, pick } from './rng';
-import { diffOf } from './difficulty';
+import { diffOf, type Difficulty } from './difficulty';
 import { HOSTILE, WAVE, crewFactor, kitLevel, nextWaveDay, phaseOf, waveDossier, warningSign, type WaveState } from './waves';
 import { adaptation, adaptedHeads, defensiveStrength, adaptLevel, ADAPT, belowExtra, cadenceFactor, findBonus, followDays, probeHeads, probes, sinceHit, torchBonus, whyBigger } from './adaptive';
 import { logGate } from './nag';
@@ -42,7 +42,7 @@ import { isHome } from './blueprints';
 import { log } from './economy';
 import { burnStructure, isFinished } from './construction';
 import { raidPressure } from './opsec';
-import { PERIMETER, peopleBlock, runFinished, runGrowth, wallLength } from './perimeter';
+import { PERIMETER, holdScale, peopleBlock, runFinished, runGrowth, wallLength } from './perimeter';
 import { weakPenalty } from './wallTops';
 import { gatePosture } from './gateSecurity';
 import { enclosure } from './enclosure';
@@ -173,7 +173,7 @@ export function postureOf(s: GameState): Posture {
     if (!runFinished(r) || d.blocks.people <= 0) continue;
     if (line.onLine.has(r.id)) { look += wallLength(r) * (d.height > 0.35 ? 1 : 0.3) * runGrowth(r, s.clock.t); continue; }   // the property line holds by whether it is closed (sim/enclosure.ts)
     const g = runGrowth(r, s.clock.t), len = wallLength(r);
-    held += len * Math.max(0, peopleBlock(s, r) - weakPenalty(s, r)) * g;
+    held += len * Math.max(0, peopleBlock(s, r) - weakPenalty(s, r)) * holdScale(r.kind) * g;   // (walls matter) times the tier's toughness: a palisade is not a concrete wall
     wall += len * g;
     look += len * (d.height > 0.35 ? 1 : 0.3) * g;
   }
@@ -677,13 +677,39 @@ const alliesOf = defenders;
 /** How many come at the line once the allies are there (about one fewer per two of them). */
 const raidersAfterHelp = (e: Encounter, help: number) => Math.max(1, e.size - Math.floor(help / 12));
 
+/**
+ * Hiding stops being free (balance pass "hide vs defend"): a flat 10-12 % find chance whatever the crew, the wave or the number of times it had worked.
+ * Every wave that has come is a crew that has learned the county (WAVE points each, to WAVE_MAX waves); each time a crew already found the place
+ * hiding in the last REPEAT_DAYS days they know somebody lives here and look harder (REPEAT points each, to REPEAT_MAX finds), on top of the
+ * +20 for a crew that came back.
+ */
+export const HIDE = { WAVE: 2, WAVE_MAX: 10, REPEAT: 10, REPEAT_MAX: 3, REPEAT_DAYS: 120 } as const;
+/**
+ * Where the new hide costs apply (HIDE's wave and repeat-find points, STRIP's bigger share): Cozy and Standard take them in full; Hardcore keeps hiding as it
+ * was (it already adds +12 to the find chance and 1.5x wounds, and the owner's rule for this pass is that Hardcore gets no harsher than today: its
+ * best hiding bots survived about a third of runs and must stay there).
+ */
+export const HIDE_COST_K: Record<Difficulty, number> = { cozy: 1, standard: 1, hardcore: 0 };
+/** Times a hiding family was found by a crew in the recent past (counts the gate history, so no new state). */
+export function repeatFinds(s: GameState, e: Pick<Encounter, 'day'>): number {
+  const n = s.gate.history.filter(h => h.stance === 'hide' && h.tone === 'bad' && e.day - h.day <= HIDE.REPEAT_DAYS && e.day - h.day >= 0).length;
+  return HIDE.REPEAT * Math.min(HIDE.REPEAT_MAX, n);
+}
+
+/** Extra standing in the county (0-1) for a raid that ended 'repelled': the wall held and none of them got over it. */
+export const REPELLED_RESPECT = 0.15;
+
 /** The chance a crew finds the place lived in if the family hides (it shows; a savage crew looks hard; a crew come back knows). */
 export function hideFoundChance(s: GameState, e: Encounter, p: Posture = postureOf(s)): number {
   const hunt = diffOf(s.disaster).hunt;
   if (e.kind === 'horde') return Math.min(0.95, p.visibility * 0.6 / 100);
-  return Math.max(0, Math.min(0.95, (p.visibility * 0.6 + (e.temper === 'savage' ? 25 : 0) + (e.back ? 20 : 0) + (e.scouted ? SCOUT_HIDE_BONUS : 0) + (e.dig ? 40 : 0) + hunt + findBonus(e.adapt ?? 0)) / 100));
+  return Math.max(0, Math.min(0.95, (p.visibility * 0.6 + (e.temper === 'savage' ? 25 : 0) + (e.back ? 20 : 0) + HIDE_COST_K[s.disaster.difficulty ?? 'standard'] * (HIDE.WAVE * Math.min(HIDE.WAVE_MAX, e.wave ?? 0) + repeatFinds(s, e)) + (e.scouted ? SCOUT_HIDE_BONUS : 0) + (e.dig ? 40 : 0) + hunt + findBonus(e.adapt ?? 0)) / 100));
 }
 
+/** The share of the stores a crew carries off from a place where the family hid and was found: BASE + PER_HEAD per man, to CAP (it was 8 % + 1.5 %, to 30 %). */
+export const STRIP = { BASE: 0.15, PER_HEAD: 0.02, CAP: 0.45 } as const;
+/** The same on Hardcore (unchanged by the balance pass: see HIDE_COST_K). */
+export const STRIP_HARDCORE = { BASE: 0.08, PER_HEAD: 0.015, CAP: 0.3 } as const;
 /**
  * Hiding when they find the place (round 4, playtest Q3: hiding cost nothing
  * and the prepper hid its way through every run): nobody is there to stop
@@ -700,7 +726,7 @@ function stripEmpty(s: GameState, e: Encounter, p: Posture, r: () => number, los
   const belowBase = s.structures.some(st => st.kind === 'bunker_stores' && isFinished(st)) ? 0.3 : p.bunker ? 0.6 : 1;
   // a scout counted the doors: they know there is a stores room below, and dig for it
   const below = Math.min(1, belowBase + (e.scouted ? SCOUT_BELOW_EXTRA : 0) + belowExtra(e.adapt ?? 0));
-  const share = Math.min(0.3, 0.08 + 0.015 * e.size) * (e.temper === 'savage' || e.temper === 'hard' ? 1.3 : 1) * below * (crew ? 1 : e.kind === 'refugees' ? 0.3 : 0.5);
+  const strip = s.disaster.difficulty === 'hardcore' ? STRIP_HARDCORE : STRIP, share = Math.min(strip.CAP, strip.BASE + strip.PER_HEAD * e.size) * (e.temper === 'savage' || e.temper === 'hard' ? 1.3 : 1) * below * (crew ? 1 : e.kind === 'refugees' ? 0.3 : 0.5);
   for (const k of ['fresh', 'canned', 'staples', 'frozen', 'fuel', 'meds'] as const) {
     const t = Math.floor((s.stock[k] ?? 0) * share);
     if (t > 0) { s.stock[k] -= t; lost.push(`${t} ${k}`); }
@@ -984,7 +1010,9 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         for (const n of allies) n.disposition = Math.min(100, n.disposition + 5);
         // word gets around: this place shoots back (more so if they left people on the drive)
         const downed = (b.leftBehind?.wounded ?? 0) + (b.leftBehind?.dead ?? 0) + (b.leftBehind?.surrendered ?? 0);
-        g.respect = Math.min(1, (g.respect ?? 0) + 0.25 + 0.1 * downed);
+        // (walls/hide balance pass) a wall that held with nobody across is the best word to leave on the county road: standing is not only the costly choice
+        const heldFirm = b.result === 'repelled' ? REPELLED_RESPECT : 0;
+        g.respect = Math.min(1, (g.respect ?? 0) + 0.25 + 0.1 * downed + heldFirm);
         g.next = Math.max(g.next, e.day + Math.round(15 + 35 * g.respect));
       } else {
         // (round 4: no second take of their wants here: applyBattle has already taken its 30–90 % share of the stores)

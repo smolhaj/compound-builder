@@ -361,6 +361,11 @@ export function walkBattle(b: Battle, w: NavWorld, o: WalkOpts): WalkResult {
       }
       path = acc ? acc.map(p => ({ x: r2(p.x), z: r2(p.z) })) : null;
     } else path = findPath(w, here, goal, t, speed)?.map(p => ({ x: r2(p.x), z: r2(p.z) })) ?? null;
+    // a climb rides on the LAST leg only: if routing dropped the ladder's foot (it lies within a hand of the top), put it back, or the unit would rise as he walks along the ground
+    if (path && path.length && y && y > 0.05 && vias && vias.length) {
+      const foot = vias[vias.length - 1], last = path[path.length - 1], prev = path.length > 1 ? path[path.length - 2] : here;
+      if (Math.hypot(last.x - prev.x, last.z - prev.z) > 1 && Math.hypot(foot.x - last.x, foot.z - last.z) < 0.8) path = [...path.slice(0, -1), { x: r2(foot.x), z: r2(foot.z) }, last];
+    }
     if (path) path = splitAtTimed(w, here, path);
     if (!path) {
       // shut doors in the way: wait where he stands until the first one that gives a way opens, then go

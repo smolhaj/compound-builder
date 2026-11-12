@@ -14,7 +14,7 @@ import { isFinished } from './construction';
 import type { GameState } from './state';
 
 /** A box is `h` tall from the ground under it. Trees and brush are camera obstacles only: they never stop a round. */
-export interface Box { x0: number; z0: number; x1: number; z1: number; h: number; kind: 'building' | 'wall' | 'tree' | 'brush'; /** Height of the underside above the ground (a tree's crown; default 0). */ y0?: number }
+export interface Box { x0: number; z0: number; x1: number; z1: number; h: number; kind: 'building' | 'wall' | 'tree' | 'brush'; /** Height of the underside above the ground (a tree's crown; default 0). */ y0?: number; /** A wall some rounds go through (sharpened logs): a shot across it is a partial hit, not blocked. */ leaky?: boolean }
 
 export interface P3 { x: number; y: number; z: number }
 type Ground = (x: number, z: number) => number;
@@ -35,6 +35,12 @@ export const WALL_POST = 4.5;
 
 /** Walls and berms that stop a round. Chain-link, wire, pickets and bars, split-rail and a thorn hedge do not (they hide a man, they do not stop a bullet). */
 export const FIRE_SOLID: ReadonlySet<PerimeterKind> = new Set<PerimeterKind>(['log_palisade', 'container_wall', 'container_stack', 'earth_berm', 'steel_wall', 'electric_steel', 'concrete_wall', 'stone_wall']);
+
+/**
+ * Solid walls a rifle round goes through some of the time (balance pass "wall quality"): sharpened logs stop a pistol round and slow a rifle's, they do not
+ * stop it, so a shot at someone behind one is a partial hit (PARTIAL_HIT), not blocked. Steel plate, stone, concrete, containers and earth stop it.
+ */
+export const LEAKY_WALLS: ReadonlySet<PerimeterKind> = new Set<PerimeterKind>(['log_palisade']);
 
 const WALL_THICK = 0.1;
 
@@ -81,7 +87,7 @@ export function fireBoxesOf(g: Pick<GameState, 'structures' | 'perimeter'>): Box
       const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 0.8));
       for (let k = 0; k < n; k++) {
         const x0 = ax + (bx - ax) * k / n, z0 = az + (bz - az) * k / n, x1 = ax + (bx - ax) * (k + 1) / n, z1 = az + (bz - az) * (k + 1) / n;
-        out.push({ x0: Math.min(x0, x1) - WALL_THICK, x1: Math.max(x0, x1) + WALL_THICK, z0: Math.min(z0, z1) - WALL_THICK, z1: Math.max(z0, z1) + WALL_THICK, h: def.height, kind: 'wall' });
+        out.push({ x0: Math.min(x0, x1) - WALL_THICK, x1: Math.max(x0, x1) + WALL_THICK, z0: Math.min(z0, z1) - WALL_THICK, z1: Math.max(z0, z1) + WALL_THICK, h: def.height, kind: 'wall', ...(LEAKY_WALLS.has(run.kind) ? { leaky: true } : {}) });
       }
     }
   }
@@ -203,7 +209,9 @@ export function fireLine(map: FireMap, from: Stance, to: Stance, opts: { ports?:
   const own = { from: opts.ports ? OWN_BOX : 0, to: OWN_BOX };
   const m = muzzleOf(from);
   const chest: P3 = { x: to.x, z: to.z, y: to.y + (to.kneel ? TORSO.kneel : TORSO.stand) };
-  if (!lineOfFire(m, chest, near, ground, own).blocked) return 'clear';
+  const first = lineOfFire(m, chest, near, ground, own);
+  if (!first.blocked) return 'clear';
+  if (first.by?.leaky) return 'partial';   // through the logs: only some rounds find a man behind them
   const head: P3 = { x: to.x, z: to.z, y: to.y + (to.kneel ? HEAD.kneel : HEAD.stand) };
   if (!lineOfFire(m, head, near, ground, own).blocked) return 'partial';
   return 'blocked';

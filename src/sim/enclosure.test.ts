@@ -25,10 +25,12 @@ describe('enclosure', () => {
 
   it('a closed wall round the whole line holds as hard as the wall does', () => {
     const g = game(false);
-    g.perimeter.push(loop(g, 'log_palisade'));
+    g.perimeter.push(loop(g, 'stone_wall'));
     const e = enclosure(g);
     expect(e.openShare).toBe(0);
-    expect(e.barrier).toBeGreaterThan(80);
+    expect(e.barrier).toBeGreaterThan(80);   // (walls/hide balance pass: stone, not a log palisade, is the wall that holds this hard: a palisade closed round the line reads ~30)
+    g.perimeter = [loop(g, 'log_palisade')];
+    expect(enclosure(g).barrier).toBeGreaterThan(20); expect(enclosure(g).barrier).toBeLessThan(45);
     g.perimeter = [loop(g, 'barbed_wire')];
     expect(enclosure(g).barrier).toBeLessThan(40);
   });
@@ -56,7 +58,7 @@ describe('enclosure', () => {
 
   it('a creek through the place is the way in until it is barred at both crossings', () => {
     const g = game(true);
-    g.perimeter.push(loop(g, 'log_palisade'));
+    g.perimeter.push(loop(g, 'stone_wall'));
     const h = g.site.home, midZ = (h.z0 + h.z1) / 2;
     expect(enclosure(g).creekOpen).toBe(2);
     expect(enclosure(g).barrier).toBeLessThanOrEqual(CREEK_OPEN_CAP);
@@ -71,18 +73,18 @@ describe('enclosure', () => {
 
   it('a creek off the place needs no bars', () => {
     const g = game(false);
-    g.perimeter.push(loop(g, 'log_palisade'));
+    g.perimeter.push(loop(g, 'stone_wall'));
     expect(enclosure(g).creekOpen).toBe(0);
   });
 
   it('an unfinished run holds nothing, and the posture reads the closed line', () => {
     const g = game(true);
-    const r = loop(g, 'log_palisade');
+    const r = loop(g, 'stone_wall');
     r.finishedAt = null; r.done = 0.2;
     g.perimeter.push(r);
     expect(enclosure(g).barrier).toBe(0);
     const before = postureOf(g).barrier;
-    g.perimeter = [loop(g, 'log_palisade')];
+    g.perimeter = [loop(g, 'stone_wall')];
     const h = g.site.home, midZ = (h.z0 + h.z1) / 2;
     const open = postureOf(g).barrier;
     g.perimeter.push(run('creek_bars', [[h.x0 + 1, midZ - 3], [h.x0 + 1, midZ + 3]]), run('creek_bars', [[h.x1 - 1, midZ - 3], [h.x1 - 1, midZ + 3]]));
@@ -111,11 +113,11 @@ describe('defense report', () => {
     expect(bare.homes[0].covered).toBe(false);
     expect(bare.walls.find(c => c.id === 'line')?.ok).toBe(false);
     const h = g.site.home, midZ = (h.z0 + h.z1) / 2;
-    g.perimeter.push(loop(g, 'log_palisade'), run('creek_bars', [[h.x0 + 1, midZ - 3], [h.x0 + 1, midZ + 3]]), run('creek_bars', [[h.x1 - 1, midZ - 3], [h.x1 - 1, midZ + 3]]));
+    g.perimeter.push(loop(g, 'stone_wall'), run('creek_bars', [[h.x0 + 1, midZ - 3], [h.x0 + 1, midZ + 3]]), run('creek_bars', [[h.x1 - 1, midZ - 3], [h.x1 - 1, midZ + 3]]));
     const walled = defenseReport(g);
     expect(walled.homes[0].covered).toBe(true);
-    expect(walled.walls.every(c => c.ok || c.id === 'strong')).toBe(true);
+    expect(walled.walls.filter(c => !c.ok && c.id !== 'strong' && c.id !== 'walkway').map(c => c.id)).toEqual([]);   // (a stone wall can carry a patrol deck, a palisade cannot: that one is an extra to-do, not a failure)
     expect(walled.score).toBeGreaterThan(bare.score + 20);
-    expect(walled.improvements.join()).toMatch(/palisade/i);
+    expect(walled.improvements.join()).toMatch(/stone/i);
   });
 });

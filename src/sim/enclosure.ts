@@ -12,7 +12,7 @@
  *    the east). Each crossing needs creek bars; with either open the creek is
  *    the way round every wall and gate, and the barrier can't pass 35.
  */
-import { PERIMETER, PREDATOR_BLOCK, peopleBlock, runFinished, runGrowth, type PerimeterRun, type Pt } from './perimeter';
+import { PERIMETER, PREDATOR_BLOCK, holdScale, peopleBlock, runFinished, runGrowth, type PerimeterRun, type Pt } from './perimeter';
 import type { Rect } from './land';
 import type { GameState } from './state';
 import { GARAGE_HOLD, garageHolds } from './garage';
@@ -96,7 +96,7 @@ export function enclosure(s: GameState, t = s.clock.t, who: Against = 'people'):
   let sum = 0, open = 0;
   const gaps: Pt[] = [];
   for (const [x, z] of ring) {
-    let hold = 0;
+    let hold = 0, strong = 0;
     for (const r of holders) {
       const { d, s: along } = nearest(r.pts, x, z);
       if (d > REACH) continue;
@@ -104,9 +104,11 @@ export function enclosure(s: GameState, t = s.clock.t, who: Against = 'people'):
       // a finished gatehouse garage fills its gap: nearly as good as the wall (steel gates, roll-up doors); for animals it is shut unless somebody is at the gate
       const garaged = !!gate?.garage && garageHolds(s, x, z);
       const gateF = garaged ? (who === 'people' ? GARAGE_HOLD : s.gate.pending ? 0.5 : 1) : gate ? gateHold : 1;
-      hold = Math.max(hold, holdOf(s, r, who) * runGrowth(r, t) * gateF);
+      const h = holdOf(s, r, who) * runGrowth(r, t) * gateF;
+      hold = Math.max(hold, h);
+      strong = Math.max(strong, who === 'people' ? h * holdScale(r.kind) : h);   // (walls matter) the strength of the line is the tier's toughness too; whether it is open is not
     }
-    sum += hold;
+    sum += strong;
     if (hold < openBelow) { open++; if (gaps.length < 8 && (open - 1) % 6 === 0) gaps.push([x, z]); }
   }
   const n = Math.max(1, ring.length), avg = sum / n, openShare = open / n;

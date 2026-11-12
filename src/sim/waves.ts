@@ -36,8 +36,8 @@ export const WAVE = {
   WARN: 3,
   /** Crew size: up to this much bigger at the peak wave (x the difficulty's wave weight). */
   HEADS_ESC: 0.7,
-  /** Crew size: up to this much bigger against a fully defended place (strength 0 = no change). Small on purpose: defense must still pay. */
-  HEADS_DEF: 0.15,
+  /** Crew size: up to this much bigger against a fully defended place (strength 0 = no change). Doubled in the walls/hide balance pass (crews scale with the player's fortification; a taller wall still pays). */
+  HEADS_DEF: 0.3,
   /** Kit (grenades, plate, automatic rifles, a rocket via sim/adaptive.extraKit): the `adapt` number a peak wave carries at weight 1 and full defense; half of it without any. */
   KIT: 0.7,
   /** Waves stop once the county has order again (law track at or above this): there is nobody left to send them. */
