@@ -126,6 +126,23 @@ export function log(s: GameState, text: string): void {
   if (s.log.length > 60) s.log.splice(0, s.log.length - 60);
 }
 
+/**
+ * A load of one good reaches the stockpile a whole unit at a time as it is carried in, not all at once at the end
+ * (QA: 9 fieldstone sat behind 74 hours of carrying a 37-unit pile; a family with day jobs waited a month for them).
+ */
+export function releaseCarried(s: GameState, r: GameState['roadside'][number]): void {
+  if (r.lines.length !== 1) return;
+  const l = r.lines[0], per = CARRY_H[l.material] ?? 0;
+  if (l.food || per <= 0 || l.qty <= 1) return;
+  const k = Math.min(Math.floor(r.done / per + 1e-9), Math.floor(l.qty - 1e-9));
+  if (k < 1) return;
+  receive(s, { ...l, qty: k });
+  l.qty -= k; r.hours -= k * per; r.done -= k * per;
+}
+
+/** Is any of this good sitting at the road waiting to be carried in? */
+export const atTheRoad = (s: GameState, m: MaterialId): boolean => (s.roadside ?? []).some(r => r.lines.some(l => l.material === m && !l.food && l.qty > 0));
+
 /** Carry person-hours of deliveries in from the road (oldest first); returns the hours used. */
 export function addCarryWork(s: GameState, hours: number, wanted?: ReadonlySet<MaterialId>): number {
   let left = hours;
@@ -138,6 +155,7 @@ export function addCarryWork(s: GameState, hours: number, wanted?: ReadonlySet<M
     const r = s.roadside[0];
     const use = Math.min(left, r.hours - r.done);
     r.done += use; left -= use;
+    releaseCarried(s, r);
     if (r.done >= r.hours - 1e-9) {
       for (const l of r.lines) receive(s, l);
       s.roadside.shift();

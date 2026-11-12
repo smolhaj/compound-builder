@@ -123,13 +123,21 @@ export const navStats: { cores: number; direct: number; grids: number; expanded:
 interface Learned { pad: Record<number, { tries: number; ok: number }>; failed: Set<string> }
 const LEARNED = new WeakMap<NavWorld, Learned>();
 const learnedOf = (w: NavWorld): Learned => { let l = LEARNED.get(w); if (!l) { l = { pad: { 3: { tries: 0, ok: 0 }, 8: { tries: 0, ok: 0 } }, failed: new Set() }; LEARNED.set(w, l); } return l; };
-/** The state of the timed doors and breaches at time t, as a number: the same value means the same openings. */
+/**
+ * The state of the timed doors and breaches at time t, as a number: the same value means the same openings AND the same coming changes. A search that fails
+ * only because a door is about to be shut (or a breach not yet through) while the unit is still walking must not poison the same pair of points for the moment
+ * the way is open: the state hash alone is the same before a door's first closing and after its opening, so the next transition is part of it.
+ */
 function openingsAt(w: NavWorld, t: number): number {
-  let h = 17;
-  w.barriers.forEach((b, i) => { if (t < b.openAt + SLACK && t >= (b.from ?? -1)) h = (Math.imul(h, 31) + i + 1) | 0; });
-  w.carves.forEach((c, i) => { if (t >= c.from + SLACK) h = (Math.imul(h, 37) + i + 7) | 0; });
-  return h;
+  let h = 17, next = Infinity;
+  const note = (x: number) => { if (x > t && x < next) next = x; };
+  w.barriers.forEach((b, i) => { if (t < b.openAt + SLACK && t >= (b.from ?? -1)) h = (Math.imul(h, 31) + i + 1) | 0; note(b.from ?? -1); note(b.openAt + SLACK); });
+  w.carves.forEach((c, i) => { if (t >= c.from + SLACK) h = (Math.imul(h, 37) + i + 7) | 0; note(c.from + SLACK); });
+  return next === Infinity ? h : (Math.imul(h, 41) + Math.round(next * 100)) | 0;
 }
+
+/** A leg this short is inside a building or a yard corner: only the smallest search box has cells fine enough to find an interior doorway (about 0.07 wide for a body), so it is never retired. */
+const LOCAL_LEG = 4;
 
 function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[] | null {
   navStats.cores++;
@@ -139,7 +147,7 @@ function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[]
   for (const pad of [3, 8, 24]) {
     // a small box that has almost never found a way in this scene is not tried again: the doorway, wall or creek it keeps running into makes the big box the one that works
     const ps = L.pad[pad];
-    if (ps && ps.tries >= 16 && ps.ok / ps.tries < 0.2) continue;
+    if (ps && ps.tries >= 16 && ps.ok / ps.tries < 0.2 && !(pad === 3 && Math.hypot(b.x - a.x, b.z - a.z) < LOCAL_LEG)) continue;
     const x0 = Math.min(a.x, b.x) - pad, x1 = Math.max(a.x, b.x) + pad, z0 = Math.min(a.z, b.z) - pad, z1 = Math.max(a.z, b.z) + pad;
     const cell = Math.max(0.05, Math.max(x1 - x0, z1 - z0) / 300);
     const nx = Math.ceil((x1 - x0) / cell), nz = Math.ceil((z1 - z0) / cell);
@@ -552,5 +560,8 @@ export function findClips(b: Battle, w: NavWorld, center?: Pt): Clip[] {
 
 /** A tiny world for tests and tools: solid boxes, with the openings simply left out. */
 export function boxWorld(boxes: readonly Rect[], barriers: Barrier[] = [], carves: Carve[] = []): NavWorld {
-  return { solid: (x, z) => boxes.some(b => inRect(b, x, z)), barriers, carves };
+  // (a bucket index: a scene's routing asks this millions of times, and a scan of every box was most of its time)
+  const B = 0.5, key = (i: number, j: number) => i * 8191 + j, buckets = new Map<number, Rect[]>();
+  for (const b of boxes) for (let i = Math.floor(b.x0 / B); i <= Math.floor(b.x1 / B); i++) for (let j = Math.floor(b.z0 / B); j <= Math.floor(b.z1 / B); j++) { const k = key(i, j), a = buckets.get(k); if (a) a.push(b); else buckets.set(k, [b]); }
+  return { solid: (x, z) => { const a = buckets.get(key(Math.floor(x / B), Math.floor(z / B))); if (!a) return false; for (const b of a) if (inRect(b, x, z)) return true; return false; }, barriers, carves };
 }

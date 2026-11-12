@@ -16,10 +16,10 @@ import { enclosure } from './enclosure';
 import { hardenCost } from './hardening';
 import { blueprintOf, isFinished, planProblem } from './construction';
 import { countyWorks, needsPermit, permitFee, reviewDays } from './paperwork';
-import { onOrder, orderCost, prices } from './economy';
+import { onOrder, orderCost, orderProblem, prices } from './economy';
 import { firewoodOutlook } from './heating';
 import { FIT, UTILITY } from './utilities';
-import { stuckProject, stuckAction, linesText, logWait, ESCALATE_DAYS, STALL_DAYS } from './stalls';
+import { roadWait, stuckProject, stuckAction, linesText, logWait, ESCALATE_DAYS, STALL_DAYS } from './stalls';
 import { activeNeeds, needDays } from './needsStuck';
 import { rxStatus } from './body';
 import { driveQuote, fixBill, hookupProblem, pendingFixes } from './improvements';
@@ -31,6 +31,7 @@ import { isAre, materialCount, pluralize } from './words';
 import { crewProblem, crewQuote } from './crews';
 import { crewNudge } from './crewNudge';
 import { idleCash } from './idleCash';
+import { permitWait, permitWaitText } from './permitWait';
 import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind, type Pt } from './perimeter';
 import { MAX_TOWERS, ringStatus } from './fortress';
 import { canHostWalkway } from './walkway';
@@ -301,12 +302,22 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
             why: `The trees you marked will cover it (${pluralize(lw.queued, 'log')} coming). The family fells them in work hours, so keep someone on wood.${idle}`,
             acts: lw.at ? [{ label: 'Show me', act: { type: 'select' as const, id: lw.at } }] : [] }); } }
   // deliveries pile up at the road because there is no drive in: the family carries every load by hand (sim/economy.ts), so say what ends it
-  { const hours = (s.roadside ?? []).reduce((a, r) => a + r.hours - r.done, 0);
-    if (hours >= 24 && !s.site.improvements.drive && hookupProblem(s, 'drive') === null) {
+  { const hours = (s.roadside ?? []).reduce((a, r) => a + r.hours - r.done, 0), rw = roadWait(s);
+    if ((hours >= 24 || (rw && rw.days >= 2)) && !s.site.improvements.drive && hookupProblem(s, 'drive') === null) {
       const q = driveQuote(s.site.improvements, s.site, s.seed);
-      out.push({ id: 'road_pile', kind: '', title: `Put in a gravel drive: ${pluralize(Math.round(hours), 'hour')} of deliveries are waiting at the road`, urgency: 92,
-        why: `There is no drive in, so the truck leaves every order at the road and the family carries it in by hand. A contractor puts in the drive in about ${pluralize(q.days, 'day')} for ${usd(q.usd)}; after that the trucks come to the yard. A hired crew also carries the pile in.`,
-        acts: [{ label: `Hire the drive contractor (${usd(q.usd)})`, act: { type: 'hookup', what: 'drive' } }] }); } }
+      out.push({ id: 'road_pile', kind: '', title: rw ? `The ${rw.label.toLowerCase()} is waiting for ${rw.what}: it is at the road, not on the place` : `Put in a gravel drive: ${pluralize(Math.round(hours), 'hour')} of deliveries are waiting at the road`, urgency: rw && rw.days >= STALL_DAYS ? 95 : 92, ...(rw && rw.days >= ESCALATE_DAYS ? { tone: 'alarm' as const } : {}),
+        why: `There is no drive in, so the truck leaves every order at the road and the family carries it in by hand (${pluralize(Math.round(hours), 'hour')} of carrying in all, done in the hours after the day job). A contractor puts in the drive in about ${pluralize(q.days, 'day')} for ${usd(q.usd)}; after that the trucks come to the yard. A hired crew also carries the pile in.`,
+        acts: [{ label: `Hire the drive contractor (${usd(q.usd)})`, act: { type: 'hookup', what: 'drive' } }, ...(rw?.at ? [{ label: 'Show me', act: { type: 'select' as const, id: rw.at } }] : [])] }); } }
+  // the county is reviewing permits: say what to do with the days (sim/permitWait.ts; the rules themselves are not touched)
+  { const need = plansNeedLines(s), pw = permitWait(s, need);
+    if (pw) {
+      const t = permitWaitText(pw);
+      out.push({ id: 'permit_wait', kind: '', title: t.title, urgency: 56, why: t.why,
+        acts: [
+          ...(pw.lines.length && !orderProblem(s, pw.lines) ? [{ label: `Order what the plans need (${usd(pw.linesUsd)})`, act: { type: 'order' as const, lines: pw.lines } }] : []),
+          ...(pw.tents > 0 ? [{ label: `Buy ${pluralize(pw.tents, 'tent')} (${usd(pw.tentUsd)})`, act: { type: 'order' as const, lines: [{ material: 'tent' as const, qty: pw.tents }] } }] : []),
+          { label: 'Show me', act: { type: 'select' as const, id: pw.longestId } },
+        ] }); } }
   // the family's own hands would take weeks on the house and the cash covers a crew: say so, with the price and a one-click hire (sim/crewNudge.ts)
   { const n = crewNudge(s);
     if (n) out.push({ id: 'house_crew', kind: '', title: n.title, urgency: 93, why: n.why,

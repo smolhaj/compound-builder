@@ -13,7 +13,7 @@ import { crewStep } from './crews';
 import { guardDay } from './guards';
 import { insiderDay } from './insider';
 import { addWork, canGoOn, isFinished } from './construction';
-import { addCarryWork, deliverOrders } from './economy';
+import { addCarryWork, atTheRoad, deliverOrders } from './economy';
 import { stallsDay, wantedNow } from './stalls';
 import { addFixWork, nextFix, siteJobsDay } from './improvements';
 import { addDamageWork, nextDamage } from './raidDamage';
@@ -128,8 +128,10 @@ function subStep(s: GameState): void {
   const fix = target || run || fit || harden ? null : nextFix(s);
   const dmg = target || run || fit || harden || fix ? null : nextDamage(s);
   // deliveries at the road come in before anything else gets built
-  const carry = s.roadside?.length > 0;
-  const wanted = carry && s.roadside.length > 1 ? wantedNow(s) : undefined;
+  // (carrying comes first only while something waits on what is at the road, or there is nothing else to build: a pile of
+  // spare lumber must not hold up the outhouse that only needs a little stone, QA early playtest)
+  const wanted = s.roadside?.length > 0 ? wantedNow(s) : undefined;
+  const carry = s.roadside?.length > 0 && ([...(wanted ?? [])].some(m => atTheRoad(s, m)) || (!target && !run && !fit && !harden && !fix && !dmg));
   const job = nextFellJob(s);
   // with both building and felling to do, the family splits: every other person to the woods
   // the weekender (sim/weekender.ts): the family drives up Friday night and back Sunday afternoon; relatives and anyone taken in stay

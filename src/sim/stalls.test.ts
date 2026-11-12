@@ -105,7 +105,7 @@ describe('a stuck project is loud', () => {
     const { g, st } = roofless();
     noteStalls(g); expect(Object.keys(g.stalls!)).toHaveLength(1);
     st.supplied = true;
-    noteStalls(g); expect(g.stalls).toEqual({});
+    noteStalls(g); g.clock.t += 2; noteStalls(g); expect(g.stalls).toEqual({});   // (a wait is forgotten two days after it ends)
   });
   it('save v82 -> v83 adds the clock', () => {
     const raw = JSON.parse(JSON.stringify(fresh())) as Record<string, unknown> & { version: number };

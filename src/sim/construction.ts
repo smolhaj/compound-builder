@@ -11,7 +11,7 @@ import { permitHold } from './paperwork';
 import { keepsWalls, stampStyle, styledBlueprint } from './housingStyles';
 import { BLUEPRINTS, totalBill } from './blueprints';
 import { hasAll, shortfall, waitingFor, type Stock } from './materials';
-import { log } from './economy';
+import { atTheRoad, log } from './economy';
 import { chronicleUpkeep } from './lineage';
 import { payUpkeep, toolHold, wearTools, workSpeed } from './tools';
 import type { GameState, Structure } from './state';
@@ -64,8 +64,13 @@ export function blockedReason(s: GameState, st: Structure): string | null {
   const need = blueprintOf(st).stages[st.stage].materials;
   if (hasAll(s.stock, need)) return null;
   const miss = shortfall(s.stock, need);
-  return waitingFor(miss);
+  return waitingFor(miss) + (roadWaiting(s, miss) ? ROAD_SUFFIX : '');
 }
+
+/** The note on a wait whose materials were delivered but sit at the road (no drive): they are on the way, not missing. */
+export const ROAD_SUFFIX = ' (at the road: the family is carrying it in by hand)';
+/** Every missing material is already at the road. */
+export const roadWaiting = (s: GameState, miss: Partial<Stock>): boolean => { const k = Object.keys(miss) as Array<keyof Stock>; return k.length > 0 && k.every(m => atTheRoad(s, m)); };
 
 /** `blockedReason(s, st) === null` without building the message (the engine asks this every quarter-hour). */
 export function canGoOn(s: GameState, st: Structure): boolean {

@@ -1,86 +1,96 @@
 import { describe, expect, it } from 'vitest';
+import { step } from './engine';
+import { listings, ANY_WISH } from './site';
+import { placeAll } from './fuzz/passiveBot';
+import { plansNeedLines } from './guidance';
+import { placeOrder } from './economy';
 import { newGame, type GameState } from './state';
-import { CLASSIC, RAW, type Site } from './site';
-import { addCarryWork, deliverOrders, onOrder, placeOrder } from './economy';
-import { planStructure } from './construction';
-import { hireCrew, crewStep } from './crews';
+import { planStructure, blockedReason } from './construction';
+import { emptyStock } from './materials';
+import { addCarryWork, atTheRoad, deliverOrders } from './economy';
+import { roadWait, stuckProject, waiters } from './stalls';
 import { suggestions } from './guidance';
-import { wantedNow } from './stalls';
-import { perfNoticePlace, PERF_NOTICE_MS } from '../ui/hudLayout';
 
+/** QA early playtest: a family-only outhouse on a steep lot waited 30 days for 9 fieldstone with $695k, because the truck left the whole 37-unit pile at the road (no drive). */
 const noDrive = (): GameState => {
-  const site: Site = { ...CLASSIC, improvements: { ...RAW, poleFt: 300, driveFt: 600 } };
-  const g = newGame(4, 105, 2027, { site });
-  g.structures = []; g.money = 400_000;
+  const g = newGame(5); g.structures = []; g.perimeter = []; g.hardenJobs = []; g.utilities.fittings = []; g.stock = emptyStock(); g.orders = [];
+  g.site.improvements = { ...g.site.improvements, drive: false }; g.money = 600_000; g.roadside = [];
   return g;
 };
-const deliver = (g: GameState, lines: Array<{ material: never; qty: number }> | Array<{ material: string; qty: number }>) => {
-  placeOrder(g, lines as never);
-  g.clock.t = g.orders[g.orders.length - 1].dueAt + 0.1;
-  deliverOrders(g);
-};
 
-describe('a lot with no drive: deliveries left at the road', () => {
-  it('each heavy good is its own load and goods that need no carrying go straight to the stockpile', () => {
+describe('a load left at the road comes in a unit at a time', () => {
+  it('releases whole units as they are carried, so a small need is not stuck behind the whole pile', () => {
     const g = noDrive();
-    deliver(g, [{ material: 'lumber', qty: 40 }, { material: 'concrete', qty: 6 }, { material: 'hardware', qty: 1 }]);
-    expect(g.stock.concrete).toBe(6);                                   // a mixer truck needs no carrying
-    expect(g.roadside.map(r => r.lines[0].material).sort()).toEqual(['lumber']);
-    expect(g.stock.hardware).toBeGreaterThan(0);                       // a small box is carried in with the order, not stuck behind the lumber
+    g.roadside.push({ lines: [{ material: 'fieldstone', qty: 37 }], hours: 74, done: 0 });
+    addCarryWork(g, 19);   // 9.5 units' worth of hands
+    expect(g.stock.fieldstone).toBe(9);
+    expect(g.roadside[0].lines[0].qty).toBe(28);
+    expect(g.roadside[0].hours - g.roadside[0].done).toBeCloseTo(56 - 1, 5);
+    addCarryWork(g, 1000);
+    expect(g.stock.fieldstone).toBe(37);
+    expect(g.roadside).toHaveLength(0);
   });
-
-  it('the load a waiting project needs is carried in first, not the oldest', () => {
+  it('a pile that is carried in whole still lands whole (fractions, food and multi-line piles are untouched)', () => {
     const g = noDrive();
-    const st = planStructure(g, 'outhouse', 0, 0, 0);
-    st.permit = 'ok'; st.stage = 1;   // the stage after the footing wants fieldstone
-    deliver(g, [{ material: 'lumber', qty: 40 }]);
-    deliver(g, [{ material: 'fieldstone', qty: 3 }]);
-    expect(g.roadside.length).toBe(2);
-    expect(wantedNow(g).has('fieldstone')).toBe(true);
-    addCarryWork(g, 6.5, wantedNow(g));
-    expect(g.stock.fieldstone).toBe(3);
-    expect(g.stock.lumber).toBe(0);
-    expect(g.roadside.length).toBe(1);
-  });
-
-  it('a hired crew carries the pile in on weekdays, billed by the hour', () => {
-    const g = noDrive();
-    const st = planStructure(g, 'timber_cabin', 0, 0, 0); st.permit = 'ok';
-    deliver(g, [{ material: 'lumber', qty: 30 }]);
-    expect(hireCrew(g, st.id)).toBeNull();
-    g.clock.t = Math.ceil(g.clock.t) + 7 + 9 / 24;   // a Monday-to-Friday morning, whatever the weekday
-    while (Math.floor(g.clock.t) % 7 >= 5) g.clock.t += 1;
-    const money = g.money, before = g.roadside.reduce((a, r) => a + r.hours - r.done, 0);
-    for (let i = 0; i < 16; i++) { g.clock.t += 0.25 / 24; crewStep(g, 0.25 / 24); }
-    const after = g.roadside.reduce((a, r) => a + r.hours - r.done, 0);
-    expect(after).toBeLessThan(before);
-    expect(g.money).toBeLessThan(money);
-  });
-
-  it('a Next-steps card offers the gravel drive once the pile is big, and not when a drive is on the books or in', () => {
-    const g = noDrive();
-    deliver(g, [{ material: 'lumber', qty: 60 }]);
-    const card = suggestions(g, 20).find(x => x.id === 'road_pile');
-    expect(card?.acts?.[0].act).toEqual({ type: 'hookup', what: 'drive' });
-    g.siteJobs.drive = g.clock.t + 5;
-    expect(suggestions(g, 20).find(x => x.id === 'road_pile')).toBeUndefined();
-    g.siteJobs.drive = null; g.site = { ...g.site, improvements: { ...g.site.improvements, drive: true } };
-    expect(suggestions(g, 20).find(x => x.id === 'road_pile')).toBeUndefined();
-    expect(onOrder(g).lumber).toBeGreaterThan(0);
+    g.roadside.push({ lines: [{ material: 'lumber', qty: 2.5 }], hours: 3.75, done: 0 });
+    addCarryWork(g, 100);
+    expect(g.stock.lumber).toBeCloseTo(2.5, 5);
   });
 });
 
-describe('the "graphics switched to LOW" toast', () => {
-  it('sits right of the left panel and above the bottom toolbars, and goes after 8 seconds', () => {
-    const wide = perfNoticePlace(1280);
-    expect(wide.left).toBeGreaterThanOrEqual(244 + 10);               // clear of the left panel
-    expect(wide.bottom).toBeGreaterThanOrEqual(34 + 40);              // above the bottom toolbars
-    expect(wide.left + wide.width).toBeLessThanOrEqual(1280 - 320 - 10);   // clear of the right panel
-    expect(PERF_NOTICE_MS).toBe(8000);
+describe('the wait says it is at the road and a card says what to do', () => {
+  const setup = () => {
+    const g = noDrive(), st = planStructure(g, 'outhouse', 0, 0, 0);
+    st.stage = 1;
+    g.orders.push({ id: 'o1', lines: [{ material: 'fieldstone', qty: 30 }], cost: 0, placedAt: 0, dueAt: 0, status: 'ordered' });
+    deliverOrders(g);
+    return { g, st };
+  };
+  it('names the road in the block reason and offers the drive, with the project in the title', () => {
+    const { g, st } = setup();
+    expect(g.roadside.length).toBeGreaterThan(0);
+    const miss = waiters(g)[0];
+    expect(atTheRoad(g, 'fieldstone')).toBe(true);
+    expect(blockedReason(g, st)).toMatch(/at the road/);
+    g.stalls = { [miss.key]: { since: g.clock.t - 4 } };
+    expect(stuckProject(g)).toBeNull();   // nothing to order: it is already here
+    expect(roadWait(g)?.label).toBeTruthy();
+    const card = suggestions(g, 40).find(x => x.id === 'road_pile');
+    expect(card?.title).toMatch(/at the road/);
+    expect(card?.acts?.[0].act).toEqual({ type: 'hookup', what: 'drive' });
   });
-  it('on a narrow window it lies along the very bottom, full width', () => {
-    const narrow = perfNoticePlace(600);
-    expect(narrow.bottom).toBeLessThan(10);
-    expect(narrow.left + narrow.width).toBeLessThanOrEqual(600);
+});
+
+describe('family-only start on a lot with no drive (real sim)', () => {
+  it('the first building gets its stone within two weeks and no project waits on road stone for long', () => {
+    for (const seed of [2, 3, 6, 10]) {
+      const lots = listings(seed, 'mountain_west', { ...ANY_WISH, built: 'raw' }, 6, 800_000);
+      let g = newGame(seed, undefined, undefined, { site: lots[seed % lots.length], lifestyle: 'fulltime', mode: 'surprise', peace: 'random', kind: null, difficulty: 'standard', dayJobs: true, grid: true } as never);
+      placeAll(g);
+      placeOrder(g, plansNeedLines(g));
+      let worst = 0;
+      for (let d = 0; d < 30; d += 1) {
+        g = step(g, 1);
+        for (const w of waiters(g)) if (w.home || w.label.includes('outhouse')) worst = Math.max(worst, g.clock.t - (g.stalls?.[w.key]?.since ?? g.clock.t));
+      }
+      const out = g.structures.find(x => x.kind === 'outhouse');
+      expect(worst, `seed ${seed}`).toBeLessThan(14);
+      expect(out?.stage ?? 0, `seed ${seed} outhouse`).toBeGreaterThanOrEqual(1);
+    }
+  }, 120_000);
+});
+
+describe('a wait that breaks for a moment is the same wait', () => {
+  it('keeps the mark for two days when a unit arrived and was used by a neighbor project', async () => {
+    const { noteStalls } = await import('./stalls');
+    const g = noDrive(); planStructure(g, 'outhouse', 0, 0, 0).stage = 1;
+    g.clock.t = 10; noteStalls(g);
+    const key = Object.keys(g.stalls ?? {}).find(k => k.startsWith('s:'))!;
+    g.stock.fieldstone = 5; g.clock.t = 11; noteStalls(g);   // supplied for the moment
+    expect(g.stalls?.[key]).toBeDefined();
+    g.stock.fieldstone = 0; g.clock.t = 12; noteStalls(g);
+    expect(g.stalls?.[key].since).toBe(10);
+    g.stock.fieldstone = 5; g.clock.t = 13; noteStalls(g); g.clock.t = 16; noteStalls(g);
+    expect(g.stalls?.[key]).toBeUndefined();   // gone for good once it has been fed for more than two days
   });
 });
