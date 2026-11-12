@@ -698,6 +698,13 @@ export function repeatFinds(s: GameState, e: Pick<Encounter, 'day'>): number {
 
 /** Extra standing in the county (0-1) for a raid that ended 'repelled': the wall held and none of them got over it. */
 export const REPELLED_RESPECT = 0.15;
+/**
+ * A crew that finds the place while the family hides still has to get at the stores: a closed ring that holds (the posture's wall strength, which now
+ * reads the tier) keeps them out of most of it. The share they carry off is cut by up to `MAX` when the barrier is `FULL` or more, and not at all
+ * at `FROM` or less. A palisade ring (barrier ~30) saves almost nothing, a steel or concrete one most of it.
+ */
+export const HIDE_WALL = { FROM: 25, FULL: 90, MAX: 0.65 } as const;
+export const holdOutK = (barrier: number): number => 1 - HIDE_WALL.MAX * Math.max(0, Math.min(1, (barrier - HIDE_WALL.FROM) / (HIDE_WALL.FULL - HIDE_WALL.FROM)));
 
 /** The chance a crew finds the place lived in if the family hides (it shows; a savage crew looks hard; a crew come back knows). */
 export function hideFoundChance(s: GameState, e: Encounter, p: Posture = postureOf(s)): number {
@@ -726,7 +733,7 @@ function stripEmpty(s: GameState, e: Encounter, p: Posture, r: () => number, los
   const belowBase = s.structures.some(st => st.kind === 'bunker_stores' && isFinished(st)) ? 0.3 : p.bunker ? 0.6 : 1;
   // a scout counted the doors: they know there is a stores room below, and dig for it
   const below = Math.min(1, belowBase + (e.scouted ? SCOUT_BELOW_EXTRA : 0) + belowExtra(e.adapt ?? 0));
-  const strip = s.disaster.difficulty === 'hardcore' ? STRIP_HARDCORE : STRIP, share = Math.min(strip.CAP, strip.BASE + strip.PER_HEAD * e.size) * (e.temper === 'savage' || e.temper === 'hard' ? 1.3 : 1) * below * (crew ? 1 : e.kind === 'refugees' ? 0.3 : 0.5);
+  const strip = s.disaster.difficulty === 'hardcore' ? STRIP_HARDCORE : STRIP, share = Math.min(strip.CAP, strip.BASE + strip.PER_HEAD * e.size) * (e.temper === 'savage' || e.temper === 'hard' ? 1.3 : 1) * below * holdOutK(p.barrier) * (crew ? 1 : e.kind === 'refugees' ? 0.3 : 0.5);
   for (const k of ['fresh', 'canned', 'staples', 'frozen', 'fuel', 'meds'] as const) {
     const t = Math.floor((s.stock[k] ?? 0) * share);
     if (t > 0) { s.stock[k] -= t; lost.push(`${t} ${k}`); }
@@ -960,7 +967,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       } else if (!found) { title = 'They never knew'; text = p.bunker ? 'Lights out, everyone down the hatch. Boots on the porch, voices, then the truck pulls away.' : 'Everyone into the timber, flat in the deadfall. Boots on the porch, voices, then the truck pulls away.'; tone = 'good'; }
       else {
         // (round 4) nobody home to stop them: they go through the place at their leisure, not only for what they came for
-        const lost = take(s, e.wants ?? {}, p.bunker ? 1 : 1.5);
+        const lost = take(s, e.wants ?? {}, (p.bunker ? 1 : 1.5) * holdOutK(p.barrier));
         lines.push(...stripEmpty(s, e, p, r, lost));
         title = 'They took what they found'; text = p.bunker ? 'From the bunker you hear them go through the house and the shop.' : 'From the trees you watch them load your supplies into the truck.'; tone = 'bad';
         if (!p.bunker && !p.safeRoom && r() < 0.3) lines.push(wound(s, r, 30, 'hurt running for the timber'));

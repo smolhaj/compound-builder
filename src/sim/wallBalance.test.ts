@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { newGame, type GameState } from './state';
 import { PERIMETER, WALL_HP, WALL_HP_TOP, climbHoldS, climbRateK, holdScale, needsMeans, planRun, wallHp, wallToughness, type PerimeterKind } from './perimeter';
 import { planBattle, MILITIA, wallPostCover, type BattleOptions } from './battle';
-import { HIDE, HIDE_COST_K, REPELLED_RESPECT, STRIP, STRIP_HARDCORE, hideFoundChance, postureOf, repeatFinds, type Encounter } from './encounters';
+import { HIDE, HIDE_COST_K, HIDE_WALL, REPELLED_RESPECT, holdOutK, STRIP, STRIP_HARDCORE, hideFoundChance, postureOf, repeatFinds, type Encounter } from './encounters';
 import { MATERIALS } from './materials';
 import { TOWER_POSTS_CAP, battleTowerPosts } from './towers';
 import { WAVE } from './waves';
@@ -141,6 +141,16 @@ describe('towers do not stack', () => {
     expect(four).toBeGreaterThanOrEqual(one - 0.12);   // more towers than the cap add (almost) nothing
     expect(run(1, 'concrete_wall')).toBeLessThan(four);
   }, 120_000);
+});
+
+describe('a wall that holds still counts when the family hides', () => {
+  it('a found hide loses less of the stores behind a strong closed ring, and nothing is saved behind a weak one', () => {
+    expect(holdOutK(0)).toBe(1); expect(holdOutK(HIDE_WALL.FROM)).toBe(1);
+    expect(holdOutK(100)).toBeCloseTo(1 - HIDE_WALL.MAX, 10); expect(holdOutK(60)).toBeLessThan(holdOutK(40));
+    const barrier = (k: PerimeterKind) => { const g = afterHit(3, false); ring(g, k); return postureOf(g).barrier; };
+    expect(holdOutK(barrier('log_palisade'))).toBeGreaterThan(0.85);   // a palisade ring saves almost nothing
+    expect(holdOutK(barrier('concrete_wall'))).toBeLessThan(0.45);
+  });
 });
 
 describe('standing pays', () => {
