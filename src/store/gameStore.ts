@@ -532,7 +532,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
       n++;
     }
     if (yard && layPropertyWall(g, yard, geo) > 0) n++;
-    if (n) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    if (n) { set({ game: g, welcome: false }); void saveGame(AUTOSAVE, g); }   // (the welcome line has done its job once the player lays the compound)
     return n;
   },
   resumeTo: null,

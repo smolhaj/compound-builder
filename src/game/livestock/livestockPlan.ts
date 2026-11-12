@@ -89,7 +89,8 @@ export function animalGoal(a: { id: string; kind: StockKind }, homes: readonly H
   if (c.raided || night || c.storm) return { x: door.x, z: door.z, inside: true, home: home.id, panic: c.raided };
   // turned out: a spot in the paddock in front of the door, moving on every few game hours
   const k = Math.floor(c.clock / 0.12 + hash(a.id, 4) * 40);
-  const along = (hash(a.id + k, 5) - 0.5) * (home.w + 1.6), out = 0.35 + hash(a.id + k, 6) * (a.kind === 'hen' || a.kind === 'rabbit' ? 0.6 : 1.5);
+  // (a paddock wide enough for the herd to graze apart: about 5 m deep for the big animals, a coop yard for the hens)
+  const small = a.kind === 'hen' || a.kind === 'rabbit', along = (hash(a.id + k, 5) - 0.5) * (home.w + (small ? 1.6 : 4.5)), out = 0.35 + hash(a.id + k, 6) * (small ? 0.6 : 3.2);
   const px = -door.uz, pz = door.ux;      // across the front
   return { x: door.x + door.ux * out + px * along, z: door.z + door.uz * out + pz * along, inside: false, home: home.id, panic: false };
 }

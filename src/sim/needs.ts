@@ -37,7 +37,7 @@ import { socialMorale } from './gatherings';
 import { addFoodKcal, dietDay, dietEffects, eatFrom, inDateKcal, syncPantry } from './pantry';
 import { mulberry32 } from './rng';
 import { dogEffects } from './pets';
-import { sleepEffects } from './housing';
+import { heatOn, sleepEffects } from './housing';
 import { CROPS, fieldFactor, fieldsOf, GROSS, gardenFactor, keepSeed, successionDays } from './crops';
 import { kitchenDay, putByDay } from './kitchen';
 import { pollination } from './bees';
@@ -53,7 +53,7 @@ import { harvestShare } from './sharedHarvest';
 import { caloriesText } from './units';
 import { isRadiationHurt, radiationDay, type RadState } from './radiation';
 import { drinkShare, dryWork, heatFactor, isThirstHurt, thirstDay } from './thirst';
-import { coldDay, isColdHurt, propaneDay } from './cold';
+import { coldDay, isColdHurt, propaneDay, rooflessGain } from './cold';
 import { treated } from './water';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
@@ -358,7 +358,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
     });
     n.hurt = n.hurt.filter(h => h.sev > 0);
     // radiation (repair, acute sickness, a cancer years on), thirst, the cold
-    dh += radiationDay(s, i, p, n, { ...radCare, fed: n.hunger < 5000 }, said) + thirstDay(p, n, share, heat, cozy, said) + coldDay(p, n, sl?.effF, cozy, said);
+    dh += radiationDay(s, i, p, n, { ...radCare, fed: n.hunger < 5000 }, said) + thirstDay(p, n, share, heat, cozy, said) + coldDay(p, n, sl?.effF, cozy, said, rooflessGain(s, heatOn(s)));
     // a diet short of fat or protein (or salt, working hard) keeps health from coming all the way back
     if (n.health + dh > diet.healthCap) dh = Math.min(dh, n.health > diet.healthCap ? -0.2 : diet.healthCap - n.health);
     if (sl) dh -= sl.harm;

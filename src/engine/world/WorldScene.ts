@@ -29,6 +29,7 @@ import {
 import { godRayStrength, milkyWayVisibility, moonAngle, moonIllumination, starVisibility } from './sky/skyState';
 import { phaseWeights, type DayPhase } from './sky/dayPhase';
 import { installSeasonShaderPatch } from './season/seasonShader';
+import { weatherFogAerialScale } from './fog/aerialFog';
 import { NO_HEIGHT_FOG, installHeightFogPatch, setHeightFog as applyHeightFog, type HeightFogParams } from './fog/heightFog';
 
 export type Quality = 'high' | 'medium' | 'low';
@@ -68,8 +69,8 @@ export class WorldScene {
     DAY_SUN: 2.9,
     DAY_SKY: 1.15,
     DAY_FILL: 0.55,
-    NIGHT_SKY: 0.30,
-    NIGHT_FILL: 0.08,
+    NIGHT_SKY: 0.40,
+    NIGHT_FILL: 0.12,
   };
   /** Daytime aerial-perspective haze — pale blue-gray that matches the sky horizon. */
   static readonly FOG_DAY = 0xb4c4d4;
@@ -451,8 +452,8 @@ export class WorldScene {
       fillColor: new THREE.Color(0.60, 0.46, 0.88), rimColor: new THREE.Color(1.0, 0.62, 0.36),
     },
     night: {
-      sun: 0.62, hemi: WorldScene.LIGHT.NIGHT_SKY, fill: WorldScene.LIGHT.NIGHT_FILL, rim: 0.0,
-      hemiSky: new THREE.Color(0.38, 0.52, 0.92), hemiGround: new THREE.Color(0.08, 0.09, 0.14),
+      sun: 0.78, hemi: WorldScene.LIGHT.NIGHT_SKY, fill: WorldScene.LIGHT.NIGHT_FILL, rim: 0.0,
+      hemiSky: new THREE.Color(0.38, 0.52, 0.92), hemiGround: new THREE.Color(0.11, 0.13, 0.20),
       fillColor: new THREE.Color(0.35, 0.45, 0.78), rimColor: new THREE.Color(0.5, 0.6, 0.9),
     },
   } as const;
@@ -571,8 +572,10 @@ export class WorldScene {
     if (this.scene.fog) {
       const fog = this.scene.fog as THREE.FogExp2;
       fog.color.copy(sky.fog);
+      // weather fog thins as the camera climbs (eye level stays stormy, the aerial view stays readable): see weatherFogAerialScale
+      const wk = weatherFogAerialScale(this.camera.position.y);
       fog.density = this._fogConfig.density * (wd + wg * 1.12 + wn * 1.35)
-        * (1 + fogW * 6.5 + wx.rain * 1.4 + wx.snow * 2.2) * (0.8 + 0.5 * hazeW);
+        * (1 + (fogW * 6.5 + wx.rain * 1.4 + wx.snow * 2.2) * wk) * (0.8 + 0.5 * hazeW);
       const r = this._viewRadius;
       if (r > WorldScene.FOG_FULL_RADIUS) {
         fog.density = Math.min(fog.density * (WorldScene.FOG_FULL_RADIUS / r) ** 2, WorldScene.FOG_OVERVIEW_DEPTH / r);
@@ -580,9 +583,12 @@ export class WorldScene {
       fog.density = Math.min(fog.density, WorldScene.FOG_WEATHER_DEPTH / Math.max(1, r));
     }
 
-    applyHeightFog(this._quality === 'low' || !this.scene.fog ? NO_HEIGHT_FOG : this._hfog);
+    // rain, snow and storm: the valley bank and low cloud thin out as the camera climbs, so an aerial view of a storm still shows the compound
+    // (eye level keeps the full wall of weather; a pure fog day, with no precipitation, is left as it is)
+    const hf = this._hfog, precip = Math.min(1, Math.max(wx.rain, wx.snow) * 1.5), hk = 1 - precip * (1 - weatherFogAerialScale(this.camera.position.y));
+    applyHeightFog(this._quality === 'low' || !this.scene.fog ? NO_HEIGHT_FOG : hk >= 0.999 ? hf : { ...hf, bankDensity: hf.bankDensity * hk, cloudDensity: hf.cloudDensity * hk });
 
-    this.scene.environmentIntensity = 0.10 + (1 - wn) * 0.24;
+    this.scene.environmentIntensity = 0.15 + (1 - wn) * 0.19;
     if (this.outdoorLight < 0.999) {
       const k = this.outdoorLight;
       this._sunLight.intensity *= k; this._hemiLight.intensity *= k; this._fillLight.intensity *= k; this._rimLight.intensity *= k;

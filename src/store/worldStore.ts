@@ -66,6 +66,9 @@ export interface WorldState {
   buildingView: BuildingView;
   /** Sightline overlay: off / exposure from the road / from the ridge / night lights / viewshed from a point. */
   sightMode: 'off' | 'road' | 'ridge' | 'night' | 'viewshed';
+  /** The viewshed has a point to look from (picked by a click on the ground); the on-screen hint shows until then. */
+  sightPicked: boolean;
+  setSightPicked: (b: boolean) => void;
   /** The terrain overlay (high ground, lanes, water, sun): game/terrain/TerrainOverlay.ts. */
   terrainMode: 'off' | 'high' | 'lanes' | 'water' | 'sun' | 'shade' | 'fire';
   setTerrainMode: (m: WorldState['terrainMode']) => void;
@@ -172,6 +175,7 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   cameraMode: 'diorama',
   buildingView: 'full',
   sightMode: 'off',
+  sightPicked: false,
   terrainMode: 'off',
   blueprint: false,
   setBlueprint: (blueprint) => set({ blueprint }),
@@ -201,7 +205,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   starterPreview: null,
   setStarterPreview: (starterPreview) => set({ starterPreview }),
   setMarkNearestTrees: (markNearestTrees) => set({ markNearestTrees }),
-  setSightMode: (sightMode) => set({ sightMode }),
+  setSightMode: (sightMode) => set({ sightMode, sightPicked: false }),
+  setSightPicked: (sightPicked) => set({ sightPicked }),
   setTerrainMode: (terrainMode) => set({ terrainMode }),
   setShowBoundary: (showBoundary) => set({ showBoundary }),
   setWeakView: (weakView) => set({ weakView }),
