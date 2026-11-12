@@ -92,7 +92,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     else if (a.type === 'caretaker') { const why = g.money(d => hireCaretaker(d, a.kind)); if (why) setNote(`Could not arrange that: ${why}.`); }
     else if (a.type === 'fire') g.fireAllHands(a.on);
     else if (a.type === 'belt') { const why = g.daily(d => setBelt(d, a.on)); if (why) setNote(why[0].toUpperCase() + why.slice(1) + '.'); }
-    else if (a.type === 'crew') { const id = a.id, st = game.structures.find(x => x.id === id); guard(st ? crewQuote(st).usd : 0, () => { const why = g.hire(id); if (why) setNote(`Could not hire them: ${why}.`); }); }
+    else if (a.type === 'crew') { const id = a.id, st = game.structures.find(x => x.id === id); const lines = a.lines; guard((st ? crewQuote(st).usd : 0) + (lines ? orderCost(lines, prices(game)) : 0), () => { if (lines && !g.order(lines)) { setNote('Could not place that order.'); return; } const why = g.hire(id); if (why) setNote(`Could not hire them: ${why}.`); }); }
     else if (a.type === 'hookup') { const q = a.what === 'drive' ? driveQuote(game.site.improvements, game.site, game.seed).usd : powerQuote(game.site.improvements, game.site).usd; guard(q, () => { const why = g.hookup(a.what); if (why) setNote(`Could not arrange that: ${why}.`); }); }
     else if (a.type === 'shop') g.openShop(true, a.tab);
     else if (a.type === 'open') g.focusHud({ right: a.right, ...(a.supplies ? { supplies: a.supplies } : {}) });
