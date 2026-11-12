@@ -611,7 +611,7 @@ export function gateDay(s: GameState): Encounter | null {
       if (op.kind === 'demand') {
         e.wants = e.wants && Object.keys(e.wants).length ? e.wants : { canned: Math.max(3, e.size), fuel: 1 };
         e.stances = [...e.stances.filter(st => !st.startsWith('flag_')), 'flag_pay', ...(asksPassage(crewKindOf(e.kind)) ? ['flag_pass' as const] : []), 'flag_bluff', 'flag_shoot'];
-        e.dossier = [...e.dossier, 'A man walks up the drive alone with a white rag on a stick. He wants a toll, and says nobody has to get hurt.'];
+        e.dossier = [...e.dossier.filter(l => !/^A man walks up/.test(l)), demandLine(e.kind)];
       } else if (op.kind === 'scouts') {
         op.spotted = mulberry32(s.seed * 4057 + day * 11 + 3)() < scoutSpotted(p.detection, hourOf(s.clock.t) < 6 || hourOf(s.clock.t) >= 20);
         if (op.spotted) e.dossier = [...e.dossier, 'Two men were seen on the ridge, glassing the place, a while before the rest came.'];
@@ -623,6 +623,20 @@ export function gateDay(s: GameState): Encounter | null {
   g.pending = e;
   raiseAlert(s);
   return e;
+}
+
+/**
+ * The line that says how a crew opens with a demand, written for who they are:
+ * a requisition team or a patrol is officials with an order, not a man with a
+ * rag asking for a toll (the dossier used to say both).
+ */
+export function demandLine(kind: string): string {
+  switch (kind) {
+    case 'requisition': return 'The deputy walks up the drive alone, clipboard in hand, and reads the order. He wants a share, and says nobody has to get hurt.';
+    case 'patrol': return 'An officer steps down from the armored car and walks up the drive alone, hands open. He wants a share, and says nobody has to get hurt.';
+    case 'militia': return 'A recruiter walks up the drive alone with a list and a white cloth on his rifle. He wants supplies and a place on the line, and says nobody has to get hurt.';
+    default: return 'A man walks up the drive alone with a white rag on a stick. He wants a toll, and says nobody has to get hurt.';
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────

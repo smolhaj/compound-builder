@@ -11,12 +11,13 @@ import { useCutsceneView } from '../../store/cutsceneStore';
 import type { CutsceneState } from '../../store/gameStore';
 import { hourAfter, locate, sceneCaption, sceneWindow } from '../../sim/siege';
 import { lightLabel } from './lightLabel';
-import { Director, auditPose, poseAt, type PoseAudit, type V3, type Box } from './director';
+import { Director, auditPose, chestOf, poseAt, type PoseAudit, type V3, type Box } from './director';
 import type { BattleRenderer } from './BattleRenderer';
 import type { Battle } from '../../sim/battleTypes';
 import { interiorShot, type CrewPos, type DoorBeat } from './interiorShot';
 import { breachShot } from './breachShot';
 import { liveBreach } from './liveBreach';
+import { setViewPeel } from '../../engine/world/trees/viewPeel';
 
 export interface PlayerDeps {
   battle: BattleRenderer;
@@ -76,7 +77,7 @@ export class CutscenePlayer {
     if (this.active && useBattleStore.getState().battle) useBattleStore.getState().endBattle();
     this.active = false; this._c = null;
     this.d.battle.lightNight = null;
-    liveBreach.clear(); this._setInside(false);
+    liveBreach.clear(); this._setInside(false); setViewPeel(null);
     useCutsceneView.getState().set(null);
   }
 
@@ -109,7 +110,7 @@ export class CutscenePlayer {
     // the card between scenes holds everything still until it is answered
     if (c.offer != null) {
       this._time += dt;
-      this._endBattle();
+      this._endBattle(); setViewPeel(null);
       // (the picture behind the card is its own frame, from the compound's own side, not the last shot of the scene before: the card can stay up a while)
       const house = this.d.house(), k = c.offer;
       if (this._lastKind !== `offer${k}`) { this._dir.variant = 2 * (k + 1) + 1; this._dir.establish(this._time, house, this._road, this.d.ground, { x: house.x, y: 0, z: house.z }, 2 * (k + 1) + 1); this._lastKind = `offer${k}`; }
@@ -184,6 +185,7 @@ export class CutscenePlayer {
     if (battle.playing !== this._wasPlaying) { this._wasPlaying = battle.playing; this._dir.shot = null; this._lastKind = ''; }
     const inner = battle.playing ? (interiorShot(battle.battle?.invasion, battle.time, ground, this._boxes, this._focusOf(battle), this._doorBeats(battle), this._crewOf(battle)) ?? breachShot(battle.battle?.invasion, battle.time, ground, this._boxes)) : null;
     this._setInside(inner?.kind === 'house');
+    this._peel(battle, ground);
     if (inner) {
       this._dir.shot = inner; this._lastKind = 'interior';
       shot = inner;
@@ -196,6 +198,13 @@ export class CutscenePlayer {
     }
     this._publish(false);
     return poseAt(shot, this._time);
+  }
+
+  /** Tell the forest where the people are, so crowns between the lens and them shrink out of the way (viewPeel). */
+  private _peel(battle: BattleRenderer, ground: (x: number, z: number) => number): void {
+    const live = battle.actors().filter(u => !u.dead && !u.gone);
+    if (!live.length) { setViewPeel(null); return; }
+    setViewPeel({ targets: live.slice(0, 24).map(u => chestOf(u, ground)) });
   }
 
   private _ready(b: Battle): Battle {
