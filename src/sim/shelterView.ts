@@ -5,6 +5,7 @@
  */
 import { isFinished } from './construction';
 import { SHELTER_DAYS, doseBetween, shelterOf } from './nuclear';
+import { remText } from './units';
 import type { GameState } from './state';
 
 /** Sickness starts near 1 Sv (sim/needs.ts); under a quarter of that is a clinical non-event. */
@@ -37,15 +38,15 @@ export function shelterRows(s: GameState): ShelterRow[] {
   return rows.sort((a, b) => b.pf - a.pf);
 }
 
-export const doseText = (sv: number): string => (sv < 0.01 ? 'under 0.01 Sv' : `${sv < 1 ? sv.toFixed(2) : sv.toFixed(1)} Sv`);
+export const doseText = (sv: number): string => (sv < 0.01 ? 'under 1 rem' : remText(sv));
 
-/** The label under a building: "PF 40 · 0.10 Sv in 14 days". */
+/** The label under a building: "PF 40 · 10 rem in 14 days". */
 export function radiationSub(r: Pick<ShelterRow, 'pf' | 'doseSv'>): string { return `PF ${Math.round(r.pf).toLocaleString('en-US')} · ${doseText(r.doseSv)} in ${SHELTER_DAYS} days`; }
 
 /** The one-line summary for the readout: the best shelter and the open camp for comparison. */
 export function radiationSummary(s: GameState): string {
   const rows = shelterRows(s), open = shelterDose(s.disaster.variant, 1.5);
-  if (!rows.length) return `No shelter yet: ${doseText(open)} in ${SHELTER_DAYS} days in the open camp (sick from 1 Sv).`;
+  if (!rows.length) return `No shelter yet: ${doseText(open)} in ${SHELTER_DAYS} days in the open camp (sick from 100 rem).`;
   const b = rows[0];
-  return `Best shelter ${b.what} (PF ${Math.round(b.pf)}): ${doseText(b.doseSv)} in ${SHELTER_DAYS} days; the open camp ${doseText(open)}. Sick from 1 Sv.`;
+  return `Best shelter ${b.what} (PF ${Math.round(b.pf)}): ${doseText(b.doseSv)} in ${SHELTER_DAYS} days; the open camp ${doseText(open)}. Sick from 100 rem.`;
 }

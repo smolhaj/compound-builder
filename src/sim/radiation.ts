@@ -34,6 +34,7 @@ import type { GameState } from './state';
 import type { Needs } from './needs';
 import type { Person } from './family';
 import { mulberry32 } from './rng';
+import { remText } from './units';
 
 /** Half-time of repair (days) and the share of dose that is never repaired. */
 export const REPAIR_HALF_DAYS = 30, IRREPARABLE = 0.1;
@@ -157,7 +158,7 @@ export function radiationDay(s: GameState, i: number, p: Person, n: Needs, care:
   // the illness begins (or comes again after a fresh, bigger dose)
   if (eff >= ARS_THRESHOLD && (!rad.ars || (rad.ars.done && eff > rad.ars.dose + 0.5))) {
     rad.ars = { dose: eff, at: day, u: rngFor(s, i, day, 1)() };
-    out.push(`${p.first} is sick to the stomach and can't keep anything down: radiation sickness (${eff.toFixed(1)} Sv).`);
+    out.push(`${p.first} is sick to the stomach and can't keep anything down: radiation sickness (${remText(eff)}).`);
   }
   const a = rad.ars;
   n.hurt = n.hurt.filter(h => !h.what.startsWith('radiation sickness'));

@@ -17,7 +17,7 @@ import { answerCallout, askPact, joinGroup, joinGroupProblem, leaveGroup, leaveP
 import { inPact } from '../sim/pact';
 import { clarity, openRumors, roadRisk, scoutProblem, sendScout } from '../sim/rumors';
 import { pluralize } from '../sim/words';
-import { gallonsText, kmText } from '../sim/units';
+import { gallonsText, kmText, remText } from '../sim/units';
 
 const DIM = 'rgba(238,238,238,0.6)', LINE = 'rgba(255,255,255,0.08)';
 const TONE = { good: '#a8d080', warn: '#f0c070', bad: '#f08060' } as const;
@@ -76,7 +76,7 @@ export function ScavengeSection() {
       const r = riskOf(game, x, Math.max(1, team.length));
       const w = riskWord(r);
       const picked = pickedOver(x);
-      const tip = [`Someone else there ${pct(r.people)}`, x.claim?.known ? `${cap(x.claim.crew)} hold it` : '', `dogs ${pct(r.dogs)}`, `a fall or a nail ${pct(r.hurt)}`, r.fallout > 0 ? `fallout ≈ ${Math.round(r.fallout * 1000)} mSv each` : '', r.sickness > 0 ? `sickness ${pct(r.sickness)}` : ''].filter(Boolean).join(' · ');
+      const tip = [`Someone else there ${pct(r.people)}`, x.claim?.known ? `${cap(x.claim.crew)} hold it` : '', `dogs ${pct(r.dogs)}`, `a fall or a nail ${pct(r.hurt)}`, r.fallout > 0 ? `fallout ≈ ${remText(r.fallout)} each` : '', r.sickness > 0 ? `sickness ${pct(r.sickness)}` : ''].filter(Boolean).join(' · ');
       return <button key={x.id} onClick={() => setSel(x.id === sel ? null : x.id)} title={tip}
         style={{ display: 'block', width: '100%', textAlign: 'left', padding: '4px 6px', marginBottom: 2, borderRadius: 6, border: 0, cursor: 'pointer', background: x.id === sel ? 'rgba(216,201,160,0.22)' : 'rgba(255,255,255,0.04)', color: '#eee', fontSize: 12 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><span>{cap(x.name)}</span><span style={{ color: DIM }}>{kmText(x.km)}</span></div>

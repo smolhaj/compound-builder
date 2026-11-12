@@ -46,4 +46,15 @@ describe('units', () => {
   it('per 100 ft cost', () => {
     expect(Math.round(U.perHundredFeet(1000))).toBe(305);
   });
+  it('radiation reads in rem, mrem and curies (1 Sv = 100 rem)', () => {
+    expect(U.remText(0.0034)).toBe('340 mrem');
+    expect(U.remText(0.025)).toBe('2.5 rem');
+    expect(U.remText(0.5)).toBe('50 rem');
+    expect(U.remText(4)).toBe('400 rem');
+    expect(U.remText(0)).toBe('0 mrem');
+    expect(U.remRateText(0.0123)).toBe('1.2 rem/h');
+    expect(U.remRateText(0.0004)).toBe('40 mrem/h');
+    expect(U.curieText(3.7e10)).toBe('1 Ci');
+    expect(U.curieText(3.7e7)).toBe('1 mCi');
+  });
 });

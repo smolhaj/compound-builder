@@ -48,8 +48,8 @@ describe('shelter view', () => {
     expect(bp.readout.radiation).toContain('Best shelter the root cellar');
   });
   it('text', () => {
-    expect(doseText(0.004)).toBe('under 0.01 Sv'); expect(doseText(0.5)).toBe('0.50 Sv'); expect(doseText(2.34)).toBe('2.3 Sv');
-    expect(radiationSub({ pf: 1234, doseSv: 0.1 })).toBe('PF 1,234 · 0.10 Sv in 14 days');
+    expect(doseText(0.004)).toBe('under 1 rem'); expect(doseText(0.5)).toBe('50 rem'); expect(doseText(2.34)).toBe('234 rem');
+    expect(radiationSub({ pf: 1234, doseSv: 0.1 })).toBe('PF 1,234 · 10 rem in 14 days');
     const g = nuclearGame(); g.structures.length = 0;
     expect(radiationSummary(g)).toContain('No shelter yet');
   });

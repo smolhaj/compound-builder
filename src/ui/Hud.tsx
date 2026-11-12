@@ -100,7 +100,7 @@ import { getViolence, setViolence, type Violence } from '../game/battle/bloodFx'
 import { getNames, setNames, getPips, setPips } from '../game/battle/nameLabels';
 import { useFeelStore, saveRevealed, worldId } from '../store/feelStore';
 import { visibleTabs, type RightTab } from '../sim/tabReveal';
-import { caloriesText, feetText, gallonsText, kmText, lengthText } from '../sim/units';
+import { caloriesText, feetText, gallonsText, kmText, lengthText, remRateText, remText } from '../sim/units';
 
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
 
@@ -294,7 +294,7 @@ export function Hud() {
               const st = game.personState[i], n = st?.needs;
               if (n?.left) return null;   // moved away (sim/newcomers.ts): not on the roll, noted under Newcomers
               const bar = (v: number, c: string, t: string) => <div title={t} style={{ flex: 1, height: 4, background: '#333', borderRadius: 2 }}><div style={{ width: `${Math.max(0, v)}%`, height: '100%', background: c, borderRadius: 2 }} /></div>;
-              const notes = n && n.died == null ? [n.hunger > 5000 ? 'hungry' : '', ...n.hurt.map(h => h.med ? `${h.what} (${h.med.care})` : h.trauma ? `${h.what}: ${treating ? 'being treated' : 'needs dressings and antibiotics'}` : h.what), n.dose > 0.05 ? `${n.dose.toFixed(2)} Sv (${effectiveDose(n).toFixed(2)} not yet repaired)` : ''].filter(Boolean).join(', ') : '';
+              const notes = n && n.died == null ? [n.hunger > 5000 ? 'hungry' : '', ...n.hurt.map(h => h.med ? `${h.what} (${h.med.care})` : h.trauma ? `${h.what}: ${treating ? 'being treated' : 'needs dressings and antibiotics'}` : h.what), n.dose > 0.05 ? `${remText(n.dose)} (${remText(effectiveDose(n))} not yet repaired)` : ''].filter(Boolean).join(', ') : '';
               return <div key={p.id} style={{ padding: '5px 0', borderBottom: `1px solid ${LINE}` }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
                   <span><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 4, background: '#' + p.shirt.toString(16).padStart(6, '0'), marginRight: 6 }} />{fullName(p)}, {p.age}{p.rel && <span style={{ color: DIM, fontSize: 11 }}> · {kinTitle(p, game.people)}</span>}{p.origin && <span style={{ color: DIM, fontSize: 11 }}> · {originLabel(game, p)}</span>}{backgroundOf(p) && <span style={{ color: '#c9b27a', fontSize: 11 }}> · {BACKGROUND_NAME[backgroundOf(p)!]}</span>}</span>
@@ -583,7 +583,7 @@ export function Hud() {
                 {isNuclear(game) && (() => {
                   const h = (game.clock.t - game.disaster.hitAt) * 24, rate = doseRate(game.disaster.variant, h) * 1000, [pf, where] = bestShelter(game);
                   return <>
-                    <Row label="Outside" value={`${rate >= 10 ? Math.round(rate) : rate.toFixed(1)} mSv/h`} tone={rate > 10 ? 'bad' : rate > 1 ? 'warn' : 'good'} />
+                    <Row label="Outside" value={remRateText(rate / 1000)} tone={rate > 10 ? 'bad' : rate > 1 ? 'warn' : 'good'} />
                     {h < SHELTER_DAYS * 24 && <Row label="Sheltering" value={`${where} (PF ${Math.round(pf).toLocaleString('en-US')})`} />}
                     {h < SHELTER_DAYS * 24 && <Note>Out to work in {pluralize(Math.ceil(SHELTER_DAYS - h / 24), 'day')} (by then it's a hundredth of day one)</Note>}
                   </>;
