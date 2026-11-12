@@ -57,3 +57,17 @@ describe('a creek between the barns', () => {
     for (const a of r.animals()) { if (a.x < 25) expect(a.inside).toBe(true); expect(Math.abs(a.x - 25)).toBeGreaterThan(0.4); }
   });
 });
+
+describe('the herd is spread out', () => {
+  it('no two animals in the field are sent to the same spot, and none to the strip the barn stands on', () => {
+    const r = new LivestockRenderer(new THREE.Scene());
+    const stock = { cow: 8, sheep: 8, pig: 8, goat: 8 };
+    const one: Home[] = [{ id: 'b', kind: 'barn', x: 10, z: 0, rot: 0, w: 3, d: 4, depth: 0 }];
+    for (let i = 0; i < 4000; i++) r.update(0.1, stock, 0, one, c({ clock: 5 }), ctx, 1);
+    const out = r.animals().filter(a => !a.inside);
+    expect(out.length).toBe(32);
+    let min = Infinity;
+    for (let i = 0; i < out.length; i++) for (let j = i + 1; j < out.length; j++) min = Math.min(min, Math.hypot(out[i].x - out[j].x, out[i].z - out[j].z));
+    expect(min).toBeGreaterThan(0.12);
+  });
+});

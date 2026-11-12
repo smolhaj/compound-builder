@@ -6,23 +6,24 @@
  */
 import * as THREE from 'three';
 import type { Pt } from '../../sim/pathRoute';
-import { animalGoal, drawnHerd, type AnimalGoal, type Home, type HerdCtx, type StockKind } from './livestockPlan';
+import { animalGoal, doorOf, drawnHerd, type AnimalGoal, type Home, type HerdCtx, type StockKind } from './livestockPlan';
 import { slopePace } from '../paths/walkRoute';
 import { climbLimit, gradeBetween } from '../paths/groundMovers';
+import { bodyGeometry, headGeometry, legGeometry } from './livestockGeometry';
 
 const CAP = 64;
 const LEGS = 4;
 
-interface Look { h: number; len: number; wid: number; col: number; head: number; speed: number; legK: number }
+interface Look { h: number; len: number; wid: number; col: number; head: number; speed: number; legK: number; /** Neck angle above the horizontal (rad). */ up: number }
 /** Size (world units), colour and pace (units per second at 1x) of each kind. */
 export const LOOK: Record<StockKind, Look> = {
-  cow: { h: 0.23, len: 0.3, wid: 0.075, col: 0x9a6a46, head: 0.05, speed: 0.17, legK: 0.45 },
-  steer: { h: 0.21, len: 0.28, wid: 0.07, col: 0x7a4a2e, head: 0.048, speed: 0.17, legK: 0.45 },
-  goat: { h: 0.12, len: 0.15, wid: 0.045, col: 0xd9d2c2, head: 0.027, speed: 0.22, legK: 0.5 },
-  sheep: { h: 0.12, len: 0.16, wid: 0.065, col: 0xe6e0d2, head: 0.027, speed: 0.2, legK: 0.35 },
-  pig: { h: 0.11, len: 0.2, wid: 0.07, col: 0xe0a39a, head: 0.035, speed: 0.2, legK: 0.3 },
-  rabbit: { h: 0.045, len: 0.07, wid: 0.025, col: 0xb9a48a, head: 0.016, speed: 0.28, legK: 0.3 },
-  hen: { h: 0.065, len: 0.07, wid: 0.03, col: 0x9a5a34, head: 0.014, speed: 0.2, legK: 0.35 },
+  cow: { h: 0.23, len: 0.3, wid: 0.075, col: 0x9a6a46, head: 0.042, speed: 0.17, legK: 0.45, up: 0.35 },
+  steer: { h: 0.21, len: 0.28, wid: 0.07, col: 0x7a4a2e, head: 0.04, speed: 0.17, legK: 0.45, up: 0.35 },
+  goat: { h: 0.12, len: 0.15, wid: 0.045, col: 0xd9d2c2, head: 0.024, speed: 0.22, legK: 0.5, up: 0.65 },
+  sheep: { h: 0.12, len: 0.16, wid: 0.065, col: 0xe6e0d2, head: 0.024, speed: 0.2, legK: 0.35, up: 0.5 },
+  pig: { h: 0.11, len: 0.2, wid: 0.07, col: 0xe0a39a, head: 0.03, speed: 0.2, legK: 0.3, up: -0.15 },
+  rabbit: { h: 0.045, len: 0.07, wid: 0.025, col: 0xb9a48a, head: 0.016, speed: 0.28, legK: 0.3, up: 0.5 },
+  hen: { h: 0.065, len: 0.07, wid: 0.03, col: 0x9a5a34, head: 0.014, speed: 0.2, legK: 0.35, up: 1.0 },
 };
 
 interface Agent {
@@ -37,6 +38,34 @@ interface Agent {
 const tmpM = new THREE.Matrix4(), tmpL = new THREE.Matrix4(), tmpB = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpE = new THREE.Euler(),
   tmpV = new THREE.Vector3(), tmpS = new THREE.Vector3(), tmpC = new THREE.Color();
 const hash = (s: string, k: number): number => { let h = 2166136261 ^ k; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return ((h >>> 0) % 10000) / 10000; };
+
+/**
+ * Keep the animals apart: the spots they are sent to (a hash in front of the barn) are pushed apart until no two bodies touch, and kept out of the
+ * strip in front of the door where the building stands. Only the ones out in the field (not going in, not on the alarm) are moved. Pure (tested).
+ */
+export function spreadGoals(herd: ReadonlyArray<{ id: string; kind: StockKind }>, goals: AnimalGoal[], homes: readonly Home[]): void {
+  const idx: number[] = [];
+  for (let i = 0; i < goals.length; i++) if (!goals[i].inside && !goals[i].panic) idx.push(i);
+  const rad = (i: number): number => LOOK[herd[i].kind].len * 0.5 + 0.04;
+  const byId = new Map(homes.map(h => [h.id, h]));
+  for (let it = 0; it < 14; it++) {
+    for (let p = 0; p < idx.length; p++) for (let q = p + 1; q < idx.length; q++) {
+      const A = goals[idx[p]], B = goals[idx[q]];
+      let dx = B.x - A.x, dz = B.z - A.z, d = Math.hypot(dx, dz);
+      const need = rad(idx[p]) + rad(idx[q]);
+      if (d >= need) continue;
+      if (d < 1e-4) { const t = (p * 7 + q * 3) * 0.9; dx = Math.cos(t); dz = Math.sin(t); d = 1; }
+      const push = (need - d) / 2 + 0.002;
+      A.x -= dx / d * push; A.z -= dz / d * push; B.x += dx / d * push; B.z += dz / d * push;
+    }
+    for (const i of idx) {
+      const g = goals[i], home = g.home ? byId.get(g.home) : undefined;
+      if (!home) continue;
+      const door = doorOf(home), out = (g.x - door.x) * door.ux + (g.z - door.z) * door.uz, min = 0.3 + LOOK[herd[i].kind].len * 0.5;
+      if (out < min) { g.x += door.ux * (min - out); g.z += door.uz * (min - out); }
+    }
+  }
+}
 
 export interface LivestockCtx {
   ground: (x: number, z: number) => number;
@@ -58,7 +87,7 @@ export class LivestockRenderer {
 
   constructor(scene: THREE.Scene) {
     this._scene = scene;
-    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0 });
+    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0, vertexColors: true });
     const mk = (name: string, g: THREE.BufferGeometry, per: number): THREE.InstancedMesh => {
       const m = new THREE.InstancedMesh(g, mat, CAP * per);
       m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -68,10 +97,9 @@ export class LivestockRenderer {
       scene.add(m);
       return m;
     };
-    const ball = new THREE.SphereGeometry(1, 10, 7);
-    this._body = mk('body', ball, 2);     // (body and neck: instances, not draws)
-    this._head = mk('head', ball, 1);
-    this._leg = mk('leg', new THREE.CylinderGeometry(1, 0.7, 1, 6).translate(0, -0.5, 0), LEGS);
+    this._body = mk('body', bodyGeometry(), 1);
+    this._head = mk('head', headGeometry(), 1);          // (neck, skull, muzzle and ears are one merged mesh)
+    this._leg = mk('leg', legGeometry(), LEGS);
   }
 
   /** Where the animals are (QA / tests). */
@@ -86,9 +114,11 @@ export class LivestockRenderer {
     this._age += dt;
     if (this._age > 90) { this._age = 0; for (const a of this._agents.values()) a.noWay.clear(); }     // (the layout may have changed: look again)
     const k = Math.max(1, Math.min(3, speedK));
-    for (const h of herd) {
+    const goals = herd.map(h => animalGoal(h, homes, c, this._agents.get(h.id)?.noWay));
+    spreadGoals(herd, goals, homes);
+    for (let gi = 0; gi < herd.length; gi++) {
+      const h = herd[gi], goal = goals[gi];
       let a = this._agents.get(h.id);
-      const goal = animalGoal(h, homes, c, a?.noWay);
       if (!a) {
         // a new animal starts at its own spot (a load puts everyone where they belong)
         a = { id: h.id, kind: h.kind, x: goal.x, z: goal.z, rot: hash(h.id, 9) * 6.28, phase: hash(h.id, 8) * 6, tone: hash(h.id, 7), via: [], viaFor: '', wait: 0, inside: goal.inside, v: 0, noWay: new Set(), homeId: goal.home };
@@ -153,21 +183,19 @@ export class LivestockRenderer {
         tmpM.multiplyMatrices(tmpB, tmpL);
       };
       const bodyCol = a.kind === 'cow' ? [0xe6e0d4, 0x9a6a46, 0x5a4636, 0xc9b79a][Math.floor(hash(a.id, 1) * 4)] : L.col;
-      loc(0, by, 0, 0, L.wid * 0.55, bh, L.len / 2);
+      // wool and fat make a sheep and a pig a little rounder than the frame under them
+      const fat = a.kind === 'sheep' ? 1.18 : a.kind === 'pig' ? 1.1 : 1;
+      loc(0, by, 0, 0, L.wid * 0.55 * fat, bh * fat, L.len / 2);
       put(this._body, nb++, bodyCol, a.tone);
       const grazing = a.v < 0.01 && hash(a.id, 6) < 0.7 && Math.sin(a.phase * 0.1 + hash(a.id, 5) * 9 + performance.now() / 2600) > 0.1;
-      const bird = a.kind === 'hen';
-      const hy = by + (grazing ? -bh * 0.55 : bh * (bird ? 0.7 : 0.8)), hz = L.len / 2 + L.head * (bird ? 0.4 : 1.3);
-      // the neck: a short slab from the shoulder up (or down, grazing) to the head
-      const ny = (by + bh * 0.3 + hy) / 2, nz = L.len / 2 - L.head * 0.2, tilt = grazing ? 0.9 : -0.7;
-      loc(0, ny, nz, tilt, L.wid * 0.38, L.head * 1.0, L.head * 1.5);
-      put(this._body, nb++, bodyCol, a.tone);
-      loc(0, hy, hz, 0, L.head, L.head * 0.9, L.head * 1.3);
-      put(this._head, nh++, a.kind === 'cow' ? 0xb08a6a : a.kind === 'sheep' ? 0x4a4036 : L.col, a.tone);
+      // the neck is part of the head mesh: it starts at the withers and runs up (or down, grazing) to the skull
+      const th = grazing ? -0.95 : L.up, nk = 2.6 * L.head;
+      loc(0, by + bh * 0.45 + Math.sin(th) * nk, L.len * 0.4 + Math.cos(th) * nk, -th, L.head, L.head, L.head);
+      put(this._head, nh++, a.kind === 'cow' ? 0xc9a98a : a.kind === 'sheep' ? 0x6a5c4c : L.col, a.tone);
       for (let i = 0; i < LEGS; i++) {
         const fz = (i < 2 ? 1 : -1) * L.len * 0.3, fx = (i % 2 ? 1 : -1) * L.wid * 0.6, sw = swing * ((i < 2) === (i % 2 === 0) ? 1 : -1), r = Math.max(0.007, L.h * 0.085);
         loc(fx, by - bh * 0.2, fz, sw, r, by - bh * 0.2, r);
-        put(this._leg, nl, a.kind === 'sheep' ? 0x3a3631 : L.col, a.tone * 0.6);
+        put(this._leg, nl, a.kind === 'sheep' ? 0x4a4540 : bodyCol, a.tone * 0.7);
         nl++;
       }
     }

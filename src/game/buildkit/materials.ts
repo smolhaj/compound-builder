@@ -50,9 +50,9 @@ export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' 
   // a house's shipping container, painted (less metal sheen than the perimeter's)
   | 'shell_blue' | 'shell_rust' | 'shell_tan' | 'shell_green';
 
-/** World units covered by one texture repeat. */
+/** World units covered by one texture repeat. Fieldstone: 0.14 u (84 cm) a repeat, so a stone is 5-12 cm in world units (30-70 cm was bigger than a head). */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
-  timber_lap: 0.5, fieldstone: 0.5, metal_roof: 0.5, metal_roof_green: 0.5, metal_roof_grey: 0.5, adobe: 0.9, plaster: 0.5, deck: 0.5, door: 0.2,
+  timber_lap: 0.5, fieldstone: 0.14, metal_roof: 0.5, metal_roof_green: 0.5, metal_roof_grey: 0.5, adobe: 0.9, plaster: 0.5, deck: 0.5, door: 0.2,
   curtain: 0.15, curtain_red: 0.15, hedge: 0.25, hedge2: 0.25,
   pine_panel: 0.5, quilt_red: 0.12, quilt_blue: 0.12, rug: 0.3, books: 0.1,
   lap_white: 0.5, vinyl: 0.5, shingle: 0.5,
