@@ -150,20 +150,28 @@ function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[]
     let si = gi(a.x), sj = gj(a.z), ti = gi(b.x), tj = gj(b.z);
     let s = idx(si, sj), goal = idx(ti, tj);
     const g = new Float32Array(nx * nz).fill(Infinity), from = new Int32Array(nx * nz).fill(-1), closed = new Uint8Array(nx * nz);
-    const heap: Array<[number, number]> = [];   // [f, node]
-    const push = (f: number, n: number) => { heap.push([f, n]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
-    const pop = (): [number, number] => { const top = heap[0], last = heap.pop()!; if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top; };
-    const memo = new Map<number, boolean>();
+    // (a binary heap in two flat arrays: a search pushes millions of entries, and a pair object per push was most of its time)
+    const hf: number[] = [], hn: number[] = [];
+    const push = (f: number, n: number) => { let i = hf.length; hf.push(f); hn.push(n); while (i > 0) { const p = (i - 1) >> 1; if (hf[p] <= f) break; hf[i] = hf[p]; hn[i] = hn[p]; i = p; } hf[i] = f; hn[i] = n; };
+    const pop = (): number => {
+      const top = hn[0], lf = hf.pop()!, ln = hn.pop()!, len = hf.length;
+      if (len) { let i = 0; for (;;) { const l = 2 * i + 1; if (l >= len) break; const r = l + 1, m = r < len && hf[r] < hf[l] ? r : l; if (hf[m] >= lf) break; hf[i] = hf[m]; hn[i] = hn[m]; i = m; } hf[i] = lf; hn[i] = ln; }
+      return top;
+    };
+    const memo = new Uint8Array(nx * nz);   // 0 unknown, 1 open, 2 solid
+    // (only the doors and breaches that touch this box can matter to a cell in it)
+    const hits = (r: Rect) => r.x1 >= x0 && r.x0 <= x1 && r.z1 >= z0 && r.z0 <= z1;
+    const bars = w.barriers.filter(hits), cars = w.carves.filter(hits);
     const free = (i: number, j: number, te: number) => {
       // (the start and goal cells are always allowed: the caller has already put both on open ground)
       const n = idx(i, j);
       if (n === s || n === goal) return true;
       // static solidity is cached; barriers and carves are timed
-      let st = memo.get(n);
-      if (st === undefined) { st = w.solid(cx(i), cz(j)); memo.set(n, st); }
-      for (const bar of w.barriers) if (te < bar.openAt + SLACK && te >= (bar.from ?? -1) && inRect(bar, cx(i), cz(j))) return false;
-      if (!st) return true;
-      for (const c of w.carves) if (te >= c.from + SLACK && inRect(c, cx(i), cz(j))) return true;
+      let st = memo[n];
+      if (st === 0) { st = w.solid(cx(i), cz(j)) ? 2 : 1; memo[n] = st; }
+      if (bars.length) for (const bar of bars) if (te < bar.openAt + SLACK && te >= (bar.from ?? -1) && inRect(bar, cx(i), cz(j))) return false;
+      if (st === 1) return true;
+      if (cars.length) for (const c of cars) if (te >= c.from + SLACK && inRect(c, cx(i), cz(j))) return true;
       return false;
     };
     // (a start or goal tight against a corner can sit in a grid cell whose neighbours are all solid: snap it to the nearest open cell with a clear straight line)
@@ -205,26 +213,28 @@ function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[]
       return true;
     };
     if (pocket(s, goal) || pocket(goal, s)) continue;
-    g.fill(Infinity); heap.length = 0; g[s] = 0; push(Math.hypot(cx(ti) - cx(si), cz(tj) - cz(sj)), s);
+    g.fill(Infinity); hf.length = 0; hn.length = 0; g[s] = 0; push(Math.hypot(cx(ti) - cx(si), cz(tj) - cz(sj)), s);
     let found = false;
     navStats.grids++; const exp0 = navStats.expanded; navStats.pad[pad].tries++; if (L.pad[pad]) L.pad[pad].tries++;
-    while (heap.length) {
-      const [, n] = pop();
+    const nfree = [false, false, false, false, false, false, false, false];
+    const DI = [-1, 0, 1, -1, 1, -1, 0, 1], DJ = [-1, -1, -1, 0, 0, 1, 1, 1];
+    while (hf.length) {
+      const n = pop();
       if (closed[n]) continue;
       closed[n] = 1;
       navStats.expanded++;
       if (n === goal) { found = true; break; }
       const ci = n % nx, cj = (n - ci) / nx, te = t + g[n] * cell / speed;
-      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
-        if (!di && !dj) continue;
-        const ni = ci + di, nj = cj + dj;
-        if (ni < 0 || nj < 0 || ni >= nx || nj >= nz) continue;
-        const m = idx(ni, nj);
-        if (closed[m] || !free(ni, nj, te)) continue;
-        // no cutting a corner
-        if (di && dj && (!free(ci + di, cj, te) || !free(ci, cj + dj, te))) continue;
-        const step = di && dj ? 1.4142 : 1, ng = g[n] + step;
-        if (ng < g[m]) { g[m] = ng; from[m] = n; push(ng + Math.hypot(cx(ti) - cx(ni), cz(tj) - cz(nj)), m); }
+      // (each neighbour is tested once; the two straight neighbours of a diagonal are the same tests)
+      for (let k = 0; k < 8; k++) { const ni = ci + DI[k], nj = cj + DJ[k]; nfree[k] = ni >= 0 && nj >= 0 && ni < nx && nj < nz && free(ni, nj, te); }
+      for (let k = 0; k < 8; k++) {
+        if (!nfree[k]) continue;
+        const di = DI[k], dj = DJ[k], ni = ci + di, nj = cj + dj, m = idx(ni, nj);
+        if (closed[m]) continue;
+        // no cutting a corner: the two straight neighbours must be open (k: 0 1 2 / 3 . 4 / 5 6 7)
+        if (di && dj && (!nfree[dj < 0 ? 1 : 6] || !nfree[di < 0 ? 3 : 4])) continue;
+        const ng = g[n] + (di && dj ? 1.4142 : 1);
+        if (ng < g[m]) { g[m] = ng; from[m] = n; { const hx = (ti - ni) * cell, hz = (tj - nj) * cell; push(ng + Math.sqrt(hx * hx + hz * hz), m); } }
       }
     }
     navStats.pad[pad].expanded += navStats.expanded - exp0;
