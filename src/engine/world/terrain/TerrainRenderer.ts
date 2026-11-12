@@ -374,6 +374,30 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
         float camDc = length(vRPos - cameraPosition);
         float nearK = 1.0 - smoothstep(250.0, 500.0, camDc);   // fine detail only where it resolves
         vec3 rockC = uRock * (0.68 + 0.5 * na) * (0.85 + 0.3 * mix(0.5, nc, nearK)) * (1.0 + nearK * 0.1 * sin(alt * 0.55 + na * 7.0));
+        // Rock face detail (the cliff band is a few units tall, far finer than the ranges' own noise): sedimentary strata that warp and pinch out,
+        // warm ochre / cool grey tints between them, rust-and-dark water streaks down the face, and lichen on the ledges and flats. Procedural, no extra draws.
+        if (rk > 0.01) {
+          float fineK = 1.0 - smoothstep(70.0, 330.0, camDc);
+          float warp = rNoise(vRPos.xz * 0.35 + vRPos.y * 0.2) * 1.6 + rNoise(vRPos.xz * 1.3) * 0.4;
+          float sPh = alt * 2.1 + warp * 2.0;
+          float strata = 0.5 + 0.5 * sin(sPh * 3.14159) * (0.6 + 0.4 * sin(sPh * 0.53 + 1.3));
+          float bandId = floor(sPh);
+          float bandT = rHash(vec2(bandId, 17.0));
+          vec3 warmT = vec3(1.18, 1.02, 0.80), coolT = vec3(0.86, 0.92, 1.0);
+          vec3 tint = mix(coolT, warmT, bandT);
+          float grain = rTriN(vRPos, tw, 1.7) * 0.6 + rTriN(vRPos, tw, 5.3) * 0.4;
+          vec3 detail = tint * (0.9 + 0.2 * strata) * (0.86 + 0.28 * grain);
+          rockC *= mix(vec3(1.0), detail, fineK * 0.85);
+          // vertical streaks where water runs
+          float streak = rNoise(vec2((vRPos.x + vRPos.z) * 2.6, alt * 0.18 + rNoise(vRPos.xz * 0.7) * 0.5));
+          rockC *= 1.0 - 0.32 * smoothstep(0.55, 0.85, streak) * fineK * smoothstep(0.1, 0.35, slope);
+          // lichen: yellow-green crust on the flatter ledges, patchy
+          float lich = smoothstep(0.58, 0.74, rNoise(vRPos.xz * 1.1 + vRPos.y * 1.4) * 0.65 + rNoise(vRPos.xz * 4.0 + vRPos.y * 3.0) * 0.35);
+          lich *= (1.0 - smoothstep(0.35, 0.8, slope)) * 0.8 + 0.2 * smoothstep(0.55, 0.7, grain);
+          rockC = mix(rockC, vec3(0.36, 0.40, 0.17) * (0.8 + 0.4 * grain), lich * 0.55 * fineK);
+          // a little lift so a shaded face keeps its colour in grey light
+          rockC = rockC * 1.3 + vec3(0.02, 0.019, 0.02);
+        }
         col = mix(col, rockC, rk);
         // Snow: above the snow line, sticking to all but the steepest faces
         // (lower on shaded north faces, patchy along its edge, shed only by near-vertical rock)
@@ -411,6 +435,16 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
           vec3 grad = vec3(RH(vRPos + vec3(e, 0.0, 0.0)) - h0, RH(vRPos + vec3(0.0, e, 0.0)) - h0, RH(vRPos + vec3(0.0, 0.0, e)) - h0) / e;
           vec3 bump = -(grad - N * dot(grad, N)) * bk * 5.0;
           normal = normalize(normal + (viewMatrix * vec4(bump, 0.0)).xyz);
+          // rock face: strata ledges and chipped grain (finer than the grid above carries), near the camera only
+          float rkn = rk * (1.0 - snow) * (1.0 - smoothstep(60.0, 260.0, camD));
+          if (rkn > 0.02) {
+            float e2 = 0.1;
+            #define RF(q) (0.3 * sin(((q).y * 2.1 + rNoise((q).xz * 0.35 + (q).y * 0.2) * 3.2) * 6.2832) + 0.7 * rTriN((q), tw, 3.1) + 0.4 * rTriN((q), tw, 9.0))
+            float f0 = RF(vRPos);
+            vec3 g2 = vec3(RF(vRPos + vec3(e2, 0.0, 0.0)) - f0, RF(vRPos + vec3(0.0, e2, 0.0)) - f0, RF(vRPos + vec3(0.0, 0.0, e2)) - f0) / e2;
+            vec3 b2 = -(g2 - N * dot(g2, N)) * rkn * 0.03;
+            normal = normalize(normal + (viewMatrix * vec4(b2, 0.0)).xyz);
+          }
         }`)
       .replace('#include <fog_fragment>', /* glsl */`#ifdef USE_FOG
           // Aerial perspective: thinner fog with distance so the ranges stay legible
@@ -421,7 +455,7 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
           ${HEIGHT_FOG_GLSL}
         #endif`);
   };
-  mat.customProgramCacheKey = () => 'regional_terrain_v5_' + look.evergreen + (look.floor ? 'f' : '') + (look.kudzu ? 'k' : '');
+  mat.customProgramCacheKey = () => 'regional_terrain_v6_' + look.evergreen + (look.floor ? 'f' : '') + (look.kudzu ? 'k' : '');
   applyGroundSkyFill(mat); // r15 dusk
   return { mat, u };
 }

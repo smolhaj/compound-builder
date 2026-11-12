@@ -18,13 +18,33 @@ export type TerrainMode = 'off' | 'high' | 'lanes' | 'water' | 'sun' | 'shade' |
 export const TERRAIN_LEGEND: Record<Exclude<TerrainMode, 'off'>, { label: string; tip: string; legend: string }> = {
   high: { label: 'High ground', tip: 'Where the land stands above its surroundings', legend: 'Orange: ground above the land around it. A tower here sees farther and shoots farther (an extra 33 ft of view at the best). Blue-gray: hollows that hide a watcher.' },
   lanes: { label: 'Lanes', tip: 'The ways a crew would come at you', legend: 'Green: easy going. Amber: a scramble. Red: cliff (ladders needed). Blue: the creek (a ford). The bright line is the way a crew takes: the cheapest; rings mark where it narrows to a choke. The road side counts as easy.' },
-  water: { label: 'Water', tip: 'Floodplain, mud, frost pockets and reservoir sites', legend: 'Deep blue: the creek\'s floodplain (floods take what stands here; spring mud slows building). Light blue: wet flats and gullies. White: frost pockets where cold air pools. Green ring: a bench that would feed the camp by gravity.' },
+  water: { label: 'Water', tip: 'Floodplain, mud, frost pockets and reservoir sites', legend: 'Deep blue: the creek\'s floodplain (floods take what stands here; spring mud slows building). Light blue: wet flats and gullies. Pale lilac: frost pockets where cold air pools. Green ring: a bench that would feed the camp by gravity.' },
   fire: { label: 'Fire', tip: 'How likely each building is to burn in a wildfire', legend: 'A ring around each building: green, cleared or fire-safe walls; amber, trees close in; red, trees hard against it. The ring grows with the chance (the same number the fire front rolls). Cut the trees nearest the red ones.' },
   shade: { label: 'Shade', tip: 'What the low winter sun misses: noon on Dec 21', legend: 'Dark blue: shaded at noon on the winter solstice, when shadows are longest (hills, buildings, evergreens; bare oaks only dim). Clear: full sun. Site solar and beds in the clear; the list below says how much of each you have shaded.' },
-  sun: { label: 'Sun', tip: 'Which slopes catch the sun', legend: 'Yellow: south-facing ground (up to +25% solar and warmer beds). Blue: north-facing ground (down to -25%, frost lingers).' },
+  sun: { label: 'Sun', tip: 'Which slopes catch the sun', legend: 'Amber: south-facing ground (up to +25% solar and warmer beds). Slate blue: north-facing ground (down to -25%, frost lingers).' },
 };
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+/** Box-blur RGBA vertex colors in place, weighting colors by alpha so a clear neighbor does not tint the edge of a wash. */
+export function smoothColors(col: Float32Array, nx: number, nz: number, passes: number): void {
+  let src: Float32Array = col, dst: Float32Array = new Float32Array(col.length);
+  for (let p = 0; p < passes; p++) {
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+      let r = 0, g = 0, b = 0, a = 0, n = 0;
+      for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+        const ii = i + di, jj = j + dj;
+        if (ii < 0 || jj < 0 || ii >= nx || jj >= nz) continue;
+        const q = (jj * nx + ii) * 4, w = src[q + 3];
+        r += src[q] * w; g += src[q + 1] * w; b += src[q + 2] * w; a += w; n++;
+      }
+      const o = (j * nx + i) * 4;
+      dst[o] = a > 1e-6 ? r / a : 0; dst[o + 1] = a > 1e-6 ? g / a : 0; dst[o + 2] = a > 1e-6 ? b / a : 0; dst[o + 3] = n ? a / n : 0;
+    }
+    [src, dst] = [dst, src];
+  }
+  if (src !== col) col.set(src);
+}
 
 export class TerrainOverlay {
   private readonly _scene: THREE.Scene;
@@ -62,6 +82,8 @@ export class TerrainOverlay {
       const c = this._paint(t, j * nx + i);
       col.set(c, v * 4);
     }
+    // the analysis cells are about 12 ft; smooth the soft modes so the washes read as ground, not as stepped tiles
+    if (this._mode === 'sun' || this._mode === 'water' || this._mode === 'high' || this._mode === 'shade') smoothColors(col, nx, nz, 2);
     geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
     geo.computeBoundingSphere();
     const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
@@ -94,9 +116,10 @@ export class TerrainOverlay {
         return [0.9, 0.2, 0.15, 0.5];
       }
       case 'water': {
-        if (t.wet[k] === 2) return [0.1, 0.3, 0.85, 0.5];
-        if (t.wet[k] === 1) return [0.35, 0.6, 0.95, 0.38];
-        if (t.frost[k]) return [0.92, 0.92, 1, 0.5];
+        // one cool family, softly layered: floodplain deepest, wet flats lighter, frost a pale lilac wash (no white stripes)
+        if (t.wet[k] === 2) return [0.16, 0.38, 0.72, 0.36];
+        if (t.wet[k] === 1) return [0.34, 0.6, 0.82, 0.24];
+        if (t.frost[k]) return [0.66, 0.7, 0.92, 0.16];
         return [0, 0, 0, 0];
       }
       case 'shade': {
@@ -104,8 +127,9 @@ export class TerrainOverlay {
         return sh > 0.04 ? [0.1, 0.15, 0.6, Math.min(0.62, 0.15 + sh * 0.5)] : [1, 0.9, 0.4, 0.07];
       }
       case 'sun': {
-        const s = t.sun[k] - 1;
-        return s >= 0 ? [1, 0.85, 0.2, Math.min(0.55, s * 3)] : [0.2, 0.4, 0.95, Math.min(0.55, -s * 3)];
+        // one ramp, cool slate-blue (north faces) through to warm amber (south faces); faint where the ground is neutral
+        const s = t.sun[k] - 1, u = Math.max(0, Math.min(1, 0.5 + s * 2));
+        return [lerp(0.30, 0.98, u), lerp(0.46, 0.72, u), lerp(0.78, 0.30, u), Math.min(0.32, Math.abs(s) * 1.6)];
       }
       default: return [0, 0, 0, 0];
     }

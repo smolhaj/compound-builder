@@ -241,7 +241,7 @@ export function GameCanvas() {
       vsNdc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
       vsRay.setFromCamera(vsNdc, ws.camera);
       const h = vsRay.intersectObject(world.terrain.mesh, false)[0];
-      if (h) sight.set('viewshed', { x: h.point.x, z: h.point.z, eye: e.shiftKey ? 1.7 : 0.3 });
+      if (h) { sight.set('viewshed', { x: h.point.x, z: h.point.z, eye: e.shiftKey ? 1.7 : 0.3 }); useWorldStore.getState().setSightPicked(true); }
     };
     canvas.addEventListener('pointerdown', onVsDown);
     canvas.addEventListener('pointermove', onPickMove);
