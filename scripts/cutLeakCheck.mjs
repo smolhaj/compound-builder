@@ -84,12 +84,13 @@ try {
     }
     const gc = () => new Promise(r => setTimeout(r, 50));
     const info = () => { const i = cb.ws.renderer.info; return { geometries: i.memory.geometries, textures: i.memory.textures, programs: i.programs?.length ?? null }; };
+    const { navStats } = await import('/src/sim/cutNav.ts');
     const rows = [];
     const base = { ...info(), heap: Math.round(performance.memory.usedJSHeapSize / 1e6) };
     let slowest = 0;
     for (let k = 0; k < days.length; k++) {
       const { d, last } = days[k];
-      const t0 = performance.now();
+      const t0 = performance.now(); const ns0 = JSON.parse(JSON.stringify(navStats));
       const seed = g.seed * 131 + Math.round(last.duration * 7), dir = new LineDirector(seed);
       let b = decorateBreach(last, g.perimeter, { x: home.x, z: home.z }, seed, false, dir);
       const t1 = performance.now();
@@ -103,7 +104,7 @@ try {
       slowest = Math.max(slowest, maxStep);
       cb.battle.stop();
       await gc();
-      rows.push({ k, day: d, prepMs: Math.round(prep), split, unrouted: r.unrouted, ok: r.ok, steps, maxStepMs: +maxStep.toFixed(1), frame: drawn, heap: Math.round(performance.memory.usedJSHeapSize / 1e6), ...info(), props: cb.battle.props.live });
+      rows.push({ k, day: d, prepMs: Math.round(prep), split, nav: { ...Object.fromEntries(['cores', 'direct', 'grids', 'expanded', 'skipped'].map(a => [a, navStats[a] - ns0[a]])), pad: Object.fromEntries([3, 8, 24].map(q => [q, [navStats.pad[q].tries - ns0.pad[q].tries, navStats.pad[q].ok - ns0.pad[q].ok, navStats.pad[q].expanded - ns0.pad[q].expanded]])) }, unrouted: r.unrouted, ok: r.ok, steps, maxStepMs: +maxStep.toFixed(1), frame: drawn, heap: Math.round(performance.memory.usedJSHeapSize / 1e6), ...info(), props: cb.battle.props.live });
     }
     return { base, rows, slowestStepMs: +slowest.toFixed(1) };
   }, [hour0, N, wantDay]);
