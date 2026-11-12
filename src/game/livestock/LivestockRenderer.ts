@@ -9,7 +9,7 @@ import type { Pt } from '../../sim/pathRoute';
 import { animalGoal, doorOf, drawnHerd, type AnimalGoal, type Home, type HerdCtx, type StockKind } from './livestockPlan';
 import { slopePace } from '../paths/walkRoute';
 import { climbLimit, gradeBetween } from '../paths/groundMovers';
-import { bodyGeometry, headGeometry, legGeometry } from './livestockGeometry';
+import { NECK_LEN, bodyGeometry, headGeometry, legGeometry } from './livestockGeometry';
 
 const CAP = 64;
 const LEGS = 4;
@@ -203,7 +203,7 @@ export class LivestockRenderer {
       put(this._body, nb++, bodyCol, a.tone);
       const grazing = a.v < 0.01 && hash(a.id, 6) < 0.7 && Math.sin(a.phase * 0.1 + hash(a.id, 5) * 9 + performance.now() / 2600) > 0.1;
       // the neck is part of the head mesh: it starts at the withers and runs up (or down, grazing) to the skull
-      const th = grazing ? -0.95 : L.up, nk = 2.6 * L.head;
+      const th = grazing ? -0.95 : L.up, nk = NECK_LEN * L.head;
       loc(0, by + bh * 0.45 + Math.sin(th) * nk, L.len * 0.4 + Math.cos(th) * nk, -th, L.head, L.head, L.head);
       put(this._head, nh++, a.kind === 'cow' ? 0xc9a98a : a.kind === 'sheep' ? 0x6a5c4c : L.col, a.tone);
       for (let i = 0; i < LEGS; i++) {

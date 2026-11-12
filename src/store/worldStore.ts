@@ -78,6 +78,9 @@ export interface WorldState {
   blueprintReadout: BpReadout | null;
   /** Shade overlay: one line per solar array / bed (sim/shade.ts). */
   shadeReadout: string[] | null;
+  /** The Fire overlay's empty-state line (nothing built, or every ring green), or null while there is a ring to read. */
+  fireNote: string | null;
+  setFireNote: (n: string | null) => void;
   setShadeReadout: (r: string[] | null) => void;
   setBlueprintReadout: (r: BpReadout | null) => void;
   /** The property line drawn on the ground (also shown while a fence or wall is being drawn). */
@@ -181,6 +184,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   setBlueprint: (blueprint) => set({ blueprint }),
   blueprintReadout: null,
   shadeReadout: null,
+  fireNote: null,
+  setFireNote: (fireNote) => set({ fireNote }),
   setShadeReadout: (shadeReadout) => set({ shadeReadout }),
   setBlueprintReadout: (blueprintReadout) => set({ blueprintReadout }),
   showBoundary: false,

@@ -80,6 +80,15 @@ describe('regional seasons', () => {
     expect(CLIMATES.pacific_northwest.weatherSnow).toBeLessThan(1);
   });
 
+  it('Pacific Northwest: snowless winters still show a winter ground (rime), only in the cold months and never over real snow', () => {
+    expect(CLIMATES.pacific_northwest.rime).toBeGreaterThan(0);
+    expect(at('pacific_northwest', 1, 20).rime).toBeGreaterThan(0.5);
+    expect(at('pacific_northwest', 4, 12).rime).toBe(0);    // the default mid-April start is not wintry
+    expect(at('pacific_northwest', 7, 20).rime).toBe(0);
+    expect(at('new_england', 1, 20).rime).toBe(0);
+    expect(CLIMATES.new_england.rime).toBe(0);   // a snowy region has real snow instead
+  });
+
   it('the forced fall season lands on each region\'s peak', () => {
     for (const c of Object.values(CLIMATES)) {
       const p = seasonTargets(c, overrideDay('fall', c));

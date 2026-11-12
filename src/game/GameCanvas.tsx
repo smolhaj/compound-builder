@@ -1,5 +1,5 @@
 import { moatStates } from '../sim/waterWorks';
-import { fireMarks } from '../sim/fireRisk';
+import { fireMarks, fireOverlayNote } from '../sim/fireRisk';
 import { litTowerIds } from '../sim/towers';
 import { encodePhoto, setPhotoCapturer } from './photoCapture';
 import { shadeGrid } from '../sim/shade';
@@ -290,7 +290,7 @@ export function GameCanvas() {
     const terrainOv = new TerrainOverlay(ws.scene, world.groundAt);
     const showTerrain = () => {
       const g = useGameStore.getState().game, m = useWorldStore.getState().terrainMode, t = terrainOf(g);
-      if (m === 'off' || !t) { terrainOv.set('off', null); useWorldStore.getState().setShadeReadout(null); return; }
+      if (m === 'off' || !t) { terrainOv.set('off', null); useWorldStore.getState().setShadeReadout(null); useWorldStore.getState().setFireNote(null); return; }
       let sg = null;
       if (m === 'shade') {
         const { sc, own } = shadeSceneOf(g, world.groundAt, world.treeSpecs);
@@ -298,7 +298,9 @@ export function GameCanvas() {
         useWorldStore.getState().setShadeReadout(shadeReadout(g, sc, own));
       } else useWorldStore.getState().setShadeReadout(null);
       const lanes = lanesOf(g);
-      terrainOv.set(m, t, lanes, siteCandidates(t, { lot: g.site.home, camp: campOf(g) }, lanes), m === 'fire' ? fireMarks(g, world.fuelNear(g.structures)) : [], sg);
+      const fire = m === 'fire' ? fireMarks(g, world.fuelNear(g.structures)) : [];
+      useWorldStore.getState().setFireNote(m === 'fire' ? fireOverlayNote(fire, g.structures.filter(isFinished).length) : null);
+      terrainOv.set(m, t, lanes, siteCandidates(t, { lot: g.site.home, camp: campOf(g) }, lanes), fire, sg);
     };
     // the blueprint view: names, rings, gates, towers and tunnels (game/blueprint)
     const host = canvas.parentElement ?? document.body;

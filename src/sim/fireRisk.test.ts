@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { bandOf, burnChance, fireMarks } from './fireRisk';
+import { bandOf, burnChance, fireMarks, fireOverlayNote, type FireMark } from './fireRisk';
 import { newGame } from './state';
+
+describe('fire overlay empty state', () => {
+  const m = (band: FireMark['band']): FireMark => ({ id: 'a', x: 0, z: 0, near: 1, p: 0.1, band });
+  it('explains an empty or all-green map and stays quiet when there is something to read', () => {
+    expect(fireOverlayNote([], 0)).toMatch(/Nothing to mark/);
+    expect(fireOverlayNote([], 2)).toMatch(/underground/);
+    expect(fireOverlayNote([m('low'), m('low')], 2)).toMatch(/green/);
+    expect(fireOverlayNote([m('low'), m('high')], 2)).toBeNull();
+  });
+});
 
 describe('fire risk', () => {
   it('matches the wildfire formula: more trees, more risk, capped', () => {
