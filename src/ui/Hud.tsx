@@ -136,6 +136,13 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
 const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died', shelter: 'Sheltering', away: 'Away from the place', town: 'At the town house', ...DAILY_TASK_TEXT };
 
+/** "Click a point" for the viewshed overlay, which draws nothing until a spot on the ground is picked (always on screen, whatever panels are open). */
+function SightHint() {
+  const on = useWorldStore(s => s.sightMode === 'viewshed' && !s.sightPicked);
+  if (!on) return null;
+  return <div data-testid="sight-hint" style={{ position: 'fixed', left: '50%', bottom: 64, transform: 'translateX(-50%)', color: '#f2ecd8', background: 'rgba(20,22,18,0.86)', border: '1px solid rgba(240,230,190,0.4)', borderRadius: 6, padding: '6px 16px', fontSize: 14, pointerEvents: 'none', zIndex: 20, whiteSpace: 'nowrap' }}>Click a point on the ground to see what can be seen from there (Shift-click: from a 33 ft tower)</div>;
+}
+
 function dateLabel(doy: number): string {
   let m = 11;
   while (m > 0 && doy <= MONTH_START[m]) m--;
@@ -226,6 +233,7 @@ export function Hud() {
     <>
       <ToastLine />
       <CursorHint />
+      <SightHint />
       <LineToolBar />
       <WelcomeCard />
       {/* Top bar: date, time, money, speed */}

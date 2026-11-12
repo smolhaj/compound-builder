@@ -20,6 +20,7 @@
  *
  * Low tier: no precipitation, no sky/fog changes (CampusCanvas passes 'off').
  */
+import { weatherFogAerialScale } from '../fog/aerialFog';
 import * as THREE from 'three';
 import { WeatherSim, WEATHER_NOW, hash01, snowShownUnderRain, type WeatherMode, type WeatherOutputs } from './weatherState';
 import { installSeasonShaderPatch } from '../season/seasonShader';
@@ -542,7 +543,7 @@ export class WeatherRenderer {
 
     // ── Fog banks ────────────────────────────────────────────────────────────
     const vb = f.valleyBank;
-    const bank = low ? 0 : vb ? vb.amount : Math.max(0, Math.min(1, (o.fog - 0.2) / 0.6)) * (f.fogBankScale ?? 1);
+    const bank = low ? 0 : vb ? vb.amount : Math.max(0, Math.min(1, (o.fog - 0.2) / 0.6)) * (f.fogBankScale ?? 1) * (0.25 + 0.75 * weatherFogAerialScale(f.camera.position.y));
     this._bank.visible = bank > 0.01;
     if (this._bank.visible) {
       const bu = this._bankMat.uniforms;
