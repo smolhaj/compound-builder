@@ -5,7 +5,7 @@ import { BLUEPRINTS } from '../../sim/blueprints';
 import { billText, type MaterialId } from '../../sim/materials';
 import { orderCost, orderProblem, prices } from '../../sim/economy';
 import { ToolNeedsNote } from '../ToolsPanel';
-import { blockedReason, holdReason, isFinished, progress } from '../../sim/construction';
+import { blockedReason, ROAD_SUFFIX, holdReason, isFinished, progress } from '../../sim/construction';
 import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../../sim/crews';
 import { fixBill, fixBlocked, fixDef, pendingFixes } from '../../sim/improvements';
 import { KIT } from '../../game/buildkit/kit';
@@ -118,6 +118,8 @@ export function ProjectsTab() {
               : <>
                 {!why && !isFinished(sel) && blockedReason(game, sel) && <Note tone="warn">{blockedReason(game, sel) === holdReason(game, sel) && /permit/i.test(blockedReason(game, sel)!)
                   ? 'A crew would stand idle (billing nothing) until the permit clears.'
+                  : blockedReason(game, sel)!.endsWith(ROAD_SUFFIX)
+                  ? 'The materials are at the road. A crew carries them in first, on its own hours; a gravel drive ends the carrying.'
                   : `Still need ${blockedReason(game, sel)!.replace(/^Waiting for /, '')}: order first, a crew would stand idle (billing nothing).`}</Note>}
                 <button style={{ ...btn(), width: '100%', marginTop: 4 }} disabled={!!why} title={why ?? `${CREW_SIZE} workers at $${CREW_RATE}/h, weekdays 8 to 5; you still buy the materials`} onClick={() => guard(q.usd, () => g.hire(sel.id))}>
                   Hire a crew{!why && !isFinished(sel) && blockedReason(game, sel) ? ' anyway' : ''}: ~{usd(q.usd)}, about {q.weeks} week{q.weeks > 1 ? 's' : ''}

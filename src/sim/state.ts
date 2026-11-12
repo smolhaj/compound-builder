@@ -225,7 +225,7 @@ export interface GameState {
   stock: Stock;
   orders: Order[];
   /** Projects waiting on materials: key (sim/stalls.ts) -> the day first seen waiting, and whether the stuck line was already said. Absent on a save from before v83. */
-  stalls?: Record<string, { since: number; said?: boolean }>;
+  stalls?: Record<string, { since: number; said?: boolean; /** Last day it was seen waiting (a wait that breaks for a day because a unit arrived and was used is the same wait). Optional: no migration. */ seen?: number }>;
   people: Person[];
   personState: PersonState[];
   structures: Structure[];
