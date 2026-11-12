@@ -124,7 +124,7 @@ try {
       const meta = await page.evaluate(async () => {
         const { useCutsceneView } = await import('/src/store/cutsceneStore.ts');
         const v = useCutsceneView.getState().view, a = window.__cb.player.audit(), b = window.__cb.battle;
-        return { label: v?.sceneLabel, scene: v?.scene, seg: v?.seg, hour: v?.hour, inside: a?.inside, near: a?.nearest, kind: a?.kind, fb: a?.fallbacks, bt: b?.playing ? +b.time.toFixed(2) : null };
+        return { label: v?.sceneLabel, scene: v?.scene, seg: v?.seg, hour: v?.hour, inside: a?.inside, near: a?.nearest, cover: a?.cover, wall: a?.wall, eye: a?.eye, look: a?.look, kind: a?.kind, fb: a?.fallbacks, bt: b?.playing ? +b.time.toFixed(2) : null };
       });
       // let React flush the overlay
       await page.evaluate(() => new Promise(r => setTimeout(r, 30)));
