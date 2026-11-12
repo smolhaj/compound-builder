@@ -54,3 +54,15 @@ describe('cutNav: nobody walks through a wall', () => {
     expect(findClips(r.battle, w)).toEqual([]);
   });
 });
+
+describe('cutNav: the router remembers only what stays true', () => {
+  // a long wall at x = 5 whose only opening is a door that is shut from t = 5 to t = 20
+  const wall = [{ x0: 4.95, z0: -30, x1: 5.05, z1: -0.5 }, { x0: 4.95, z0: 0.5, x1: 5.05, z1: 30 }];
+  const door = { id: 'door0', x0: 4.9, x1: 5.1, z0: -0.5, z1: 0.5, from: 5, openAt: 20 };
+  it('a leg that fails because the door will be shut on arrival is not condemned for the moment it is open', () => {
+    const w = boxWorld(wall, [door]);
+    const a = { x: 0, z: 5 }, b = { x: 9, z: 5 };
+    expect(findPath(w, a, b, 1)).toBeNull();            // he would reach the door at about t = 7, shut
+    expect(findPath(w, a, b, 21)).not.toBeNull();       // the same two points once it is open: a real way (this answer was served from the failure above)
+  });
+});

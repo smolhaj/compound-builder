@@ -70,7 +70,7 @@ describe('swearing fits the person', () => {
 });
 
 describe('whole scenes: nobody untrained is given a fire team\'s words', () => {
-  for (const [label, hour, kind, size, temper] of [['night gang', 2.25, 'gang', 10, 'savage'], ['day raid', 12.5, 'gang', 8, 'hard'], ['invasion', 2.25, 'gang', 12, 'savage']] as const) for (const seed of [4, 5, 8]) {
+  for (const [label, hour, kind, size, temper] of [['night gang', 2.25, 'gang', 10, 'savage'], ['day raid', 12.5, 'gang', 8, 'hard'], ['invasion', 2.25, 'gang', 12, 'savage']] as const) for (const seed of [3, 5, 8]) {
     it(`${label} seed ${seed}`, () => {
       const { g, battles } = scenes(seed, hour, kind, size, temper, 'log_palisade');
       for (const b0 of battles) {

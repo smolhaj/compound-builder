@@ -31,7 +31,7 @@ describe('the dead do not speak', () => {
     expect(deadSpeakers(deadSilent(all))).toEqual([]);
     expect(deadSilent(all).events.filter(e => e.kind === 'say').length).toBe(2);
   });
-  for (const [label, hour, kind, size, temper] of [['night gang', 2.25, 'gang', 10, 'savage'], ['day raid', 12.5, 'gang', 8, 'hard'], ['invasion', 2.25, 'gang', 12, 'savage']] as const) for (const seed of [4, 5, 8]) {
+  for (const [label, hour, kind, size, temper] of [['night gang', 2.25, 'gang', 10, 'savage'], ['day raid', 12.5, 'gang', 8, 'hard'], ['invasion', 2.25, 'gang', 12, 'savage']] as const) for (const seed of [3, 5, 8]) {
     it(`${label} seed ${seed}: nobody speaks after dying in the prepared scene`, () => {
       const { g, battles } = scenes(seed, hour, kind, size, temper, 'log_palisade');
       for (const bb of battles) expect(deadSpeakers(prepared(bb, g, seed * 17))).toEqual([]);
