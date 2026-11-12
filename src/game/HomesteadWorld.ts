@@ -2725,10 +2725,16 @@ export class HomesteadWorld {
     if (this.walls.blocks(x, z)) return true;     // a retaining wall (the cut a road runs in): over only at its stairs
     if (Math.hypot(x - this.camp.x, z - this.camp.z) < 0.4 + r) return true;
     if (this._yardAt(x, z, r)) return true;
-    for (const t of this.treeSpecs) {
-      const dx = t.x - x, dz = t.z - z;
-      const tr = r + 0.07 * t.scale;
-      if (dx * dx + dz * dz < tr * tr) return true;
+    // trunks: only the ones in the cells round the point (a spatial hash, `_trunks`); this runs millions of times when a cutscene's people are routed, and
+    // a scan of every tree on the parcel made one scene's routing take over three minutes
+    const cells = this._trunks(), fx = Math.floor(x), fz = Math.floor(z);
+    for (let ix = -1; ix <= 1; ix++) for (let iz = -1; iz <= 1; iz++) {
+      const arr = cells.get((fx + ix) * 4099 + (fz + iz));
+      if (!arr) continue;
+      for (const [tx, tz, trunk] of arr) {
+        const dx = tx - x, dz = tz - z, tr = r + trunk - 0.03;
+        if (dx * dx + dz * dz < tr * tr) return true;
+      }
     }
     return false;
   };

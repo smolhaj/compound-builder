@@ -90,24 +90,56 @@ export function nearestFree(w: NavWorld, x: number, z: number, t: number, r = 1.
   return null;
 }
 
+
+/** How many corner rescues a leg may try before it is given up (each failed try floods a whole search box). */
+const RESCUES = 14;
+
 /** A path from a to b through the open ground at time t, as waypoints (b last), or null. */
 export function findPath(w: NavWorld, a: Pt, b: Pt, t: number, speed = RUN): Pt[] | null {
   const r = findPathCore(w, a, b, t, speed);
   if (r) return r;
-  // a start or a goal pressed into a corner: step to a nearby open spot (a clear line away) and search from there
+  // a start or a goal pressed into a corner: step to a nearby open spot (a clear line away) and search from there. Each failed try floods a whole search box,
+  // and a goal with no way to it fails them all: after RESCUES tries the leg is given up (the caller waits for a door, or leaves it straight).
+  // (a leg with no way through - a wall with no gap yet - fails from every point beside its ends too, and each try floods a whole search box: one scene lost a minute to
+  // 24 near-identical tries; so the tries are capped.)
+  let tries = 0;
   for (const d of [0.08, 0.15, 0.25, 0.4]) for (let k = 0; k < 8; k++) {
     const dx = Math.cos(k * 0.785) * d, dz = Math.sin(k * 0.785) * d;
     const a2 = { x: a.x + dx, z: a.z + dz };
-    if (!blockedAt(w, a2.x, a2.z, t) && lineClear(w, a, a2, t, speed)) { const r2 = findPathCore(w, a2, b, t, speed); if (r2) return [a2, ...r2]; }
+    if (!blockedAt(w, a2.x, a2.z, t) && lineClear(w, a, a2, t, speed)) { if (tries++ >= RESCUES) return null; const r2 = findPathCore(w, a2, b, t, speed); if (r2) return [a2, ...r2]; }
     const b2 = { x: b.x + dx, z: b.z + dz };
-    if (!blockedAt(w, b2.x, b2.z, t) && lineClear(w, b2, b, t, speed)) { const r2 = findPathCore(w, a, b2, t, speed); if (r2) return [...r2, b]; }
+    if (!blockedAt(w, b2.x, b2.z, t) && lineClear(w, b2, b, t, speed)) { if (tries++ >= RESCUES) return null; const r2 = findPathCore(w, a, b2, t, speed); if (r2) return [...r2, b]; }
   }
   return null;
 }
 
+/** Counters for the QA harness (scripts/cutLeakCheck.mjs): how many searches a scene's routing makes and how big they are. */
+export const navStats: { cores: number; direct: number; grids: number; expanded: number; fails: number; skipped: number; ms: number; pad: Record<number, { tries: number; ok: number; expanded: number }> } = { cores: 0, direct: 0, grids: 0, expanded: 0, fails: 0, skipped: 0, ms: 0, pad: { 3: { tries: 0, ok: 0, expanded: 0 }, 8: { tries: 0, ok: 0, expanded: 0 }, 24: { tries: 0, ok: 0, expanded: 0 } } };
+
+/**
+ * What the routing of one scene has learned (per world): which search boxes pay off, and which (start, goal) pairs have no way through in the present state of the
+ * doors and breaches. In the slow scenes 90 % of the small-box searches failed and each failure floods its whole box (59 M cell expansions in one scene).
+ */
+interface Learned { pad: Record<number, { tries: number; ok: number }>; failed: Set<string> }
+const LEARNED = new WeakMap<NavWorld, Learned>();
+const learnedOf = (w: NavWorld): Learned => { let l = LEARNED.get(w); if (!l) { l = { pad: { 3: { tries: 0, ok: 0 }, 8: { tries: 0, ok: 0 } }, failed: new Set() }; LEARNED.set(w, l); } return l; };
+/** The state of the timed doors and breaches at time t, as a number: the same value means the same openings. */
+function openingsAt(w: NavWorld, t: number): number {
+  let h = 17;
+  w.barriers.forEach((b, i) => { if (t < b.openAt + SLACK && t >= (b.from ?? -1)) h = (Math.imul(h, 31) + i + 1) | 0; });
+  w.carves.forEach((c, i) => { if (t >= c.from + SLACK) h = (Math.imul(h, 37) + i + 7) | 0; });
+  return h;
+}
+
 function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[] | null {
-  if (lineClear(w, a, b, t, speed)) return [b];
+  navStats.cores++;
+  if (lineClear(w, a, b, t, speed)) { navStats.direct++; return [b]; }
+  const L = learnedOf(w), key = `${Math.round(a.x / 0.03)},${Math.round(a.z / 0.03)}>${Math.round(b.x / 0.03)},${Math.round(b.z / 0.03)}@${openingsAt(w, t)}`;
+  if (L.failed.has(key)) { navStats.skipped++; return null; }
   for (const pad of [3, 8, 24]) {
+    // a small box that has almost never found a way in this scene is not tried again: the doorway, wall or creek it keeps running into makes the big box the one that works
+    const ps = L.pad[pad];
+    if (ps && ps.tries >= 16 && ps.ok / ps.tries < 0.2) continue;
     const x0 = Math.min(a.x, b.x) - pad, x1 = Math.max(a.x, b.x) + pad, z0 = Math.min(a.z, b.z) - pad, z1 = Math.max(a.z, b.z) + pad;
     const cell = Math.max(0.05, Math.max(x1 - x0, z1 - z0) / 300);
     const nx = Math.ceil((x1 - x0) / cell), nz = Math.ceil((z1 - z0) / cell);
@@ -154,12 +186,33 @@ function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[]
     if (stuck(si, sj) || !lineClear(w, a, { x: cx(si), z: cz(sj) }, t, speed)) { const q = snap(a, si, sj); if (q) { si = q.i; sj = q.j; snapped.a = q.p; } }
     if (stuck(ti, tj) || !lineClear(w, { x: cx(ti), z: cz(tj) }, b, t, speed)) { const q = snap(b, ti, tj); if (q) { ti = q.i; tj = q.j; snapped.b = q.p; } }
     s = idx(si, sj); goal = idx(ti, tj);
+    // (a start or a goal shut into a small pocket - a pen, a closet, the lee of a fence - has no way out, and finding that out by flooding the whole grid took minutes in
+    // some scenes: look round each end first, and give up on this box when one is boxed in. A 4-connected flood reaches everything the 8-connected search could.)
+    const pocket = (c: number, other: number): boolean => {
+      const seen = new Set<number>([c]), q = [c];
+      for (let h = 0; h < q.length; h++) {
+        const n = q[h]; if (n === other) return false;
+        const ci = n % nx, cj = (n - ci) / nx;
+        for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+          const ni = ci + di, nj = cj + dj;
+          if (ni < 0 || nj < 0 || ni >= nx || nj >= nz) continue;
+          const m = idx(ni, nj);
+          if (seen.has(m) || !free(ni, nj, t)) continue;
+          seen.add(m); q.push(m);
+          if (seen.size > (pad === 24 ? 8000 : 700)) return false;
+        }
+      }
+      return true;
+    };
+    if (pocket(s, goal) || pocket(goal, s)) continue;
     g.fill(Infinity); heap.length = 0; g[s] = 0; push(Math.hypot(cx(ti) - cx(si), cz(tj) - cz(sj)), s);
     let found = false;
+    navStats.grids++; const exp0 = navStats.expanded; navStats.pad[pad].tries++; if (L.pad[pad]) L.pad[pad].tries++;
     while (heap.length) {
       const [, n] = pop();
       if (closed[n]) continue;
       closed[n] = 1;
+      navStats.expanded++;
       if (n === goal) { found = true; break; }
       const ci = n % nx, cj = (n - ci) / nx, te = t + g[n] * cell / speed;
       for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
@@ -174,7 +227,9 @@ function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[]
         if (ng < g[m]) { g[m] = ng; from[m] = n; push(ng + Math.hypot(cx(ti) - cx(ni), cz(tj) - cz(nj)), m); }
       }
     }
+    navStats.pad[pad].expanded += navStats.expanded - exp0;
     if (!found) continue;
+    navStats.pad[pad].ok++; if (L.pad[pad]) L.pad[pad].ok++;
     const raw: Pt[] = [];
     for (let n = goal; n >= 0; n = from[n]) raw.push({ x: cx(n % nx), z: cz(Math.floor(n / nx)) });
     raw.reverse();
@@ -196,6 +251,7 @@ function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[]
     for (const q of out) { if (!lineClear(w, p, q, tl, speed)) { ok = false; break; } tl += Math.hypot(q.x - p.x, q.z - p.z) / speed; p = q; }
     if (ok) return out;
   }
+  L.failed.add(key);
   return null;
 }
 

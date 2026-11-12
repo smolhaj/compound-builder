@@ -47,6 +47,9 @@ try {
   const frames = async (k) => { const f0 = await page.evaluate(() => window.__cb.qa.frames); await page.waitForFunction(x => window.__cb.qa.frames >= x, f0 + k, { polling: 200 }); };
   
   const N = Number(opt('--n', 20));
+  const PROF = args.includes('--prof');
+  let cdpP = null;
+  if (PROF) { cdpP = await page.context().newCDPSession(page); await cdpP.send('Profiler.enable'); await cdpP.send('Profiler.setSamplingInterval', { interval: 2000 }); await cdpP.send('Profiler.start'); }
   const out = await page.evaluate(async ([hour0, N, wantDay]) => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp;
     const sp = cb.tool.findSpot('timber_cabin', c.x, c.z, 0);
@@ -81,27 +84,36 @@ try {
     }
     const gc = () => new Promise(r => setTimeout(r, 50));
     const info = () => { const i = cb.ws.renderer.info; return { geometries: i.memory.geometries, textures: i.memory.textures, programs: i.programs?.length ?? null }; };
+    const { navStats } = await import('/src/sim/cutNav.ts');
     const rows = [];
     const base = { ...info(), heap: Math.round(performance.memory.usedJSHeapSize / 1e6) };
     let slowest = 0;
     for (let k = 0; k < days.length; k++) {
       const { d, last } = days[k];
-      const t0 = performance.now();
+      const t0 = performance.now(); const ns0 = JSON.parse(JSON.stringify(navStats));
       const seed = g.seed * 131 + Math.round(last.duration * 7), dir = new LineDirector(seed);
       let b = decorateBreach(last, g.perimeter, { x: home.x, z: home.z }, seed, false, dir);
+      const t1 = performance.now();
       b = planHouseAssault(b, { box: footprint(KIT[home.kind], home.x, home.z, home.rot, false), blocked: solid, seed, dir });
+      const t2 = performance.now();
       const r = routeScene(b, solid, undefined, stepSegments(g.perimeter));
-      const prep = performance.now() - t0;
+      const prep = performance.now() - t0, split = { decorate: Math.round(t1 - t0), house: Math.round(t2 - t1), route: Math.round(performance.now() - t2) };
       cb.battle.play(r.battle);
       let steps = 0, maxStep = 0, drawn = null;
       while (cb.battle.playing && steps < 4000) { const s0 = performance.now(); cb.battle.update(1 / 12); maxStep = Math.max(maxStep, performance.now() - s0); steps++; if (!drawn && cb.battle.time > r.battle.duration * 0.6) { cb.qa.skipDraw = false; const f0 = performance.now(); cb.ws.renderFrame(); const ms = performance.now() - f0; const i = cb.ws.renderer.info.render; drawn = { ms: +ms.toFixed(1), calls: i.calls, triangles: i.triangles }; cb.qa.skipDraw = true; } if (cb.battle.time > r.battle.duration + 1) break; }
       slowest = Math.max(slowest, maxStep);
       cb.battle.stop();
       await gc();
-      rows.push({ k, day: d, prepMs: Math.round(prep), unrouted: r.unrouted, ok: r.ok, steps, maxStepMs: +maxStep.toFixed(1), frame: drawn, heap: Math.round(performance.memory.usedJSHeapSize / 1e6), ...info(), props: cb.battle.props.live });
+      rows.push({ k, day: d, prepMs: Math.round(prep), split, nav: { ...Object.fromEntries(['cores', 'direct', 'grids', 'expanded', 'skipped'].map(a => [a, navStats[a] - ns0[a]])), pad: Object.fromEntries([3, 8, 24].map(q => [q, [navStats.pad[q].tries - ns0.pad[q].tries, navStats.pad[q].ok - ns0.pad[q].ok, navStats.pad[q].expanded - ns0.pad[q].expanded]])) }, unrouted: r.unrouted, ok: r.ok, steps, maxStepMs: +maxStep.toFixed(1), frame: drawn, heap: Math.round(performance.memory.usedJSHeapSize / 1e6), ...info(), props: cb.battle.props.live });
     }
     return { base, rows, slowestStepMs: +slowest.toFixed(1) };
   }, [hour0, N, wantDay]);
+  if (PROF) {
+    const { profile } = await cdpP.send('Profiler.stop');
+    const self = new Map(), byId = new Map(profile.nodes.map(n => [n.id, n]));
+    const dt = profile.timeDeltas; profile.samples.forEach((id, i) => { const n = byId.get(id), k = `${n.callFrame.functionName || '(anon)'} ${n.callFrame.url.split('/').slice(-2).join('/')}:${n.callFrame.lineNumber}`; self.set(k, (self.get(k) ?? 0) + (dt[i] ?? 0)); });
+    console.log('PROFILE (self ms)', JSON.stringify([...self.entries()].sort((a, b) => b[1] - a[1]).slice(0, 14).map(([k, v]) => [k, Math.round(v / 1000)])));
+  }
   console.log('LEAK', JSON.stringify(out));
   writeFileSync(`${outDir}/leak.json`, JSON.stringify(out, null, 1));
   const cdp = await page.context().newCDPSession(page);
