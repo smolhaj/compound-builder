@@ -30,6 +30,7 @@ import { MATERIAL_IDS, MATERIALS, type MaterialId } from './materials';
 import { isAre, materialCount, pluralize } from './words';
 import { crewProblem, crewQuote } from './crews';
 import { crewNudge } from './crewNudge';
+import { idleCash } from './idleCash';
 import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind, type Pt } from './perimeter';
 import { MAX_TOWERS, ringStatus } from './fortress';
 import { canHostWalkway } from './walkway';
@@ -309,8 +310,19 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
   // the family's own hands would take weeks on the house and the cash covers a crew: say so, with the price and a one-click hire (sim/crewNudge.ts)
   { const n = crewNudge(s);
     if (n) out.push({ id: 'house_crew', kind: '', title: n.title, urgency: 93, why: n.why,
-      acts: [{ label: `Hire the crew (~${usd(n.usd)})`, act: { type: 'crew', id: n.id } },
+      acts: [{ label: n.lines.length ? `Order the materials and hire the crew (~${usd(n.totalUsd)})` : `Hire the crew (~${usd(n.usd)})`, act: { type: 'crew', id: n.id, ...(n.lines.length ? { lines: n.lines } : {}) } },
         ...(n.tents > 0 ? [{ label: `Or buy ${pluralize(n.tents, 'tent')} for now (${usd(n.tentUsd)})`, act: { type: 'order' as const, lines: [{ material: 'tent' as const, qty: n.tents }] } }] : [{ label: 'Show me', act: { type: 'select' as const, id: n.id } }])] }); }
+  // spare cash with a job to do: another crew, a few months of guards once the warning is up, a small metals hedge (sim/idleCash.ts; advice only)
+  { const ic = idleCash(s);
+    if (ic) {
+      const parts = [ic.crew ? `a second crew on the ${ic.crew.name} (about ${pluralize(ic.crew.weeks, 'week')})` : '', ic.guards ? `${pluralize(ic.guards.n, 'contract guard')} (${usd(ic.guards.usd)} for the first quarter)` : '', ic.metals > 0 ? `${usd(ic.metals)} of gold and silver for barter` : ''].filter(Boolean);
+      out.push({ id: 'idle_cash', kind: '', title: `About ${usd(Math.round(ic.spare / 1000) * 1000)} is sitting idle: put it to work`, urgency: 58,
+        why: `Cash does not build anything by itself, and money is not what limits the first months: permits, deliveries and labor hours are. You could hire ${parts.join(', ')}. Each is your call; the family keeps a living reserve either way.`,
+        acts: [
+          ...(ic.crew ? [{ label: `${ic.crew.lines.length ? 'Order and hire' : 'Hire'} a crew for the ${ic.crew.name} (~${usd(ic.crew.totalUsd)})`, act: { type: 'crew' as const, id: ic.crew.id, ...(ic.crew.lines.length ? { lines: ic.crew.lines } : {}) } }] : []),
+          ...(ic.guards ? [{ label: 'Contract guards (Defense tab)', act: { type: 'open' as const, right: 'defense' as const } }] : []),
+          ...(ic.metals > 0 ? [{ label: 'Gold and silver shelf', act: { type: 'shop' as const, tab: 'metals' } }] : []),
+        ] }); } }
   // a home that lost its roof (chimney fire, storm, looters): re-roof it before anything else, the family should not winter in tents
   { const bare = homes.find(h => h.roofLost && !isFinished(h));
     if (bare && stuck?.key !== `s:${bare.id}`) {
