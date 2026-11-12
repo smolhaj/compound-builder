@@ -207,7 +207,7 @@ export class LivestockRenderer {
       loc(0, by + bh * 0.45 + Math.sin(th) * nk, L.len * 0.4 + Math.cos(th) * nk, -th, L.head, L.head, L.head);
       put(this._head, nh++, a.kind === 'cow' ? 0xc9a98a : a.kind === 'sheep' ? 0x6a5c4c : L.col, a.tone);
       for (let i = 0; i < LEGS; i++) {
-        const fz = (i < 2 ? 1 : -1) * L.len * 0.3, fx = (i % 2 ? 1 : -1) * L.wid * 0.6, sw = swing * ((i < 2) === (i % 2 === 0) ? 1 : -1), r = Math.max(0.007, L.h * 0.085);
+        const fz = (i < 2 ? 1 : -1) * L.len * 0.3, fx = (i % 2 ? 1 : -1) * L.wid * 0.6, sw = swing * ((i < 2) === (i % 2 === 0) ? 1 : -1), r = Math.max(0.006, L.h * 0.064);
         loc(fx, by - bh * 0.2, fz, sw, r, by - bh * 0.2, r);
         put(this._leg, nl, a.kind === 'sheep' ? 0x4a4540 : bodyCol, a.tone * 0.7);
         nl++;
