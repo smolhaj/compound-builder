@@ -79,14 +79,19 @@ export interface AnimalGoal {
 export interface HerdCtx { hour: number; raided: boolean; storm: boolean; house: Pt; clock: number }
 
 export function animalGoal(a: { id: string; kind: StockKind }, homes: readonly Home[], c: HerdCtx, noWay: ReadonlySet<string> = new Set(), free?: (x: number, z: number) => boolean): AnimalGoal {
-  const night = c.hour >= 19.5 || c.hour < 6.2;
+  // dusk and dawn are staggered by animal (some go in at 19.5, the last about 20.8; out between 6.2 and 7), so they file through the door, not all at once
+  const night = c.hour >= 19.5 + hash(a.id, 13) * 1.3 || c.hour < 6.2 + hash(a.id, 14) * 0.8;
   const home = shelterOf(a.kind, a.id, homes, c.raided, c.house, noWay);
   if (!home) {
     // no roof: lying up by the camp
     return { x: c.house[0] + (hash(a.id, 1) - 0.5) * 1.6, z: c.house[1] + 1.4 + hash(a.id, 2) * 0.8, inside: false, home: null, panic: c.raided };
   }
   const door = doorOf(home);
-  if (c.raided || night || c.storm) return { x: door.x, z: door.z, inside: true, home: home.id, panic: c.raided };
+  if (c.raided || night || c.storm) {
+    // in through the door one by one: each aims for its own spot across the doorway, so they file in instead of piling at one point
+    const across = (hash(a.id, 12) - 0.5) * 0.5, px = -door.uz, pz = door.ux;
+    return { x: door.x + px * across, z: door.z + pz * across, inside: true, home: home.id, panic: c.raided };
+  }
   // turned out: a spot in the paddock in front of the door, moving on every few game hours
   const k0 = Math.floor(c.clock / 0.12 + hash(a.id, 4) * 40);
   // (a paddock wide enough for the herd to graze apart: about 5 m deep for the big animals, a coop yard for the hens)
