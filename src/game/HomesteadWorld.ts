@@ -2815,6 +2815,7 @@ export class HomesteadWorld {
     this.terrain.update();
     this._clock += dt;
     ForestRenderer.setWindTime(this._clock);
+    ForestRenderer.setGust(this.air.wind);
     updateWaterGlobals(this._ws.scene, this._clock);
     // Wood smoke: the stove is lit when it's cold, and for cooking morning and evening
     const a = this.air, h = a.hour;

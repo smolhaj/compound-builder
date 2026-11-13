@@ -134,7 +134,7 @@ export function packWear(w: Wear, cls: WearClass | null): [number, number, numbe
   const moss = cls === 'roof' || cls === 'stone' || cls === 'metal' || cls === 'wood' ? w.moss * (cls === 'metal' ? 0.4 : 1) : 0;
   // moss in the fraction, patch share in tenths in the integer part; grime rides on rust's sign-free headroom (x ≥ 2 never happens)
   const z = Math.min(0.999, moss) + Math.round(Math.min(0.9, w.patch) * 10);
-  return [Math.min(1, rust) + Math.round(Math.min(1, w.grime) * 10) * 2, gray, z, 1 - Math.min(1, peel)];
+  return [Math.min(1, rust) + Math.round(Math.min(2, w.grime) * 10) * 2, gray, z, 1 - Math.min(1, peel)];
 }
 
 /** Unpack (tests / the shader's reading of it). */
