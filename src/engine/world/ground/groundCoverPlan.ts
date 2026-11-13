@@ -31,9 +31,9 @@ export type LitterTile = (typeof LIT)[keyof typeof LIT];
 
 /** Card size (world units): width, height at scale 1. */
 export const CARD_SIZE: Record<number, readonly [number, number]> = {
-  [CARD.TUFT]: [0.13, 0.075], [CARD.TALL]: [0.14, 0.14], [CARD.STRAW]: [0.12, 0.1], [CARD.FERN]: [0.22, 0.13],
-  [CARD.DAISY]: [0.12, 0.09], [CARD.SPIKE]: [0.1, 0.12], [CARD.SCRUB]: [0.2, 0.1], [CARD.CACTUS]: [0.1, 0.075],
-  [CARD.YUCCA]: [0.13, 0.1], [CARD.CLOVER]: [0.1, 0.035], [CARD.BRAMBLE]: [0.2, 0.12], [CARD.LOW]: [0.1, 0.04],
+  [CARD.TUFT]: [0.105, 0.06], [CARD.TALL]: [0.12, 0.12], [CARD.STRAW]: [0.1, 0.085], [CARD.FERN]: [0.19, 0.115],
+  [CARD.DAISY]: [0.1, 0.075], [CARD.SPIKE]: [0.085, 0.1], [CARD.SCRUB]: [0.17, 0.09], [CARD.CACTUS]: [0.085, 0.065],
+  [CARD.YUCCA]: [0.11, 0.09], [CARD.CLOVER]: [0.09, 0.03], [CARD.BRAMBLE]: [0.17, 0.1], [CARD.LOW]: [0.09, 0.035],
 };
 
 type Weights = ReadonlyArray<readonly [number, number]>;
@@ -175,9 +175,9 @@ export interface CoverSampler {
 export interface QualityDensity { cards: number; litter: number; stones: number; scuffs: number }
 /** Planned items per square world unit at full density (the quality tier). */
 export const DENSITY: Record<Quality, QualityDensity> = {
-  high: { cards: 11.5, litter: 12, stones: 0.5, scuffs: 6 },
-  medium: { cards: 7.5, litter: 7, stones: 0.28, scuffs: 3.5 },
-  low: { cards: 3.2, litter: 2.2, stones: 0.08, scuffs: 1.2 },
+  high: { cards: 24, litter: 16, stones: 0.5, scuffs: 7 },
+  medium: { cards: 14, litter: 9, stones: 0.28, scuffs: 4 },
+  low: { cards: 6, litter: 3, stones: 0.08, scuffs: 1.5 },
 };
 
 /** Radius (world units) the cover reaches from the focus: it fades to nothing at `fadeEnd`. */
@@ -188,6 +188,18 @@ export const REACH: Record<Quality, { fadeStart: number; fadeEnd: number }> = {
 };
 
 export const CHUNK = 4;
+
+/**
+ * How much of the nominal density is kept at distance `d` from the focus (1 near, 0.22 at the fade end): the cover is thick
+ * round the feet and thins outward, so the triangles go where the eye is. The same hash thins on the CPU (what is drawn) and in
+ * the vertex shader (the smooth edge as the focus moves).
+ */
+export function thinKeep(d: number, fadeEnd: number): number {
+  const t = Math.min(1, Math.max(0, (d - 2) / Math.max(0.1, fadeEnd - 2)));
+  return 1 - 0.78 * t * t * (3 - 2 * t);
+}
+/** The per-item thinning number in [0, 1) (an item is kept while it is below `thinKeep`). */
+export function thinHash(rand: number): number { const v = rand * 91.7 + 0.37; return v - Math.floor(v); }
 
 // ── Pure helpers ─────────────────────────────────────────────────────────────
 

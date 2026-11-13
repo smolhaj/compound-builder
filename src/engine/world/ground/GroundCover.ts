@@ -18,7 +18,7 @@ import { seasonState } from '../season/seasonState';
 import type { Quality } from '../WorldScene';
 import { cardAtlas, litterAtlas, ATLAS_GRID } from './groundAtlas';
 import {
-  CARD_STRIDE, CHUNK, DENSITY, LITTER_STRIDE, REACH, STONE_STRIDE, flowerSeason, groundProfileFor, hexLinear, planChunk,
+  CARD_STRIDE, CHUNK, DENSITY, LITTER_STRIDE, REACH, STONE_STRIDE, flowerSeason, groundProfileFor, hexLinear, planChunk, thinHash, thinKeep,
   type ChunkPlan, type CoverSampler, type GroundProfile,
 } from './groundCoverPlan';
 import type { RegionKind } from '../terrain/regionalLandscape';
@@ -61,6 +61,11 @@ varying vec3 vGcFlower;
 varying float vGcFlag;
 varying float vGcSnow;
 bool gcIs(float a) { return abs(aTile - a) < 0.5; }
+float gcThin(float d, float r) {
+  float t = clamp((d - 2.0) / max(0.1, uGcFade.y - 2.0), 0.0, 1.0);
+  float keep = 1.0 - 0.78 * t * t * (3.0 - 2.0 * t);
+  return clamp((keep + 0.08 - fract(r * 91.7 + 0.37)) / 0.1, 0.0, 1.0);
+}
 `;
 
 const CARD_VERT = /* glsl */`
@@ -77,7 +82,7 @@ else if (gcIs(2.0)) { gcVis = 0.5 + 0.5 * clamp(max(max(gcDor, gcFall), uSeaB.z)
 else if (gcIs(3.0)) { gcVis = uGcEver > 0.5 ? 1.0 - 0.25 * uSeaC.w : 1.0 - smoothstep(0.35, 0.9, gcFall * 0.8 + gcDor + aRand * 0.2); gcHy = mix(1.0, 0.35, gcSnowB * (1.0 - uGcEver)); }
 else if (gcIs(4.0) || gcIs(5.0)) { gcVis = smoothstep(aRand * 0.5, aRand * 0.5 + 0.45, uGcFlower); gcHy = mix(1.0, 0.5, gcSnowB); }
 else if (gcIs(10.0)) { gcVis = 1.0 - 0.55 * smoothstep(0.4, 0.95, uSeaA.y + gcDor); gcHy = mix(1.0, 0.5, gcSnowB); }
-gcVis *= gcFade;
+gcVis *= gcFade * gcThin(gcD, aRand);
 vec3 transformed = vec3(position);
 float gcH = position.y;
 // wind: a travelling gust across the field plus a quick flutter, bending the upper blades along the wind
@@ -138,6 +143,7 @@ else if (gcIs(5.0)) { gcT = aCol * mix(1.0, 0.5, uSeaD.z); }
 else if (gcIs(6.0)) gcT = vec3(0.2, 0.12, 0.06);
 else if (gcIs(7.0)) { gcVis = clamp(0.35 + gcDry * 0.8 - aRand * 0.5, 0.0, 1.0); gcT = vec3(0.36, 0.28, 0.14) * (0.8 + 0.4 * aRand); }
 vGcSnow = clamp(uSeaB.x * 1.2, 0.0, 0.95);
+gcVis *= gcThin(gcD, aRand);
 vec3 transformed = vec3(position) * gcFade * gcVis;
 vGcUv = (vec2(mod(aTile, uGcGrid), floor(aTile / uGcGrid)) + 0.02 + uv * 0.96) / uGcGrid;
 vGcUv.y = 1.0 - vGcUv.y;
@@ -156,7 +162,7 @@ varying float vGcSnow;
 const FRAG_MAP = /* glsl */`
 vec4 gcTex = texture2D(uGcAtlas, vGcUv, -0.5);
 if (gcTex.a < 0.5) discard;
-vec3 gcCol = vGcTint * (0.3 + 1.2 * gcTex.r);
+vec3 gcCol = vGcTint * (0.22 + 1.0 * gcTex.r);
 if (vGcFlag > 0.5) {
   float pm = smoothstep(0.55, 0.85, gcTex.g);
   float ctr = smoothstep(0.35, 0.5, gcTex.g) * (1.0 - pm);
@@ -251,7 +257,7 @@ export class GroundCover {
     const q = this._quality, reach = REACH[q];
     this._u.uGcFade.value.set(reach.fadeStart, reach.fadeEnd);
     const area = Math.PI * (reach.fadeEnd + 1.3) * (reach.fadeEnd + 1.3), d = DENSITY[q];
-    const capC = Math.ceil(d.cards * area * 1.1), capL = Math.ceil((d.litter + d.scuffs) * area * 1.1), capS = Math.max(8, Math.ceil(d.stones * area * 1.6 * (this._profile?.stoneDensity ?? 1)));
+    const capC = Math.ceil(d.cards * area * 0.7), capL = Math.ceil((d.litter + d.scuffs) * area * 0.7), capS = Math.max(8, Math.ceil(d.stones * area * 1.6 * (this._profile?.stoneDensity ?? 1)));
 
     const share = (m: THREE.MeshStandardMaterial, vert: string, atlas: THREE.Texture | null, name: string) => {
       m.onBeforeCompile = (sh) => {
@@ -372,7 +378,7 @@ export class GroundCover {
 
   private _compose(): void {
     const cards = this._cards!, litter = this._litter!, stones = this._stones!;
-    const R = REACH[this._quality].fadeEnd + 1.3, R2 = R * R, cx = this._center.x, cz = this._center.y;
+    const fadeEnd = REACH[this._quality].fadeEnd, R = fadeEnd + 1.3, R2 = R * R, cx = this._center.x, cz = this._center.y;
     const i0 = Math.floor((cx - R) / CHUNK), i1 = Math.floor((cx + R) / CHUNK), j0 = Math.floor((cz - R) / CHUNK), j1 = Math.floor((cz + R) / CHUNK);
     const aT = cards.geometry.getAttribute('aTile') as THREE.InstancedBufferAttribute, aR = cards.geometry.getAttribute('aRand') as THREE.InstancedBufferAttribute, aC = cards.geometry.getAttribute('aCol') as THREE.InstancedBufferAttribute;
     const lT = litter.geometry.getAttribute('aTile') as THREE.InstancedBufferAttribute, lR = litter.geometry.getAttribute('aRand') as THREE.InstancedBufferAttribute, lC = litter.geometry.getAttribute('aCol') as THREE.InstancedBufferAttribute;
@@ -385,7 +391,8 @@ export class GroundCover {
       const A = c.cards;
       for (let o = 0; o < A.length && nc < capC; o += CARD_STRIDE) {
         const x = A[o], z = A[o + 2], dx = x - cx, dz = z - cz;
-        if (dx * dx + dz * dz > R2) continue;
+        const d2 = dx * dx + dz * dz;
+        if (d2 > R2 || thinHash(A[o + 7]) > thinKeep(Math.sqrt(d2), fadeEnd) + 0.08) continue;
         const r = A[o + 3], w = A[o + 4], hh = A[o + 5], cs = Math.cos(r), sn = Math.sin(r), m = nc * 16;
         cm[m] = cs * w; cm[m + 1] = 0; cm[m + 2] = -sn * w; cm[m + 3] = 0;
         cm[m + 4] = 0; cm[m + 5] = hh; cm[m + 6] = 0; cm[m + 7] = 0;
@@ -398,7 +405,8 @@ export class GroundCover {
       const L = c.litter;
       for (let o = 0; o < L.length && nl < capL; o += LITTER_STRIDE) {
         const x = L[o], z = L[o + 2], dx = x - cx, dz = z - cz;
-        if (dx * dx + dz * dz > R2) continue;
+        const d2 = dx * dx + dz * dz;
+        if (d2 > R2 || thinHash(L[o + 6]) > thinKeep(Math.sqrt(d2), fadeEnd) + 0.08) continue;
         const r = L[o + 3], size = L[o + 4], nx = L[o + 10], nz = L[o + 11], ny = Math.sqrt(Math.max(0.0001, 1 - nx * nx - nz * nz)), m = nl * 16;
         // basis lying on the slope: Y = normal, X = the heading projected onto the plane, Z = X × Y
         let hx = Math.cos(r), hz = Math.sin(r), hy = 0;
