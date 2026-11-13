@@ -79,12 +79,14 @@ describe('neighbors and the gate', () => {
     expect(run(true)).toBeGreaterThan(run(false));
   });
 
-  it('hiding in a bunker keeps the family safe even when they find the place', () => {
+  it('hiding in a bunker keeps the family safe when they find the place but not the way down (sim/bunkerHide.test.ts: when the bunker is found, it does not)', () => {
     for (let seed = 1; seed <= 20; seed++) {
       const g = afterHit(seed);
+      Object.assign(g.stock, { canned: 60, water_jugs: 40 });
       g.structures.push({ id: 'b', kind: 'bunker_hatch', x: 5, z: 5, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 });
       g.gate.pending = { id: 'x', kind: 'gang', day: 1, title: 'Gang', dossier: [], size: 8, armed: true, strength: 96, wants: { canned: 8 }, stances: ['hide'] };
-      resolve(g, 'hide');
+      const o = resolve(g, 'hide');
+      if (o.bunker && o.bunker.fight !== 'hidden') continue;
       expect(g.personState.every(ps => ps.needs.hurt.length === 0)).toBe(true);
     }
   });

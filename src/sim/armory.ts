@@ -239,6 +239,9 @@ export function firepower(s: GameState): number {
   }
   return sum / fighters.length;
 }
+/** A gun's weight in a fight (by type); the bunker's shootout (sim/bunkerHide.ts) reads it. */
+export const gunWeight = (g: Gun): number => FIGHT[GUN[g.model].type];
+export const isAutoGun = (t: GunType): boolean => isAuto(t);
 export const armed = (s: GameState) => s.armory.guns.some(g => (s.armory.ammo[GUN[g.model].cal] ?? 0) >= 10);
 
 /** Rounds one gun of this type fires in an average fight (spendInFight varies it between half and one and a half times this). */
