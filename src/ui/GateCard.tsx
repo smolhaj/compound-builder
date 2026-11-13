@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { ambushOdds, ambushParty, chosenParty } from '../sim/tunnelers';
 import { doorHoldLine } from '../sim/terrainFx';
+import { hidePreview } from '../sim/bunkerHide';
 import { fightOdds, hideFoundChance, postureOf, type Stance } from '../sim/encounters';
 import { askQuestion, carryLines, carryOf, MAX_QUESTIONS, QUESTIONS } from '../sim/newcomers';
 import { AFTERMATH_TEXT, SURRENDER_TEXT, aftermathHeads } from '../sim/aftermath';
@@ -158,6 +159,7 @@ export function GateCard() {
           {odds && <div>If you fight: you hold {inTen(odds.win)} · someone of yours killed or taken {inTen(odds.loseSomeone)}</div>}
           {odds && (() => { const d = doorHoldLine(g.game); return d ? <div style={{ opacity: 0.85 }}>{d}</div> : null; })()}
           {e.stances.includes('hide') && <div>If you hide: they find the place lived in {inTen(hideFoundChance(g.game, e, p))}, and strip it</div>}
+          {e.stances.includes('hide') && p.bunker && (() => { const hp = hidePreview(g.game, e, hideFoundChance(g.game, e, p)); return <div data-testid="hide-cost" style={{ opacity: 0.9 }}><div>{hp.costLine}.</div><div>{hp.daysLine}.</div><div>{hp.riskLine}.</div><div>{hp.foundLine}.</div></div>; })()}
         </div>}
         {cut && e.strength > 0 && e.kind !== 'break_in' && (() => {
           const offer = talkOffer(g.game, e, p);
@@ -180,7 +182,7 @@ export function GateCard() {
         </div>
         <div data-testid={cut ? 'stance-buttons' : undefined} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, ...(cut ? { flex: '0 0 auto', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 5 } : {}) }}>
           {e.stances.filter(st => !(e.kind === 'kin' && st === 'build_first')).map((st, i) => (
-            <button key={st} style={cut ? { ...button(st === picked), outline: st === picked ? '2px solid #d8c9a0' : undefined, background: st === picked ? '#4a4a3c' : '#2e302a', color: '#eee' } : button(i === 0)} title={label(st)[1]} onClick={() => (cut ? g.chooseStance(st) : g.answer(st))}>
+            <button key={st} disabled={st === 'hide' && p.bunker && !hidePreview(g.game, e, 0).viable} data-testid={`stance-${st}`} style={cut ? { ...button(st === picked), outline: st === picked ? '2px solid #d8c9a0' : undefined, background: st === picked ? '#4a4a3c' : '#2e302a', color: '#eee' } : button(i === 0)} title={label(st)[1]} onClick={() => (cut ? g.chooseStance(st) : g.answer(st))}>
               <div style={{ fontWeight: 600 }}>{label(st)[0]}</div>
               <div style={{ fontSize: 11.5, opacity: 0.75, ...CLAMP2 }}>{label(st)[1]}</div>
             </button>

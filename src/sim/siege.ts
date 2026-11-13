@@ -491,7 +491,7 @@ export type PlannedSpent = Record<string, number>;
  * `tone` is the outcome card's: good = they leave, mixed = they leave with something, bad = they
  * go through the house.
  */
-export function gateScene(s: GameState, e: Pick<Encounter, 'size' | 'kind' | 'id'>, stance: Stance, tone: 'good' | 'mixed' | 'bad', seed: number): Battle {
+export function gateScene(s: GameState, e: Pick<Encounter, 'size' | 'kind' | 'id'>, stance: Stance, tone: 'good' | 'mixed' | 'bad', seed: number, bunker?: { fight: string }): Battle {
   const r = mulberry32(seed * 7717 + 3);
   const { C, at } = stage(s, seed);
   const n = Math.max(2, Math.min(8, e.size));
@@ -526,6 +526,11 @@ export function gateScene(s: GameState, e: Pick<Encounter, 'size' | 'kind' | 'id
     if (tone === 'bad') {
       say(24, pickOf(r, ['Shop first. Grab the cans, all of it, and whatever fuel there is.', 'Load the truck. Get everything with a label on it.']), 'r0');
       for (let i = 0; i < n; i++) { const p = at(1.2 + (i % 3) * 0.6, (i - (n - 1) / 2) * 0.8); ev.push({ t: r2(28 + r() * 8), kind: 'move', unit: `r${i}`, x: r2(p.x), z: r2(p.z) }); }
+      if (bunker && bunker.fight !== 'hidden') {
+        // they found the way down: the crew gathers at the house, and what is said at the hatch is the scene (the fight below is on the outcome card)
+        say(34, pickOf(r, ['Hatch! There is a hatch under the rug!', 'Here. Steel door. Somebody is down there.', 'Stairs. Look, stairs. They are under us.']), 'r1');
+        say(42, bunker.fight === 'door_held' ? pickOf(r, ['It will not move. Forget it.', 'Solid steel. We are wasting our time.']) : bunker.fight === 'shootout' ? pickOf(r, ['Open it. Open it, go!', 'On three. One man at a time.']) : pickOf(r, ['Open it. They have nothing down there.', 'Get the door. Everyone out of there.']), 'r0');
+      }
       for (let i = 0; i < n; i++) { const p = at(start, (i - 3) * 1.8); ev.push({ t: r2(52 + r() * 8), kind: 'move', unit: `r${i}`, x: r2(p.x), z: r2(p.z) }); }
     } else {
       say(26, pickOf(r, ['Nobody. Empty. Let\'s go.', 'Nothing here. Back in the truck.']), 'r0');
