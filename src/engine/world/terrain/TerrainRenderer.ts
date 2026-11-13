@@ -85,6 +85,8 @@ uniform float uFarm;
 uniform float uFieldSize;
 uniform float uStoneWalls;
 uniform float uWaterY;
+uniform sampler2D uWetTex;
+uniform vec4 uWetRect;
 uniform float uSeaY;
 uniform float uSnowCover;
 uniform float uFieldMode;
@@ -156,6 +158,9 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
     uFieldSize: { value: look.fieldSize },
     uStoneWalls: { value: look.stoneWalls ? 1 : 0 },
     uWaterY: { value: waterY ?? -1e6 },
+    // a creek's signed-depth raster (StreamRenderer): the bank above the waterline goes damp, then wet mud (rect.z = 0: none)
+    uWetTex: { value: null as THREE.Texture | null },
+    uWetRect: { value: new THREE.Vector4(0, 0, 0, 0) },
     uSeaY: { value: -1e6 },
     uSnowCover: { value: 0 },
     uFieldMode: { value: look.fieldMode === 'plss' ? 0 : look.fieldMode === 'irregular' ? 1 : 2 },
@@ -416,6 +421,18 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
         // Damp shore and wet mud just above the water line
         float shore = 1.0 - smoothstep(0.0, 0.7, alt - uWaterY);
         col = mix(col, vec3(0.20, 0.19, 0.14), shore * 0.7);
+        // Creek bank: a darker, wetter band just above the waterline (damp → mud → dark wet sand at the edge), nothing under water
+        if (uWetRect.z > 0.0) {
+          vec2 wuv = (vRPos.xz - uWetRect.xy) * uWetRect.zw;
+          if (wuv.x > 0.0 && wuv.x < 1.0 && wuv.y > 0.0 && wuv.y < 1.0) {
+            float wsd = texture2D(uWetTex, wuv).r * 3.0 - 1.0;      // + under water, − above (units)
+            float damp = 1.0 - smoothstep(0.0, 0.34, -wsd);
+            float mud = 1.0 - smoothstep(0.0, 0.11, -wsd);
+            vec3 wetC = mix(vec3(0.17, 0.155, 0.11), vec3(0.30, 0.27, 0.19), smoothstep(0.02, 0.08, -wsd) * (0.5 + 0.5 * nb));
+            col *= 1.0 - 0.38 * damp;
+            col = mix(col, wetC, mud * 0.85);
+          }
+        }
         // Seabed (coastal maps): the ground under the ocean is sand fading to
         // dark sediment with depth — never fields or meadow showing through
         // the clear shallow water (eye test: lawn / field "slabs" in the SoCal sea)
@@ -480,6 +497,20 @@ export class TerrainRenderer {
   get mesh(): THREE.Mesh | null { return this._mesh; }
   private _holes: Array<[number, number, number, number]> = [];
   /** Cut openings clean through the ground (world rects, at most four): you look down a floor hatch's stairwell through the house's floor. */
+  /** The creek's signed-depth raster (rect: x0, z0, 1/w, 1/h) for the damp bank band; null clears it. */
+  setWetBank(tex: THREE.Texture | null, rect: THREE.Vector4 | null): void {
+    const u = this._u;
+    if (!u) return;
+    u['uWetTex'].value = tex;
+    (u['uWetRect'].value as THREE.Vector4).copy(rect ?? new THREE.Vector4(0, 0, 0, 0));
+  }
+
+  /** The water level of a lake on a lot (shore mud on the parcel's own ground); null = the region's. */
+  setShoreY(y: number | null, fallback: number | null): void {
+    const u = this._u;
+    if (u) u['uWaterY'].value = y ?? fallback ?? -1e6;
+  }
+
   setHoles(rects: ReadonlyArray<readonly [number, number, number, number]>): void {
     this._holes = rects.slice(0, 4).map(r => [r[0], r[1], r[2], r[3]]);
     this._applyHoles();
