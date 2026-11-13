@@ -72,6 +72,8 @@ try {
           const gy = (x, z) => world.groundAt(x, z);
           if (view === 'out') { // just outside the south wall (the gate side), looking in
             const x = cx + 4.5, z = cz + h + 5.5; qa.pose = { x, y: gy(x, z) + 0.3, z, lx: cx, ly: gy(cx, cz) + 0.35, lz: cz - 3, fov: 62 };
+          } else if (view === 'far') { // a wide look from the road, 30 units out
+            const x = cx - 2, z = cz + h + 30; qa.pose = { x, y: gy(x, z) + 0.45, z, lx: cx, ly: gy(cx, cz) + 0.5, lz: cz, fov: 55 };
           } else { // inside, a few units from the gate, looking out over the wall
             const x = cx + 3, z = cz + h - 6; qa.pose = { x, y: gy(x, z) + 0.3, z, lx: cx + 1, ly: gy(cx, cz) + 0.5, lz: cz + h + 30, fov: 62 };
           }
