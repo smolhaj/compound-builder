@@ -110,7 +110,7 @@ gcG = mix(gcG, vec3(0.22, 0.19, 0.115) * gcKk * (0.93 + 0.14 * aRand), gcDor * 0
 vec3 gcT = gcG;
 vGcFlag = 0.0; vGcFlower = aCol;
 if (gcIs(2.0)) gcT = vec3(0.34, 0.27, 0.13) * (0.75 + 0.5 * aRand) * mix(1.0, 0.8, uGcTerrDry * 0.0);
-else if (gcIs(3.0)) gcT = mix(vec3(0.07, 0.19, 0.045) * (0.8 + 0.4 * aRand), vec3(0.30, 0.14, 0.045), gcFall * (1.0 - uGcEver));
+else if (gcIs(3.0)) gcT = mix(vec3(0.05, 0.14, 0.035) * (0.8 + 0.4 * aRand), vec3(0.30, 0.14, 0.045), gcFall * (1.0 - uGcEver));
 else if (gcIs(4.0) || gcIs(5.0)) { gcT = gcG * 0.8; vGcFlag = 1.0; }
 else if (gcIs(6.0)) gcT = mix(vec3(0.13, 0.17, 0.095), uGcGrass * 0.55, 0.25) * (0.8 + 0.4 * aRand) * (1.0 - 0.12 * gcDor);
 else if (gcIs(7.0)) { gcT = vec3(0.075, 0.2, 0.075) * (0.85 + 0.3 * aRand); vGcFlag = 1.0; vGcFlower = aCol; }
@@ -166,7 +166,7 @@ vec3 gcCol = vGcTint * (0.22 + 1.0 * gcTex.r);
 if (vGcFlag > 0.5) {
   float pm = smoothstep(0.55, 0.85, gcTex.g);
   float ctr = smoothstep(0.35, 0.5, gcTex.g) * (1.0 - pm);
-  gcCol = mix(gcCol, vGcFlower * (0.55 + 0.7 * gcTex.r), pm);
+  gcCol = mix(gcCol, vGcFlower * (0.38 + 0.55 * gcTex.r), pm);
   gcCol = mix(gcCol, vec3(0.5, 0.33, 0.02), ctr);
 }
 gcCol = mix(gcCol, vec3(0.80, 0.83, 0.88), vGcSnow);
