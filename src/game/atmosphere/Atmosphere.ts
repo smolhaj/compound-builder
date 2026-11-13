@@ -131,7 +131,7 @@ export class Atmosphere {
   /** Wet surfaces after rain (rises with the rain, dries over about a minute). */
   private _wet = 0;
   /** QA: force every window's lamp kind / the fire. */
-  qa: { lamp?: LampKind; fire?: number } = {};
+  qa: { lamp?: LampKind; fire?: number; /** Hold the sense of safety (0-1) instead of reading the game. */ safety?: number } = {};
 
   constructor(host: AtmosHost) {
     this._h = host;
@@ -174,7 +174,7 @@ export class Atmosphere {
     this._safetyT -= f.dt;
     if (this._safetyT <= 0 || !this._safetyIn) { this._safetyT = 0.5; this._safetyIn = homeSafetyInput(game, f.battle ? { raid: 'attack' } : {}); }
     this.safety = homeSafety({ ...this._safetyIn, prev: this.warmth, dt: f.dt });
-    this.warmth = this.safety.level;
+    this.warmth = this.qa.safety ?? this.safety.level;
     const built = [...this._h.buildings()];
     // ── seasons: mud, frost, drifts, the stock tank ──
     const R = regionFor(game.site);

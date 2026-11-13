@@ -60,7 +60,7 @@ try {
     await page.evaluate(() => window.__cb.store.getState().setBuildingView('full'));
     const geo = await page.evaluate(() => { const w = window.__cb.world, st = window.__cb.game.getState().game.structures[0]; return { x: st.x, z: st.z, gy: w.groundAt(st.x, st.z) }; });
     const tod = t => page.evaluate(([t]) => window.__cb.store.getState().setTimeOfDay(t), [t]);
-    const warm = k => page.evaluate(([k]) => { window.__cb.world.atmos.warmth = k; }, [k]);
+    const warm = k => page.evaluate(([k]) => { const a = window.__cb.world.atmos; a.qa.safety = k >= 1 ? undefined : k; a.warmth = k; }, [k]);
     const shot = async name => { await frame(2); const f = `${outDir}/${kind}-${name}.png`; await page.screenshot({ path: f }); console.error(f); };
     const look = (r, pitch, yawA, h = 0.25, dx = 0, dz = 0) => page.evaluate(([x, z, gy, r, pitch, yawA, h, dx, dz]) => { const { cam } = window.__cb; cam.target.set(x + dx, gy + h, z + dz); cam.radius = r; cam.pitch = pitch; cam.yaw = yawA; }, [geo.x, geo.z, geo.gy, r, pitch, yawA, h, dx, dz]);
     // a person for scale on the lawn in front, the eye behind them
@@ -95,19 +95,13 @@ try {
         cb.cam.placeEye(st.x + ex, st.z + ez, st.x + tx, st.z + tz, floorEye);
       }, [p, 0.3]);
       await shot('inside');
+      if (views.includes('low')) { await warm(0.15); await shot('low-in'); await warm(1); }
       await page.evaluate(() => window.__cb.store.getState().setBuildingView('full'));
     }
     if (views.includes('low')) {
       await tod(22);
       await warm(0.15);
       await eye(2.2, -1, 0.26); await shot('low-out');
-      const p = INSIDE[kind] ?? INSIDE.cottage;
-      await page.evaluate(async ([p, floorEye]) => {
-        const cb = window.__cb, K = await import('/src/game/buildkit/kit.ts'), st = cb.game.getState().game.structures[0];
-        const [ex, ez] = K.rotQ(p.eye[0], p.eye[1], st.rot), [tx, tz] = K.rotQ(p.at[0], p.at[1], st.rot);
-        cb.cam.placeEye(st.x + ex, st.z + ez, st.x + tx, st.z + tz, floorEye);
-      }, [p, 0.36]);
-      await shot('low-in');
       await warm(1);
     }
   }
