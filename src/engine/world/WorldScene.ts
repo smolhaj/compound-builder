@@ -24,13 +24,13 @@ import { ColorGradingShader, COLOR_GRADING_PRESETS } from './post/ColorGradingSh
 import { GodRayShader } from './post/GodRayShader';
 import { TiltShiftH, TiltShiftV, tiltStrength } from './post/tiltShift';
 import {
-  ProceduralSky, SKY_PALETTES, blendSkyPalettes, createSkyPalette, type SkyPalette, type SkyWeather,
+  ProceduralSky, SKY_PALETTES, blendSkyPalettes, createSkyPalette, skyHorizonUniforms, type SkyPalette, type SkyWeather,
 } from './sky/ProceduralSky';
 import { godRayStrength, milkyWayVisibility, moonAngle, moonIllumination, starVisibility } from './sky/skyState';
 import { phaseWeights, type DayPhase } from './sky/dayPhase';
 import { installSeasonShaderPatch } from './season/seasonShader';
 import { weatherFogAerialScale } from './fog/aerialFog';
-import { NO_HEIGHT_FOG, installHeightFogPatch, setHeightFog as applyHeightFog, type HeightFogParams } from './fog/heightFog';
+import { AERIAL_TINT, NO_HEIGHT_FOG, installHeightFogPatch, setAerialSky, setHeightFog as applyHeightFog, type HeightFogParams } from './fog/heightFog';
 
 export type Quality = 'high' | 'medium' | 'low';
 
@@ -587,6 +587,7 @@ export class WorldScene {
     // (eye level keeps the full wall of weather; a pure fog day, with no precipitation, is left as it is)
     const hf = this._hfog, precip = Math.min(1, Math.max(wx.rain, wx.snow) * 1.5), hk = 1 - precip * (1 - weatherFogAerialScale(this.camera.position.y));
     applyHeightFog(this._quality === 'low' || !this.scene.fog ? NO_HEIGHT_FOG : hk >= 0.999 ? hf : { ...hf, bankDensity: hf.bankDensity * hk, cloudDensity: hf.cloudDensity * hk });
+    setAerialSky(this._quality === 'low' || !this.scene.fog ? null : skyHorizonUniforms(), AERIAL_TINT);
 
     this.scene.environmentIntensity = 0.15 + (1 - wn) * 0.19;
     if (this.outdoorLight < 0.999) {

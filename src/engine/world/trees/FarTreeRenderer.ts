@@ -258,7 +258,7 @@ export class FarTreeRenderer {
       this._disposables.push(near, far);
       const l = lists.get(sp);
       if (!l || l.m.length === 0) continue;
-      const set = new InstancedLodSet(this._scene, [{ geometry: near, maxDist: 180 }, { geometry: far, maxDist: Infinity }], SPECIES_DECIDUOUS[sp] ? brMat : conMat, l.m, {
+      const set = new InstancedLodSet(this._scene, [{ geometry: near, maxDist: 110 }, { geometry: far, maxDist: Infinity }], SPECIES_DECIDUOUS[sp] ? brMat : conMat, l.m, {
         name: 'regional_trees', userData: { type: 'regional_trees', species: sp, noSSAO: true }, noSSAOFromLevel: 0, maxDrawDist: 1400,
       });
       l.c.forEach((c, i) => set.setColorAt(i, c));

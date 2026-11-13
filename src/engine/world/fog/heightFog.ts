@@ -39,6 +39,38 @@ const A = { x: 0, y: 0, z: BANK_FALLOFF, w: 0 };           // bank top, bank den
 const B = { x: 0, y: 0, z: CLOUD_FALLOFF, w: 0 };          // cloud base, cloud density, falloff, noise
 const C = { x: 1.1, y: 1.1, z: 1.13, w: 0 };              // tint on the fog colour
 
+// Aerial perspective: the sky dome's own horizon (colors, sun) as plain holders, so every fogged material can tint its distance haze toward
+// the sky in its view direction (sun side warm and bright, anti-sun side cool). Filled by setAerialSky from the dome's uniforms each frame.
+const AE_A = { x: 0, y: 0, z: 0, w: 0 };   // horizon toward the sun, sun glow strength
+const AE_B = { x: 0, y: 0, z: 0, w: 0 };   // horizon away from the sun
+const AE_C = { x: 0, y: 0, z: 0, w: 0 };   // ground below the horizon
+const AE_D = { x: 0, y: 0, z: 0, w: 0 };   // glow added to the horizon (town lights, afterglow)
+const AE_E = { x: 0, y: 1, z: 0, w: 0 };   // sun direction
+const AE_F = { x: 0, y: 0, z: 0, w: 0 };   // sun color, w = amount of the aerial tint (0 = off)
+
+/** How much of the far haze takes the sky's color (0 = the single fog color, as before). */
+export const AERIAL_TINT = 0.6;
+
+/** Copy the sky dome's horizon uniforms (ProceduralSky.skyHorizonUniforms) into the shared holders. `amount` 0 turns the tint off. */
+export function setAerialSky(u: Record<string, THREE.IUniform> | null, amount: number): void {
+  if (!u) { AE_F.w = 0; return; }
+  const c = (k: string): THREE.Color => u[k].value as THREE.Color;
+  const hs = c('uSkyHS'), ha = c('uSkyHA'), gr = c('uSkyGround'), gl = c('uSkyGlow'), sc = c('uSkySunColor');
+  const sd = u['uSkySunDir'].value as THREE.Vector3;
+  AE_A.x = hs.r; AE_A.y = hs.g; AE_A.z = hs.b; AE_A.w = u['uSkySunGlow'].value as number;
+  AE_B.x = ha.r; AE_B.y = ha.g; AE_B.z = ha.b;
+  AE_C.x = gr.r; AE_C.y = gr.g; AE_C.z = gr.b;
+  AE_D.x = gl.r; AE_D.y = gl.g; AE_D.z = gl.b;
+  AE_E.x = sd.x; AE_E.y = sd.y; AE_E.z = sd.z;
+  AE_F.x = sc.r; AE_F.y = sc.g; AE_F.z = sc.b; AE_F.w = amount;
+}
+
+/** The tint's weight for a ray (mirrors the shader, for tests): none under 160 units, full from 900, scaled by how much fog is on, thinner with altitude. */
+export function aerialTintWeight(L: number, fogFactor: number, meanY: number): number {
+  const t = Math.max(0, Math.min(1, (L - 160) / 740));
+  return t * t * (3 - 2 * t) * Math.max(0, Math.min(1, fogFactor * 1.6)) * Math.exp(-Math.max(meanY, 0) * 0.004);
+}
+
 /** Write a frame's parameters into the shared uniforms. */
 export function setHeightFog(p: HeightFogParams): void {
   A.x = p.bankTop; A.y = p.bankDensity; A.w = p.time;
@@ -81,7 +113,17 @@ const PARS_FRAG = /* glsl */`
   uniform vec4 uHFogA;   // bank top, bank density, falloff above the top, time (s)
   uniform vec4 uHFogB;   // cloud base, cloud density, falloff below the base, noise amount
   uniform vec4 uHFogC;   // mist tint (multiplies the fog colour)
+  uniform vec4 uAeA; uniform vec4 uAeB; uniform vec4 uAeC; uniform vec4 uAeD; uniform vec4 uAeE; uniform vec4 uAeF;
   varying vec3 vFogV;
+  // the sky dome's horizon color in direction d (ProceduralSky SKY_HORIZON_GLSL), above the horizon only
+  vec3 aeSky( vec3 d ) {
+    vec2 dxz = normalize( d.xz + vec2( 1e-5 ) );
+    vec2 sxz = normalize( uAeE.xz + vec2( 1e-5 ) );
+    float az = clamp( dot( dxz, sxz ) * 0.5 + 0.5, 0.0, 1.0 );
+    vec3 sky = mix( uAeB.xyz, uAeA.xyz, az * az ) * 1.14 + uAeD.xyz;
+    float mu = max( dot( d, normalize( uAeE.xyz ) ), 0.0 );
+    return sky + uAeF.xyz * uAeA.w * ( 0.30 * pow( mu, 10.0 ) + 0.90 * pow( mu, 160.0 ) );
+  }
   float hfHash( vec2 p ) { vec3 p3 = fract( vec3( p.xyx ) * 0.1031 ); p3 += dot( p3, p3.yzx + 33.33 ); return fract( ( p3.x + p3.y ) * p3.z ); }
   float hfNoise( vec2 p ) {
     vec2 i = floor( p ); vec2 f = fract( p ); vec2 u = f * f * ( 3.0 - 2.0 * f );
@@ -119,6 +161,18 @@ export const HEIGHT_FOG_GLSL = /* glsl */`
     if ( uHFogB.y > 1e-4 ) tau += hfBelow( - cameraPosition.y, - hfW.y, hfL, - uHFogB.x, uHFogB.z, uHFogB.y * max( hfNB, 0.0 ) );
     gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor * uHFogC.rgb, 1.0 - exp( - tau ) );
   }
+  // aerial perspective: the far haze takes the sky's color in this view direction (warm and bright toward the sun, cool away from it)
+  if ( uAeF.w > 0.0 ) {
+    float aeL = length( vFogV );
+    if ( aeL > 160.0 ) {
+      vec3 aeW = cameraPosition + ( vec4( vFogV, 0.0 ) * viewMatrix ).xyz;
+      vec3 aeD = ( aeW - cameraPosition ) / aeL;
+      aeD.y = max( aeD.y, 0.02 );
+      float aeF = 1.0 - exp( - fogDensity * fogDensity * mix( 1.0, 0.1, smoothstep( 80.0, 420.0, aeL ) ) * aeL * aeL );
+      float aeK = smoothstep( 160.0, 900.0, aeL ) * clamp( aeF * 1.6, 0.0, 1.0 ) * exp( - max( 0.5 * ( cameraPosition.y + aeW.y ), 0.0 ) * 0.004 ) * uAeF.w;
+      gl_FragColor.rgb = mix( gl_FragColor.rgb, aeSky( aeD ), aeK );
+    }
+  }
   #endif
 `;
 const FRAG = /* glsl */`
@@ -146,5 +200,6 @@ export function installHeightFogPatch(): void {
   for (const id of ['standard', 'physical'] as const) {
     const u = THREE.ShaderLib[id].uniforms as Record<string, THREE.IUniform>;
     u.uHFogA = { value: A }; u.uHFogB = { value: B }; u.uHFogC = { value: C };
+    u.uAeA = { value: AE_A }; u.uAeB = { value: AE_B }; u.uAeC = { value: AE_C }; u.uAeD = { value: AE_D }; u.uAeE = { value: AE_E }; u.uAeF = { value: AE_F };
   }
 }
