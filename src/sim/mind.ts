@@ -56,6 +56,7 @@ import { tension } from './disaster';
 import { eveningHelps, sharedPoints, wearKits, type KitId } from './evenings';
 import { drilledOf } from './courses';
 import { comfortPoints } from './comfort';
+import { ritualHelp } from './rituals';
 import { bondHelp, bondsRift } from './bonds';
 
 export type TraumaKind = 'raid' | 'wounded' | 'killed' | 'execution' | 'captivity' | 'witness' | 'disaster';
@@ -421,6 +422,7 @@ export function reading(s: GameState, p: Person, sleeping: ReturnType<typeof sle
   h('work that means something', !p.kid && meaningful ? 3 : 0);
   h('passing a trade on', row.filter(d => d === 'mentor').length >= 2 ? 5 : 0);
   if (p.kid) h('school, bedtime and a parent near', (row.filter(d => d === 'school' || d === 'mentor').length >= 2 ? 3 : 0) + (row.filter(d => d === 'sleep').length >= 9 ? 2 : 0) + (living.some(q => !q.kid && closeness(p, q) >= 1) ? 2 : 0));
+  h('family evenings', ritualHelp(s.rituals?.score[p.id] ?? 0));
   h('a dog', dogEffects(s, p.id).morale > 0 ? (p.kid ? 3 : 2) : 0);
   const mate = p.partner ? person(s, p.partner) : undefined;
   h('someone close', mate && here(s, mate) ? 2 : living.some(q => q !== p && closeness(p, q) >= 0.8) ? 1.5 : 0);

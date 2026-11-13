@@ -11,7 +11,7 @@ const DOOR_HALF = 0.12, DOOR_DEPTH = 0.08;
 
 /** `pad`: shrink every opening by this much (the router keeps a hand's width from the edges of a breach; the checker tests the true size). */
 export function navFor(b: Battle, solid: (x: number, z: number) => boolean, pad = 0): NavWorld {
-  const barriers: Barrier[] = [], carves: Carve[] = [];
+  const barriers: Barrier[] = [], carves: Carve[] = [], portals: Array<[Pt, Pt]> = [];
   const doors = b.events.filter((e): e is Extract<BattleEvent, { kind: 'house_door' }> => e.kind === 'house_door').sort((p, q) => p.t - q.t);
   let closedFrom: number | null = null;
   const rect = (d: Extract<BattleEvent, { kind: 'house_door' }>) => Math.abs(d.nx) > Math.abs(d.nz)
@@ -31,7 +31,7 @@ export function navFor(b: Battle, solid: (x: number, z: number) => boolean, pad 
   if (climb && climb.method === 'climb' && !b.events.some(e => e.kind === 'gap')) {
     const spot = climb.where as ({ x?: number; z?: number; w: number } | null), br = b.events.find(e => e.kind === 'breach') as { t: number; x: number; z: number } | undefined;
     const cx = spot?.x ?? br?.x, cz = spot?.z ?? br?.z;
-    if (cx !== undefined && cz !== undefined) { const h = 0.6 - pad; carves.push({ x0: cx - h - 0.3, x1: cx + h + 0.3, z0: cz - h - 0.3, z1: cz + h + 0.3, from: (br?.t ?? climb.t) - 1.5 }); }
+    if (cx !== undefined && cz !== undefined) { const o = (spot as { out?: { x: number; z: number } } | null)?.out ?? out ? { x: (spot as { out?: { x: number; z: number } } | null)?.out?.x ?? out!.ox, z: (spot as { out?: { x: number; z: number } } | null)?.out?.z ?? out!.oz } : null; if (o) portals.push([{ x: cx - o.x * 0.9, z: cz - o.z * 0.9 }, { x: cx + o.x * 0.9, z: cz + o.z * 0.9 }]); const h = 0.6 - pad; carves.push({ x0: cx - h - 0.3, x1: cx + h + 0.3, z0: cz - h - 0.3, z1: cz + h + 0.3, from: (br?.t ?? climb.t) - 1.5 }); }
   }
   for (const e of b.events) if (e.kind === 'gap') {
     const along = Math.max(0.06, e.w / 2 - 0.04 - pad), across = 0.32, acrossX = out ? Math.abs(out.ox) > Math.abs(out.oz) : null;
@@ -39,16 +39,36 @@ export function navFor(b: Battle, solid: (x: number, z: number) => boolean, pad 
     else if (acrossX) carves.push({ x0: e.x - across, x1: e.x + across, z0: e.z - along, z1: e.z + along, from: e.t });
     else carves.push({ x0: e.x - along, x1: e.x + along, z0: e.z - across, z1: e.z + across, from: e.t });
   }
-  return { solid, barriers, carves };
+  return { solid, barriers, carves, portals };
+}
+
+/** The two landing spots on either side of each gate in the wall runs (for `routeScene`): a hand off the gate's line, along the wall's normal. */
+export function gatePortals(runs: ReadonlyArray<{ pts: ReadonlyArray<readonly [number, number]>; gates: ReadonlyArray<{ at: number; w: number }> }>): Array<[Pt, Pt]> {
+  const out: Array<[Pt, Pt]> = [];
+  for (const run of runs) for (const gt of run.gates) {
+    let acc = 0;
+    for (let i = 1; i < run.pts.length; i++) {
+      const [ax, az] = run.pts[i - 1], [bx, bz] = run.pts[i], len = Math.hypot(bx - ax, bz - az);
+      if (gt.at >= acc && gt.at <= acc + len) {
+        const f = (gt.at - acc) / (len || 1), x = ax + (bx - ax) * f, z = az + (bz - az) * f, nx = -(bz - az) / (len || 1), nz = (bx - ax) / (len || 1);
+        out.push([{ x: x + nx * 0.45, z: z + nz * 0.45 }, { x: x - nx * 0.45, z: z - nz * 0.45 }]);
+        break;
+      }
+      acc += len;
+    }
+  }
+  return out;
 }
 
 /** Route a whole staged scene. Anything that goes wrong leaves the scene as it was (a cutscene must never take the game down). */
-export function routeScene(b: Battle, solid: (x: number, z: number) => boolean, center?: Pt, steps: readonly StepSeg[] = []): { battle: Battle; unrouted: number; lost: Array<{ unit: string; t: number; from: Pt; to: Pt }>; nudged: string[]; ok: boolean } {
+export function routeScene(b: Battle, solid: (x: number, z: number) => boolean, center?: Pt, steps: readonly StepSeg[] = [], portals: Array<[Pt, Pt]> = []): { battle: Battle; unrouted: number; lost: Array<{ unit: string; t: number; from: Pt; to: Pt }>; nudged: string[]; ok: boolean } {
   try {
     const lifted = elevateOnProps(b, steps, solid);
     const iw = lifted.invasion?.interior;
     const settle = iw ? { ids: new Set(lifted.units.filter(u => u.side === 'home' && !u.civilian && !u.machine && !u.bystander).map(u => u.id)), from: iw.from - 8, to: iw.to } : undefined;
-    const r = routeBattle(lifted, navFor(lifted, solid, 0.06), center, settle);
+    const nav = navFor(lifted, solid, 0.06);
+    nav.portals = [...(nav.portals ?? []), ...portals];
+    const r = routeBattle(lifted, nav, center, settle);
     return { ...r, ok: true };
   } catch {
     return { battle: b, unrouted: 0, lost: [], nudged: [], ok: false };

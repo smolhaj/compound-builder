@@ -11,6 +11,7 @@ import { lightLabel } from '../game/battle/lightLabel';
 import { RaidOrders } from './GateCard';
 import { ORDERS, ORDER_HINT, ORDER_NAME } from '../sim/raidOrders';
 import { lootLines } from '../sim/raidFacts';
+import type { RaidBreakdown } from '../sim/raidBreakdown';
 
 const BAR = 'clamp(54px, 12vh, 120px)';
 const FONT = '"Iowan Old Style", "Palatino Linotype", Georgia, serif';
@@ -162,10 +163,27 @@ function Report() {
       {r.facts && r.facts.loss.people.spared > 0 && row('Spared', pluralize(r.facts.loss.people.spared, 'person', 'people'))}
       {r.facts?.hostages.length ? row('Hostages', pluralize(r.facts.hostages.length, 'person', 'people') + ' (you can get them back: radio, ransom or a rescue)', true) : null}
       {row('Raiders on the drive', r.raidersWounded + r.raidersDead + (r.raidersSurrendered ?? 0) ? [(r.raidersSurrendered ?? 0) > 0 ? `${r.raidersSurrendered} surrendered` : '', r.raidersWounded > 0 ? `${r.raidersWounded} wounded` : '', r.raidersDead > 0 ? `${r.raidersDead} dead` : ''].filter(Boolean).join(', ') : 'none left')}
+      {r.breakdown && <Breakdown b={r.breakdown} />}
       <MoreLines rounds={r.rounds} lines={r.lines.filter(l => !/^Lost:|rounds fired\.$|more rounds went out/.test(l))} />
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
         <button style={{ ...btn, background: '#d8c9a0', color: '#1c1d18', border: 0, padding: '8px 16px', fontSize: 14 }} onClick={end}>{r.aftermath ? 'Check the drive' : 'Pick up the pieces'}</button>
       </div>
+    </div>
+  );
+}
+
+/** Why it went the way it did: one line per defense layer, held or failed (sim/raidBreakdown.ts). Open by default; the headline stays when folded. */
+function Breakdown({ b }: { b: RaidBreakdown }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div data-testid="raid-breakdown" style={{ margin: '8px 0 2px' }}>
+      <button style={{ ...btn, width: '100%', textAlign: 'left', background: 'rgba(30,26,22,0.9)' }} data-testid="raid-breakdown-toggle" onClick={() => setOpen(o => !o)}>{open ? '▾' : '▸'} Why it went this way: {b.headline}</button>
+      {open && <div style={{ marginTop: 6 }}>
+        {b.lines.map((l, i) => <div key={i} data-testid={`breakdown-${l.layer}`} style={{ display: 'flex', gap: 8, padding: '3px 0', borderBottom: '1px solid rgba(239,230,212,0.1)', fontSize: 13, lineHeight: 1.3 }}>
+          <span style={{ width: 62, flex: 'none', fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6, color: l.held ? '#a8d080' : '#f08070' }}>{l.held ? 'Held' : 'Failed'}</span>
+          <span style={{ opacity: 0.9 }}>{l.text}</span>
+        </div>)}
+      </div>}
     </div>
   );
 }

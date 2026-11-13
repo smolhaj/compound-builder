@@ -27,6 +27,8 @@ export interface NavWorld {
   solid: (x: number, z: number) => boolean;
   barriers: Barrier[];
   carves: Carve[];
+  /** Static openings the caller knows (a gate in the yard wall): a spot on each side. The router joins each pair; nothing else is assumed about them. */
+  portals?: Array<[Pt, Pt]>;
 }
 
 /** A timed opening counts as open a tenth of a second after its moment (the frame the door swings, the dust of the breach): nobody steps through on the exact tick. */
@@ -68,6 +70,207 @@ export interface WalkResult { events: BattleEvent[]; units: Battle['units']; /**
 
 // ─── search ──────────────────────────────────────────────────────────────
 
+// ─── what the scene's static world has taught the router ────────────────────
+//
+// Two caches live as long as the static solid test does (a world's `solid` function; the game makes a new one whenever a structure or a wall run changes, so they
+// are rebuilt exactly when the compound changes, and shared by every scene of one cutscene):
+//   the lattice  - whether a spot is solid, asked once per cell of a fixed lattice instead of once per search (a scene's 100+ searches overlap almost completely, and
+//                  in the game each answer walks the stream, the buildings, the wall runs and the trees);
+//   the opening graph - the corners and openings (gates, breaches, doorways) that earlier legs were routed through, joined where a leg ran from one to the next. A new
+//                  leg first tries to ride that graph (a few straight, verified runs between known openings) and only floods a search grid when the graph has no good way.
+// Timed doors and breaches are never stored: a graph path is re-checked at the clock it will be walked, and a shut door sends the leg back to the search.
+
+/** Cell sizes the search grids use (a grid is aligned to its own cell size so scenes' searches share lattice answers). */
+const LEVELS = Array.from({ length: 24 }, (_, k) => 0.05 * Math.pow(1.12, k));
+const PAGE = 32;
+interface Graph { nodes: Pt[]; adj: number[][]; byCell: Map<number, number[]>; sees: Map<number, boolean>; /** Edges through a known opening (checked at the clock of use, inside the search). */ portal: Set<number> }
+interface StaticCache { pages: Map<number, Uint8Array>; lookups: number; misses: number }
+const GRAPHS = new WeakMap<NavWorld, Graph>();
+const STATIC = new WeakMap<object, StaticCache>();
+const cacheOf = (w: NavWorld): StaticCache => {
+  const key = w.solid as unknown as object;
+  let c = STATIC.get(key);
+  if (!c) { c = { pages: new Map(), lookups: 0, misses: 0 }; STATIC.set(key, c); }
+  return c;
+};
+/** Is the lattice cell (li, lj) of cell size `cell` (level `lv`) solid? 0 unknown, 1 open, 2 solid in the page. */
+function latticeSolid(w: NavWorld, c: StaticCache, lv: number, cell: number, li: number, lj: number, ph = 0): boolean {
+  const off = ph * 0.5, pi = Math.floor(li / PAGE), pj = Math.floor(lj / PAGE), key = ((lv * 2 + ph) * 4096 + (pi & 4095)) * 4096 + (pj & 4095);
+  let page = c.pages.get(key);
+  if (!page) { page = new Uint8Array(PAGE * PAGE); c.pages.set(key, page); }
+  const k = (lj - pj * PAGE) * PAGE + (li - pi * PAGE);
+  c.lookups++;
+  let v = page[k];
+  if (v === 0) { c.misses++; v = w.solid((li + 0.5 + off) * cell, (lj + 0.5 + off) * cell) ? 2 : 1; page[k] = v; }
+  return v === 2;
+}
+
+/** How far outside an opening its two landing spots lie, beyond the opening's own half depth. */
+const LANDING = 0.2;
+/**
+ * The scene's opening graph, made once per world (a scene) and grown by every routed leg: seeded with the two landing spots on either side of each opening that is
+ * known up front - every timed door and breach, and the static gates the caller names - and each pair joined (the way through is checked at the clock it is used).
+ */
+function graphOf(w: NavWorld): Graph {
+  let G = GRAPHS.get(w);
+  if (G) return G;
+  G = { nodes: [], adj: [], byCell: new Map(), sees: new Map(), portal: new Set() };
+  GRAPHS.set(w, G);
+  const pair = (p: Pt, q: Pt) => {
+    if (blockedAtStatic(w, p) || blockedAtStatic(w, q)) return;
+    const i = nodeAt(G!, p), j = nodeAt(G!, q);
+    if (i >= 0 && j >= 0 && i !== j) { G!.adj[i].push(j); G!.adj[j].push(i); G!.portal.add(i < j ? i * 4096 + j : j * 4096 + i); }
+  };
+  for (const r of [...w.barriers, ...w.carves]) {
+    const hx = (r.x1 - r.x0) / 2, hz = (r.z1 - r.z0) / 2, cx = (r.x0 + r.x1) / 2, cz = (r.z0 + r.z1) / 2;
+    if (Math.abs(hx - hz) < 0.02) continue;   // (a square patch is a climbed spot, not a doorway with a direction)
+    if (hx < hz) pair({ x: cx - hx - LANDING, z: cz }, { x: cx + hx + LANDING, z: cz }); else pair({ x: cx, z: cz - hz - LANDING }, { x: cx, z: cz + hz + LANDING });
+  }
+  for (const [p, q] of w.portals ?? []) pair(p, q);
+  return G;
+}
+const blockedAtStatic = (w: NavWorld, p: Pt) => w.solid(p.x, p.z);
+
+/** Graph node spacing: two nodes closer than this are one. */
+const NODE_MERGE = 0.06, NODE_CAP = 900, NODE_CELL = 1;
+const cellKey = (x: number, z: number) => Math.floor(x / NODE_CELL) * 100003 + Math.floor(z / NODE_CELL);
+function nodeAt(G: Graph, p: Pt): number {
+  const cx = Math.floor(p.x / NODE_CELL), cz = Math.floor(p.z / NODE_CELL);
+  for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+    const a = G.byCell.get((cx + i) * 100003 + cz + j);
+    if (a) for (const n of a) if (Math.hypot(G.nodes[n].x - p.x, G.nodes[n].z - p.z) < NODE_MERGE) return n;
+  }
+  if (G.nodes.length >= NODE_CAP) return -1;
+  const n = G.nodes.length;
+  G.nodes.push({ x: p.x, z: p.z }); G.adj.push([]);
+  const k = cellKey(p.x, p.z), a = G.byCell.get(k);
+  if (a) a.push(n); else G.byCell.set(k, [n]);
+  return n;
+}
+/** Remember a routed path: its points are nodes, and each run between two of them an edge. */
+function learnPath(w: NavWorld, a: Pt, path: readonly Pt[]): void {
+  const G = graphOf(w);
+  let prev = nodeAt(G, a);
+  for (const p of path) {
+    const n = nodeAt(G, p);
+    if (prev >= 0 && n >= 0 && n !== prev) { if (!G.adj[prev].includes(n)) G.adj[prev].push(n); if (!G.adj[n].includes(prev)) G.adj[n].push(prev); }
+    prev = n;
+  }
+}
+/** The nodes within `r` of p that p can walk to in a clear line at time t, nearest first (at most `max`). */
+function visibleNodes(w: NavWorld, G: Graph, p: Pt, t: number, speed: number, r: number, max: number, toward: boolean, other: Pt): number[] {
+  const cand: Array<{ n: number; d: number }> = [];
+  const cx = Math.floor(p.x / NODE_CELL), cz = Math.floor(p.z / NODE_CELL), reach = Math.ceil(r / NODE_CELL);
+  for (let i = -reach; i <= reach; i++) for (let j = -reach; j <= reach; j++) {
+    const a = G.byCell.get((cx + i) * 100003 + cz + j);
+    if (a) for (const n of a) { const d = Math.hypot(G.nodes[n].x - p.x, G.nodes[n].z - p.z); if (d <= r) cand.push({ n, d }); }
+  }
+  // (nearest first, but a node that lies back the way he came is worth less than one toward the goal)
+  cand.sort((u, v) => (u.d + (toward ? 0 : 0) + 0.3 * Math.hypot(G.nodes[u.n].x - other.x, G.nodes[u.n].z - other.z)) - (v.d + 0.3 * Math.hypot(G.nodes[v.n].x - other.x, G.nodes[v.n].z - other.z)));
+  const out: number[] = [];
+  let tries = 0;
+  for (const c of cand) {
+    if (out.length >= max || tries >= max * 2) break;
+    const q = G.nodes[c.n];
+    if (!staticSees2(w, cacheOf(w), p, q)) continue;   // (the cached lattice rules out the walled-off ones for almost nothing; the real line decides the rest)
+    tries++;
+    if (toward ? lineClear(w, p, q, t, speed) : lineClear(w, q, p, t, speed)) out.push(c.n);
+  }
+  return out;
+}
+
+/** How far (in node cells, one unit each) two nodes may be and still be tested for sight of each other. */
+const VIS_R = 6;
+/** Can the static ground (no doors, no breaches) be crossed in a straight line between two nodes? Memoised for the life of the cache. */
+function staticSees(w: NavWorld, c: StaticCache, G: Graph, i: number, j: number): boolean {
+  const key = i < j ? i * 4096 + j : j * 4096 + i, hit = G.sees.get(key);
+  if (hit !== undefined) return hit;
+  const p = G.nodes[i], q = G.nodes[j], d = Math.hypot(q.x - p.x, q.z - p.z), n = Math.max(1, Math.ceil(d / SUB));
+  let ok = true;
+  for (let k = 1; k <= n && ok; k++) { const f = k / n; if (latticeSolid(w, c, 0, LEVELS[0], Math.floor((p.x + (q.x - p.x) * f) / LEVELS[0]), Math.floor((p.z + (q.z - p.z) * f) / LEVELS[0]))) ok = false; }
+  G.sees.set(key, ok);
+  return ok;
+}
+
+/** Can the static ground be crossed in a straight line from a to b (lattice answers)? */
+function staticSees2(w: NavWorld, c: StaticCache, a: Pt, b: Pt): boolean {
+  const d = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(1, Math.ceil(d / SUB)), L0 = LEVELS[0];
+  for (let k = 1; k <= n; k++) { const f = k / n; if (latticeSolid(w, c, 0, L0, Math.floor((a.x + (b.x - a.x) * f) / L0), Math.floor((a.z + (b.z - a.z) * f) / L0))) return false; }
+  return true;
+}
+
+/** The longest a graph path may be against the straight line before the search grid is trusted to do better. */
+const GRAPH_RATIO = 1.5, GRAPH_SLACK = 1.2, GRAPH_MIN = 1.2;
+/** A path from a to b along the opening graph (a few verified runs), or null. */
+function graphPath(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[] | null {
+  const SC = cacheOf(w), G = graphOf(w);
+  if (G.nodes.length < 2) return null;
+  const direct = Math.hypot(b.x - a.x, b.z - a.z);
+  if (direct < GRAPH_MIN) return null;
+  const R = 14;
+  const from = visibleNodes(w, G, a, t, speed, R, 5, true, b);
+  if (!from.length) return null;
+  const to = visibleNodes(w, G, b, t, speed, R, 5, false, a);
+  if (!to.length) return null;
+  const goal = new Map(to.map(n => [n, Math.hypot(G.nodes[n].x - b.x, G.nodes[n].z - b.z)]));
+  const dist = new Map<number, number>(), prev = new Map<number, number>(), done = new Set<number>();
+  // (a small Dijkstra over at most a few hundred nodes: a linear scan for the next node is cheaper than a heap here)
+  const open = new Set<number>();
+  for (const n of from) { dist.set(n, Math.hypot(G.nodes[n].x - a.x, G.nodes[n].z - a.z)); open.add(n); }
+  let best = -1, bestCost = Infinity;
+  // (a wall between the two ends makes a long way round the only way: then the way is not judged against the straight line)
+  const walled = !staticSees2(w, SC, a, b);
+  const limit = walled ? 8 * direct + 90 : GRAPH_RATIO * direct + GRAPH_SLACK;
+  while (open.size) {
+    let cur = -1, cd = Infinity;
+    for (const n of open) { const d = dist.get(n)!; if (d < cd) { cd = d; cur = n; } }
+    if (cd >= bestCost || cd > limit) break;
+    open.delete(cur); done.add(cur);
+    if (goal.has(cur) && cd + goal.get(cur)! < bestCost) { bestCost = cd + goal.get(cur)!; best = cur; }
+    const around: number[] = [...G.adj[cur]];
+    // (and the nodes it can see on the static ground: two openings in view of each other need no search between them)
+    { const p0 = G.nodes[cur], cx = Math.floor(p0.x / NODE_CELL), cz = Math.floor(p0.z / NODE_CELL);
+      for (let i = -VIS_R; i <= VIS_R; i++) for (let j = -VIS_R; j <= VIS_R; j++) { const arr = G.byCell.get((cx + i) * 100003 + cz + j); if (arr) for (const m of arr) if (m !== cur && !done.has(m) && !G.adj[cur].includes(m) && Math.hypot(G.nodes[m].x - p0.x, G.nodes[m].z - p0.z) <= VIS_R && staticSees(w, SC, G, cur, m)) around.push(m); } }
+    for (const m of around) {
+      if (done.has(m)) continue;
+      const nd = cd + Math.hypot(G.nodes[m].x - G.nodes[cur].x, G.nodes[m].z - G.nodes[cur].z);
+      // (an opening that is shut when he would get there is no way yet: the timed layers decide, here, for the openings the graph was seeded with)
+      if (G.portal.has(cur < m ? cur * 4096 + m : m * 4096 + cur) && !lineClear(w, G.nodes[cur], G.nodes[m], t + cd / speed, speed)) continue;
+      if (nd < (dist.get(m) ?? Infinity)) { dist.set(m, nd); prev.set(m, cur); open.add(m); }
+    }
+  }
+  if (best < 0 || bestCost > limit) return null;
+  const chain: Pt[] = [];
+  for (let n: number | undefined = best; n !== undefined; n = prev.get(n)) chain.push(G.nodes[n]);
+  chain.reverse();
+  const raw = [a, ...chain, b];
+  const out = pullString(w, raw, t, speed);
+  // (every run must be clear at the clock it will be walked: a door shut since the nodes were learned sends the leg to the search)
+  if (!checkLegs(w, a, out, t, speed)) return null;
+  return out;
+}
+
+/** String-pull: from each anchor, the farthest point with a clear line. `raw[0]` is the start. */
+function pullString(w: NavWorld, raw: readonly Pt[], t: number, speed: number): Pt[] {
+  const out: Pt[] = [];
+  let anchor = raw[0], tt = t, k = 0;
+  while (k < raw.length - 1) {
+    let far = k + 1;
+    for (let m = raw.length - 1; m > k + 1; m--) if (lineClear(w, anchor, raw[m], tt, speed)) { far = m; break; }
+    out.push(raw[far]);
+    tt += Math.hypot(raw[far].x - anchor.x, raw[far].z - anchor.z) / speed;
+    anchor = raw[far]; k = far;
+  }
+  return out;
+}
+/** Is every run of the pulled path clear at the time it is walked? */
+function checkLegs(w: NavWorld, a: Pt, out: readonly Pt[], t: number, speed: number): boolean {
+  let p = a, tl = t;
+  for (const q of out) { if (!lineClear(w, p, q, tl, speed)) return false; tl += Math.hypot(q.x - p.x, q.z - p.z) / speed; p = q; }
+  return true;
+}
+
+
 function lineClear(w: NavWorld, a: Pt, b: Pt, t0: number, speed: number): boolean {
   const d = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(1, Math.ceil(d / SUB));
   for (let i = 1; i <= n; i++) {
@@ -96,7 +299,7 @@ const RESCUES = 14;
 
 /** A path from a to b through the open ground at time t, as waypoints (b last), or null. */
 export function findPath(w: NavWorld, a: Pt, b: Pt, t: number, speed = RUN): Pt[] | null {
-  const r = findPathCore(w, a, b, t, speed);
+  const r = findPathCore(w, a, b, t, speed, true);
   if (r) return r;
   // a start or a goal pressed into a corner: step to a nearby open spot (a clear line away) and search from there. Each failed try floods a whole search box,
   // and a goal with no way to it fails them all: after RESCUES tries the leg is given up (the caller waits for a door, or leaves it straight).
@@ -114,15 +317,16 @@ export function findPath(w: NavWorld, a: Pt, b: Pt, t: number, speed = RUN): Pt[
 }
 
 /** Counters for the QA harness (scripts/cutLeakCheck.mjs): how many searches a scene's routing makes and how big they are. */
-export const navStats: { cores: number; direct: number; grids: number; expanded: number; fails: number; skipped: number; ms: number; pad: Record<number, { tries: number; ok: number; expanded: number }> } = { cores: 0, direct: 0, grids: 0, expanded: 0, fails: 0, skipped: 0, ms: 0, pad: { 3: { tries: 0, ok: 0, expanded: 0 }, 8: { tries: 0, ok: 0, expanded: 0 }, 24: { tries: 0, ok: 0, expanded: 0 } } };
+export const navStats: { cores: number; graph: number; direct: number; grids: number; expanded: number; fails: number; skipped: number; ms: number; pad: Record<number, { tries: number; ok: number; expanded: number }> } = { cores: 0, graph: 0, direct: 0, grids: 0, expanded: 0, fails: 0, skipped: 0, ms: 0, pad: { 3: { tries: 0, ok: 0, expanded: 0 }, 8: { tries: 0, ok: 0, expanded: 0 }, 24: { tries: 0, ok: 0, expanded: 0 } } };
 
 /**
  * What the routing of one scene has learned (per world): which search boxes pay off, and which (start, goal) pairs have no way through in the present state of the
  * doors and breaches. In the slow scenes 90 % of the small-box searches failed and each failure floods its whole box (59 M cell expansions in one scene).
  */
-interface Learned { pad: Record<number, { tries: number; ok: number }>; failed: Set<string> }
+interface Region { key: number; lv: number; ph: number; li0: number; lj0: number; nx: number; nz: number; closed: Uint8Array; x0: number; z0: number; x1: number; z1: number }
+interface Learned { pad: Record<number, { tries: number; ok: number }>; failed: Set<string>; /** Grids that a search flooded to the end without reaching its goal (the biggest box only): what they reached is one piece of ground, and a leg from inside it to a spot outside it has no way either. */ regions: Region[] }
 const LEARNED = new WeakMap<NavWorld, Learned>();
-const learnedOf = (w: NavWorld): Learned => { let l = LEARNED.get(w); if (!l) { l = { pad: { 3: { tries: 0, ok: 0 }, 8: { tries: 0, ok: 0 } }, failed: new Set() }; LEARNED.set(w, l); } return l; };
+const learnedOf = (w: NavWorld): Learned => { let l = LEARNED.get(w); if (!l) { l = { pad: { 3: { tries: 0, ok: 0 }, 8: { tries: 0, ok: 0 } }, failed: new Set(), regions: [] }; LEARNED.set(w, l); } return l; };
 /**
  * The state of the timed doors and breaches at time t, as a number: the same value means the same openings AND the same coming changes. A search that fails
  * only because a door is about to be shut (or a breach not yet through) while the unit is still walking must not poison the same pair of points for the moment
@@ -136,21 +340,52 @@ function openingsAt(w: NavWorld, t: number): number {
   return next === Infinity ? h : (Math.imul(h, 41) + Math.round(next * 100)) | 0;
 }
 
+/** Does a flooded region put a and b on different sides: a in the piece of ground it reached, b open ground it did not (or the other way round)? */
+function regionSplits(w: NavWorld, c: StaticCache, r: Region, a: Pt, b: Pt): boolean {
+  const cell = LEVELS[r.lv];
+  const off = r.ph * 0.5;
+  const ci = (p: Pt) => { const i = Math.floor(p.x / cell - off) - r.li0, j = Math.floor(p.z / cell - off) - r.lj0; return i < 0 || j < 0 || i >= r.nx || j >= r.nz ? -1 : j * r.nx + i; };
+  const ia = ci(a), ib = ci(b);
+  if (ia < 0 || ib < 0 || r.closed[ia] === r.closed[ib]) return false;
+  // (a spot in solid ground has its own rules - the search nudges it to open ground - so only open cells decide)
+  const open = (p: Pt) => !latticeSolid(w, c, r.lv, cell, Math.floor(p.x / cell - off), Math.floor(p.z / cell - off), r.ph);
+  return open(a) && open(b);
+}
+
+/** How far a new search box may stick out past a flooded one and still be answered by it (a way out through that sliver and back in is not a thing). */
+const REGION_TOL = 2.5;
+
 /** A leg this short is inside a building or a yard corner: only the smallest search box has cells fine enough to find an interior doorway (about 0.07 wide for a body), so it is never retired. */
 const LOCAL_LEG = 4;
 
-function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[] | null {
+function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number, graph = false): Pt[] | null {
   navStats.cores++;
   if (lineClear(w, a, b, t, speed)) { navStats.direct++; return [b]; }
   const L = learnedOf(w), key = `${Math.round(a.x / 0.03)},${Math.round(a.z / 0.03)}>${Math.round(b.x / 0.03)},${Math.round(b.z / 0.03)}@${openingsAt(w, t)}`;
   if (L.failed.has(key)) { navStats.skipped++; return null; }
-  for (const pad of [3, 8, 24]) {
+  const open0 = openingsAt(w, t);
+  // (a leg that can ride the openings earlier legs went through needs no grid at all)
+  const viaGraph = graph ? graphPath(w, a, b, t, speed) : null;
+  if (viaGraph) { navStats.graph++; return viaGraph; }
+  const SC = cacheOf(w);
+  // (two passes: the grid on the shared lattice first; then, only when that finds no way, the grid hung on the leg's own corner, as it always was - a gap of a hand's
+  // width between a partition and a table is found by a grid with a cell centre in it, and which grid has one is luck of the origin)
+  for (const ph of [0, 1]) for (const pad of ph === 0 ? [3, 8, 24] : [3, 8]) {
     // a small box that has almost never found a way in this scene is not tried again: the doorway, wall or creek it keeps running into makes the big box the one that works
     const ps = L.pad[pad];
     if (ps && ps.tries >= 16 && ps.ok / ps.tries < 0.2 && !(pad === 3 && Math.hypot(b.x - a.x, b.z - a.z) < LOCAL_LEG)) continue;
-    const x0 = Math.min(a.x, b.x) - pad, x1 = Math.max(a.x, b.x) + pad, z0 = Math.min(a.z, b.z) - pad, z1 = Math.max(a.z, b.z) + pad;
-    const cell = Math.max(0.05, Math.max(x1 - x0, z1 - z0) / 300);
+    // (the grid sits on a fixed lattice of a few cell sizes, so one search's answers about the ground serve the next: see `latticeSolid`)
+    const want = Math.max(0.05, (Math.max(Math.max(a.x, b.x) - Math.min(a.x, b.x), Math.max(a.z, b.z) - Math.min(a.z, b.z)) + 2 * pad) / 300);
+    // (rounded DOWN to the next level: a cell is never coarser than the search asked for, so a narrow doorway is never lost to the lattice)
+    let lv = 0; while (lv + 1 < LEVELS.length && LEVELS[lv + 1] <= want + 1e-9) lv++;
+    const cell = LEVELS[lv];
+    const off = ph * 0.5;
+    const li0 = Math.floor((Math.min(a.x, b.x) - pad) / cell - off), lj0 = Math.floor((Math.min(a.z, b.z) - pad) / cell - off);
+    const x0 = (li0 + off) * cell, z0 = (lj0 + off) * cell;
+    const x1 = Math.max(a.x, b.x) + pad, z1 = Math.max(a.z, b.z) + pad;
     const nx = Math.ceil((x1 - x0) / cell), nz = Math.ceil((z1 - z0) / cell);
+    // (a search whose box lies inside one that an earlier search flooded to the end, from a spot in the same piece of ground to one outside it, fails the same way: skip the flood)
+    if (L.regions.some(r => r.key === open0 && r.lv === lv && r.ph === ph && Math.min(a.x, b.x) - pad >= r.x0 - REGION_TOL && Math.max(a.x, b.x) + pad <= r.x1 + REGION_TOL && Math.min(a.z, b.z) - pad >= r.z0 - REGION_TOL && Math.max(a.z, b.z) + pad <= r.z1 + REGION_TOL && regionSplits(w, SC, r, a, b))) { navStats.skipped++; continue; }
     const cx = (i: number) => x0 + (i + 0.5) * cell, cz = (j: number) => z0 + (j + 0.5) * cell;
     const idx = (i: number, j: number) => j * nx + i;
     const gi = (v: number) => Math.min(nx - 1, Math.max(0, Math.floor((v - x0) / cell)));
@@ -176,7 +411,7 @@ function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[]
       if (n === s || n === goal) return true;
       // static solidity is cached; barriers and carves are timed
       let st = memo[n];
-      if (st === 0) { st = w.solid(cx(i), cz(j)) ? 2 : 1; memo[n] = st; }
+      if (st === 0) { st = latticeSolid(w, SC, lv, cell, li0 + i, lj0 + j, ph) ? 2 : 1; memo[n] = st; }
       if (bars.length) for (const bar of bars) if (te < bar.openAt + SLACK && te >= (bar.from ?? -1) && inRect(bar, cx(i), cz(j))) return false;
       if (st === 1) return true;
       if (cars.length) for (const c of cars) if (te >= c.from + SLACK && inRect(c, cx(i), cz(j))) return true;
@@ -185,7 +420,7 @@ function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[]
     // (a start or goal tight against a corner can sit in a grid cell whose neighbours are all solid: snap it to the nearest open cell with a clear straight line)
     const snapped: { a: Pt | null; b: Pt | null } = { a: null, b: null };
     const snap = (p: Pt, i0: number, j0: number): { i: number; j: number; p: Pt } | null => {
-      const open = (i: number, j: number) => { if (i < 0 || j < 0 || i >= nx || j >= nz) return false; const st2 = w.solid(cx(i), cz(j)); return !st2 || w.carves.some(c => t >= c.from + SLACK && inRect(c, cx(i), cz(j))); };
+      const open = (i: number, j: number) => { if (i < 0 || j < 0 || i >= nx || j >= nz) return false; const st2 = latticeSolid(w, SC, lv, cell, li0 + i, lj0 + j, ph); return !st2 || w.carves.some(c => t >= c.from + SLACK && inRect(c, cx(i), cz(j))); };
       for (let r = 0; r <= 8; r++) for (let dj = -r; dj <= r; dj++) for (let di = -r; di <= r; di++) {
         if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue;
         const i = i0 + di, j = j0 + dj;
@@ -246,7 +481,11 @@ function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[]
       }
     }
     navStats.pad[pad].expanded += navStats.expanded - exp0;
-    if (!found) continue;
+    if (!found) {
+      // a flood that ran out of ground in the biggest box: remember what it reached (the goal's side of the wall is not in it)
+            if (!snapped.a && !snapped.b) { L.regions.push({ key: open0, lv, ph, li0, lj0, nx, nz, closed, x0, z0, x1: x0 + nx * cell, z1: z0 + nz * cell }); if (L.regions.length > 24) L.regions.shift(); }
+      continue;
+    }
     navStats.pad[pad].ok++; if (L.pad[pad]) L.pad[pad].ok++;
     const raw: Pt[] = [];
     for (let n = goal; n >= 0; n = from[n]) raw.push({ x: cx(n % nx), z: cz(Math.floor(n / nx)) });
@@ -254,20 +493,10 @@ function findPathCore(w: NavWorld, a: Pt, b: Pt, t: number, speed: number): Pt[]
     raw[0] = snapped.a ?? a; raw[raw.length - 1] = snapped.b ?? b;
     if (snapped.a) raw.unshift(a);
     if (snapped.b) raw.push(b);
-    // string-pull: from each anchor, the farthest point with a clear line
-    const out: Pt[] = [];
-    let anchor = a, tt = t, k = 0;
-    while (k < raw.length - 1) {
-      let far = k + 1;
-      for (let m = raw.length - 1; m > k + 1; m--) if (lineClear(w, anchor, raw[m], tt, speed)) { far = m; break; }
-      out.push(raw[far]);
-      tt += Math.hypot(raw[far].x - anchor.x, raw[far].z - anchor.z) / speed;
-      anchor = raw[far]; k = far;
-    }
+    const out = pullString(w, raw, t, speed);
     // (a pulled leg must itself be clear; a coarse grid can pinch a doorway, so one leg that is not is refused and the next pad tried)
-    let ok = true, p = a, tl = t;
-    for (const q of out) { if (!lineClear(w, p, q, tl, speed)) { ok = false; break; } tl += Math.hypot(q.x - p.x, q.z - p.z) / speed; p = q; }
-    if (ok) return out;
+    const ok = checkLegs(w, a, out, t, speed);
+    if (ok) { learnPath(w, a, out); return out; }
   }
   L.failed.add(key);
   return null;
@@ -556,6 +785,30 @@ export function findClips(b: Battle, w: NavWorld, center?: Pt): Clip[] {
     },
   });
   return clips;
+}
+
+/**
+ * A spot the renderer pushes a raider to (out of a bush, off a neighbour) is only taken when the leg to it stays where the plan's leg was: a push that hops a wall, a
+ * fence or a house beside an opening, or that turns the leg into a cut across a corner of the wall, would make the next straight step cross something solid.
+ * `from` is where the plan put him, `to` the pushed spot, `now` where he stands (his last waypoint) and `next` the plan's next waypoint for him with the solid test as it
+ * will be then (a breach that is still shut now is open by then); returns `to` or `from`.
+ */
+export function keepPush(solid: (x: number, z: number) => boolean, from: Pt, to: Pt, now?: Pt, next?: { at: Pt; solid: (x: number, z: number) => boolean }): Pt {
+  if (to.x === from.x && to.z === from.z) return to;
+  const openBy = (sol: (x: number, z: number) => boolean) => (a: Pt, b: Pt) => {
+    const d = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(1, Math.ceil(d / 0.03));
+    for (let i = 1; i <= n; i++) if (sol(a.x + (b.x - a.x) * i / n, a.z + (b.z - a.z) * i / n)) return false;
+    return true;
+  };
+  const open = openBy(solid);
+  // (a push that ends inside something solid, from open ground, is refused; so is one whose way there is not open all along)
+  if (solid(to.x, to.z) && !solid(from.x, from.z)) return from;
+  if (!open(from, to)) return from;
+  // (the plan's leg ran clear from where he stands to the planned spot: the pushed leg must too)
+  if (now && open(now, from) && !open(now, to)) return from;
+  // (and the leg on from the pushed spot to the plan's next waypoint, which ran clear from the planned spot)
+  if (next) { const ahead = openBy(next.solid); if (ahead(from, next.at) && !ahead(to, next.at)) return from; }
+  return to;
 }
 
 /** A tiny world for tests and tools: solid boxes, with the openings simply left out. */

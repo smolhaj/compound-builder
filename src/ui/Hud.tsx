@@ -11,6 +11,7 @@ import { fogLineFor } from '../sim/fogFx';
 import { PersonInsight, PeopleSection, MedicalSection, ClassesSection } from './PeoplePanel';
 import { DailySection } from './SchedulePanel';
 import { DAILY_TASK_TEXT } from './dailyText';
+import { HomeLine } from './HomeLine';
 import { useWorldStore, type BuildingView, type CameraMode, type FrameCap } from '../store/worldStore';
 import { useGameStore } from '../store/gameStore';
 import type { Quality } from '../engine/world/WorldScene';
@@ -693,6 +694,7 @@ export function Hud() {
             : 'Cinematic tour · Esc to leave'}
         </div>
       )}
+      <HomeLine />
       {w.tourCaption && (
         <div style={{ ...panel, position: 'fixed', left: '50%', bottom: 60, transform: 'translateX(-50%)', padding: '10px 16px' }}>
           <div style={{ fontSize: 18, fontWeight: 600 }}>{w.tourCaption.title}</div>

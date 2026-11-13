@@ -60,3 +60,26 @@ describe('the wildlife renderer draws modelled animals', () => {
     }
   });
 });
+describe('the season day reaches the antlers', () => {
+  /** The antler growth of the first instance of a model in a draw at the given day of the year. */
+  const adornAt = (doy: number | undefined): number => {
+    const g = newGame(3), scene = new THREE.Scene(), r = new WildlifeRenderer(scene);
+    r.update(0.05, g, g.clock.t, ctx({ doy }), 1);
+    r.spawnDebug('deer', 0.5, 0, 0, true);
+    r.update(0.05, g, g.clock.t, ctx({ doy }), 1);
+    const meshes = scene.children.filter(o => (o as THREE.InstancedMesh).isInstancedMesh && o.name.startsWith('wildlife_deer_')) as THREE.InstancedMesh[];
+    const qa = r.animals().find(a => a.id.startsWith('qa:'));
+    expect(qa, 'the debug buck is in the herd').toBeTruthy();
+    let best = 0;
+    for (const m of meshes) if (m.count > 0) { const ex = m.geometry.attributes.iExtra.array as Float32Array; for (let k = 0; k < m.count; k++) best = Math.max(best, ex[k * 4]); }
+    r.dispose();
+    return best;
+  };
+  it('a buck wears full antlers in the rut and none in winter, by the day the renderer is given', () => {
+    expect(adornAt(290)).toBeGreaterThan(0.6);       // October: hard antlers
+    expect(adornAt(170)).toBeGreaterThan(0.2);       // June: in velvet, still growing
+    expect(adornAt(170)).toBeLessThan(adornAt(290));
+    expect(adornAt(20)).toBeLessThan(0.01);          // January: shed
+  });
+});
+

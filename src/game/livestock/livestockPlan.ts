@@ -73,6 +73,65 @@ export interface AnimalGoal {
   home: string | null;
   /** Hurrying (a raid). */
   panic: boolean;
+  /** Where in the doorway it crosses (local lateral offset, world units); only for an animal going in. */
+  across?: number;
+  /** How it gets in: the spot outside the doorway it walks to by the route, the doorway in the wall, and just inside it. Set by `restSlots`. */
+  entry?: Entry;
+}
+
+/** The way in through a door: walk by the route to `stage` (clear of the wall), then straight in through `door` and `inner` to the rest spot. */
+export interface Entry { stage: Pt; door: Pt; inner: Pt }
+
+/** The doorway in the wall of a building (local +z is the front), and the way out from it. */
+export function wallDoor(h: Home): { x: number; z: number; ux: number; uz: number } {
+  const r = h.rot * Math.PI / 2, ux = Math.sin(r), uz = Math.cos(r), half = h.d / 2;
+  return { x: h.x + ux * half, z: h.z + uz * half, ux, uz };
+}
+
+/** The doorway points for an animal of body length `len` crossing at lateral offset `across` (kept inside the door, which is about 60 % of the front). */
+export function entryOf(h: Home, across: number, len: number): Entry {
+  const w = wallDoor(h), px = -w.uz, pz = w.ux, lane = Math.max(-0.18, Math.min(0.18, across));
+  const at = (o: number): Pt => [w.x + w.ux * o + px * lane, w.z + w.uz * o + pz * lane];
+  return { stage: at(0.36 + len * 0.5), door: at(0), inner: at(-Math.min(0.3, h.d * 0.25)) };
+}
+
+/**
+ * The spot each animal that is going in rests at: inside the footprint, packed in rows from the back wall toward the door (the doorway stays clear),
+ * the rows kept off the side walls. Sets `x`, `z` and `entry` on the goals that are going in. Pure (tested).
+ */
+export function restSlots(herd: ReadonlyArray<{ id: string; kind: StockKind }>, goals: AnimalGoal[], homes: readonly Home[], len: (k: StockKind) => number): void {
+  const byId = new Map(homes.map(h => [h.id, h]));
+  const per = new Map<string, number[]>();
+  goals.forEach((g, i) => { if (g.home && byId.has(g.home)) (per.get(g.home) ?? per.set(g.home, []).get(g.home)!).push(i); });
+  for (const [hid, list] of per) {
+    const h = byId.get(hid)!, w = wallDoor(h), px = -w.uz, pz = w.ux;
+    const half = Math.max(0.1, h.w / 2 - Math.max(0.12, Math.min(0.4, h.w * 0.22)));
+    const sMin = Math.min(0.3, h.d * 0.25), sMax = Math.max(sMin + 0.1, h.d - 0.45);
+    // rows from the back: each row is as wide as the animals in it side by side
+    const rows: Array<{ items: number[]; width: number; depth: number }> = [];
+    let row = { items: [] as number[], width: 0, depth: 0 };
+    for (const i of list) {
+      const l = len(herd[i].kind), wd = l * 0.45 + 0.05;
+      if (row.items.length && row.width + wd > half * 2) { rows.push(row); row = { items: [], width: 0, depth: 0 }; }
+      row.items.push(i); row.width += wd; row.depth = Math.max(row.depth, l);
+    }
+    if (row.items.length) rows.push(row);
+    const need = rows.reduce((t, r) => t + r.depth + 0.03, 0), room = sMax - sMin, squeeze = need > room ? room / need : 1;
+    let s = sMax;
+    for (const r of rows) {
+      const d = (r.depth + 0.03) * squeeze, sc = s - d / 2;
+      let x = -r.width / 2;
+      for (const i of r.items) {
+        const wd = len(herd[i].kind) * 0.45 + 0.05, l = x + wd / 2;
+        if (goals[i].inside) {
+          goals[i].x = w.x - w.ux * sc + px * l; goals[i].z = w.z - w.uz * sc + pz * l;
+          goals[i].entry = entryOf(h, goals[i].across ?? 0, len(herd[i].kind));
+        }
+        x += wd;
+      }
+      s -= d;
+    }
+  }
 }
 
 /** In the cold rain, or at night, or on the alarm, they are shut in. */
@@ -90,7 +149,7 @@ export function animalGoal(a: { id: string; kind: StockKind }, homes: readonly H
   if (c.raided || night || c.storm) {
     // in through the door one by one: each aims for its own spot across the doorway, so they file in instead of piling at one point
     const across = (hash(a.id, 12) - 0.5) * 0.5, px = -door.uz, pz = door.ux;
-    return { x: door.x + px * across, z: door.z + pz * across, inside: true, home: home.id, panic: c.raided };
+    return { x: door.x + px * across, z: door.z + pz * across, inside: true, home: home.id, panic: c.raided, across };
   }
   // turned out: a spot in the paddock in front of the door, moving on every few game hours
   const k0 = Math.floor(c.clock / 0.12 + hash(a.id, 4) * 40);

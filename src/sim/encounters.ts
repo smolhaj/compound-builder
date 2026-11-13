@@ -72,6 +72,7 @@ import { practice } from './skills';
 import { turbineNoise } from './renewables';
 import { villageWatch } from './outposts';
 import { guardPosture, resolveGuardStay } from './guards';
+import { isGuardUnit } from './defenseTune';
 import { hardness, opportunistK } from './reputation';
 import { resolveInsider } from './insider';
 import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp } from './trial';
@@ -792,7 +793,7 @@ export function fightOdds(s: GameState, e: Encounter, tries = Math.max(10, Math.
   for (let i = 0; i < tries; i++) {
     const b = planBattle(s, raidersAfterHelp(e, help), 7_919 + i * 104_729 + e.day, battleOpts(e, e.dig || e.insiderHelp ? { insideBreach: true } : {}));
     if (b.result === 'repelled' || b.result === 'fled') win++;
-    const n = b.events.filter(x => (x.kind === 'death' || x.kind === 'taken') && x.unit.startsWith('h_')).length;
+    const n = b.events.filter(x => (x.kind === 'death' || x.kind === 'taken') && x.unit.startsWith('h_') && !isGuardUnit(x.unit)).length;
     if (n) loseSomeone++;
     lost += n;
   }

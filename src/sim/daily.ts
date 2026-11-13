@@ -50,6 +50,7 @@ import { plantChoreRate } from './renewables';
 import { regionFor } from './climate';
 import { pairNudge } from './bonds';
 import { onPost } from './roadPost';
+import { ritualMorale } from './rituals';
 
 // ─────────────────────────────────────────────────────────────────────────
 // Duties
@@ -1114,6 +1115,7 @@ export function lifeMorale(s: GameState, i: number): number {
   if (lv.kitchen < 40 && s.structures.some(st => isFinished(st) && isHome(st.kind))) m += 2;
   if ((ps?.fatigue ?? 0) > 70) m -= 6;
   m += kinPersonal(s, i);
+  m += ritualMorale(s.rituals?.score[s.people[i]?.id ?? ''] ?? 0);
   if ((s.daily?.plan.threat ?? 0) >= 1 && Object.values(s.daily!.plan.hours).some(r => r[1] === 'watch' || r[23] === 'watch')) m += 2;
   return m;
 }
