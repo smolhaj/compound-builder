@@ -93,8 +93,23 @@ function buildBird(rooster: boolean, lod: Lod) {
     { p: [0, 0.295, -0.1], w: 0.08, h: 0.085, dn: 0.08, pw: 2.2, skin: sk(BONE.ROOT), coat: 1, col: [1, 1, 1] },
     { p: [0, 0.32, -0.17], w: 0.052, h: 0.06, dn: 0.05, pw: 2.1, skin: sk(BONE.ROOT), coat: 1, col: [1, 1, 1] },
   ], { seg, sub, capStart: true, capEnd: true }));
-  // wings folded on the sides
-  for (const sx of [-1, 1]) out.push(blob([sx * 0.082, 0.285, -0.03], [0.024, 0.07, 0.115], { seg: Math.max(6, seg - 4), rings: 5, col: [0.95, 0.95, 0.95], coat: 1, region: REGION.BODY, skin: sk(BONE.ROOT), tilt: -0.12, yaw: sx * 0.03, flat: true }));
+  // wings folded on the sides: three layers of overlapping feathers (coverts, secondaries, primaries), each laid a little further out
+  if (lod.detail < 1) {
+    const rowsW: Array<{ n: number; y: number; z0: number; dz: number; len: number; w: number; out: number; shade: number }> = [
+      { n: 5, y: 0.262, z0: 0.05, dz: -0.03, len: 0.15, w: 0.0105, out: 0.0, shade: 0.8 },       // primaries, longest and lowest
+      { n: 5, y: 0.292, z0: 0.07, dz: -0.028, len: 0.115, w: 0.0115, out: 0.003, shade: 0.9 },   // secondaries
+      { n: 6, y: 0.322, z0: 0.085, dz: -0.022, len: 0.07, w: 0.0105, out: 0.006, shade: 1.0 },   // coverts, short and on top
+    ];
+    // the body's half-width along z (breast to rump), so each feather lies on the surface
+    const bw = (z: number): number => (z > 0.1 ? 0.082 - (z - 0.1) * 0.43 : z > 0 ? 0.092 - (0.1 - z) * 0.1 : z > -0.1 ? 0.092 - (-z) * 0.12 : 0.08 - (-z - 0.1) * 0.4);
+    for (const sx of [-1, 1]) for (const r of rowsW) for (let i = 0; i < r.n; i += lod.sub > 2 ? 1 : 2) {
+      const z = r.z0 + r.dz * i, y = r.y - (r.len > 0.1 ? 0 : 0.004 * (i % 2));
+      const P = (t: number): V3 => { const zz = z - r.len * t; return [sx * (bw(zz) + 0.004 + r.out), y - 0.012 * t - (r.len > 0.1 ? 0.012 * t : 0), zz]; };
+      const c = r.shade * (0.96 + 0.04 * ((i * 7) % 3 === 0 ? 1 : 0));
+      const rs: Ring[] = [[0, 0.5], [0.45, 1], [0.85, 0.7], [1, 0.25]].map(([t, wk]) => ({ p: P(t), w: r.w * wk, h: 0.0028, skin: sk(BONE.ROOT), coat: 1, region: REGION.BODY, col: [c, c, c] as V3 }));
+      out.push(tube(rs, { seg: 4, sub: 1, up: [1, 0, 0], flat: true, capEnd: true }));
+    }
+  } else for (const sx of [-1, 1]) out.push(blob([sx * 0.082, 0.285, -0.03], [0.024, 0.07, 0.115], { seg: Math.max(6, seg - 4), rings: 5, col: [0.95, 0.95, 0.95], coat: 1, region: REGION.BODY, skin: sk(BONE.ROOT), tilt: -0.12, yaw: sx * 0.03, flat: true }));
   // neck
   out.push(tube([
     { p: [0, 0.3, 0.13], w: 0.045, h: 0.05, dn: 0.05, skin: sk(BONE.ROOT), coat: 1, col: [1, 1, 1] },
@@ -111,11 +126,11 @@ function buildBird(rooster: boolean, lod: Lod) {
     { p: [0, -0.012, 0.068], w: 0.002, h: 0.002, skin: sk(BONE.HEAD), col: [0.7, 0.5, 0.15], region: REGION.BEAK },
   ], { seg: 6, sub: 1, up: [0, 1, 0], flat: true }));
   if (lod.detail < 2) {
-    const ch = rooster ? 0.034 : 0.016;
+    const ch = rooster ? 0.046 : 0.026;
     const pts: Array<[number, number]> = rooster ? [[-0.018, 0.002], [-0.01, 0.026], [-0.002, 0.012], [0.006, 0.034], [0.014, 0.014], [0.022, 0.03], [0.03, 0.008], [0.036, 0.002]] : [[-0.012, 0.002], [-0.004, 0.015], [0.004, 0.008], [0.012, 0.016], [0.02, 0.004]];
     append(head, tube(pts.map(([z, h]) => ({ p: [0, 0.022 + h * 0.3, z] as V3, w: rooster ? 0.006 : 0.004, h: Math.max(0.002, h * (ch / 0.03)), dn: 0.002, skin: sk(BONE.HEAD), col: RED, region: REGION.FLESH })), { seg: 6, sub: 1, up: [0, 1, 0], capStart: true, capEnd: true, flat: true }));
     for (const sx of [-1, 1]) {
-      append(head, blob([sx * 0.006, -0.026, 0.042], [rooster ? 0.007 : 0.005, rooster ? 0.022 : 0.012, 0.007], { seg: 6, rings: 3, col: RED, region: REGION.FLESH, skin: sk(BONE.HEAD), flat: true }));
+      append(head, blob([sx * 0.006, -0.026, 0.042], [rooster ? 0.008 : 0.006, rooster ? 0.03 : 0.018, 0.008], { seg: 6, rings: 3, col: RED, region: REGION.FLESH, skin: sk(BONE.HEAD), flat: true }));
       append(head, blob([sx * 0.019, 0.004, 0.026], [0.0045, 0.0085, 0.0085], { seg: 6, rings: 3, col: [0.92, 0.55, 0.08], region: REGION.EYE, skin: sk(BONE.HEAD), flat: true }));
       append(head, blob([sx * 0.021, 0.004, 0.028], [0.0028, 0.005, 0.005], { seg: 5, rings: 2, col: [0.03, 0.02, 0.02], region: REGION.EYE, skin: sk(BONE.HEAD), flat: true }));
       append(head, blob([sx * 0.018, -0.012, 0.012], [0.004, 0.009, 0.007], { seg: 5, rings: 3, col: rooster ? [0.9, 0.9, 0.9] : [0.85, 0.82, 0.8], region: REGION.FLESH, skin: sk(BONE.HEAD), flat: true }));   // earlobe
@@ -123,21 +138,26 @@ function buildBird(rooster: boolean, lod: Lod) {
   }
   for (let i = 0; i < head.pos.length; i++) head.pos[i] *= rooster ? 1.22 : 1.3;
   out.push(place(head, 0, [0, 0.43 + ny, 0.19]));
-  // tail feathers: a fan of flat blades rising up and back; a rooster's are long sickles
-  const blades = rooster ? 5 : 5;
+  // tail feathers: a full fan of flat blades rising up and back (shorter ones tucked in front, longer behind); a rooster's are long arching sickles
+  const blades = rooster ? 7 : 8;
   for (let i = 0; i < blades; i++) {
-    const f = (i / (blades - 1)) * 2 - 1, sx = f * 0.025, len = rooster ? 0.2 + (1 - Math.abs(f)) * 0.14 : 0.13 + (1 - Math.abs(f)) * 0.05;
-    const up = rooster ? 0.55 : 0.85, w = rooster ? 0.036 : 0.03;
+    const f = (i / (blades - 1)) * 2 - 1, sx = f * 0.03, mid = 1 - Math.abs(f);
+    const len = rooster ? (i === 4 ? 0.34 : 0.2 + mid * 0.16) : 0.1 + mid * 0.075;
+    const up = rooster ? 0.55 : 0.85, w = rooster ? 0.034 : 0.03;
     const P = (t: number): V3 => {
       const arch = rooster ? Math.sin(t * Math.PI * 0.9) * 0.1 * (1 - Math.abs(f) * 0.4) : 0;
-      return [sx * (1 + t * 1.2), 0.31 + up * len * t * (rooster ? 1.0 : 1) * 0.9 + arch - (rooster ? t * t * 0.14 * len * 4 : 0), -0.17 - len * t * (rooster ? 1.0 : 0.85)];
+      return [sx * (1 + t * 2.4), 0.31 + up * len * t * 0.9 + arch - (rooster ? t * t * 0.14 * len * 4 : 0) - (rooster ? 0 : Math.abs(f) * t * 0.03), -0.17 - len * t * (rooster ? 1.0 : 0.85)];
     };
-    const rs: Ring[] = [0, 0.3, 0.65, 1].map((t, j) => ({ p: P(t), h: 0.0035, w: j === 3 ? 0.003 : w * (j === 0 ? 0.5 : j === 1 ? 1 : 0.8), skin: sk(BONE.TAIL), coat: 1, region: REGION.TAIL, col: [0.95, 0.95, 0.95] as V3 }));
-    out.push(tube(rs, { seg: 6, sub: lod.sub, up: [1, 0, 0], flat: true, capEnd: true }));
+    const rs: Ring[] = [0, 0.3, 0.65, 1].map((t, j) => ({ p: P(t), h: 0.0035, w: j === 3 ? 0.003 : w * (j === 0 ? 0.5 : j === 1 ? 1 : 0.8), skin: sk(BONE.TAIL), coat: 1, region: REGION.TAIL, col: [0.95 - Math.abs(f) * 0.08, 0.95 - Math.abs(f) * 0.08, 0.95 - Math.abs(f) * 0.08] as V3 }));
+    out.push(tube(rs, { seg: lod.detail ? 6 : 4, sub: Math.min(lod.sub, 2), up: [1, 0, 0], flat: true, capEnd: true }));
   }
-  if (rooster && lod.detail < 2) {
-    // hackle: a ruff of longer feathers over the shoulders (a flattened collar)
-    out.push(blob([0, 0.355, 0.12], [0.06, 0.04, 0.05], { seg: Math.max(6, seg - 2), rings: 4, col: [0.98, 0.98, 0.98], coat: 1, region: REGION.BODY, skin: sk(BONE.NECK), flat: true }));
+  if (lod.detail < 1) {
+    // hackle: a ruff of long narrow feathers lying back and down over the neck and shoulders (a rooster's are long and glossy)
+    const nh = (rooster ? 10 : 8) / (lod.sub > 2 ? 1 : 2);
+    for (let i = 0; i < nh; i++) {
+      const a = (i / nh) * Math.PI * 2, rr = rooster ? 0.046 : 0.04, ln = rooster ? 0.075 : 0.042;
+      out.push(blob([Math.sin(a) * rr, 0.35 + ny * 0.5 + Math.cos(a) * 0.012, 0.12 + Math.cos(a) * rr * 0.55 + 0.02], [rooster ? 0.0075 : 0.009, 0.0045, ln], { seg: 5, rings: 3, col: [rooster ? 1.05 : 0.95, rooster ? 1.05 : 0.95, rooster ? 1.05 : 0.95], coat: 1, region: REGION.BODY, skin: sk(BONE.NECK), tilt: -0.75 - (i % 2) * 0.12, yaw: Math.PI + Math.sin(a) * 0.5, flat: true }));
+    }
   }
   // legs: feathered thigh, drumstick, yellow scaly shank, four toes
   for (const [sx, b] of [[1, BONE.HL], [-1, BONE.HR]] as const) {
@@ -171,7 +191,7 @@ function birdBones(rooster: boolean): Array<BoneAnim | undefined> {
   }
   return b;
 }
-const hb = (name: string, o: Partial<Breed> & { base: V3 }): Breed => ({ name, style: 0, fur: 1.0, furFreq: 80, nose: c3(0.5, 0.1, 0.1), ...o });
+const hb = (name: string, o: Partial<Breed> & { base: V3 }): Breed => ({ name, style: 0, fur: 0.5, furFreq: 80, feather: 1, nose: c3(0.5, 0.1, 0.1), ...o });
 export const HEN_MODEL = (): AnimalModel => ({
   id: 'hen', build: lod => buildBird(false, lod), withers: 0.34, length: 0.5, stride: 0.34, graze: { neck: -0.9, head: -0.55 },
   spec: {
@@ -179,7 +199,7 @@ export const HEN_MODEL = (): AnimalModel => ({
     breeds: [
       hb('Rhode Island Red', { base: c3(0.5, 0.2, 0.09), style: 0, leg: c3(0.05, 0.05, 0.04), legMix: 0.8, belly: c3(0.55, 0.26, 0.12), bellyMix: 0.3, bellyY: 0.2 }),
       hb('Leghorn', { base: c3(0.95, 0.94, 0.9), leg: c3(0.95, 0.94, 0.9), legMix: 0 }),
-      hb('Barred Rock', { base: c3(0.86, 0.86, 0.84), style: 2, patch: c3(0.1, 0.1, 0.11), cover: 0.5, scale: 24, leg: c3(0.3, 0.3, 0.3), legMix: 0.7 }),
+      hb('Barred Rock', { base: c3(0.86, 0.86, 0.84), style: 2, patch: c3(0.18, 0.18, 0.2), cover: 0.6, scale: 52, feather: 1, leg: c3(0.3, 0.3, 0.3), legMix: 0.7 }),
       hb('Speckled Sussex', { base: c3(0.45, 0.2, 0.1), style: 4, patch: c3(0.93, 0.92, 0.88), cover: 0.4, scale: 45, leg: c3(0.2, 0.1, 0.06), legMix: 0.6, size: 0.97 }),
     ],
   },
@@ -191,7 +211,7 @@ export const ROOSTER_MODEL = (): AnimalModel => ({
     breeds: [
       hb('Rhode Island Red', { base: c3(0.55, 0.19, 0.07), style: 5, patch: c3(0.78, 0.32, 0.08), belt: [-0.03, 0.12], leg: c3(0.04, 0.12, 0.08), legMix: 0.95 }),
       hb('Leghorn', { base: c3(0.96, 0.95, 0.92), leg: c3(0.92, 0.9, 0.85), legMix: 0.9 }),
-      hb('Barred Rock', { base: c3(0.84, 0.84, 0.82), style: 2, patch: c3(0.1, 0.1, 0.11), cover: 0.55, scale: 24, leg: c3(0.14, 0.14, 0.15), legMix: 0.9 }),
+      hb('Barred Rock', { base: c3(0.84, 0.84, 0.82), style: 2, patch: c3(0.18, 0.18, 0.2), cover: 0.6, scale: 52, feather: 1, leg: c3(0.14, 0.14, 0.15), legMix: 0.9 }),
       hb('Game', { base: c3(0.86, 0.46, 0.08), style: 5, patch: c3(0.55, 0.12, 0.06), belt: [-0.04, 0.14], leg: c3(0.05, 0.28, 0.22), legMix: 0.95, size: 1.02 }),
     ],
   },

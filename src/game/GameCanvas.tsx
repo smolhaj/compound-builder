@@ -126,7 +126,7 @@ export function GameCanvas() {
         height: (x, z) => world.parcel.natural(x, z).h,
         owned: (x, z) => ownsAt(useGameStore.getState().game, x, z),
         water: (x, z) => world.parcel.isCreek(x, z) || world.stream.depthAt(x, z) > 0,
-        blocked: (x, z) => world.onCamp(x, z, 0.4) || world.onAccess(x, z, 0.4),
+        blocked: (x, z) => world.onCamp(x, z, 0.4) || world.onAccess(x, z, 0.4) || world.onRoadBed(x, z),
       };
       useGameStore.getState().placeImprovements(world.siteImprovements(unplaced, query));
     }
@@ -283,7 +283,7 @@ export function GameCanvas() {
       height: (x, z) => world.parcel.natural(x, z).h,
       owned: (x, z) => ownsAt(useGameStore.getState().game, x, z),
       water: (x, z) => world.parcel.isCreek(x, z) || world.stream.depthAt(x, z) > 0,
-      blocked: (x, z) => world.onCamp(x, z) || world.onAccess(x, z, 0.1),
+      blocked: (x, z) => world.onCamp(x, z) || world.onAccess(x, z, 0.1) || world.onRoadBed(x, z),
     });
     const starter = new StarterPreview(ws.scene, world);
     world.setBurnedFarms(burnedFarms(useGameStore.getState().game));
@@ -339,7 +339,7 @@ export function GameCanvas() {
           height: (x, z) => world.parcel.natural(x, z).h,
           owned: (x, z) => ownsAt(useGameStore.getState().game, x, z),
           water: (x, z) => world.parcel.isCreek(x, z) || world.stream.depthAt(x, z) > 0,
-          blocked: (x, z) => world.onCamp(x, z, 0.4) || world.onAccess(x, z, 0.4),
+          blocked: (x, z) => world.onCamp(x, z, 0.4) || world.onAccess(x, z, 0.4) || world.onRoadBed(x, z),
         };
         const a = anchorOf(gm);
         const spots = world.siteImprovements(todo, query, a);

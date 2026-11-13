@@ -441,16 +441,23 @@ export function buildRoadWorks(plan: RoadPlan, ground: Ground, o: RoadWorksOpts)
 
 // ── culvert: a corrugated pipe through the fill, ends at the toe of the slope, a headwall each ──
 
-function culvert(parts: Parts, fr: readonly Frame[], a: number, b: number, ground: Ground, natural: Ground, big: boolean): void {
-  const f = fr[Math.round((a + b) / 2)], r = big ? 0.08 : 0.05;
+/** The two mouths of a culvert under the road at frame `f` (the toe of the fill each side, under the road surface), and the pipe radius. */
+export function culvertEnds(f: Pick<Frame, 'x' | 'z' | 'y' | 'nx' | 'nz'>, ground: Ground, natural: Ground, big: boolean): { A: V3; B: V3; r: number } {
+  const r = big ? 0.08 : 0.05;
   const toe = (sg: number): V3 => {
     // walk out along the cross-section to where the fill slope meets the natural ground
     let o = BED.halfW + 0.1;
     for (; o < 4; o += 0.05) { const x = f.x + f.nx * sg * o, z = f.z + f.nz * sg * o; if (ground(x, z) - natural(x, z) < 0.02) break; }
     const x = f.x + f.nx * sg * (o + 0.06), z = f.z + f.nz * sg * (o + 0.06);
-    return [x, natural(x, z) + r + 0.01, z];
+    // (the pipe runs under the road: where the bed is cut into the hill the natural ground at the toe stands above the road, and a pipe laid on it lay on top of the road)
+    return [x, Math.min(natural(x, z) + r + 0.01, f.y - r - 0.045), z];
   };
-  const A = toe(1), B = toe(-1);
+  return { A: toe(1), B: toe(-1), r };
+}
+
+function culvert(parts: Parts, fr: readonly Frame[], a: number, b: number, ground: Ground, natural: Ground, big: boolean): void {
+  const f = fr[Math.round((a + b) / 2)];
+  const { A, B, r } = culvertEnds(f, ground, natural, big);
   // the pipe: corrugated metal
   parts.tube('steel', A, B, r, 12);
   for (const e of [A, B]) {
