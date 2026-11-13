@@ -289,7 +289,7 @@ function look(s: GameState, id: GoalId, ops: Map<OpId, OpItem>, nudge: ReturnTyp
 function actCost(s: GameState, a: GoalAct): number {
   if (a.type === 'stake') return kitCost(s, a.kind);
   if (a.type === 'order') return orderCost(a.lines, prices(s));
-  if (a.type === 'crew') { const st = s.structures.find(x => x.id === a.id); return st ? crewQuote(st).usd + (a.lines ? orderCost(a.lines, prices(s)) : 0) : 0; }
+  if (a.type === 'crew') { const st = s.structures.find(x => x.id === a.id) ?? s.perimeter.find(x => x.id === a.id); return st ? crewQuote(st).usd + (a.lines ? orderCost(a.lines, prices(s)) : 0) : 0; }
   if (a.type === 'hookup') return driveQuote(s.site.improvements, s.site, s.seed).usd;
   return 0;
 }

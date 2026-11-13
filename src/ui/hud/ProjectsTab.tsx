@@ -6,7 +6,7 @@ import { billText, type MaterialId } from '../../sim/materials';
 import { orderCost, orderProblem, prices } from '../../sim/economy';
 import { ToolNeedsNote } from '../ToolsPanel';
 import { blockedReason, ROAD_SUFFIX, holdReason, isFinished, progress } from '../../sim/construction';
-import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote } from '../../sim/crews';
+import { CREW_RATE, CREW_SIZE, crewProblem, crewQuote, crewRate, CREW_WEEK, crewsFor, crewsOn } from '../../sim/crews';
 import { fixBill, fixBlocked, fixDef, pendingFixes } from '../../sim/improvements';
 import { KIT } from '../../game/buildkit/kit';
 import { ResidentsLine } from '../QuartersPanel';
@@ -68,6 +68,16 @@ export function ProjectsTab() {
           <span style={{ flex: 1, cursor: r.kind === 'building' ? 'pointer' : 'default' }} title={r.blocked ?? undefined} onClick={() => r.kind === 'building' && g.select(r.id)}>
             {i === 0 && r.first ? '★ ' : ''}{r.kind === 'building' ? (KIT[r.name]?.name ?? r.name) : r.name} <span style={{ color: DIM, fontSize: 11 }}>{Math.round(r.pct * 100)}% · {Math.round(r.hours).toLocaleString('en-US')} h</span>
             {r.blocked && <div style={{ fontSize: 10.5, color: TONE.warn }}>{r.blocked}</div>}
+            {r.kind === 'line' && (() => {
+              // how long the family and hired crews need for a run (the crews side by side)
+              const run = game.perimeter.find(x => x.id === r.id), n = crewsOn(game, r.id);
+              if (!run || r.hours < 100) return null;
+              const fam = weeksFor(r.hours, pace), cw = crewWeeksFor(game, r.id), more = crewsFor(game, run, 4);
+              return <div style={{ fontSize: 10.5, color: DIM }}>
+                Family: {eta(fam)}{cw !== null ? ` · ${n} ${n === 1 ? 'crew' : 'crews'}: ${eta(cw)}` : ''}
+                {more > 0 && !crewProblem(game, run) && <> · <a style={{ color: TONE.good, cursor: 'pointer' }} title={`Wages come to about ${usd(crewQuote(run, 1, crewRate(game)).usd)} either way: more crews finish sooner, the bill is the same`} onClick={() => guard(crewQuote(run, 1, crewRate(game)).usd, () => { g.hire(r.id, more); })}>hire {more} {more === 1 ? 'crew' : 'crews'} ({eta(r.hours / (CREW_WEEK * (n + more)))})</a></>}
+              </div>;
+            })()}
           </span>
           {!(i === 0) && <button style={btn()} title="Put this ahead of everything else (the family still works on something else while it waits for materials)" onClick={() => g.setFocus(r.id)}>Work on this first</button>}
           {i === 0 && r.first && <button style={btn()} onClick={() => g.setFocus(null)}>Clear</button>}

@@ -7,7 +7,7 @@
 import { RESERVE_MIN, RESERVE_SHARE } from './starterCompound';
 import { daysOfFood, KCAL, needOf } from './needs';
 import { orderCost, prices } from './economy';
-import { CREW_RATE, hoursLeft } from './crews';
+import { CREW_RATE, crewHoursLeft, crewMarket } from './crews';
 import type { GameState } from './state';
 import { isGod } from './godMode';
 import { countyWorks, needsPermit, permitFee } from './paperwork';
@@ -28,12 +28,11 @@ export function spendCheck(money: number, cost: number): SpendCheck {
  * bills by the hour as it works and goes home when the money runs out, so a second hire has to be judged against
  * the cash the first has already claimed, not against the whole balance.
  */
-export function committedCrewWages(s: Pick<GameState, 'crews' | 'structures'>): number {
+export function committedCrewWages(s: GameState): number {
+  // the hours left on each job, once (crews side by side on a run share it), at today's wage
+  const rate = CREW_RATE * crewMarket(s).rateMult;
   let usd = 0;
-  for (const c of s.crews ?? []) {
-    const st = s.structures.find(x => x.id === c.target);
-    if (st) usd += hoursLeft(st) * CREW_RATE;
-  }
+  for (const id of new Set((s.crews ?? []).map(c => c.target))) usd += crewHoursLeft(s, id) * rate;
   return Math.round(usd);
 }
 

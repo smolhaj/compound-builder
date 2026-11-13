@@ -8,7 +8,7 @@ import { clearCollapse, strandAway } from '../sim/corridors';
 import { dropRoadBridge, rebuildRoadBridge } from '../sim/roadFx';
 import { interrogate, type Approach, type Question } from '../sim/interrogation';
 import { AFTERMATH_TEXT, joinPrisoner, releasePrisoner, resolveAftermath, type AftermathChoice } from '../sim/aftermath';
-import { dismissCrew, hireCrew } from '../sim/crews';
+import { dismissCrew, hireCrews } from '../sim/crews';
 import { dismissGuard, hireGuard } from '../sim/guards';
 import { setFocus } from '../sim/priority';
 import { orderHookup, placeImprovements } from '../sim/improvements';
@@ -264,7 +264,8 @@ export interface GameStore {
   harden: (buildingId: string, upgrade: HardenId, all?: boolean) => string | null;
   repairPump: (id: string) => boolean;
   /** Hire a crew for a building, or send one home. */
-  hire: (buildingId: string) => string | null;
+  /** Hire a crew on a building or a perimeter run; `count` crews side by side on a run. */
+  hire: (buildingId: string, count?: number) => string | null;
   dismiss: (crewId: string) => void;
   hireGuard: () => string | null;
   dismissGuard: () => void;
@@ -750,12 +751,12 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   },
   select: (selected) => { if (!locked()) set({ selected }); },
   focusHud: (hudFocus) => set({ hudFocus }),
-  hire: (id) => {
+  hire: (id, count = 1) => {
     if (locked()) return LOCKED_WHY;
     const g = structuredClone(get().game);
-    const why = hireCrew(g, id);
-    if (!why) { set({ game: g }); void saveGame(AUTOSAVE, g); }
-    return why;
+    const { hired, why } = hireCrews(g, id, count);
+    if (hired) { set({ game: g }); void saveGame(AUTOSAVE, g); }
+    return hired ? null : why;
   },
   setFocus: (id) => {
     if (locked()) return LOCKED_WHY;

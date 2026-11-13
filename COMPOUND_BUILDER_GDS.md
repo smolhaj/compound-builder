@@ -389,6 +389,7 @@ You pick the lifestyle on the new-game screen and can change it later, but not c
 
 **While the family is away,** things work the way they do in the real world, depending on what's there:
 - **Hired building crews:** optional. They build during the week, faster but at a cost, and they see everything (OPSEC).
+  - **Crews build walls too:** a crew can take a perimeter run (wall, fence, hedge), and a rich family can hire many crews at once, side by side on different stretches of a long run (one per 80 ft), so money converts to speed: a stone ring that takes a family hundreds of days by hand goes up in weeks. Wages are billed by the hour worked at the usual rate (about $60 an hour a head), materials are ordered as for buildings. After the disaster hits, crews keep working while the banks, the law and the fuel still hold: wages climb (up to +150%) and fewer crews can be had as those fail, and none at all once nobody can be paid or driven in.
 - **A neighbor caretaker:** optional, for a fee or goodwill. They feed the animals and watch the place.
 - **Break-ins:** possible when security is weak.
 - **Upkeep slips:** with nobody tending the garden and animals, or heating the house (frozen pipes in winter).
@@ -421,7 +422,7 @@ You pick the lifestyle on the new-game screen and can change it later, but not c
 - **The budget comes from the lifestyle** (§10.7). Compound builders are roughly the top 10–15 % of households, about $1M or more in net worth.
   - Weekend getaway: about $450k.
   - Full-time with jobs: about $800k.
-  - Financially independent: about $0.7M to $1.4M (each family rolls inside that range from its jobs, savings, house sale and debts, `sim/startFunds.ts`; it was $1.0M to $2.0M until the cash-use pass), plus about $45k a year in passive income.
+  - Financially independent: about $1.0M to $2.0M (each family rolls inside that range from its jobs, savings, house sale and debts, `sim/startFunds.ts`; money buys build speed, so wealth is an advantage: crews build walls too, §10.7), plus about $45k a year in passive income.
 - **Everything is priced at real 2025 costs** (land, materials, contractors, gear).
   - Owner-built work saves the labor, which is about half the cost of hiring it out.
   - Hiring a crew is faster and dearer.
