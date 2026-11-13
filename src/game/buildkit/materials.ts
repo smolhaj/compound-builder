@@ -13,10 +13,11 @@
 import * as THREE from 'three';
 import { patchWaterMaterial, WATER_LOOKS } from '../../engine/world/water/waterShading';
 import { generateNormalMap } from '../../engine/world/materials/normalMapGen';
-import { patchWear, WEAR_CLASS } from '../atmosphere/weathering';
+import { patchWear, patchSnowSlab, WEAR_CLASS } from '../atmosphere/weathering';
+import { glowAtlas } from './buildingDetail';
 import { screenTexture, siteMapTexture } from './screenFeeds';
 
-export type KitMaterialId = 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' | 'deck' | 'door' | 'glass' | 'chimney_cap' | 'frame' | 'scaffold' | 'string'
+export type KitMaterialId = 'snow' | 'timber_lap' | 'trim' | 'fieldstone' | 'metal_roof' | 'deck' | 'door' | 'glass' | 'chimney_cap' | 'frame' | 'scaffold' | 'string'
   // interior finishes and furnishings
   | 'pine_panel' | 'wood_dark' | 'wood_mid' | 'iron' | 'enamel' | 'quilt_red' | 'quilt_blue' | 'linen' | 'rug' | 'books' | 'lamp' | 'cutcap' | 'crockery'
   // more buildings
@@ -158,7 +159,15 @@ function paintMetalRoof(base: [number, number, number] = [122, 52, 40]): HTMLCan
     g.fillRect(i * pw, 0, 2, N);
     g.fillStyle = 'rgba(40,15,10,0.6)';
     g.fillRect(i * pw + 2, 0, 3, N);
+    // the clip screws along each seam (a head every ~35 cm of run: 3 mm washers on a 43 cm panel)
+    for (let y = 18 + (i % 2) * 20; y < N; y += 64) {
+      g.fillStyle = 'rgba(25,20,18,0.8)'; g.beginPath(); g.arc(i * pw + pw * 0.5, y, 2.2, 0, Math.PI * 2); g.fill();
+      g.fillStyle = 'rgba(235,225,215,0.5)'; g.fillRect(i * pw + pw * 0.5 - 1, y - 1.5, 1.2, 1.2);
+    }
   }
+  // a lap where two sheets overlap, a thin shadow line with a bright lip
+  g.fillStyle = 'rgba(20,10,8,0.45)'; g.fillRect(0, 128, N, 1.5);
+  g.fillStyle = 'rgba(235,215,205,0.3)'; g.fillRect(0, 129.5, N, 1);
   return c;
 }
 
@@ -514,7 +523,12 @@ function paintShingle(): HTMLCanvasElement {
     }
     g.fillStyle = 'rgba(15,15,15,0.6)'; g.fillRect(0, j * rh + rh - 2, N, 2);
     for (let k = 0; k < 3; k++) if (r() < 0.4) { g.fillStyle = 'rgba(90,110,60,0.3)'; g.fillRect(r() * N, j * rh, 10 + r() * 20, rh); }
+    // the slots that split each course into tabs, and a few nail heads in the course above
+    g.fillStyle = 'rgba(12,12,12,0.55)';
+    for (let i = -1; i < 9; i++) for (const f of [1 / 3, 2 / 3]) g.fillRect(i * tw + (j % 2) * tw / 2 + tw * f, j * rh + rh * 0.38, 1.4, rh * 0.62);
   }
+  // granules: grit in the asphalt, fine enough that the normal map reads it as a rough surface
+  for (let k = 0; k < 2600; k++) { const v = 40 + r() * 70; g.fillStyle = `rgba(${v},${v},${v},0.35)`; g.fillRect(r() * N, r() * N, 1, 1); }
   return c;
 }
 
@@ -753,13 +767,15 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     // see-through (rooms are furnished); a little reflection, warm glow from the lamps at night
     case 'glass': m = new THREE.MeshStandardMaterial({ color: 0x9fb4c0, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.28, depthWrite: false }); break;
     // lit windows from outside: one-sided (faces out), invisible by day
-    case 'glow': m = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, transparent: true, opacity: 0, depthWrite: false, emissive: new THREE.Color(1.0, 0.72, 0.42), emissiveIntensity: 0, side: THREE.FrontSide }); m.visible = false; break;
+    case 'glow': m = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, transparent: true, opacity: 0, depthWrite: false, emissive: new THREE.Color(1.0, 0.72, 0.42), emissiveMap: glowAtlas(), emissiveIntensity: 0, side: THREE.FrontSide }); m.visible = false; break;
     // per-building window light (atmosphere/nightLife): oil lamp, electric light, blackout curtain, dark
     case 'glow_oil': case 'glow_electric': case 'glow_curtain': case 'glow_off': {
       const e = id === 'glow_oil' ? new THREE.Color(1.0, 0.6, 0.27) : id === 'glow_electric' ? new THREE.Color(1.0, 0.86, 0.66) : new THREE.Color(0.32, 0.12, 0.05);
-      m = new THREE.MeshStandardMaterial({ color: id === 'glow_curtain' ? 0x1a1512 : 0x000000, roughness: 1, transparent: true, opacity: 0, depthWrite: false, emissive: e, emissiveIntensity: 0, side: THREE.FrontSide });
+      m = new THREE.MeshStandardMaterial({ color: id === 'glow_curtain' ? 0x1a1512 : 0x000000, roughness: 1, transparent: true, opacity: 0, depthWrite: false, emissive: e, emissiveMap: glowAtlas(), emissiveIntensity: 0, side: THREE.FrontSide });
       m.visible = false; break;
     }
+    // the winter roof: snow slabs that rise with the snow and icicles on the gutters; not drawn (material.visible) until it snows
+    case 'snow': { const mm = new THREE.MeshStandardMaterial({ color: 0xf1f5fa, roughness: 0.92 }); mm.visible = false; patchSnowSlab(mm); m = mm; break; }
     case 'pine_panel': m = texMat(id, paintPinePanel, 1.2, 0.7); break;
     case 'wood_dark': m = new THREE.MeshStandardMaterial({ color: 0x5a3b24, roughness: 0.6 }); break;
     case 'wood_mid': m = new THREE.MeshStandardMaterial({ color: 0x9a6a3e, roughness: 0.65 }); break;

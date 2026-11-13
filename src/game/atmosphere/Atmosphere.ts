@@ -37,6 +37,7 @@ import { awakeAtHome, firePitLit, flashlightCarriers, generatorRunning, windowLi
 import { frostAt, mudSeason, troughIce } from './seasonCover';
 import { kitIdOf, setMeshWear, WEAR_CLASS } from './weathering';
 import { SnowDrifts, type DriftWall } from './snowDrifts';
+import { setBuildingWeather, SNOW_MESH, WINTER } from '../buildkit/buildingDetail';
 import { Overgrowth, type WildArea } from './Overgrowth';
 import { regionFor } from '../../sim/climate';
 
@@ -107,6 +108,8 @@ export class Atmosphere {
   private _wearTimer = 0;
   private _mud = 0;
   private _frost = 0;
+  /** Wet surfaces after rain (rises with the rain, dries over about a minute). */
+  private _wet = 0;
   /** QA: force every window's lamp kind / the fire. */
   qa: { lamp?: LampKind; fire?: number } = {};
 
@@ -152,6 +155,20 @@ export class Atmosphere {
     this._mud = mudSeason(doy, R.frost[0], R.cold, sp.snow);
     this._frost = frostAt(f.hour, sp.cold, f.snow, f.cloud);
     writeSeasonExtras(this._frost, this._mud);
+    // buildings' weather: wet runs on the walls, snow slabs and icicles on the roof, rime on the trim
+    this._wet = Math.max(f.rain, this._wet - f.dt / 60);
+    setBuildingWeather(this._wet, f.snow, this._frost * 0.9);
+    const roofSnow = this._q !== 'low' && f.snow > (WINTER.on ? 0.22 : 0.3);
+    kitMaterial('snow').visible = roofSnow;
+    if (roofSnow !== WINTER.on) {
+      WINTER.on = roofSnow;
+      // each building's winter roof mesh is drawn (and counted) only while snow lies, and never over a roof the view has hidden
+      for (const b of built) for (const o of b.group.children) {
+        const m = o as THREE.Mesh;
+        if (m.name !== SNOW_MESH) continue;
+        m.visible = roofSnow && b.group.children.some(c => (c as THREE.Mesh).isMesh && c.userData.layer === 'roof' && c.name !== SNOW_MESH && c.visible);
+      }
+    }
     const driftsOn = this._q !== 'low';
     if (driftsOn && f.snow > 0.05) this._drifts.build(this._driftKey(built), this._driftWalls(built, game.perimeter), this._h.groundAt);
     this._drifts.update(f.snow, driftsOn);

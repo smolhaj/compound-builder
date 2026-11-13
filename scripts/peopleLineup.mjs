@@ -52,11 +52,11 @@ try {
         const x = rows.ox + i * 0.34 - (rows.n - 1) * 0.17, z = rows.oz;
         layer.setWear(i, rows.wears[i]);
         const o = f(i, K);
-        layer.setPose(i, { x, y: ground(x, z), z, rot: Math.PI, scale: rows.scales[i], phase: 0, amp: 0, ...o });
+        layer.setPose(i, { x, y: ground(x, z), z, rot: 0, scale: rows.scales[i], phase: 0, amp: 0, ...o });
       }
       layer.commit(rows.n, true);
       if (layer.setTime) layer.setTime(3.7);
-      cam.target.set(rows.ox - 1.4, 0.14, rows.oz); cam.radius = 1.7; cam.pitch = 0.12; cam.yaw = 0;
+      cam.target.set(rows.ox - 1.4, 0.14, rows.oz); cam.radius = 1.25; cam.pitch = 0.12; cam.yaw = 0;
     }, [poseFn]);
     await frames(); await frames();
     await page.screenshot({ path: `${out}/lineup-${tag}-${name}-a.png` });
