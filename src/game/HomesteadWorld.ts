@@ -624,13 +624,10 @@ export class HomesteadWorld {
     if (trimWas !== detailGeometryOn()) for (const b of this._built.values()) this._rebuild(b, b.opts);
     this.roadLife.setQuality(q);
     this.livestock.setQuality(q);
-<<<<<<< HEAD
     this.wildlife.setQuality(q);
     this.dogs.setQuality(q);
-=======
     this.contact.setQuality(q);
     this._bandKey = '';
->>>>>>> origin/main
     this.terrain.build({
       source: this._terrainSource,
       kind: this.regionWorld.kind, cx: this.center.x, cz: this.center.z,
