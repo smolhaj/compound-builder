@@ -19,7 +19,7 @@ export const hexLin = (h: number): V3 => [(h >> 16) & 255, (h >> 8) & 255, h & 2
 function flap(sx: number, b: number, at: V3, len: number, wd: number, lod: Lod, o: { sweep?: number; fold?: boolean; col?: V3 } = {}): Mesh {
   const sw = o.sweep ?? 0.25, col = o.col ?? [1, 1, 1];
   const pts: Array<[number, number, number, number]> = o.fold
-    ? [[0.0, 0.0, 0.0, 0.3], [0.3, 0.3, 0.0, 0.85], [0.55, 0.45, 0.25, 1], [0.7, 0.4, 0.5, 0.85], [0.78, 0.28, 0.7, 0.3]]   // stands, then folds forward over itself
+    ? [[0.0, 0.0, 0.0, 0.35], [0.3, 0.2, 0.0, 0.85], [0.5, 0.45, 0.12, 1], [0.42, 0.7, 0.3, 0.85], [0.2, 0.8, 0.45, 0.3]]   // a button ear: stands a little, then the tip folds forward and down over itself
     : [[0.0, 0.0, 0.0, 0.4], [-0.25, 0.25, 0.0, 0.9], [-0.6, 0.35, -0.02, 1], [-0.9, 0.42, 0.0, 0.75], [-1, 0.45, 0.02, 0.2]];
   const rs: Ring[] = pts.map(([dy, dx, dz, w], i) => ({ p: [at[0] + sx * dx * len * sw * 0.55, at[1] + dy * len, at[2] + dz * len] as V3, w: wd * w, h: 0.0045, skin: i === 0 ? sk(BONE.HEAD, b, 0.35) : sk(b), coat: 1, region: REGION.EAR, col }));
   return tube(rs, { seg: Math.max(6, Math.round(lod.seg * 0.5)), sub: lod.sub > 1 ? 2 : 1, up: [1, 0, 0], flat: true, capEnd: true });
@@ -141,7 +141,7 @@ function canid(o: Canid): Quad {
       return b;
     })(),
     breeds: o.breeds, withers: o.withers, length: o.length, stride: o.stride, graze: { neck: -0.75, head: 0.1 },
-    root: { bob: 0.01 * k, pitch: 0.03, cy: Y(0.6), cz: o.pets ? Z(-0.3) : 0, grazePitch: o.pets ? 0.55 : -0.04 }, rootPose: { alertPitch: 0.04, lieDrop: 0.3 * k, sitDrop: o.pets ? 0.2 * k : 0 }, extra: true,
+    root: { bob: 0.01 * k, pitch: 0.03, cy: Y(0.6), cz: o.pets ? Z(-0.3) : 0, grazePitch: o.pets ? 0.55 : -0.04 }, rootPose: { alertPitch: 0.04, lieDrop: o.pets ? 0.22 * k : 0.3 * k, sitDrop: o.pets ? 0.2 * k : 0 }, extra: true,
   };
 }
 export { canid, flap };

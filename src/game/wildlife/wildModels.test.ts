@@ -128,6 +128,16 @@ describe('shape polish (the wildlife and dog pass)', () => {
     for (let i = 0; i < pos.count; i++) if (mk.getY(i) === 3 || mk.getY(i) === 9) { if (mk.getY(i) === 3) tail++; else tip++; thick = Math.max(thick, Math.abs(pos.getX(i))); }
     expect(tail).toBeGreaterThan(50); expect(tip).toBeGreaterThan(20); expect(thick).toBeGreaterThan(0.04);
   });
+  it('a dog that sits or lies rests on the ground: not through it, not above it, for every breed', () => {
+    for (const b of BREEDS) {
+      const m = wildModelOf(dogModelId(b) as WildModelId), g = m.build(LODS[1]), pos = g.attributes.position, sk = g.attributes.aSkin;
+      for (const [name, a] of [['sit', { graze: 1 }], ['lie', { lie: 1 }]] as const) {
+        let lo = Infinity;
+        for (let i = 0; i < pos.count; i++) lo = Math.min(lo, posePoint(m.spec, [pos.getX(i), pos.getY(i), pos.getZ(i)], sk.getX(i), st({ time: 0.01, ...a }))[1]);
+        expect(lo, `${b} ${name}`).toBeGreaterThan(-0.012); expect(lo, `${b} ${name}`).toBeLessThan(0.03);
+      }
+    }
+  });
   it('a wolf and a coyote have a forehead stop and a muzzle that is not a thin spike', () => {
     for (const id of ['wolf', 'coyote'] as WildModelId[]) {
       const g = geo(id), pos = g.attributes.position, sk = g.attributes.aSkin, mk = g.attributes.aMark;

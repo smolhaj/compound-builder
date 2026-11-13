@@ -72,7 +72,7 @@ if (q.get('multi')) {
       const P = PO[pn] || {};
       wb.put({ id: k, breed: 0, x: 0, y: 0, z: 0, rot: 0, phase: ph, gait: P.gait ?? 0, graze: P.graze ?? 0, seed: 0.31, tone: 0.5, size: 1, adorn, lie: P.lie ?? 0, alert: P.alert ?? 0, wag: 0, li: lod });
       wb.flush(0.4);
-      const V = { side: { eye: [-Dd, Hh * 0.6, 0], at: [0, Hh * 0.5, 0], fov: 24 }, front: { eye: [-Dd * 0.62, Hh * 0.9, Dd * 0.8], at: [0, Hh * 0.5, 0], fov: 24 }, eye: { eye: [-Dd * 0.5, 0.17, Dd * 0.7], at: [0.1, Hh * 0.5, 0], fov: 38 } }[vn] || null;
+      const V = { side: { eye: [-Dd, Hh * 0.6, 0], at: [0, Hh * 0.5, 0], fov: 24 }, front: { eye: [-Dd * 0.62, Hh * 0.9, Dd * 0.8], at: [0, Hh * 0.5, 0], fov: 24 }, eye: { eye: [-Dd * 0.8, 0.17, Dd * 1.1], at: [0.2, 0.12, 0], fov: 46 } }[vn] || null;
       cam.fov = V.fov; cam.aspect = CW / CH; cam.position.set(...V.eye); cam.up.set(0, 1, 0); cam.lookAt(...V.at); cam.updateProjectionMatrix();
       const x = c * CW, y = (kinds.length - 1 - r) * CH;
       renderer.setViewport(x, y, CW, CH); renderer.setScissor(x, y, CW, CH);
