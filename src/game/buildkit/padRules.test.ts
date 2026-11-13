@@ -22,7 +22,11 @@ describe('pad-aware placement', () => {
     expect(padClash(cabin, 1.8, 0, 0, flat, [at('a', 'timber_cabin', 0, 0)])).toBeNull();
     expect(padClash(cabin, 30, 0, 0, hill, [at('a', 'timber_cabin', 0, 0)])).toBeNull();
     // along the contour (same height) the pads can touch freely
-    expect(padClash(cabin, 0, 3, 0, hill, [at('a', 'timber_cabin', 0, 0)])).toBeNull();
+    expect(padClash(cabin, 0, 3.6, 0, hill, [at('a', 'timber_cabin', 0, 0)])).toBeNull();
+    // ...but not run over the end of the other's retaining wall (its 3.9 m cut would stand in the new floor), even at one level
+    const over = padClash(cabin, 0, 3, 0, hill, [at('a', 'timber_cabin', 0, 0)]);
+    expect(over?.wall).toBe(true);
+    expect(clashText(over!, null)).toMatch(/retaining wall/);
   });
 
   it('pieces with no pad of their own are never in a clash: bunker rooms, ring walls, the watchtower', () => {

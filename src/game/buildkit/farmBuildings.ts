@@ -127,6 +127,9 @@ function greenhouseHeated(_def: KitPieceDef, seed = 1): THREE.Group {
   for (const x of rowX) for (const z of [benchZ0 + benchLen * 0.25, benchZ0 + benchLen * 0.75]) {
     p.add('iron', box(0.8 * M, 0.04 * M, 0.2 * M, x, 2.6 * M, z));
     p.add('lamp', box(0.7 * M, 0.02 * M, 0.14 * M, x, 2.57 * M, z));
+    // hung from the roof on two rods (the lamps used to hang in the air): up to the underside of the glass over that row
+    const u = x - (x < 0 ? -bayW / 2 : bayW / 2), roofY = E + (R - E) * (1 - Math.abs(u) / (bayW / 2));
+    for (const dx of [-0.3, 0.3]) p.add('steel', cylY(0.012 * M, roofY - 2.64 * M, x + dx * M, 2.64 * M, z, 4));
   }
   p.add('blue_tank', cylY(0.45 * M, 1.1 * M, hw - 0.7 * M, 0, hd - 1.2 * M, 12));
   p.add('wood_mid', box(2.6 * M, 0.05 * M, 1.0 * M, -hw + 1.6 * M, 0.9 * M, hd - 1.4 * M));     // the packing table
@@ -202,7 +205,7 @@ function solarFarm(def: KitPieceDef, seed = 1): THREE.Group {
   p.add('steel', box(0.06 * M, 1.2 * M, 0.06 * M, ix + 1.45 * M, 0, iz));
   p.add('iron', box(0.4 * M, 0.5 * M, 0.2 * M, ix + 1.45 * M, 0.8 * M, iz + 0.05 * M));
   p.add('paint_red', box(0.08 * M, 0.08 * M, 0.02 * M, ix + 1.55 * M, 1.1 * M, iz + 0.17 * M));
-  p.add('rubber', tube([[ix + 0.4 * M, 0.04, iz + 0.2 * M], [ix + 0.4 * M, 0.04, D / 2], [ix + 0.4 * M, 0.04, D / 2 + 0.2]], 0.02 * M, 5));
+  p.add('rubber', tube([[ix + 0.4 * M, 0.006, iz + 0.2 * M], [ix + 0.4 * M, 0.006, D / 2], [ix + 0.4 * M, 0.006, D / 2 + 0.2]], 0.02 * M, 5));   // conduit laid on the ground
   // a perimeter of wire-mesh fence on posts round the field with a gate at the access side
   p.layer = 'roof';
   const fx = W / 2 - 0.02, fz = D / 2 - 0.02;
@@ -421,7 +424,9 @@ function reservoir(def: KitPieceDef, seed = 1): THREE.Group {
   p.layer = 'openings';
   // the intake tower with its catwalk and the pump pad with a submersible-pump control box
   p.add('concrete', cylY(0.22 * M, 1.6 * M, -iw * 0.55, -0.01, 0, 10));
-  p.add('steel', box(0.04, 0.03, iw * 0.55 + 0.05, -iw * 0.28, 1.55 * M - 0.01, 0));
+  // the catwalk runs from the bank (x = -iw) out to the tower along x, on a post at the bank end
+  p.add('steel', box(iw * 0.45 + 0.04, 0.03, 0.04, -iw * 0.775, 1.55 * M - 0.01, 0));
+  p.add('steel', box(0.03, 1.55 * M - 0.01, 0.03, -iw - 0.01, 0, 0));
   p.add('iron', box(0.5 * M, 0.7 * M, 0.3 * M, iw * 0.8, 0.02, id + 0.16));
   p.add('blue_tank', cylY(0.25 * M, 0.8 * M, iw * 0.55, 0.02, id + 0.2, 10));
   p.add('rubber', tube([[-iw * 0.55, 0.02, 0], [-iw * 0.55, -0.01, id * 0.6], [iw * 0.5, 0.02, id + 0.2]], 0.04 * M, 5));
@@ -476,7 +481,7 @@ function sheepBarn(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Grou
     for (const [x, z, a] of [[-0.3, -0.5, 0.7], [0.3, -0.4, 2.4], [-0.35, 0.1, 1.2]] as const) sheepGeo(add, x, z, a, false);
   }, new Parts(seed, opts), p => {
     // the paddock in front: a plank fence three sides, a trough, a round bale; the flock stands in it (decor, shown by head count)
-    const pw = W + 0.3, pz0 = D / 2 + 0.05, pz1 = D / 2 + 0.95;
+    const pw = W - 0.04, pz0 = D / 2 + 0.05, pz1 = D / 2 + 0.95;   // (the fence ran 0.15 outside the lot on each side)
     p.layer = 'openings';
     for (const [ax, az, bx, bz] of [[-pw / 2, pz0, -pw / 2, pz1], [pw / 2, pz0, pw / 2, pz1], [-pw / 2, pz1, pw / 2, pz1]] as const) {
       const L = Math.hypot(bx - ax, bz - az), n = Math.ceil(L / 0.22);
