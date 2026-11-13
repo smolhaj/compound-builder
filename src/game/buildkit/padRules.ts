@@ -6,7 +6,7 @@
  */
 import { KIT, footprint, type KitPieceDef, type Placed } from './kit';
 import { isUnderground } from './underground';
-import { RW, WALLLESS, planPad, type Natural, type Rect } from '../../sim/retainPlan';
+import { RW, WALLLESS, planPad, wallAt, type Natural, type PadPlan, type Rect } from '../../sim/retainPlan';
 import { lengthText } from '../../sim/units';
 
 /** Pads that stand at levels this far apart (u, 45 cm) cannot share ground. */
@@ -19,6 +19,8 @@ export interface PadClash {
   dy: number;
   /** The overlap (u^2). */
   overlap: number;
+  /** The pad would flatten the retaining wall of the other (its slab stands inside our pad), whatever the two levels are. */
+  wall?: boolean;
 }
 
 const overlapArea = (a: Rect, b: Rect): number => Math.max(0, Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0)) * Math.max(0, Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0));
@@ -27,10 +29,18 @@ const overlapArea = (a: Rect, b: Rect): number => Math.max(0, Math.min(a.x1, b.x
 const noPad = (d: KitPieceDef): boolean => isUnderground(d) || WALLLESS.test(d.id);
 
 /** The pad (rectangle with its apron, and its level) a piece would get on the natural ground `h`. */
-export function padOf(def: KitPieceDef, x: number, z: number, rot: number, h: Natural): { rect: Rect; y: number } | null {
+export function padOf(def: KitPieceDef, x: number, z: number, rot: number, h: Natural): { rect: Rect; y: number; plan: PadPlan } | null {
   if (noPad(def)) return null;
   const plan = planPad(footprint(def, x, z, rot), h);
-  return { rect: plan.rect, y: plan.y };
+  return { rect: plan.rect, y: plan.y, plan };
+}
+
+/** Does the slab of this plan's retaining wall stand anywhere inside the rect? A pad graded over it would leave the wall (drawn from the old ground) buried or hovering. */
+function wallInside(plan: PadPlan, r: Rect): boolean {
+  if (!plan.runs.length) return false;
+  const nx = Math.max(2, Math.min(24, Math.ceil((r.x1 - r.x0) / 0.1))), nz = Math.max(2, Math.min(24, Math.ceil((r.z1 - r.z0) / 0.1)));
+  for (let i = 0; i <= nx; i++) for (let j = 0; j <= nz; j++) if (wallAt(plan, r.x0 + (r.x1 - r.x0) * i / nx, r.z0 + (r.z1 - r.z0) * j / nz, 0.08) >= RW.MIN_H) return true;
+  return false;
 }
 
 /** The graded pad of a piece we are about to stake against the pads of those already standing, or null when they leave each other alone. */
@@ -45,6 +55,8 @@ export function padClash(def: KitPieceDef, x: number, z: number, rot: number, h:
     if (!theirs) continue;
     const dy = theirs.y - mine.y, area = overlapArea(mine.rect, theirs.rect);
     if (area > 1e-4 && Math.abs(dy) >= LEVEL_APART && (!worst || area > worst.overlap)) worst = { other: p, dy, overlap: area };
+    // a neighbour's retaining wall stands where our pad would be graded flat (even at the same level): the wall would be buried in our floor or stand on nothing
+    else if (!worst && wallInside(theirs.plan, mine.rect)) worst = { other: p, dy, overlap: 0, wall: true };
   }
   return worst;
 }
@@ -52,6 +64,7 @@ export function padClash(def: KitPieceDef, x: number, z: number, rot: number, h:
 /** The sentence the placement tool shows. `snapM` is how far the suggested spot is (null: none found nearby). */
 export function clashText(c: PadClash, snapM: number | null): string {
   const name = (KIT[c.other.kind]?.name ?? c.other.kind).toLowerCase();
+  if (c.wall) return `Its graded pad would run over the retaining wall of the ${name}.${snapM === null ? ' Move it clear of the wall.' : ` Press S to snap to the nearest clear spot (${lengthText(snapM)} away).`}`;
   const m = Math.round(Math.abs(c.dy) * RW.M * 10) / 10;
   return `Its graded pad would cut into the pad of the ${name}, which stands ${lengthText(m)} ${c.dy > 0 ? 'higher' : 'lower'}.${snapM === null ? ' Move it clear, up or down the slope.' : ` Press S to snap to the nearest clear spot (${lengthText(snapM)} away).`}`;
 }

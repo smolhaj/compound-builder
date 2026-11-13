@@ -88,6 +88,8 @@ export interface WaterPatchOptions {
   reflection?: PlanarReflection;
   /** Ripple scale multiplier (big regional water reads calmer at range). */
   rippleScale?: number;
+  /** Low tier: one wind ripple layer, no pebble bed, no lamp streaks, no sparkle facets, one flow octave. */
+  lite?: boolean;
   /** Fade ripple / glitter detail out between these camera distances. */
   detailFade?: [number, number];
 }
@@ -173,7 +175,9 @@ function colorGLSL(o: WaterPatchOptions): string {
   float wSilt = wNoise(wp * 1.3 + 2.7) * 0.6 + wNoise(wp * 4.1) * 0.4;
   vec3 wBedC = uWBed * (0.82 + 0.3 * wSilt);
   float wPebK = 0.35 * smoothstep(0.82, 0.97, wShelf) * (1.0 - smoothstep(6.0, 18.0, wCamD));
+#ifndef WATER_LITE
   if (wPebK > 0.001) wBedC = mix(wBedC, uWBed * (0.7 + 0.3 * wPebbles(wp * 42.0 + vec2(wNoise(wp * 7.0) * 0.6))), wPebK);
+#endif
   // the bed shows only in the first meter or so, then the water goes opaque
   float wSee = uWClarity * pow(smoothstep(0.45, 1.0, wShelf), 2.5) * (1.0 - 0.6 * wRiver * smoothstep(0.1, 0.4, wSpeed));
   wCol = mix(wCol, wBedC * 0.4, wSee * 0.5);   // (r9: a dark, peaty margin — a bright bed read as an icy rim)
@@ -185,8 +189,8 @@ function colorGLSL(o: WaterPatchOptions): string {
     float edgeN = wNoise(wp * 5.0 + uWTime * vec2(0.15, -0.1));
     // a thin broken line right at the waterline — a wide band turned whole
     // narrow ponds / channels (all 'edge') into a pale gray sheet like ice
-    float band = smoothstep(0.8, 1.0, wEdge) * (0.35 + 0.65 * lap);
-    wFoam = band * smoothstep(0.45, 0.85, edgeN + 0.25 * lap) * 0.3;
+    float band = smoothstep(0.55, 1.0, wEdge) * (0.35 + 0.65 * lap);
+    wFoam = band * smoothstep(0.4, 0.8, edgeN + 0.25 * lap) * 0.5;
   }
 #ifdef WATER_FLOW
   if (wRiver > 0.01) {
@@ -221,7 +225,11 @@ function normalGLSL(o: WaterPatchOptions): string {
     vec2 w1 = wp * 0.045 * ${s} - uWind * uWTime * 0.05;
     vec2 w2 = mat2(0.6, -0.8, 0.8, 0.6) * wp * 0.11 * ${s} - vec2(uWind.y, -uWind.x) * uWTime * 0.11 - uWind * uWTime * 0.06;
     vec3 n1 = texture2D(uRipple, w1).xyz * 2.0 - 1.0;
+#ifdef WATER_LITE
+    vec3 n2 = vec3(0.0);
+#else
     vec3 n2 = texture2D(uRipple, w2).xyz * 2.0 - 1.0;
+#endif
     float gust = smoothstep(0.35, 0.8, wNoise(wp * 0.035 - uWind * uWTime * 0.08) * 0.7 + wNoise(wp * 0.09 + uWTime * 0.03) * 0.3);
     vec2 sl = (n1.xy + n2.xy * 0.75) * (0.16 + 0.22 * gust);
 #ifdef WATER_FLOW
@@ -229,8 +237,12 @@ function normalGLSL(o: WaterPatchOptions): string {
       vec2 f0 = wp - wOff0, f1 = wp - wOff1;
       vec3 a0 = texture2D(uRipple, f0 * 0.16 * ${s}).xyz * 2.0 - 1.0;
       vec3 a1 = texture2D(uRipple, f1 * 0.16 * ${s} + 0.37).xyz * 2.0 - 1.0;
+#ifdef WATER_LITE
+      vec3 b0 = vec3(0.0), b1 = vec3(0.0);
+#else
       vec3 b0 = texture2D(uRipple, f0 * 0.39 * ${s} + 0.21).xyz * 2.0 - 1.0;
       vec3 b1 = texture2D(uRipple, f1 * 0.39 * ${s} + 0.63).xyz * 2.0 - 1.0;
+#endif
       vec2 fsl = mix(a0.xy + b0.xy * 0.6, a1.xy + b1.xy * 0.6, wBl);
       float rough = 0.2 + 0.5 * smoothstep(0.05, 0.4, wSpeed) + 0.5 * wFoamB;
       sl = mix(sl, fsl * rough, wRiver);
@@ -308,6 +320,7 @@ function outGLSL(): string {
     vec3 spec = min(uSunCol * glint, vec3(3.0));
     // Lamp reflections: vertical streaks under each lamp's mirror image
     vec3 lamps = vec3(0.0);
+#ifndef WATER_LITE
     if (uWNight > 0.05) {
       vec3 a = normalize(vWPos - cameraPosition + vec3(wNw.x, 0.0, wNw.z) * wCamD * 0.025);
       for (int i = 0; i < ${MAX_WATER_LAMPS}; i++) {
@@ -324,6 +337,7 @@ function outGLSL(): string {
       }
       lamps *= uLampCol * 1.6 * uWNight * (1.0 - wFoam) * F * 2.2;
     }
+#endif
     float Fr = F * (1.0 - wFoam);
     sky = min(sky, vec3(1.25));
     outgoingLight = body * (1.0 - Fr) + sky * Fr + spec + lamps + totalEmissiveRadiance;
@@ -353,6 +367,7 @@ export function patchWaterMaterial(mat: THREE.MeshStandardMaterial, o: WaterPatc
   const defs: Record<string, string> = {};
   if (o.flow) defs['WATER_FLOW'] = '';
   if (o.reflection) defs['WATER_MIRROR'] = '';
+  if (o.lite) defs['WATER_LITE'] = '';
   mat.defines = { ...(mat.defines ?? {}), ...defs };
   const attrs = o.attributes ?? {};
   const attrDecl = Object.entries(attrs).map(([n, t]) => `attribute ${t} ${n};\nvarying ${t} v_${n};`).join('\n');
@@ -372,10 +387,10 @@ export function patchWaterMaterial(mat: THREE.MeshStandardMaterial, o: WaterPatc
       // Seasons: ponds / lakes / slow rivers freeze in cold winters; the
       // fast, deep river channel stays a dark open lead
       .replace('#include <opaque_fragment>', outGLSL()
-        + seasonIceGlsl('vWPos', 'smoothstep(0.12, 0.4, wSpeed) * smoothstep(0.3, 0.75, wDepth) * wRiver', o.iceExpr)
+        + seasonIceGlsl('vWPos', 'smoothstep(0.12, 0.4, wSpeed) * smoothstep(0.3, 0.75, wDepth) * wRiver', `min(1.0, (${o.iceExpr ?? 'uSeaC.x'}) * (1.0 + 2.2 * (1.0 - smoothstep(0.0, 0.5, wDepth))))`)
         + '\n#include <opaque_fragment>');
   };
-  mat.customProgramCacheKey = () => 'water-v3-' + o.key + (o.flow ? '-f' : '') + (o.reflection ? '-m' : '');
+  mat.customProgramCacheKey = () => 'water-v3-' + o.key + (o.flow ? '-f' : '') + (o.reflection ? '-m' : '') + (o.lite ? '-l' : '');
 }
 
 // ── Per-frame globals ────────────────────────────────────────────────────────

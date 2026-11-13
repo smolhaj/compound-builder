@@ -647,7 +647,7 @@ export interface SiteQuery {
   rule?(kind: string, x: number, z: number): PlaceProblem | null;
 }
 
-export type PlaceProblem = 'cross_slope' | 'needs_house' | 'needs_slope' | 'no_climb' | 'no_creek' | 'no_head' | 'no_water' | 'not_connected' | 'not_on_bank' | 'not_shore' | 'off_parcel' | 'overlaps' | 'pad_clash' | 'thin_cover' | 'too_deep' | 'too_much_climb' | 'too_steep' | 'water';
+export type PlaceProblem = 'cross_slope' | 'needs_house' | 'needs_slope' | 'no_climb' | 'no_creek' | 'no_head' | 'no_water' | 'not_connected' | 'not_on_bank' | 'not_shore' | 'off_parcel' | 'overlaps' | 'pad_clash' | 'pad_over_road' | 'thin_cover' | 'too_deep' | 'too_much_climb' | 'too_steep' | 'water';
 
 const levelOf = (d: KitPieceDef) => d.level ?? 'surface';
 /** Do pieces at these levels compete for the same ground? (Bunker rooms go under the yard and houses.) */
@@ -679,6 +679,19 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
       row.push(site.height(px, pz));
     }
     hs.push(row);
+  }
+  // the 5 x 5 samples above are 1 to 1.5 u apart on a big footprint: a creek (1.2 u wide), the drive (0.55 u) or the county road can slip between them,
+  // so the things that are thin lines are tested again on a grid no wider than a drive (0.3 u): water, the camp, the drive, the road's banks, the lot's edge.
+  // The ground graded for the piece reaches 0.06 u past its footprint, so what it must keep clear of is tested out to there.
+  if (!turned) {
+    const m = below ? 0 : 0.06, x0 = r.x0 - m, x1 = r.x1 + m, z0 = r.z0 - m, z1 = r.z1 + m;
+    const nx = Math.min(28, Math.ceil((x1 - x0) / 0.3)), nz = Math.min(28, Math.ceil((z1 - z0) / 0.3));
+    for (let i = 0; i <= nx; i++) for (let j = 0; j <= nz; j++) {
+      const px = x0 + (x1 - x0) * i / nx, pz = z0 + (z1 - z0) * j / nz, inside = px >= r.x0 && px <= r.x1 && pz >= r.z0 && pz <= r.z1;
+      if (inside && !site.owned(px, pz)) return 'off_parcel';
+      if (inside && !def.waterside && site.water(px, pz)) return 'water';
+      if (!below && site.blocked?.(px, pz)) return 'overlaps';
+    }
   }
   // steepest grade across the footprint along either axis
   let grade = 0;
@@ -739,6 +752,7 @@ export const PROBLEM_TEXT: Record<PlaceProblem, string> = {
   too_much_climb: 'The ground climbs too much along it: a stair takes up to 12 ft, a ramp 4 ft. Terrace the slope or switch back',
   cross_slope: 'The ground falls away sideways across it: turn it (R) to run up the hill, not across',
   pad_clash: 'Its graded pad would cut into a neighbor\'s pad at another level',
+  pad_over_road: 'Its flat ground (and the wall that holds it) would be graded over the drive, the camp or the road\'s bank: move it clear of the road',
   no_water: 'Your land has no lake or river wide enough for a dock',
   not_shore: 'A dock runs from dry land out over the water: put one end on the bank and the other in the lake (R turns it)',
   no_creek: 'No creek runs through your land: a turbine needs falling water',

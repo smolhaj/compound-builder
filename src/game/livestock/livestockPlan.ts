@@ -78,7 +78,7 @@ export interface AnimalGoal {
 /** In the cold rain, or at night, or on the alarm, they are shut in. */
 export interface HerdCtx { hour: number; raided: boolean; storm: boolean; house: Pt; clock: number }
 
-export function animalGoal(a: { id: string; kind: StockKind }, homes: readonly Home[], c: HerdCtx, noWay: ReadonlySet<string> = new Set()): AnimalGoal {
+export function animalGoal(a: { id: string; kind: StockKind }, homes: readonly Home[], c: HerdCtx, noWay: ReadonlySet<string> = new Set(), free?: (x: number, z: number) => boolean): AnimalGoal {
   // dusk and dawn are staggered by animal (some go in at 19.5, the last about 20.8; out between 6.2 and 7), so they file through the door, not all at once
   const night = c.hour >= 19.5 + hash(a.id, 13) * 1.3 || c.hour < 6.2 + hash(a.id, 14) * 0.8;
   const home = shelterOf(a.kind, a.id, homes, c.raided, c.house, noWay);
@@ -93,12 +93,21 @@ export function animalGoal(a: { id: string; kind: StockKind }, homes: readonly H
     return { x: door.x + px * across, z: door.z + pz * across, inside: true, home: home.id, panic: c.raided };
   }
   // turned out: a spot in the paddock in front of the door, moving on every few game hours
-  const k = Math.floor(c.clock / 0.12 + hash(a.id, 4) * 40);
+  const k0 = Math.floor(c.clock / 0.12 + hash(a.id, 4) * 40);
   // (a paddock wide enough for the herd to graze apart: about 5 m deep for the big animals, a coop yard for the hens)
-  const small = a.kind === 'hen' || a.kind === 'rabbit', along = (hash(a.id + k, 5) - 0.5) * (home.w + (small ? 1.6 : 4.5)), out = 0.35 + hash(a.id + k, 6) * (small ? 0.6 : 3.2);
-  const px = -door.uz, pz = door.ux;      // across the front
-  return { x: door.x + door.ux * out + px * along, z: door.z + door.uz * out + pz * along, inside: false, home: home.id, panic: false };
+  const small = a.kind === 'hen' || a.kind === 'rabbit', px = -door.uz, pz = door.ux;      // across the front
+  // (a spot in another building, the creek or the road is passed over for the next: the herd never has a goal it cannot stand on)
+  for (let t = 0; t < PADDOCK_TRIES; t++) {
+    const k = k0 + t * 17, along = (hash(a.id + k, 5) - 0.5) * (home.w + (small ? 1.6 : 4.5)), out = 0.35 + hash(a.id + k, 6) * (small ? 0.6 : 3.2);
+    const x = door.x + door.ux * out + px * along, z = door.z + door.uz * out + pz * along;
+    if (!free || free(x, z)) return { x, z, inside: false, home: home.id, panic: false };
+  }
+  // nowhere free in the paddock: at the door
+  return { x: door.x + door.ux * 0.3, z: door.z + door.uz * 0.3, inside: false, home: home.id, panic: false };
 }
+
+/** Spots tried in the paddock before the animal stands at the door. */
+export const PADDOCK_TRIES = 8;
 
 /** Is the crew at the gate one that means harm (the animals are driven in), as against a trader, a neighbour or refugees? */
 export function hostileAtGate(enc: { kind: string; armed: boolean } | null | undefined): boolean {

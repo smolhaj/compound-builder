@@ -235,6 +235,9 @@ export class WorldScene {
   /** Event / season wetness (0–1); the weather layer turns it into wet surfaces. */
   get eventWetness(): number { return this._wetnessCurrent; }
 
+  /** Unit vector toward the light that casts shadows (the sun by day, the moon at night). */
+  get sunDirection(): THREE.Vector3 { return this._sunDir; }
+
   /** Current night weight of the lighting cycle (0 = day … 1 = night). */
   get nightFactor(): number { return this._phase.night; }
 

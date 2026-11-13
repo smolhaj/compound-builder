@@ -8,8 +8,9 @@
  * canvas applies.
  */
 import * as THREE from 'three';
-import { FigureLayer, FIG_POSE, FIG_SCALE } from '../../engine/world/people/figureKit';
-import { pickPersonaWear, type Wear } from '../../engine/world/people/crowdWear';
+import { FigureLayer, FIG_POSE, FIG_SCALE, FIG_TOOL, GEAR, HEADWEAR, stridePhase } from '../../engine/world/people/figureKit';
+import type { Wear } from '../../engine/world/people/crowdWear';
+import { wearForRole, roleOfPerson, seedOf, type Role } from '../../engine/world/people/roleWear';
 import type { Battle, BattleEvent, BattleUnit } from '../../sim/battleTypes';
 import { coverPusher, type Box } from './cameraObstacles';
 import { MUZZLE, OWN_BOX, TORSO, WALL_POST, faceNormal, lineOfFire } from './lineOfFire';
@@ -81,6 +82,10 @@ interface U {
   lean?: number; coverAt?: number; proneUntil?: number; /** Heads down while rounds crack past (suppression). */ duckUntil?: number;
   /** Drawn size this frame (the figure grows with the camera's distance). */
   gs?: number;
+  /** Carries a rifle (every defender on the line, a raider who has fired), and until when the muzzle is up at the target. */
+  armed?: boolean; aimUntil?: number;
+  /** Where it stood last frame (the stride follows the ground covered). */
+  px?: number; pz?: number;
 }
 /** A flat mark on the ground or a wall: pools, spatter. `born`: a pool still spreading (radius `r1` after a few seconds). */
 interface Stain { clean?: { t0: number; secs: number }; x: number; y: number; z: number; r: number; stretch: number; rot: number; color: number; wall?: { nx: number; nz: number }; born?: number; r1?: number; /** A prop on the ground (a dropped rifle): drawn in Restrained too. */ prop?: boolean }
@@ -140,7 +145,7 @@ export class BattleRenderer {
 
   private readonly _scene: THREE.Scene;
   private readonly _ground: (x: number, z: number) => number;
-  private readonly _people: () => ReadonlyArray<{ id: string; shirt: number; body: 'f' | 'm' }>;
+  private readonly _people: () => ReadonlyArray<{ id: string; shirt: number; body: 'f' | 'm'; kid?: boolean; age?: number; elder?: boolean }>;
   private readonly _layer: FigureLayer;
   private readonly _group = new THREE.Group();
   private _units = new Map<string, U>();
@@ -202,7 +207,7 @@ export class BattleRenderer {
   private readonly _c = new THREE.Color();
 
   constructor(scene: THREE.Scene, ground: (x: number, z: number) => number,
-    people: () => ReadonlyArray<{ id: string; shirt: number; body: 'f' | 'm' }>) {
+    people: () => ReadonlyArray<{ id: string; shirt: number; body: 'f' | 'm'; kid?: boolean; age?: number; elder?: boolean }>) {
     this._scene = scene; this._ground = ground; this._people = people;
     this._layer = new FigureLayer(scene, 64, 'battle');
     this._group.name = 'battle-fx';
@@ -298,30 +303,39 @@ export class BattleRenderer {
     for (const def of b.units) {
       const r = rnd(hashStr(def.personId ?? def.id));
       let wear: Wear, scale = 1;
+      const night = dark;
+      let armed = false;
       if (def.side === 'home') {
         const p = people.find(q => q.id === def.personId);
-        wear = pickPersonaWear(r, 'resident', { season: 'fall', team: null });
-        if (p) { wear.shirt = p.shirt; wear.longHair = p.body === 'f'; }
-        if (def.civilian) scale = 0.66;
+        // the household as people: age, sex and build from the person; a defender on the line wears a vest, radio and cap or helmet over their own shirt
+        const role: Role = def.civilian ? (p ? roleOfPerson({ kid: !!p.kid, age: p.age ?? 30, elder: p.elder }) : 'adult') : 'guard';
+        wear = wearForRole(seedOf(def.personId ?? def.id), role, { season: 'fall', climate: 'mild', female: p?.body === 'f', age: p?.age, night });
+        if (p) { wear.shirt = p.shirt; if (p.body === 'f' && wear.hairStyle === 0) wear.longHair = true; }
+        if (def.civilian) scale = p ? (p.kid ? ((p.age ?? 9) < 8 ? 0.62 : 0.78) : 1) : 0.66;
         wear.pants = 0x3b4a66;
+        armed = !def.civilian && !def.machine;
       } else {
-        wear = pickPersonaWear(r, 'resident', { season: 'winter', team: null });
+        const rl = def.look?.role;
+        const role: Role = rl === 'scout' || rl === 'leader' ? (rl === 'leader' ? 'militia' : 'tactical') : rl === 'soldier' ? 'militia' : rl === 'kid' ? 'child' : rl === 'parent' ? 'neighbor' : !def.look ? (hashStr(def.id) % 3 === 0 ? 'militia' : 'scavenger') : 'scavenger';
+        wear = wearForRole(seedOf(def.id), role, { season: 'winter', climate: 'mild', night });
         // (work clothes and old surplus, not one black: by day the tones read against snow and grass, at night they stay near-black)
         const shirts = dark ? RAIDER_SHIRTS_NIGHT : RAIDER_SHIRTS_DAY, pants = dark ? RAIDER_PANTS_NIGHT : RAIDER_PANTS_DAY;
         wear.shirt = shirts[Math.floor(r() * shirts.length)];
-        wear.pants = pants[Math.floor(r() * pants.length)]; wear.hat = -1; wear.coat = 1;
+        wear.pants = pants[Math.floor(r() * pants.length)]; wear.coat = 1;
         if (def.look) scale = dressRaider(wear, def.look, dark, r);
+        if (role === 'militia' || role === 'tactical') { wear.headwear = wear.headwear || HEADWEAR.HELMET; }
+        armed = !def.machine && role !== 'child' && role !== 'neighbor' && rl !== 'rabble' && rl !== 'shouter';
       }
-      if (!def.look) wear.hasPack = false;
+      if (def.side === 'raider' && !def.look) wear.hasPack = false;
       wear.shorts = false;
       // armor over the clothes: a coyote plate carrier (back panel), a navy soft vest, an olive helmet
-      if (def.armor?.plate) { wear.shirt = 0x6e6446; wear.coat = 1; wear.hasPack = true; wear.pack = 0x4b4a3a; }
-      else if (def.armor?.soft) { wear.shirt = 0x2d3440; wear.coat = 1; }
-      if (def.armor?.helmet) wear.hat = 0x3d4232;
+      if (def.armor?.plate) { wear.coat = 1; wear.gear = ((wear.gear ?? 0) & ~GEAR.VEST) | GEAR.PLATE; wear.pack = 0x6e6446; wear.hasPack = false; }
+      else if (def.armor?.soft) { wear.coat = 1; wear.gear = (wear.gear ?? 0) | GEAR.VEST; wear.pack = 0x2d3440; }
+      if (def.armor?.helmet) { wear.headwear = HEADWEAR.HELMET; wear.hat = 0x3d4232; }
       const y = def.y ?? 0;
       const start = def.side === 'raider' && !def.machine ? this._clearOfCover(def.x, def.z) : { x: def.x, z: def.z };
       this._units.set(def.id, { scale, def, x: start.x, y, z: start.z, tx: start.x, ty: y, tz: start.z, rot: def.side === 'raider' ? Math.atan2(this._center.x - def.x, this._center.z - def.z) : 0,
-        phase: r() * 6, speed: RUN, wear, wound: 0, dead: false, crouch: false, gone: false });
+        phase: r() * 6, speed: RUN, wear, armed, wound: 0, dead: false, crouch: false, gone: false });
     }
     if (b.vehicle) {
       // (the opportunists' pickup: one small group of merged parts, only while this scene plays)
@@ -511,6 +525,7 @@ export class BattleRenderer {
         const p0 = this._muzzle(a, new THREE.Vector3()), p1 = this._torso(t, new THREE.Vector3());
         if (!e.hit) { p1.x += (Math.random() - 0.5) * 0.6; p1.z += (Math.random() - 0.5) * 0.6; p1.y += (Math.random() - 0.3) * 0.3; }
         a.rot = Math.atan2(p1.x - p0.x, p1.z - p0.z);
+        a.armed = true; a.aimUntil = this.time + 1.1;
         // a round only crosses a wall or a roof when the line clears its top (a tower, a wall walk): otherwise it stops at the face (lineOfFire.ts)
         const lof = lineOfFire(p0, p1, this._fireBoxes(), this._ground, { from: a.def.side === 'home' && !a.def.machine ? WALL_POST : OWN_BOX, to: OWN_BOX });
         if (lof.blocked && lof.at) { p1.set(lof.at.x, lof.at.y, lof.at.z); this._impact(p1, p0); } else if (e.hit) this._hit(p1.clone(), p0);
@@ -730,6 +745,9 @@ export class BattleRenderer {
 
   private _moveUnits(dt: number): void {
     let n = 0;
+    this._layer.setTime(this.time);
+    const carriers = new Set<string>();
+    for (const q of this._units.values()) if (q.carriedBy && !q.gone) carriers.add(q.carriedBy);
     for (const u of this._units.values()) {
       if (u.hideAt != null && this.time >= u.hideAt) u.gone = true;   // (buried: under the earth)
       if (u.sink) { const k = Math.max(0, Math.min(1, (this.time - u.sink.t0) / u.sink.secs)); u.x = u.tx = u.sink.x0 + (u.sink.x - u.sink.x0) * k; u.z = u.tz = u.sink.z0 + (u.sink.z - u.sink.z0) * k; u.y = -0.004 * k; }
@@ -758,16 +776,32 @@ export class BattleRenderer {
         } else u.y += (u.ty - u.y) * Math.min(1, dt * 4);
         if (u.speed === FLEE && Math.hypot(u.x - this._center.x, u.z - this._center.z) > 50) { u.gone = true; continue; }
       }
-      u.phase += dt * (moving ? (u.limp ? 6 : 12) : 0);
+      // the stride follows the ground covered, so the planted foot does not slide; the swing grows with the pace
+      const stepD = u.px === undefined ? 0 : Math.hypot(u.x - u.px, u.z - (u.pz ?? u.z));
+      u.px = u.x; u.pz = u.z;
+      const pace = dt > 1e-4 ? stepD / dt : 0;
+      const amp = moving ? (u.limp ? 0.3 : pace > 0.75 ? 0.85 : 0.55) : 0;
+      if (moving) u.phase = (u.phase + stridePhase(stepD, u.scale, Math.max(0.3, amp))) % 6283.19;
       if (n >= this._layer.capacity) break;
       this._layer.setWear(n, u.wear);
       const gy = this._ground(u.x, u.z) + u.y;
       // from far off the figures grow a little (up to 2.4x), so a crew at the end of the drive is still people, not specks
       const dv = this.viewer ? Math.hypot(u.x - this.viewer.x, gy - this.viewer.y, u.z - this.viewer.z) : 0;
       const gs = u.scale * Math.min(2.4, Math.max(1, dv / 16));
-      this._layer.setPose(n, { x: u.x, y: gy, z: u.z, rot: u.rot, scale: gs,
-        pose: (u.hands && !moving) || (u.y > 0.06 && u.def.side === 'raider' && !u.dead) ? FIG_POSE.REACH :   // (a raider off the ground is on a ladder's rungs: arms up, reaching for the next one)
-           (u.crouch || (u.duckUntil != null && this.time < u.duckUntil)) && !moving ? FIG_POSE.KNEEL : u.sling && !u.dead ? FIG_POSE.CROSS : FIG_POSE.STAND, phase: u.phase, amp: moving ? (u.limp ? 0.3 : 0.6) : 0 });
+      const ducking = u.duckUntil != null && this.time < u.duckUntil;
+      const aiming = u.aimUntil != null && this.time < u.aimUntil && !moving && !u.dead && !u.hands;
+      const fallT = u.dead ? Math.max(0, Math.min(1, (this.time - (u.fallAt ?? 0)) / 0.95)) : -1;
+      let pose: number = FIG_POSE.STAND, tool: number = FIG_TOOL.NONE;
+      if ((u.hands && !moving) || (u.y > 0.06 && u.def.side === 'raider' && !u.dead)) pose = FIG_POSE.REACH;   // (a raider off the ground is on a ladder's rungs: arms up, reaching for the next one)
+      else if (fallT >= 0 && fallT < 1) pose = FIG_POSE.FALL;
+      else if (ducking && !moving) pose = FIG_POSE.COVER;
+      else if (aiming && u.armed) { pose = FIG_POSE.AIM; tool = FIG_TOOL.RIFLE; }
+      else if (u.crouch && !moving) { pose = u.armed && !u.dead ? FIG_POSE.RIFLE : FIG_POSE.KNEEL; tool = u.armed && !u.dead ? FIG_TOOL.RIFLE : tool; }
+      else if (carriers.has(u.def.id)) pose = FIG_POSE.CARRYP;
+      else if (u.sling && !u.dead) pose = FIG_POSE.CROSS;
+      else if (u.armed && !u.dead && !u.def.civilian) { pose = FIG_POSE.RIFLE; tool = FIG_TOOL.RIFLE; }
+      const slope = (this._ground(u.x + Math.sin(u.rot) * 0.1, u.z + Math.cos(u.rot) * 0.1) - this._ground(u.x - Math.sin(u.rot) * 0.1, u.z - Math.cos(u.rot) * 0.1)) / 0.2;
+      this._layer.setPose(n, { x: u.x, y: gy, z: u.z, rot: u.rot, scale: gs, pose, tool, slope, phase: pose === FIG_POSE.FALL ? fallT : u.phase, amp });
       u.gs = gs;
       const down = u.carriedBy ? 1 : u.dead ? Math.max(0, Math.min(1, (this.time - (u.fallAt ?? 0)) / 0.95)) : u.layAt != null ? Math.max(0, Math.min(1, (this.time - u.layAt) / 0.7)) : -1;
       const flat = ((u.proneUntil != null && this.time < u.proneUntil && !moving) || !!u.crawl) && !u.dead && u.layAt == null && !u.carriedBy && !u.hands && u.frozenUntil == null;
