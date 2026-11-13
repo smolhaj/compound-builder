@@ -126,7 +126,7 @@ function towerPod(_def: KitPieceDef, seed = 1): THREE.Group {
   for (let i = 0; i < steps; i++) {
     const a = i * 0.34, y = 0.15 * M + i * rise;
     p.add('steel', box(0.9 * M, 0.04 * M, 0.34 * M, 0, 0, 0).translate(0.7 * M, 0, 0).rotateY(-a).translate(0, y, 0));
-    if (i % 4 === 0) p.add('steel', cylY(0.015 * M, 1.0 * M, Math.cos(a) * 1.12 * M, y, -Math.sin(a) * 1.12 * M, 4));
+    if (i % 4 === 0) p.add('steel', cylY(0.015 * M, 1.0 * M, Math.cos(a) * 1.12 * M, y, Math.sin(a) * 1.12 * M, 4));
   }
   // roof: the platform, rail, pod walls and roof
   p.layer = 'roof';
