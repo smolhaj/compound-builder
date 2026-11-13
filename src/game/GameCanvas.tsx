@@ -16,6 +16,7 @@ import { useEffect, useRef } from 'react';
 import type { GameState } from '../sim/state';
 import { MushroomCloud } from './fx/MushroomCloud';
 import { collapseLook, withWeather } from '../sim/collapseLook';
+import { OasisState } from './atmosphere/OasisState';
 import { applyDust, dustStorm } from '../engine/world/weather/dustStorm';
 import * as THREE from 'three';
 import { WorldScene } from '../engine/world/WorldScene';
@@ -53,7 +54,7 @@ import { coverBoxes, obstaclesOf, treeBoxes } from './battle/cameraObstacles';
 import { liveBreach } from './battle/liveBreach';
 import { decorateBreach } from '../sim/breach';
 import { planHouseAssault } from '../sim/houseAssault';
-import { routeScene } from '../sim/cutLive';
+import { routeScene, gatePortals } from '../sim/cutLive';
 import { voiceMoments } from '../sim/momentVoices';
 import { deadSilent } from '../sim/deadSilent';
 import { stepSegments } from '../sim/standingSurfaces';
@@ -417,13 +418,23 @@ export function GameCanvas() {
       return h ? { x: h.x, y: 0, z: h.z } : { x: world.camp.x, y: 0, z: world.camp.z };
     };
     let cutawayBefore: ReturnType<typeof useWorldStore.getState>['buildingView'] | null = null;
+    // the movement router's static ground test: ONE function for as long as the compound stands as it is, so what the router has learned about it (its lattice of solid
+    // cells and its graph of openings, sim/cutNav.ts) serves every scene of the cutscene and is thrown away the moment a structure or a wall run changes (or after a minute)
+    let navSolidCache: { sig: string; at: number; fn: (x: number, z: number) => boolean } | null = null;
+    const navSolid = () => {
+      const g = useGameStore.getState().game;
+      const sig = g.structures.filter(st => isFinished(st)).map(st => `${st.id}:${st.kind}:${st.x},${st.z},${st.rot}`).join('|') + '#' + g.perimeter.map(r => `${r.id}:${r.kind}:${r.finishedAt}:${r.done}:${JSON.stringify(r.pts)}${JSON.stringify(r.gates)}`).join('|');
+      const now = performance.now();
+      if (!navSolidCache || navSolidCache.sig !== sig || now - navSolidCache.at > 60000) navSolidCache = { sig, at: now, fn: (x: number, z: number) => world.walkBlocked(x, z, 0.04) };
+      return navSolidCache.fn;
+    };
     const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70), ...(qa.noCover ? [] : coverBoxes(world.lowCover, homeSpot(), 70))] ,
       // the invasion look (sim/breach.ts, sim/houseAssault.ts): how the wall comes down, and the fight inside the house; cinematic, the sim's result is kept
       prepare: b0 => {
         // 1. the invasion look (cinematic; the sim's result is kept); 2. the movement rule: every leg goes through a real opening (sim/cutNav.ts).
         // Any failure leaves the scene as the sim staged it: a cutscene must never take the game down.
         let b = b0;
-        const solid = (x: number, z: number) => world.walkBlocked(x, z, 0.04);
+        const solid = navSolid();
         try {
           if (b0.events.some(e => e.kind === 'breach')) {
             const g = useGameStore.getState().game, hs = homeSpot();
@@ -441,7 +452,7 @@ export function GameCanvas() {
           for (const other of useGameStore.getState().cutscene?.battles ?? []) if (other !== b0) d2.noteAll(other);
           b = voiceMoments(b, d2, id => { const pid = b0.units.find(u => u.id === id)?.personId; const p = pid ? g2.people.find(q => q.id === pid) : undefined; return (p as { first?: string } | undefined)?.first; });
         } catch (err) { console.warn('cutscene staging failed; playing the plain scene', err); b = b0; }
-        return routeScene(deadSilent(b), solid, undefined, stepSegments(useGameStore.getState().game.perimeter)).battle;
+        return routeScene(deadSilent(b), solid, undefined, stepSegments(useGameStore.getState().game.perimeter), gatePortals(useGameStore.getState().game.perimeter)).battle;
       },
       cutaway: on => { const ws2 = useWorldStore.getState(); if (on) { cutawayBefore ??= ws2.buildingView; ws2.setBuildingView('cutaway'); } else if (cutawayBefore) { ws2.setBuildingView(cutawayBefore); cutawayBefore = null; } } });
     const nameLayer = new NameLabelLayer();
@@ -451,6 +462,7 @@ export function GameCanvas() {
     let camBefore: { x: number; y: number; z: number; radius: number; pitch: number; yaw: number } | null = null, camBack = false;
     let promptAt = -1, skipScene = useCutsceneView.getState().skipScene, skipAll = useCutsceneView.getState().skipAll;
     let battleView: { x: number; z: number; radius: number; pitch: number } | null = null;
+    const oasis = new OasisState();
     const qa: { /** QA: force the dust-storm strength 0-1. */ dust?: number; noCover?: boolean; /** QA: run the frame (sim, camera, effects) without drawing it, to skip ahead cheaply. */ skipDraw?: boolean; frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
     // window.__cb.qa.renderNow(): draw one frame (a promise); renderFull('high'|'medium'): one slow full-quality, full-resolution shot
     if (lowRender.on) Object.assign(qa, { lowrender: true, renderNow: () => renderReq.request(), renderFull: (q: QaQuality = 'high') => renderReq.request(q) });
@@ -609,10 +621,10 @@ export function GameCanvas() {
       ws.cutsceneLift = player.active ? 1 : 0;
       ws.setWeather(wx, Math.max(weather.flash, look.flash), weather.skyLightning);
       // lamps on inside from dusk (which windows, and how, is the atmosphere's: who's up, power, blackout curtains)
-      setWindowGlow(Math.max(0, Math.min(1, (ws.nightFactor - 0.25) / 0.4)), now / 1000);
+      setWindowGlow(Math.max(0, Math.min(1, (ws.nightFactor - 0.25) / 0.4)), now / 1000, world.atmos.warmth, world.atmos.hearthFire);
       world.updateAtmosphere({
         dt, time: now / 1000, hour: t, night: ws.nightFactor, daylight: 1 - ws.nightFactor * 0.85, wind: wx.wind, rain: wx.rain, cloud: wx.cloud,
-        snow: Math.max(sp.snow, wx.snowCover * seasonState.weatherSnow) * (wx.rain > 0.3 ? 0.4 : 1), viewportH: canvas.clientHeight || 800, battle: battle.playing,
+        snow: Math.max(sp.snow, wx.snowCover * seasonState.weatherSnow) * (wx.rain > 0.3 ? 0.4 : 1), viewportH: canvas.clientHeight || 800, battle: battle.playing, fov: ws.camera.fov,
       }, gs, seasonState.doy);
       if (tour.active) {
         const f = tour.update(dt);
@@ -691,6 +703,8 @@ export function GameCanvas() {
         if (battleSync > 0.2 && battle.playing) { battleSync = 0; bs.setProgress(battle.time, battle.lines); }
       }
       ws.tick(dt);
+      // the oasis contrast: warm inside the held walls, cold and ashy outside, dimmed by a breach or a raid (atmosphere/OasisState.ts)
+      { const o = oasis.update(dt, gs, ws.camera.position, cam.target, world.groundAt(ws.camera.position.x, ws.camera.position.z), battle.playing ? 'attack' : gs.gate.pending ? 'knock' : 'none'); ws.setOasis(o.collapse, o.safety, o.inside); }
       ws.updateDayNight(t);
       blueprintOv.update(performance.now());
       if (!lowRender.on) {
@@ -721,7 +735,7 @@ export function GameCanvas() {
     if (!showcaseNext) requestAnimationFrame(() => requestAnimationFrame(() => { if (!cancelled) useWorldStore.getState().setBoot(null); }));
 
     // QA hook (screenshot harness, console poking).
-    (window as unknown as Record<string, unknown>).__cb = { census: () => sceneCensus(ws.scene), terrainOv, blueprintOv, player, ws, world, weather, valley, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
+    (window as unknown as Record<string, unknown>).__cb = { oasis, census: () => sceneCensus(ws.scene), terrainOv, blueprintOv, player, ws, world, weather, valley, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
       demoBattle: () => {
         const g = useGameStore.getState().game;
         const b = demoBattle(g.structures, g.people, g.structures.length ? undefined : world.camp);
