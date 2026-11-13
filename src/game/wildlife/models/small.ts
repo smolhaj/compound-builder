@@ -79,7 +79,7 @@ const SQUIRREL: Quad = {
   },
   tail: lod => {
     // bushy, an S over the back: up from the rump, a curve forward, the tip nodding
-    const pts: Array<[number, number, number, number]> = [[0, 0.15, -0.17, 0.016], [0, 0.2, -0.22, 0.03], [0, 0.27, -0.23, 0.038], [0, 0.33, -0.19, 0.036], [0, 0.35, -0.12, 0.028], [0, 0.34, -0.07, 0.01]];
+    const pts: Array<[number, number, number, number]> = [[0, 0.15, -0.17, 0.012], [0, 0.185, -0.2, 0.022], [0, 0.22, -0.215, 0.03], [0, 0.245, -0.19, 0.03], [0, 0.25, -0.15, 0.024], [0, 0.245, -0.12, 0.01]];
     return strand(pts, sk(BONE.TAIL, BONE.TAIL2, 0.6), lod, { region: REGION.TAIL, up: [1, 0, 0], coat: 1, flat: false });
   },
   extras: () => undefined,

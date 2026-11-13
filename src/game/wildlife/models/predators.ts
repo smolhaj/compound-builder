@@ -19,7 +19,7 @@ export const hexLin = (h: number): V3 => [(h >> 16) & 255, (h >> 8) & 255, h & 2
 function flap(sx: number, b: number, at: V3, len: number, wd: number, lod: Lod, o: { sweep?: number; fold?: boolean; col?: V3 } = {}): Mesh {
   const sw = o.sweep ?? 0.25, col = o.col ?? [1, 1, 1];
   const pts: Array<[number, number, number, number]> = o.fold
-    ? [[0.0, 0.0, 0.0, 0.3], [0.3, 0.3, 0.0, 0.85], [0.55, 0.45, 0.25, 1], [0.7, 0.4, 0.5, 0.85], [0.78, 0.28, 0.7, 0.3]]   // stands, then folds forward over itself
+    ? [[0.0, 0.0, 0.0, 0.35], [0.3, 0.2, 0.0, 0.85], [0.5, 0.45, 0.12, 1], [0.42, 0.7, 0.3, 0.85], [0.2, 0.8, 0.45, 0.3]]   // a button ear: stands a little, then the tip folds forward and down over itself
     : [[0.0, 0.0, 0.0, 0.4], [-0.25, 0.25, 0.0, 0.9], [-0.6, 0.35, -0.02, 1], [-0.9, 0.42, 0.0, 0.75], [-1, 0.45, 0.02, 0.2]];
   const rs: Ring[] = pts.map(([dy, dx, dz, w], i) => ({ p: [at[0] + sx * dx * len * sw * 0.55, at[1] + dy * len, at[2] + dz * len] as V3, w: wd * w, h: 0.0045, skin: i === 0 ? sk(BONE.HEAD, b, 0.35) : sk(b), coat: 1, region: REGION.EAR, col }));
   return tube(rs, { seg: Math.max(6, Math.round(lod.seg * 0.5)), sub: lod.sub > 1 ? 2 : 1, up: [1, 0, 0], flat: true, capEnd: true });
@@ -45,20 +45,31 @@ interface Canid {
   paws?: number;
   /** Limb thickness factor (default 1.3: a wolf's legs are not sticks). */
   limbW?: number;
+  /** Heavier shoulders (1 = a wolf's): the withers and the neck base broaden. */
+  shoulder?: number;
+  /** Head profile: a canid has a forehead stop and a tapered muzzle, a cat a short round face. */
+  face?: 'canid' | 'cat';
 }
 function canid(o: Canid): Quad {
-  const k = o.k, hs = (o.head ?? 1) * 1.3, ch = o.chest ?? 1, wd = o.width ?? 1, lk = o.legK ?? 1, nk = (o.neckK ?? 1) * 1.4, sw = o.skullW ?? 1, mz = o.muzzle ?? 1, sl = o.slope ?? 0;
+  const k = o.k, hs = (o.head ?? 1) * 1.2, ch = o.chest ?? 1, wd = o.width ?? 1, lk = o.legK ?? 1, nk = (o.neckK ?? 1) * 1.2, sw = o.skullW ?? 1, mz = o.muzzle ?? 1, sl = o.slope ?? 0;
   // wolf base proportions, scaled: legs by lk (the body rides on them), the chest by ch
   const lift = (lk - 1) * 0.36, st = o.stretch ?? 1;
   const Y = (y: number): number => (y + lift) * k, Z = (z: number): number => z * k * st;
-  const body = ([[0.46, 0.62, 0.38, 0.075], [0.36, 0.8 + sl, 0.8 - 0.52 * ch, 0.11], [0.12, 0.78 + sl * 0.5, 0.8 - 0.52 * ch, 0.12], [-0.14, 0.74, 0.42, 0.102], [-0.36, 0.75 - sl * 0.4, 0.45, 0.105], [-0.5, 0.7, 0.48, 0.072]] as Array<[number, number, number, number]>)
-    .map(([z, t, b, hw]) => [Z(z), Y(t), Y(b), hw * k * wd, 2.2] as [number, number, number, number, number]);
-  const neck: NeckRow[] = [{ y: 0.72 + sl, z: 0.36, w: 0.085, h: 0.12, dn: 0.12 }, { y: 0.77 + sl, z: 0.5, w: 0.066, h: 0.095, dn: 0.095 }, { y: 0.79 + sl, z: 0.6, w: 0.052, h: 0.07, dn: 0.07 }].map(n => ({ y: Y(n.y), z: Z(n.z), w: n.w * k * nk * wd, h: n.h * k * nk, dn: n.dn * k * nk }));
+  const shd = o.shoulder ?? 1;
+  const body = ([[0.46, 0.62, 0.4, 0.078], [0.36, 0.8 + sl, 0.8 - 0.46 * ch, 0.097], [0.12, 0.78 + sl * 0.5, 0.8 - 0.44 * ch, 0.107], [-0.14, 0.74, 0.44, 0.098], [-0.36, 0.75 - sl * 0.4, 0.46, 0.1], [-0.5, 0.7, 0.49, 0.07]] as Array<[number, number, number, number]>)
+    .map(([z, t, b, hw], i) => [Z(z), Y(t), Y(b), hw * k * wd * (i === 1 || i === 2 ? shd : 1), 2.2] as [number, number, number, number, number]);
+  // the neck tapers from the shoulders to the skull and never rises above the withers; the head is carried forward of the chest
+  const neck: NeckRow[] = [{ y: 0.7 + sl, z: 0.34, w: 0.092, h: 0.1, dn: 0.125 }, { y: 0.75 + sl, z: 0.48, w: 0.07, h: 0.085, dn: 0.09 }, { y: 0.775 + sl, z: 0.6, w: 0.052, h: 0.066, dn: 0.066 }].map(n => ({ y: Y(n.y), z: Z(n.z), w: n.w * k * nk * wd * (n.z < 0.4 ? shd : 1), h: n.h * k * nk, dn: n.dn * k * nk }));
   const hz = (z: number): number => (z > 0.1 ? 0.1 + (z - 0.1) * mz : z);
-  const mw = 1.3, LW = o.limbW ?? 1.3;
-  const head: HeadRow[] = ([[-0.05, 0, 0.05 * sw, 0.062, 0.062], [0.03, 0, 0.06 * sw, 0.067, 0.064], [0.1, -0.012, 0.045 * sw, 0.05, 0.048], [0.17, -0.024, 0.032 * sw * mw, 0.036, 0.035], [0.22, -0.03, 0.026 * sw * mw, 0.028, 0.026]] as HeadRow[])
-      .map(([z, cy, w, h, dn]) => [hz(z) * k, cy * k * hs, w * k * hs, h * k * hs, dn * k * hs] as HeadRow);
-  const headAt: V3 = c3(0, Y(0.78 + sl), Z(0.6)), HP = -0.16;
+  const mw = Math.sqrt(sw), LW = o.limbW ?? 1.3;
+  // a canid skull: broad, a clear forehead stop, then a deep, squarish muzzle that tapers to the nose; a cat's is short and round
+  // rows: [z, top, bottom, half-width] in the head frame at wolf size (the width of the skull rows scales with the skull, the muzzle with its root)
+  const cat = o.face === 'cat';
+  const HEAD_ROWS: Array<[number, number, number, number]> = cat
+    ? [[-0.07, 0.058, -0.056, 0.056], [-0.02, 0.07, -0.066, 0.072], [0.04, 0.068, -0.066, 0.074], [0.09, 0.054, -0.058, 0.062], [0.13, 0.04, -0.05, 0.048], [0.17, 0.03, -0.042, 0.038]]
+    : [[-0.07, 0.052, -0.05, 0.05], [-0.02, 0.066, -0.062, 0.066], [0.04, 0.068, -0.066, 0.07], [0.09, 0.05, -0.062, 0.056], [0.14, 0.036, -0.056, 0.04], [0.2, 0.03, -0.05, 0.034], [0.235, 0.026, -0.042, 0.03]];
+  const head: HeadRow[] = HEAD_ROWS.map(([z, top, bot, w]) => [hz(z) * k, ((top + bot) / 2) * k * hs, w * (z < 0.1 ? sw : mw) * k * hs, ((top - bot) / 2) * k * hs, ((top - bot) / 2) * k * hs] as HeadRow);
+  const headAt: V3 = c3(0, Y(0.78 + sl), Z(0.64)), HP = -0.16;
   const fx = 0.062 * k * wd, hx = 0.066 * k * wd;
   const fore = (b: number): LimbRow[] => ([
     [0.66, 0.35, 0.04, 0.06, sk(b)], [0.57, 0.35, 0.048, 0.072, sk(b, b + 1, 0.2)], [0.4, 0.24, 0.036, 0.05, sk(b, b + 1, 0.6)], [0.28, 0.265, 0.03, 0.04, sk(b + 1)],
@@ -74,22 +85,22 @@ function canid(o: Canid): Quad {
   const e = o.ear;
   const tailRoot = c3(0, Y(0.7), Z(-0.5));
   return {
-    id: o.id, body, neck, head, headAt, headPitch: HP, eye: [0.047 * sw * k * hs, 0.028 * k * hs, 0.1 * k * (0.8 + 0.2 * mz), 0.0092 * k * hs],
+    id: o.id, body, neck, head, headAt, headPitch: HP, eye: [0.058 * sw * k * hs, 0.02 * k * hs, 0.072 * k, 0.0095 * k * hs],
     fore, hind, foreX: fx, hindX: hx, coatFrom: 3,
     foot: (sx, b, isHind, lod) => [paw(sx * (isHind ? hx : fx), isHind ? Z(-0.375) : Z(0.31), { r: pawW, len: pawL, toes: 4, skin: sk(b), claw: 0.012 * k, coat: 1, region: REGION.LEG }, lod)],
     headExtras: (h, lod) => {
       const m = (v: number): number => v * k;
       // muzzle: the pale / dark mask, nose, the lip line is the shape of the rings
-      const zN = hz(0.22) * k;
-      append(h, blob([0, m(-0.03) * (o.head ?? 1), zN - m(0.04)], [m(0.028) * sw, m(0.026), m(0.05) * Math.max(0.7, mz)], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: REGION.ACC1, skin: sk(BONE.HEAD), flat: true }));
-      append(h, blob([0, m(-0.03) * (o.head ?? 1), zN + m(0.003)], [m(0.0185) * sw, m(0.014), m(0.012)], { seg: lod.seg, rings: 4, col: [0.04, 0.035, 0.035], region: REGION.NOSE, skin: sk(BONE.HEAD), flat: true }));
-      if (o.blaze && lod.detail < 2) append(h, blob([0, m(0.052), zN - m(0.14)], [m(0.012), m(0.012), m(0.07)], { seg: 6, rings: 3, col: [1, 1, 1], coat: 1, region: REGION.ACC2, skin: sk(BONE.HEAD), flat: true }));
+      const zT = hz(cat ? 0.17 : 0.235) * k, yT = (cat ? -0.006 : -0.008) * k * hs, zM = hz(cat ? 0.11 : 0.14) * k;
+      append(h, blob([0, -0.02 * k * hs, zM + (zT - zM) * 0.4], [m(0.036) * mw * hs, m(0.036) * hs, Math.max(m(0.04), (zT - zM) * 0.85)], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: REGION.ACC1, skin: sk(BONE.HEAD), flat: true }));
+      append(h, blob([0, yT, zT + m(0.016)], [m(0.024) * mw * hs, m(0.019) * hs, m(0.016)], { seg: lod.seg, rings: 4, col: [0.04, 0.035, 0.035], region: REGION.NOSE, skin: sk(BONE.HEAD), flat: true }));
+      if (o.blaze && lod.detail < 2) append(h, blob([0, m(0.058) * hs, hz(0.03) * k], [m(0.012), m(0.012), m(0.07)], { seg: 6, rings: 3, col: [1, 1, 1], coat: 1, region: REGION.ACC2, skin: sk(BONE.HEAD), flat: true }));
       if (lod.detail < 2) for (const sx of [-1, 1]) {
-        append(h, blob([sx * m(0.03) * sw, m(-0.05), m(0.1)], [m(0.01), m(0.016), m(0.03)], { seg: 5, rings: 3, col: [1, 1, 1], coat: 1, region: REGION.ACC1, skin: sk(BONE.HEAD), flat: true }));    // the cheek / lip
+        append(h, blob([sx * m(0.034) * mw * hs, m(-0.046) * hs, hz(0.1) * k], [m(0.01), m(0.016), m(0.03)], { seg: 5, rings: 3, col: [1, 1, 1], coat: 1, region: REGION.ACC1, skin: sk(BONE.HEAD), flat: true }));    // the cheek / lip
       }
       for (const sx of [-1, 1]) {
-        const at: V3 = e.kind === 'prick' ? [sx * m(0.034) * sw, m(0.052) * hs, m(-0.035)] : [sx * m(0.047) * sw * hs, m(0.045) * hs, m(-0.03) * hs];
-        if (e.kind === 'prick') append(h, ear(sx, earBone(sx), [Math.abs(at[0]), at[1], at[2]], m(e.len), m(e.wd), 0.18, lod, { back: 0.05, tri: true }));
+        const at: V3 = e.kind === 'prick' ? [sx * m(0.044) * sw * hs, m(0.056) * hs, m(-0.03)] : [sx * m(0.064) * sw * hs, m(0.04) * hs, m(-0.02)];
+        if (e.kind === 'prick') append(h, ear(sx, earBone(sx), [Math.abs(at[0]), at[1], at[2]], m(e.len), m(e.wd), cat ? 0.12 : 0.3, lod, { back: 0.05, tri: !cat }));
         else if (e.kind === 'drop') append(h, flap(sx, earBone(sx), [at[0], at[1], at[2]], m(e.len), m(e.wd), lod, { sweep: 0.5 }));
         else if (e.kind === 'fold') append(h, flap(sx, earBone(sx), [at[0], at[1], at[2]], m(e.len), m(e.wd), lod, { fold: true, sweep: 0.5 }));
         else {
@@ -103,32 +114,34 @@ function canid(o: Canid): Quad {
       const t = o.tail, len = (t.len ?? 0.4) * k, th = (t.thick ?? 1) * k;
       const R = (p: V3, r: number, region: number): Ring => ({ p, w: r, h: r, skin: sk(BONE.TAIL, BONE.TAIL2, 0.7), coat: 1, region, col: [1, 1, 1] });
       const r0 = tailRoot, pts: Array<[V3, number]> = [];
-      const bush = t.kind === 'bush' || t.kind === 'plume' || t.kind === 'sabre';
       const dirs: Record<string, Array<[number, number]>> = {
-        bush: [[0, 0], [-0.25, -0.35], [-0.35, -0.72], [-0.3, -1]], sabre: [[0, 0], [-0.4, -0.3], [-0.75, -0.55], [-1, -0.7]], plume: [[0, 0], [-0.35, 0.18], [-0.65, 0.45], [-0.6, 0.8]],
+        bush: [[0, 0], [-0.18, -0.28], [-0.3, -0.62], [-0.3, -0.9], [-0.25, -1.08]], sabre: [[0, 0], [-0.4, -0.3], [-0.75, -0.55], [-1, -0.7]], plume: [[0, 0], [-0.35, 0.18], [-0.65, 0.45], [-0.6, 0.8]],
         otter: [[0, 0], [-0.3, -0.2], [-0.62, -0.42], [-0.95, -0.5]], long: [[0, 0], [-0.1, -0.28], [-0.3, -0.58], [-0.65, -0.7], [-0.95, -0.52]], curl: [[0, 0], [-0.2, 0.3], [-0.1, 0.65], [0.15, 0.85]], ring: [[0, 0], [-0.3, 0.3], [-0.2, 0.7], [0.15, 0.7]],
       };
-      const prof = bush ? [0.5, 1.0, 0.95, 0.55] : t.kind === 'otter' ? [1, 1, 0.75, 0.3] : t.kind === 'long' ? [0.9, 0.85, 0.8, 0.72, 0.5] : [0.6, 0.62, 0.5, 0.2];
+      const profs: Record<string, number[]> = { bush: [0.5, 0.95, 1.05, 0.92, 0.4], sabre: [0.5, 1.0, 0.95, 0.55], plume: [0.5, 1.0, 0.95, 0.55], otter: [1, 1, 0.75, 0.3], long: [0.95, 0.95, 0.92, 0.86, 0.66], curl: [0.6, 0.62, 0.5, 0.2], ring: [0.6, 0.62, 0.5, 0.2] };
+      const prof = profs[t.kind];
       dirs[t.kind].forEach(([dz, dy], i) => pts.push([[0, r0[1] + dy * len, r0[2] + dz * len], th * 0.055 * prof[i]]));
-      const main = tube(pts.map(([p, r], i) => R(p, r, i === pts.length - 1 && o.tipAcc ? REGION.ACC3 : REGION.TAIL)), { seg: Math.max(6, lod.seg - 4), sub: lod.sub, up: [1, 0, 0], capEnd: true, flat: true });
+      // the dark (or white) tip: the last fifth of a long tail, the last ring of a short one
+      const tipFrom = pts.length >= 5 ? pts.length - 2 : pts.length - 1;
+      const main = tube(pts.map(([p, r], i) => R(p, r, i >= tipFrom && o.tipAcc ? REGION.ACC3 : REGION.TAIL)), { seg: Math.max(6, lod.seg - 4), sub: lod.sub, up: [1, 0, 0], capEnd: true, flat: true });
       return main;
     },
     extras: (out, lod) => {
       // the ruff of fur at the throat and shoulders, the chest
-      if (o.ruff && lod.detail < 2) out.push(blob([0, Y(0.64 + sl), Z(0.42)], [o.ruff * 0.085 * k * wd, o.ruff * 0.12 * k, o.ruff * 0.1 * k], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: o.collar ? REGION.ACC1 : REGION.BODY, skin: sk(BONE.ROOT, BONE.NECK, 0.5), flat: true }));
+      if (o.ruff && lod.detail < 2) out.push(blob([0, Y(0.68 + sl), Z(0.42)], [o.ruff * 0.075 * k * wd, o.ruff * 0.1 * k, o.ruff * 0.09 * k], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: o.collar ? REGION.ACC1 : REGION.BODY, skin: sk(BONE.ROOT, BONE.NECK, 0.5), flat: true }));
       if (lod.detail < 2) out.push(blob([0, Y(0.55), Z(0.42)], [0.06 * k * wd, 0.08 * k * ch, 0.08 * k], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: REGION.ACC1, skin: sk(BONE.ROOT), flat: true }));                // the pale chest
     },
     bones: (() => {
       const pv = (rows: LimbRow[], idx: number[], x: number): V3[] => idx.map(i => c3(x, rows[i][0], rows[i][1]));
       const b = quadBones(
         { fore: pv(fl, [1, 2, 4, 5], fx) as [V3, V3, V3, V3], hind: pv(hl, [1, 3, 5, 7], hx) as [V3, V3, V3, V3], swing: [0.45, 0.42], flexF: [0, 0.3, -0.5, 0.25], flexH: [0, -0.35, 0.6, -0.25], foot: -0.15 },
-        { neck: c3(0, Y(0.74 + sl), Z(0.4)), head: headAt, tail: tailRoot, tailBob: 0.08, earAt: headPoint(headAt, HP, c3(0.034 * k * sw, 0.052 * k, -0.035 * k)), rootY: Y(0.6), earFlick: 0.4, tailLen: 0.1 * k,
+        { neck: c3(0, Y(0.74 + sl), Z(0.4)), head: headAt, tail: tailRoot, tailBob: 0.08, earAt: headPoint(headAt, HP, c3(0.044 * k * sw * hs, 0.056 * k * hs, -0.03 * k)), rootY: Y(0.6), earFlick: 0.4, tailLen: 0.1 * k,
           graze: o.pets ? { neck: -0.35, head: -0.3, bob: 0.06 } : { neck: -0.75, head: 0.1, bob: 0.06 }, alert: { neck: 0.3, head: 0.18, ear: 0.0, tail: -0.5 }, gallop: false, trot: true, wag: [0.55, 10] });
       if (o.pets) dogPose(b, k);
       return b;
     })(),
     breeds: o.breeds, withers: o.withers, length: o.length, stride: o.stride, graze: { neck: -0.75, head: 0.1 },
-    root: { bob: 0.01 * k, pitch: 0.03, cy: Y(0.6), cz: o.pets ? Z(-0.3) : 0, grazePitch: o.pets ? 0.55 : -0.04 }, rootPose: { alertPitch: 0.04, lieDrop: 0.3 * k, sitDrop: o.pets ? 0.2 * k : 0 }, extra: true,
+    root: { bob: 0.01 * k, pitch: 0.03, cy: Y(0.6), cz: o.pets ? Z(-0.3) : 0, grazePitch: o.pets ? 0.55 : -0.04 }, rootPose: { alertPitch: 0.04, lieDrop: o.pets ? 0.22 * k : 0.3 * k, sitDrop: o.pets ? 0.2 * k : 0 }, extra: true,
   };
 }
 export { canid, flap };
@@ -150,7 +163,7 @@ function dogPose(b: Array<import('../../livestock/animalMaterial').BoneAnim | un
 
 // ---------------------------------------------------------------- wolf and coyote
 const WOLF = canid({
-  id: 'wolf', k: 1, chest: 0.95, legK: 1.1, muzzle: 0.8, skullW: 1.25, ear: { kind: 'prick', len: 0.13, wd: 0.062 }, tail: { kind: 'bush', len: 0.42, thick: 1.15 }, ruff: 1, tipAcc: true, paws: 1.15,
+  id: 'wolf', k: 1, chest: 1.0, legK: 1.1, muzzle: 1.0, skullW: 1.15, shoulder: 1.0, ear: { kind: 'prick', len: 0.17, wd: 0.07 }, tail: { kind: 'bush', len: 0.5, thick: 1.2 }, ruff: 1, tipAcc: true, paws: 1.15,
   withers: 0.8, length: 1.15, stride: 1.5,
   breeds: [
     cb('Gray wolf', { base: c3(0.46, 0.43, 0.38), style: 7, dorsal: 0.62, patch: c3(0.2, 0.18, 0.16), cover: 0.5, belt: [0.05, 0.5], face: c3(0.5, 0.46, 0.4), faceMix: 0.5, leg: c3(0.5, 0.42, 0.32), legMix: 0.35, belly: c3(0.75, 0.72, 0.66), bellyMix: 0.8, bellyY: 0.5, acc1: c3(0.72, 0.68, 0.6), acc1Mix: 0.8, acc3: c3(0.08, 0.07, 0.07), fur: 1.0, furFreq: 45 }),
@@ -162,7 +175,7 @@ const WOLF = canid({
 export const WOLF_MODEL = (): AnimalModel => quadModel(WOLF);
 
 const COY = canid({
-  id: 'coyote', k: 0.76, chest: 0.9, legK: 1.04, muzzle: 0.85, skullW: 1.1, ear: { kind: 'prick', len: 0.15, wd: 0.062 }, tail: { kind: 'bush', len: 0.5, thick: 0.95 }, ruff: 0.8, tipAcc: true, paws: 0.9,
+  id: 'coyote', k: 0.76, chest: 0.95, legK: 1.04, muzzle: 1.1, skullW: 1.0, shoulder: 1.0, ear: { kind: 'prick', len: 0.17, wd: 0.07 }, tail: { kind: 'bush', len: 0.55, thick: 1.0 }, ruff: 0.8, tipAcc: true, paws: 0.9,
   withers: 0.62, length: 0.9, stride: 1.2,
   breeds: [
     cb('Coyote', { base: c3(0.58, 0.46, 0.32), style: 7, dorsal: 0.45, patch: c3(0.3, 0.24, 0.18), cover: 0.45, belt: [0.05, 0.5], face: c3(0.62, 0.48, 0.32), faceMix: 0.5, leg: c3(0.62, 0.4, 0.22), legMix: 0.75, belly: c3(0.88, 0.84, 0.76), bellyMix: 0.9, bellyY: 0.5, acc1: c3(0.9, 0.87, 0.8), acc1Mix: 0.85, acc3: c3(0.07, 0.06, 0.06), fur: 1.0, furFreq: 50 }),
@@ -174,8 +187,8 @@ export const COYOTE_MODEL = (): AnimalModel => quadModel(COY);
 
 // ---------------------------------------------------------------- cougar
 const CAT = canid({
-  id: 'cougar', k: 0.9, chest: 0.9, legK: 0.78, stretch: 1.12, muzzle: 0.6, skullW: 1.2, head: 1.25, neckK: 1.2, width: 1.1, limbW: 1.75,
-  ear: { kind: 'prick', len: 0.045, wd: 0.04 }, tail: { kind: 'long', len: 0.55, thick: 0.95 }, tipAcc: true, paws: 1.2, collar: false,
+  id: 'cougar', k: 0.9, chest: 0.95, legK: 0.78, stretch: 1.12, muzzle: 0.6, skullW: 1.15, head: 1.05, neckK: 1.1, width: 1.05, limbW: 1.75, shoulder: 1.12, slope: -0.03, face: 'cat',
+  ear: { kind: 'prick', len: 0.06, wd: 0.05 }, tail: { kind: 'long', len: 0.36, thick: 1.3 }, tipAcc: true, paws: 1.2, collar: false,
   withers: 0.72, length: 1.25, stride: 1.4,
   breeds: [
     cb('Cougar', { base: c3(0.62, 0.45, 0.28), face: c3(0.6, 0.44, 0.28), faceMix: 0.4, leg: c3(0.58, 0.42, 0.26), legMix: 0.5, belly: c3(0.88, 0.8, 0.66), bellyMix: 0.9, bellyY: 0.42, acc1: c3(0.9, 0.84, 0.72), acc1Mix: 0.9, acc3: c3(0.07, 0.06, 0.05), fur: 0.5, furFreq: 70 }),
