@@ -10,6 +10,7 @@ import { CELL, type KitPieceDef } from './kit';
 import { Furniture, M, pipe, type Add, sickSlot } from './interior';
 import { Clutter } from './clutter';
 import { dressEvenings } from './goodsDress';
+import { dressCozy } from './cozyDress';
 import { Equipment } from './utilityBuildings';
 import { box, buildGabled, Parts, type BuildOpts, type FurnishCtx } from './shell';
 
@@ -83,6 +84,14 @@ function cottage(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
     c.C({ x: 0.2, z: fz(0.36), y: tableY }, a => Clutter.bread(a), 0.6);
     c.C({ x: 0.25, z: fz(0.31), y: tableY }, a => Clutter.mug(a), 0.8);
     c.C({ x: -0.2, z: back + 0.36 }, a => Clutter.slippers(a), 0.6);
+    dressCozy(c, {
+      seats: [{ x: 0.3, z: 0.05, rot: Math.PI, kind: 'armchair' }],
+      hearth: { x: STOVE.x, z: STOVE.z, fwd: 0.1, w: 0.3, d: 0.24 },
+      kettle: { x: STOVE.x - 0.06, z: STOVE.z - 0.01, topM: 0.87 + HEARTH / M },
+      lamps: [{ x: 0.22, z: fz(0.35), r: 0.26 }],
+      herbs: { x: right - 0.004, z: 0.12, rot: -Math.PI / 2, yM: 1.85, lenM: 0.6 },
+      rug2: { x: 0.0, z: fz(0.3), rot: 0.25, w: 1.0, d: 0.7 },
+    });
   }, new Parts(seed, opts));
   return group;
 }

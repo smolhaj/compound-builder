@@ -14,6 +14,7 @@ vi.mock('./materials', () => ({ kitMaterial: () => new THREE.MeshStandardMateria
 import { buildLayers } from './buildings';
 import { BUNKER_KIT, footprint, KIT, TOWER_KIT, UTILITY_KIT, UTILITY_ORDER, type KitPieceDef } from './kit';
 import { AUDIT, layerFractions, showStage, DOOR, WIN, type BuildOpts, type GabledSpec } from './shell';
+import { cozyFrom, COZY_NONE } from './cozy';
 import { auditMeshes, components, floaters, rayHit, triangleStats, zFights, type AuditMesh, type Component } from './geometryAudit';
 
 /** Everything in the kit this audit covers: not walls / towers / gates / bunkers / tunnels / utilities (those are audited elsewhere). */
@@ -23,14 +24,14 @@ export const AUDITED: KitPieceDef[] = Object.values(KIT).filter(d => !OTHER_AUDI
 
 const INSIDE = new Set(['interior', 'loft', 'decor']);
 
-interface Built { furniture: typeof AUDIT.furniture; partitions: typeof AUDIT.partitions; def: KitPieceDef; group: THREE.Group; meshes: AuditMesh[]; comps: Component[]; shells: Array<{ spec: GabledSpec; ox: number; oz: number }> }
+interface Built { decor: typeof AUDIT.decor; furniture: typeof AUDIT.furniture; partitions: typeof AUDIT.partitions; def: KitPieceDef; group: THREE.Group; meshes: AuditMesh[]; comps: Component[]; shells: Array<{ spec: GabledSpec; ox: number; oz: number }> }
 
 function build(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): Built {
-  AUDIT.on = true; AUDIT.shells = []; AUDIT.furniture = []; AUDIT.partitions = [];
+  AUDIT.on = true; AUDIT.shells = []; AUDIT.furniture = []; AUDIT.decor = []; AUDIT.partitions = [];
   const group = buildLayers(def, seed, def.id.startsWith('terrace') ? { rise: 0.3, ...opts } : opts);
   AUDIT.on = false;
   const meshes = auditMeshes(group);
-  return { def, group, meshes, comps: meshes.flatMap(components), shells: AUDIT.shells, furniture: AUDIT.furniture, partitions: AUDIT.partitions };
+  return { def, group, meshes, comps: meshes.flatMap(components), shells: AUDIT.shells, furniture: AUDIT.furniture, decor: AUDIT.decor, partitions: AUDIT.partitions };
 }
 
 const cache = new Map<string, Built>();
@@ -359,4 +360,94 @@ describe('building geometry audit: seeds and services', () => {
     for (const l of ['walls', 'roof', 'openings']) expect(count(cut, l)).toBe(count(plain, l));
     expect(floaters(cut.comps.filter(c => c.layer !== 'stakes' && !/_glow$/.test(c.name))).length).toBeLessThanOrEqual(FLOAT_OK.timber_cabin ?? 0);
   });
+});
+
+// ─────────────────────────────────────────────────────────────────────────
+// Warm lit interiors (oasis): the cosy decor of a settled home, its light pools and its window sills
+// ─────────────────────────────────────────────────────────────────────────
+
+const SETTLED = cozyFrom({ days: 900, kids: true, foodDays: 120, books: true, candles: true, dog: true, garden: true });
+const LIVED_HOMES = ['timber_cabin', 'cottage', 'guest_house', 'moms_house', 'farmhouse', 'log_house', 'stone_house', 'timber_frame'];
+const LIVED_VARIANTS: Array<[number, BuildOpts]> = [[1, {}], [4, { plumbed: true, wired: true, septic: true }], [9, { wired: true }]];
+
+describe('lived-in homes: warm decor and light pools pass the geometry audit', () => {
+  it('the audited homes include the five kinds the owner asked for', () => {
+    for (const id of LIVED_HOMES) expect(AUDITED.map(d => d.id), id).toContain(id);
+  });
+
+  for (const id of LIVED_HOMES) {
+    const def = KIT[id];
+    it(`${id}: a settled home (pillows, throw, kettle, herbs, jars, candles, rugs) has no NaN, nothing floating, furniture in the walls, decor in the room`, () => {
+      for (const [seed, o] of LIVED_VARIANTS) {
+        const b = build(def, seed, { ...o, cozy: SETTLED });
+        const bad: string[] = [];
+        for (const m of b.meshes) if (triangleStats(m).nonFinite) bad.push(`${m.name} NaN`);
+        const fl = floaters(b.comps.filter(c => c.layer !== 'stakes' && !/_glow$/.test(c.name)));
+        if (fl.length > (FLOAT_OK[id] ?? 0)) bad.push(`${fl.length} floating: ${fl.slice(0, 3).map(fmt).join(' ; ')}`);
+        for (const f of b.furniture) {
+          const sp = f.spec, T = sp.wallT;
+          if (f.c.x0 < -sp.W / 2 + T - 0.06 || f.c.x1 > sp.W / 2 - T + 0.06 || f.c.z0 < -sp.D / 2 + T - 0.06 || f.c.z1 > sp.D / 2 - T + 0.06) bad.push(`${f.kind} piece out of the walls`);
+        }
+        // every decor piece stands inside the room (between the inner wall faces, above the floor, under the eave)
+        for (const d of b.decor) {
+          const sp = d.spec, T = sp.wallT, tol = 0.02;
+          const x0 = -sp.W / 2 + T - tol + d.ox, x1 = sp.W / 2 - T + tol + d.ox, z0 = -sp.D / 2 + T - tol + d.oz, z1 = sp.D / 2 - T + tol + d.oz;
+          const bx = d.box;
+          if (bx.min.x < x0 || bx.max.x > x1 || bx.min.z < z0 || bx.max.z > z1) bad.push(`${d.name} [${bx.min.x.toFixed(2)},${bx.min.z.toFixed(2)}|${bx.max.x.toFixed(2)},${bx.max.z.toFixed(2)}] outside the room [${x0.toFixed(2)},${z0.toFixed(2)}|${x1.toFixed(2)},${z1.toFixed(2)}]`);
+          if (bx.min.y < sp.floor - 0.001 || bx.max.y > sp.floor + sp.wallH) bad.push(`${d.name} from ${bx.min.y.toFixed(3)} to ${bx.max.y.toFixed(3)} is not between the floor and the eave`);
+        }
+        // decor pieces do not stand in one another (a pillow on a sofa and a kettle on a stove never share a place)
+        const ds = b.decor;
+        for (let i = 0; i < ds.length; i++) for (let j = i + 1; j < ds.length; j++) {
+          const a = ds[i].box, c2 = ds[j].box;
+          const w = Math.min(a.max.x, c2.max.x) - Math.max(a.min.x, c2.min.x), h = Math.min(a.max.z, c2.max.z) - Math.max(a.min.z, c2.min.z), v = Math.min(a.max.y, c2.max.y) - Math.max(a.min.y, c2.min.y);
+          if (w > 0.004 && h > 0.004 && v > 0.004 && ds[i].name !== 'rug2' && ds[j].name !== 'rug2') bad.push(`${ds[i].name} overlaps ${ds[j].name}`);
+        }
+        none(bad, `${id} settled seed ${seed}`);
+      }
+    });
+
+    it(`${id}: a new home gets no cosy decor but keeps its lamp pools and sills; a settled home gets more geometry than a new one`, () => {
+      const plain = build(def, 1, { cozy: COZY_NONE }), settled = build(def, 1, { cozy: SETTLED });
+      expect(plain.decor.filter(d => d.name !== 'sill-candle').length).toBe(0);
+      expect(settled.decor.length).toBeGreaterThan(plain.decor.length);
+      const verts = (b: Built) => b.group.children.reduce((n, m) => n + ((m as THREE.Mesh).geometry?.getAttribute('position')?.count ?? 0), 0);
+      expect(verts(settled)).toBeGreaterThan(verts(plain));
+    });
+
+    it(`${id}: light pools lie flat on the floor or the yard and never through a wall`, () => {
+      const b = build(def, 1, { cozy: SETTLED });
+      const pools = b.meshes.filter(m => m.name === 'bldg_interior_spill_glow' || m.name === 'bldg_interior_hearth_glow').flatMap(components);
+      expect(pools.length, 'a home throws light').toBeGreaterThan(0);
+      const bad: string[] = [];
+      for (const c of pools) {
+        const sp = b.shells[0].spec, ox = b.shells[0].ox, oz = b.shells[0].oz, T = sp.wallT;
+        if (c.box.max.y - c.box.min.y > 0.05 || Math.max(c.box.max.x - c.box.min.x, c.box.max.z - c.box.min.z) < 0.15) continue;   // (the firebox window is a small box; pools are big and flat)
+        const inX0 = -sp.W / 2 + T + ox, inX1 = sp.W / 2 - T + ox, inZ0 = -sp.D / 2 + T + oz, inZ1 = sp.D / 2 - T + oz;
+        const inside = c.box.min.x >= inX0 - 0.006 && c.box.max.x <= inX1 + 0.006 && c.box.min.z >= inZ0 - 0.006 && c.box.max.z <= inZ1 + 0.006;
+        // a yard or porch pool starts at most a wall's thickness in (hidden in the wall), and never beyond the wall's outer face inward past that
+        const wall = 0.015;
+        const outside = c.box.max.x <= -sp.W / 2 + ox + wall || c.box.min.x >= sp.W / 2 + ox - wall || c.box.max.z <= -sp.D / 2 + oz + wall || c.box.min.z >= sp.D / 2 + oz - wall;
+        if (!inside && !outside) bad.push(`${c.name} [${c.box.min.toArray().map(v => v.toFixed(2))}|${c.box.max.toArray().map(v => v.toFixed(2))}] crosses a wall`);
+        if (inside && (c.box.min.y < sp.floor || c.box.min.y > sp.floor + 0.02)) bad.push(`${c.name} floats ${(c.box.min.y - sp.floor).toFixed(3)} off the floor`);
+      }
+      none(bad, `${id} pools`);
+    });
+
+    it(`${id}: items on window sills sit on a sill board with no solid furniture in front of them`, () => {
+      const b = build(def, 1, { cozy: SETTLED });
+      const bad: string[] = [];
+      const furn = b.furniture.filter(f => f.kind === 'I');
+      const sills = b.decor.filter(x => x.name.startsWith('sill-'));
+      for (const d of sills) {
+        for (const f of furn) if (d.box.min.x < f.c.x1 + 0.02 && d.box.max.x > f.c.x0 - 0.02 && d.box.min.z < f.c.z1 + 0.02 && d.box.max.z > f.c.z0 - 0.02) bad.push(`${d.name} has furniture in front of it`);
+        // a board of the sill carries it: a thin interior part whose top is the item's base
+        const board = b.comps.find(c => c.layer === 'interior' && Math.abs(c.box.max.y - d.box.min.y) < 0.002 && c.box.max.y - c.box.min.y < 0.012 && c.box.min.x < d.box.max.x && c.box.max.x > d.box.min.x && c.box.min.z < d.box.max.z && c.box.max.z > d.box.min.z);
+        if (!board) bad.push(`${d.name} stands on no sill board`);
+      }
+      // (one item to a sill)
+      for (let i = 0; i < sills.length; i++) for (let j = i + 1; j < sills.length; j++) if (Math.hypot(sills[i].box.min.x - sills[j].box.min.x, sills[i].box.min.z - sills[j].box.min.z) < 0.02) bad.push('two items on one sill');
+      none(bad, `${id} sills`);
+    });
+  }
 });
