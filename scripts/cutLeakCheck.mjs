@@ -46,11 +46,11 @@ try {
   console.log('quality', await page.evaluate(() => window.__cb.store.getState().quality));
   const frames = async (k) => { const f0 = await page.evaluate(() => window.__cb.qa.frames); await page.waitForFunction(x => window.__cb.qa.frames >= x, f0 + k, { polling: 200 }); };
   
-  const N = Number(opt('--n', 20));
+  const N = Number(opt('--n', 20)), AUDIT = args.includes('--audit');
   const PROF = args.includes('--prof');
   let cdpP = null;
   if (PROF) { cdpP = await page.context().newCDPSession(page); await cdpP.send('Profiler.enable'); await cdpP.send('Profiler.setSamplingInterval', { interval: 2000 }); await cdpP.send('Profiler.start'); }
-  const out = await page.evaluate(async ([hour0, N, wantDay]) => {
+  const out = await page.evaluate(async ([hour0, N, wantDay, AUDIT]) => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp;
     const sp = cb.tool.findSpot('timber_cabin', c.x, c.z, 0);
     G.getState().plan('timber_cabin', sp[0], sp[1], 0);
@@ -67,7 +67,7 @@ try {
     const { stageRaid } = await import('/src/sim/raidCutscene.ts');
     const { decorateBreach } = await import('/src/sim/breach.ts');
     const { planHouseAssault } = await import('/src/sim/houseAssault.ts');
-    const { routeScene } = await import('/src/sim/cutLive.ts');
+    const { routeScene, gatePortals: gatePortalsFn } = await import('/src/sim/cutLive.ts');
     const { stepSegments } = await import('/src/sim/standingSurfaces.ts');
     const { LineDirector } = await import('/src/sim/raidDialogue.ts');
     const { KIT, footprint } = await import('/src/game/buildkit/kit.ts');
@@ -84,7 +84,7 @@ try {
     }
     const gc = () => new Promise(r => setTimeout(r, 50));
     const info = () => { const i = cb.ws.renderer.info; return { geometries: i.memory.geometries, textures: i.memory.textures, programs: i.programs?.length ?? null }; };
-    const { navStats } = await import('/src/sim/cutNav.ts');
+    const { navStats, blockedAt } = await import('/src/sim/cutNav.ts'); const { navFor } = await import('/src/sim/cutLive.ts');
     const rows = [];
     const base = { ...info(), heap: Math.round(performance.memory.usedJSHeapSize / 1e6) };
     let slowest = 0;
@@ -96,18 +96,27 @@ try {
       const t1 = performance.now();
       b = planHouseAssault(b, { box: footprint(KIT[home.kind], home.x, home.z, home.rot, false), blocked: solid, seed, dir });
       const t2 = performance.now();
-      const r = routeScene(b, solid, undefined, stepSegments(g.perimeter));
+      const r = routeScene(b, solid, undefined, stepSegments(g.perimeter), gatePortalsFn ? gatePortalsFn(g.perimeter) : undefined);
       const prep = performance.now() - t0, split = { decorate: Math.round(t1 - t0), house: Math.round(t2 - t1), route: Math.round(performance.now() - t2) };
       cb.battle.play(r.battle);
+      // CLIP AUDIT (--audit): where each person actually IS each step of the real renderer, against the world's own walk collision (radius 0.012, thinner than the router's 0.04)
+      // and the scene's own doors and breaches; a step that goes from open ground into something solid is a clip
+      const nav = AUDIT ? navFor(r.battle, (x, z) => cb.world.walkBlocked(x, z, 0.012)) : null, prevPos = new Map(), clips = [];
       let steps = 0, maxStep = 0, drawn = null;
-      while (cb.battle.playing && steps < 4000) { const s0 = performance.now(); cb.battle.update(1 / 12); maxStep = Math.max(maxStep, performance.now() - s0); steps++; if (!drawn && cb.battle.time > r.battle.duration * 0.6) { cb.qa.skipDraw = false; const f0 = performance.now(); cb.ws.renderFrame(); const ms = performance.now() - f0; const i = cb.ws.renderer.info.render; drawn = { ms: +ms.toFixed(1), calls: i.calls, triangles: i.triangles }; cb.qa.skipDraw = true; } if (cb.battle.time > r.battle.duration + 1) break; }
+      while (cb.battle.playing && steps < 4000) { const s0 = performance.now(); cb.battle.update(1 / 12); maxStep = Math.max(maxStep, performance.now() - s0); steps++;
+        if (nav) for (const u of cb.battle.actors()) {
+          if (u.dead || u.gone) { prevPos.delete(u.id); continue; }
+          const p0 = prevPos.get(u.id); prevPos.set(u.id, { x: u.x, z: u.z }); if (!p0) continue;
+          const dd = Math.hypot(u.x - p0.x, u.z - p0.z), nn = Math.max(1, Math.ceil(dd / 0.04)), tt = cb.battle.time; let was = blockedAt(nav, p0.x, p0.z, tt);
+          for (let q = 1; q <= nn; q++) { const x = p0.x + (u.x - p0.x) * q / nn, z = p0.z + (u.z - p0.z) * q / nn, now = blockedAt(nav, x, z, tt); if (now && !was) { clips.push({ id: u.id, side: u.side, t: +tt.toFixed(2), x: +x.toFixed(2), z: +z.toFixed(2) }); break; } was = now; }
+        } if (!drawn && cb.battle.time > r.battle.duration * 0.6) { cb.qa.skipDraw = false; const f0 = performance.now(); cb.ws.renderFrame(); const ms = performance.now() - f0; const i = cb.ws.renderer.info.render; drawn = { ms: +ms.toFixed(1), calls: i.calls, triangles: i.triangles }; cb.qa.skipDraw = true; } if (cb.battle.time > r.battle.duration + 1) break; }
       slowest = Math.max(slowest, maxStep);
       cb.battle.stop();
       await gc();
-      rows.push({ k, day: d, prepMs: Math.round(prep), split, nav: { ...Object.fromEntries(['cores', 'direct', 'grids', 'expanded', 'skipped'].map(a => [a, navStats[a] - ns0[a]])), pad: Object.fromEntries([3, 8, 24].map(q => [q, [navStats.pad[q].tries - ns0.pad[q].tries, navStats.pad[q].ok - ns0.pad[q].ok, navStats.pad[q].expanded - ns0.pad[q].expanded]])) }, unrouted: r.unrouted, lost: (r.lost || []).slice(0, 4), ok: r.ok, steps, maxStepMs: +maxStep.toFixed(1), frame: drawn, heap: Math.round(performance.memory.usedJSHeapSize / 1e6), ...info(), props: cb.battle.props.live });
+      rows.push({ k, day: d, clips: clips.length, clipUnits: [...new Set(clips.map(c => c.id))].length, clipSample: clips.slice(0, 10), gap: r.battle.events.filter(e => e.kind === 'gap').map(e => [e.x, e.z, e.w, e.t]), prepMs: Math.round(prep), split, nav: { ...Object.fromEntries(['cores', 'direct', 'grids', 'expanded', 'skipped'].map(a => [a, navStats[a] - ns0[a]])), pad: Object.fromEntries([3, 8, 24].map(q => [q, [navStats.pad[q].tries - ns0.pad[q].tries, navStats.pad[q].ok - ns0.pad[q].ok, navStats.pad[q].expanded - ns0.pad[q].expanded]])) }, unrouted: r.unrouted, lost: (r.lost || []).slice(0, 4), ok: r.ok, steps, maxStepMs: +maxStep.toFixed(1), frame: drawn, heap: Math.round(performance.memory.usedJSHeapSize / 1e6), ...info(), props: cb.battle.props.live });
     }
     return { base, rows, slowestStepMs: +slowest.toFixed(1) };
-  }, [hour0, N, wantDay]);
+  }, [hour0, N, wantDay, args.includes('--audit')]);
   if (PROF) {
     const { profile } = await cdpP.send('Profiler.stop');
     const self = new Map(), byId = new Map(profile.nodes.map(n => [n.id, n]));
