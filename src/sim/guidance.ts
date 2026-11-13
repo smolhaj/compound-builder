@@ -4,6 +4,7 @@
  * what the bunker needs, what the plans still lack, and how the Perimeter
  * list groups by price. Pure (tested); the HUD only draws it.
  */
+import { gapLine, homeAdvice, homeAdviceText } from './homeAdvice';
 import { partsOutlook, partsYears } from './parts';
 import { serviceRate } from './vehicles';
 import { sanitationLine, worstWell } from './sanitation';
@@ -267,8 +268,10 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
   const beds = homeBeds(s);
   const out: Suggestion[] = [];
   const add = (id: string, kind: string, why: string, urgency: number) => { if (!buildOff(s, kind)) out.push({ id, kind, why, urgency }); };
-  if (homes.length === 0) add('roof', 'timber_cabin', 'no roof over the family yet', 100);
-  else if (beds < people && homes.every(h => structDone(h))) add('beds', 'cottage', `${people - beds} of ${people} have no bed`, 80);
+  // one home recommendation for the whole screen (sim/homeAdvice.ts): the Build list highlight, the Next-steps card and the Housing panel's Fix line agree
+  const homeAdv = homeAdvice(s);
+  if (homes.length === 0) add('roof', homeAdv?.kind ?? 'timber_cabin', homeAdv ? `no roof over the family yet: ${homeAdviceText(homeAdv)}` : 'no roof over the family yet', 100);
+  else if (beds < people && homes.every(h => structDone(h))) add('beds', homeAdv?.kind ?? 'cottage', homeAdv ? `${gapLine(homeAdv, people)}: ${homeAdviceText(homeAdv)}` : `${people - beds} of ${people} have no bed`, 80);
   // relatives waiting on a place of their own (sim/kin.ts): a guest house for one or two, Mom's house for more
   const wait = s.kin?.waiting ?? [];
   if (wait.length && !s.structures.some(st => SEPARATE_DWELLINGS.has(st.kind) && !isFinished(st))) {
@@ -340,11 +343,12 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
   // spare cash with a job to do: another crew, a few months of guards once the warning is up, a small metals hedge (sim/idleCash.ts; advice only)
   { const ic = idleCash(s);
     if (ic) {
-      const parts = [ic.crew ? `a second crew on the ${ic.crew.name} (about ${pluralize(ic.crew.weeks, 'week')})` : '', ic.guards ? `${pluralize(ic.guards.n, 'contract guard')} (${usd(ic.guards.usd)} for the first quarter)` : '', ic.metals > 0 ? `${usd(ic.metals)} of gold and silver for barter` : ''].filter(Boolean);
+      const parts = [ic.crew ? `hire a second crew on the ${ic.crew.name} (about ${pluralize(ic.crew.weeks, 'week')})` : '', ic.guards ? `hire ${pluralize(ic.guards.n, 'contract guard')} (${usd(ic.guards.usd)} for the first quarter)` : '', ic.metals > 0 ? `buy ${usd(ic.metals)} of gold and silver for barter` : '', ic.stake ? `stake the next project, a ${ic.stake.name} (~${usd(ic.stake.usd)})` : ''].filter(Boolean);
       out.push({ id: 'idle_cash', kind: '', title: `About ${usd(Math.round(ic.spare / 1000) * 1000)} is sitting idle: put it to work`, urgency: 58,
-        why: `Cash does not build anything by itself, and money is not what limits the first months: permits, deliveries and labor hours are. You could hire ${parts.join(', ')}. Each is your call; the family keeps a living reserve either way.`,
+        why: `Cash does not build anything by itself, and money is not what limits the first months: permits, deliveries and labor hours are. You could put it to work: ${parts.join(', ')}. Each is your call; the family keeps a living reserve either way.`,
         acts: [
           ...(ic.crew ? [{ label: `${ic.crew.lines.length ? 'Order and hire' : 'Hire'} a crew for the ${ic.crew.name} (~${usd(ic.crew.totalUsd)})`, act: { type: 'crew' as const, id: ic.crew.id, ...(ic.crew.lines.length ? { lines: ic.crew.lines } : {}) } }] : []),
+          ...(ic.stake ? [{ label: `Stake a ${ic.stake.name} (~${usd(ic.stake.usd)})`, act: { type: 'stake' as const, kind: ic.stake.kind } }] : []),
           ...(ic.guards ? [{ label: 'Contract guards (Defense tab)', act: { type: 'open' as const, right: 'defense' as const } }] : []),
           ...(ic.metals > 0 ? [{ label: 'Gold and silver shelf', act: { type: 'shop' as const, tab: 'metals' } }] : []),
         ] }); } }
@@ -731,7 +735,7 @@ function escalateNeeds(s: GameState, out: Suggestion[]): void {
     c.title = title(d); c.tone = 'alarm'; c.urgency = Math.max(c.urgency, d >= ESCALATE_DAYS ? 99 : 97);
   };
   raise('stock_food', 'need:food', d => `Out of food for ${pluralize(d, 'day')}`, () => ({ id: 'stock_food', kind: '', title: 'No food stored: stock up', urgency: 70, why: `No food on hand for ${s.people.length}. Open the food shelf: a month of staples is the fastest fix.`, acts: [{ label: 'Open the food shelf', act: { type: 'shop', tab: 'food' } }] }));
-  raise('beds', 'need:beds', d => `${pluralize(housingShortfall(s).outside, 'person', 'people')} without a bed for ${pluralize(d, 'day')}`, () => ({ id: 'beds', kind: 'cottage', why: `${housingShortfall(s).outside} of ${s.people.length} have no bed`, urgency: 80 }));
+  raise('beds', 'need:beds', d => `${pluralize(housingShortfall(s).outside, 'person', 'people')} without a bed for ${pluralize(d, 'day')}`, () => ({ id: 'beds', kind: homeAdvice(s)?.kind ?? 'cottage', why: `${housingShortfall(s).outside} of ${s.people.length} have no bed`, urgency: 80 }));
   if (on.includes('need:meds')) {
     const out0 = rxStatus(s).filter(x => x.days <= 0), d = needDays(s, 'need:meds'), names = joinNames(out0.map(x => x.p.first));
     const open = pharmacyOpen(s);

@@ -56,3 +56,24 @@ describe('a late card says so', () => {
     expect(staleNote({}, 30)).toBe('');
   });
 });
+
+describe('the roof goal card fires when the extra home finishes an under-sized household', () => {
+  it('a cabin that sleeps 4 of 5 shows no card; the home that closes the gap does', () => {
+    const g = fresh();
+    while (g.people.length < 5) { const p = structuredClone(g.people[0]); p.id = `x${g.people.length}`; g.people.push(p); g.personState.push(structuredClone(g.personState[0])); }
+    const cab = planStructure(g, 'timber_cabin', 0, 0, 0);
+    cab.stage = BLUEPRINTS.timber_cabin.stages.length; cab.finishedAt = 0; cab.pre = false;
+    useGameStore.setState({ game: g });
+    stop = startFeedback();
+    useFeelStore.setState({ cards: [], goalsClosed: null });
+    const same = structuredClone(g); same.clock.t += 1;
+    useGameStore.setState({ game: same });
+    expect(useFeelStore.getState().cards.map(c => c.id)).not.toContain('goal_roof');
+    const next = structuredClone(same);
+    const more = planStructure(next, 'cottage', 10, 0, 0);
+    more.stage = BLUEPRINTS.cottage.stages.length; more.finishedAt = next.clock.t; more.pre = false;
+    next.clock.t += 1;
+    useGameStore.setState({ game: next });
+    expect(useFeelStore.getState().cards.map(c => c.id)).toContain('goal_roof');
+  });
+});

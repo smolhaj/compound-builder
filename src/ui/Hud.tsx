@@ -151,6 +151,15 @@ function SightHint() {
   return <div data-testid="sight-hint" style={{ position: 'fixed', left: '50%', bottom: 64, transform: 'translateX(-50%)', color: '#f2ecd8', background: 'rgba(20,22,18,0.86)', border: '1px solid rgba(240,230,190,0.4)', borderRadius: 6, padding: '6px 16px', fontSize: 14, pointerEvents: 'none', zIndex: 20, whiteSpace: 'nowrap' }}>Click a point on the ground to see what can be seen from there (Shift-click: from a 33 ft tower)</div>;
 }
 
+/** What the terrain colors mean (the Sun overlay was an unlabeled wash from above): one line, always on screen while a terrain overlay is up. Sun, shade, water and the rest need no click. */
+export function TerrainLegendChip() {
+  const mode = useWorldStore(s => s.terrainMode);
+  if (mode === 'off') return null;
+  return <div data-testid="terrain-legend" style={{ position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)', maxWidth: 'min(640px, calc(100vw - 32px))', color: '#f2ecd8', background: 'rgba(20,22,18,0.86)', border: '1px solid rgba(240,230,190,0.3)', borderRadius: 6, padding: '4px 12px', fontSize: 12, textAlign: 'center', pointerEvents: 'none', zIndex: 20 }}>
+    <b>{TERRAIN_LEGEND[mode].label}:</b> {TERRAIN_LEGEND[mode].legend}
+  </div>;
+}
+
 /** The weak-spot overlay draws a mark only where a climber can bypass a wall: say so when there is none (always on screen, whatever panels are open). */
 function WeakHint() {
   const on = useWorldStore(s => s.weakView), trees = useWorldStore(s => s.wallTrees), game = useGameStore(s => s.game);
@@ -255,6 +264,7 @@ export function Hud() {
       <CursorHint />
       <SightHint />
       <WeakHint />
+      <TerrainLegendChip />
       <LineToolBar />
       <WelcomeCard />
       {/* Top bar: date, time, money, speed */}

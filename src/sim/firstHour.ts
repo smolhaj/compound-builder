@@ -13,10 +13,10 @@
  */
 import type { Pt } from './perimeter';
 import { PERIMETER, UTILITY_LINES, runFinished } from './perimeter';
-import { BLUEPRINTS, HOME_BEDS, isHome, totalBill, totalHours } from './blueprints';
-import { MATERIALS, type MaterialId } from './materials';
+import { BLUEPRINTS, HOME_BEDS, homeBeds, isHome, totalHours } from './blueprints';
 import { isFinished } from './construction';
 import { onOrder, orderCost, orderProblem, prices } from './economy';
+import { homeAdvice, kitUsd } from './homeAdvice';
 import { buildOff, costPer100m, perimeterOff, plansNeedLines, type SuggestionAct } from './guidance';
 import { operational, type OpId, type OpItem } from './operational';
 import { RESERVE_MIN, RESERVE_SHARE, starterWanted } from './starterCompound';
@@ -76,6 +76,8 @@ export interface FirstHour {
   goals: FirstHourGoal[];
   /** The one to show: the first with something to do, else the first still under way. Null when all are done. */
   current: FirstHourGoal | null;
+  /** While the roof is the current goal: the water, food and power goals that can be started now, so one stuck goal never blocks the rest. */
+  alsoOpen: FirstHourGoal[];
   done: number;
   total: number;
   /** Every goal on the list is done (and there is at least one). */
@@ -98,14 +100,12 @@ const OP_OF: Partial<Record<GoalId, OpId>> = { roof: 'shelter', water: 'water', 
 const placedOf = (s: GameState, id: GoalId): Structure[] => s.structures.filter(st => !st.unplaced && KINDS[id](st.kind));
 const openRuns = (s: GameState) => s.perimeter.filter(r => !runFinished(r) && !UTILITY_LINES.includes(r.kind));
 /** Something of the player's own making is placed on the land (the starter proposal is for an empty lot). */
-const anyOwnPlaced = (s: GameState) => s.structures.some(st => !st.pre && !st.unplaced) || s.perimeter.length > 0;
+// (the pipe and cable laid in for a house that came with the land are not the player's own work: a house-start lot still gets its starter plan)
+const anyOwnPlaced = (s: GameState) => s.structures.some(st => !st.pre && !st.unplaced) || s.perimeter.some(r => !UTILITY_LINES.includes(r.kind));
 
 /** The price of a kit piece in today's market (the buyable part of its bill). */
 export function kitCost(s: GameState, kind: string): number {
-  const bp = BLUEPRINTS[kind];
-  if (!bp) return 0;
-  const lines = (Object.entries(totalBill(bp)) as Array<[MaterialId, number]>).filter(([m]) => MATERIALS[m].price !== null).map(([material, qty]) => ({ material, qty }));
-  return orderCost(lines, prices(s));
+  return kitUsd(s, kind);
 }
 
 /** Days from the collapse to the first raiders at this difficulty (the wave clock's own table). */
@@ -184,7 +184,8 @@ function paceLine(s: GameState, id: GoalId, kind?: string): string | null {
   }
   if (kind && BLUEPRINTS[kind]) {
     const hrs = totalHours(BLUEPRINTS[kind]), w = weeksFor(hrs, pace);
-    return `About ${pluralize(Math.round(hrs), 'hour')} of work: ${eta(w)} at the family's pace, after the materials and any permit come in.`;
+    const adv = id === 'roof' ? homeAdvice(s) : null, crew = adv && adv.kind === kind && adv.crewUsd !== null ? ` A crew of four would do it in about ${pluralize(adv.crewWeeks!, 'week')} for ~${usd(adv.crewUsd)} more.` : '';
+    return `About ${pluralize(Math.round(hrs), 'hour')} of work: ${eta(w)} at the family's pace, after the materials and any permit come in.${crew}`;
   }
   return null;
 }
@@ -258,14 +259,14 @@ function look(s: GameState, id: GoalId, ops: Map<OpId, OpItem>, nudge: ReturnTyp
     return base;
   }
   if (id === 'roof') {
-    const kind = homeToStake(s) ?? 'cottage';
+    const adv = homeAdvice(s), kind = adv?.kind ?? homeToStake(s) ?? 'cottage';
     // the cash cannot cover a home and its reserve: tents now (so nobody sleeps outside), a home when the money is there
     if (starterBudget(s) < kitCost(s, kind)) {
       const out = housingShortfall(s).outside, tents = out > 0 && (s.stock.tent ?? 0) < 1 && !(onOrder(s).tent ?? 0) ? Math.ceil(out / TENT_SEATS) : 0;
       return { ...base, ...(tents > 0 && s.money >= tents * TENT_PRICE ? { act: { label: `Buy ${pluralize(tents, 'tent')} (${usd(tents * TENT_PRICE)}) so nobody sleeps outside`, act: { type: 'order' as const, lines: [{ material: 'tent' as const, qty: tents }] } } } : {}) };
     }
     // a finished home with too few beds, or no home at all
-    return { ...base, ...(kind ? { act: { label: `Stake a ${kind === 'cottage' ? 'cottage' : 'cabin'} (~${usd(kitCost(s, kind))})`, act: { type: 'stake' as const, kind } } } : op.act ? { act: { label: op.act.label, act: op.act.act } } : {}) };
+    return { ...base, ...(kind ? { act: { label: `Stake a ${adv?.name ?? (kind === 'cottage' ? 'cottage' : 'cabin')} (~${usd(kitCost(s, kind))}${adv ? `, ${pluralize(adv.beds, 'bed')}` : ''})`, act: { type: 'stake' as const, kind }, ...(buildOff(s, kind) ? { off: buildOff(s, kind)! } : {}) } } : op.act ? { act: { label: op.act.label, act: op.act.act } } : {}) };
   }
   if (id === 'fence') {
     if (!anyOwnPlaced(s) && starterFits(s)) return { ...base, act: { label: 'Lay out a starter compound', act: { type: 'starter' } } };
@@ -340,14 +341,18 @@ export function firstHour(s: GameState, drive?: readonly Pt[], memory: GoalMemor
     const pace = isDone ? null : paceLine(s, id, kind);
     // a goal with nothing placed and nothing to press is still "to do" (it is the player's move), unless it is placed
     const st: GoalStatus = isDone ? 'done' : status === 'underway' && !l.placed ? 'todo' : status;
-    goals.push({ id, title: TITLE[id], status: st, line: isDone ? 'Done' : l.line, ...(isDone || !l.act ? {} : { act: l.act }), why: whyText(s, id), reward: reward(s, id), pace,
+    // a home that sleeps too few is a different, solvable goal: "a bed for everyone" (the same recommendation the Build list and the Housing panel give)
+    const undersized = id === 'roof' && !isDone && s.structures.some(x => !x.unplaced && isHome(x.kind));
+    goals.push({ id, title: undersized ? 'A bed for everyone' : TITLE[id], status: st, line: isDone ? 'Done' : undersized && !l.placed ? `${Math.max(1, s.people.length - homeBeds(s))} without a bed` : l.line, ...(isDone || !l.act ? {} : { act: l.act }), why: whyText(s, id), reward: reward(s, id), pace,
       money: isDone ? null : moneyLine(s, id, l.act, l.placed) });
   }
   const done = goals.filter(g => g.status === 'done').length;
   // the first goal with a button; else the first one the family is working on; else a goal waiting on cash
   const payable = (g: FirstHourGoal) => !!g.act && !g.act.off && actCost(s, g.act.act) <= s.money;   // (a button the cash cannot press is not the one to lead with)
   const current = goals.find(g => g.status === 'todo' && payable(g)) ?? goals.find(g => g.status === 'underway') ?? goals.find(g => g.status === 'todo' && g.act && !g.act.off) ?? goals.find(g => g.status === 'todo') ?? null;
-  return { goals, current, done, total: goals.length, complete: goals.length > 0 && done === goals.length,
+  const alsoOpen = current?.id === 'roof' && current.status === 'todo'
+    ? goals.filter(g => (g.id === 'water' || g.id === 'food' || g.id === 'power') && g.status === 'todo' && g.act && !g.act.off && g.act.act.type !== 'starter') : [];
+  return { goals, current, alsoOpen, done, total: goals.length, complete: goals.length > 0 && done === goals.length,
     memory: { seen: GOAL_IDS.filter(i => seen.has(i)), done: GOAL_IDS.filter(i => doneMem.has(i)) } };
 }
 

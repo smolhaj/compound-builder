@@ -4,12 +4,15 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { useGameStore } from '../../store/gameStore';
 import { newGame } from '../../sim/state';
 import { planStructure } from '../../sim/construction';
+import { BLUEPRINTS } from '../../sim/blueprints';
 import { planRun } from '../../sim/perimeter';
 import { setFocus } from '../../sim/priority';
 import { DogsPanel } from '../DogsPanel';
 import { adoptDog } from '../../sim/pets';
 import { BuildMenu } from './BuildMenu';
 import { ProjectsTab } from './ProjectsTab';
+import { TerrainLegendChip } from '../Hud';
+import { useWorldStore } from '../../store/worldStore';
 import { ShopWindow } from '../ShopWindow';
 import { FarmPanel } from '../FarmPanel';
 import { FarmTab } from '../FarmTab';
@@ -292,5 +295,61 @@ describe('the first-hour goals card (server-rendered)', () => {
     expect(t).toContain('Show goals');
     expect(t).not.toContain('Why this matters');
     Object.assign(useFeelStore.getInitialState(), { goalsClosed: null });
+  });
+  it('an under-sized home is a "bed for everyone" goal, with the other basics listed beside it', () => {
+    Object.assign(useFeelStore.getInitialState(), { goalsClosed: null });
+    withGame(g => {
+      g.money = 900_000;
+      const st = planStructure(g, 'timber_cabin', 0, 0, 0); st.stage = 99; st.finishedAt = 0;
+      while (g.people.length < 5) { const p = structuredClone(g.people[0]); p.id = 'x' + g.people.length; g.people.push(p); g.personState.push(structuredClone(g.personState[0])); }
+    });
+    const t = text(renderToStaticMarkup(<BuildMenu />));
+    expect(t).toContain('A bed for everyone');
+    expect(t).toMatch(/1 without a bed/);
+    expect(t).toContain('Also open');
+    expect(t).toMatch(/Water: .*well/i);
+    expect(t).toMatch(/Food: .*garden/i);
+  });
+});
+
+describe('the Projects tab never says nothing is under way beside a stuck repair', () => {
+  it('lists the stuck repair, wrapped (no truncation) with the order button, and a crew job', () => {
+    withGame(g => {
+      const st = planStructure(g, 'farmhouse', 0, 0, 0); st.pre = true; st.finishedAt = 0; st.stage = BLUEPRINTS.farmhouse.stages.length;
+      st.fixes = [{ part: 'roof', cond: 'poor', done: 0, hours: 40, supplied: false }];
+      g.money = 300_000; g.stalls = { [`f:${st.id}:roof`]: { since: g.clock.t - 32 } };
+      const cab = planStructure(g, 'timber_cabin', 8, 8, 0);
+      g.crews = [{ id: 'c1', target: cab.id, hiredAt: 0, hours: 12, paid: 720 }];
+    });
+    const html = renderToStaticMarkup(<ProjectsTab />), t = text(html);
+    expect(t).not.toContain('Nothing under way');
+    expect(t).toContain('Stuck and crew jobs');
+    expect(t).toMatch(/has waited 32 days for/);
+    expect(t).toMatch(/Order it, \$/);
+    expect(t).toContain('Crew on the');
+    expect(html).not.toMatch(/text-overflow:\s*ellipsis/);
+  });
+  it('the stuck Next-steps card is shown whole, not cut to two lines', () => {
+    Object.assign(useFeelStore.getInitialState(), { goalsClosed: 'dismissed' });
+    withGame(g => {
+      const st = planStructure(g, 'farmhouse', 0, 0, 0); st.pre = true; st.finishedAt = 0; st.stage = BLUEPRINTS.farmhouse.stages.length;
+      st.fixes = [{ part: 'roof', cond: 'poor', done: 0, hours: 40, supplied: false }];
+      g.money = 300_000; g.stalls = { [`f:${st.id}:roof`]: { since: g.clock.t - 32 } };
+    });
+    const html = renderToStaticMarkup(<BuildMenu />);
+    const card = html.slice(html.indexOf('has waited 32 days') - 400, html.indexOf('has waited 32 days') + 400);
+    expect(card).not.toContain('-webkit-line-clamp');
+    Object.assign(useFeelStore.getInitialState(), { goalsClosed: null });
+  });
+});
+
+describe('terrain overlays say what their colors mean', () => {
+  it('shows a legend line for the Sun overlay (and nothing when the overlay is off)', () => {
+    Object.assign(useWorldStore.getInitialState(), { terrainMode: 'off' });
+    expect(renderToStaticMarkup(<TerrainLegendChip />)).toBe('');
+    Object.assign(useWorldStore.getInitialState(), { terrainMode: 'sun' });
+    const t = text(renderToStaticMarkup(<TerrainLegendChip />));
+    expect(t).toMatch(/Sun:.*south-facing.*north-facing/);
+    Object.assign(useWorldStore.getInitialState(), { terrainMode: 'off' });
   });
 });

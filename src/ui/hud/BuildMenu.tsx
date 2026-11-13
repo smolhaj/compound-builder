@@ -158,7 +158,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
           <b style={x.tone === 'alarm' ? { color: TONE.bad } : undefined}>{x.title ?? KIT[x.kind].name}</b>
           {!x.acts && <button style={{ ...btn(true), ...miniBtn }} onClick={() => run({ type: 'stake', kind: x.kind })}>Stake it</button>}
         </div>
-        <Clamp text={x.why}>{x.why}</Clamp>
+        <Clamp text={x.why} full={x.tone === 'alarm' || x.id === 'stalled' || x.id === 'logs'}>{x.why}</Clamp>
         {x.acts && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 3 }}>
           {x.acts.slice(0, 2).map(a => { const why = a.act.type === 'order' ? orderProblem(g.game, a.act.lines) : null; return <button key={a.label} style={{ ...btn(true), ...miniBtn, whiteSpace: 'normal', textAlign: 'left', maxWidth: '100%', lineHeight: 1.2 }} disabled={!!why} title={why ? 'Cannot order that now (money, or nobody delivering)' : a.label} onClick={() => run(a.act)}>{a.label}</button>; })}
         </div>}

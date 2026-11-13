@@ -103,14 +103,15 @@ export function eta(weeks: number | null): string {
 export function slowHint(s: GameState, weeks: number | null, pace = paceOf(s), slow = 6): string | null {
   if (weeks === null) return 'No one is free to build.';
   if (weeks < slow) return null;
-  const parts: string[] = [];
+  const parts: string[] = [], crewed = (s.crews ?? []).length > 0;   // (a crew already on the work: do not tell the player to hire one)
   if (pace.siteDays !== undefined) {
     parts.push(`the family is on the place only about ${pluralize(Math.round(pace.siteDays * 10) / 10, 'day')} a week (Friday night to Sunday afternoon)`);
-    parts.push('hire a crew for the weekdays');
-    parts.push('or move in full time (Family tab)');
+    if (!crewed) parts.push('hire a crew for the weekdays');
+    parts.push(`${crewed ? '' : 'or '}move in full time (Family tab)`);
     return `Slow going: ${parts.join('; ')}.`;
   }
   if (pace.employed.length) parts.push(`${pace.employed.join(' and ')} ${pace.employed.length > 1 ? 'work' : 'works'} in town, so building waits for weekends (quit the job in the Family tab)`);
+  if (crewed) return parts.length ? `Slow going: ${parts.join('; ')}.` : null;
   parts.push('or hire a crew');
   return `Slow going: ${parts.join('; ')}.`;
 }

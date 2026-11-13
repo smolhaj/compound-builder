@@ -116,6 +116,25 @@ export function stuckProject(s: GameState): Stuck | null {
   return null;
 }
 
+export interface StuckRow { key: string; at: string | null; label: string; days: number; /** What is missing right now (the stockpile only). */ what: string; /** The order that fixes it, and its cost (null: nothing buyable, or the order cannot be placed now). */ lines: OrderLine[] | null; cost: number }
+
+/**
+ * Every project that has waited STALL_DAYS or more for materials, longest first, homes first (the Projects tab lists them so it never
+ * says "Nothing under way" beside a Next-steps card about a stuck repair; UX playtest). Unlike `stuckProject` it keeps the ones that
+ * cannot be fixed with an order (the logs are not for sale, the cash is short).
+ */
+export function stuckRows(s: GameState): StuckRow[] {
+  const marks = s.stalls ?? {}, pending = onOrder(s);
+  return waiters(s)
+    .map(w => ({ w, days: Math.floor(s.clock.t - (marks[w.key]?.since ?? s.clock.t)) }))
+    .filter(x => x.days >= STALL_DAYS)
+    .sort((a, b) => Number(b.w.home) - Number(a.w.home) || b.days - a.days)
+    .map(({ w, days }) => {
+      const lines = missLines(s, w.miss, pending), ok = lines.length > 0 && !orderProblem(s, lines);
+      return { key: w.key, at: w.at, label: w.label, days, what: billText(w.miss), lines: ok ? lines : null, cost: ok ? orderCost(lines, prices(s)) : 0 };
+    });
+}
+
 /** A project that waits on logs: they cannot be bought, only felled from the family's own trees (sim/forestry.ts). */
 export interface LogWait {
   key: string; at: string | null; label: string; home: boolean; days: number;
