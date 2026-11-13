@@ -87,6 +87,8 @@ export interface LivestockCtx {
   ground: (x: number, z: number) => number;
   /** The way from a to b for this kind: [] = straight, null = none (game/paths/groundMovers animalRoute over the walk world). */
   via: (kind: StockKind, a: Pt, b: Pt) => Pt[] | null;
+  /** Ground an animal can stand on in the paddock (not inside a building, in the creek or on the road); omitted: anywhere. */
+  free?: (x: number, z: number) => boolean;
 }
 
 /** One thing to draw in a QA preview (scripts/animalviewer.js): an animal of a kind and breed standing, walking, grazing. */
@@ -181,7 +183,7 @@ export class LivestockRenderer {
     this._time += dt;
     if (this._age > 90) { this._age = 0; for (const a of this._agents.values()) a.noWay.clear(); }     // (the layout may have changed: look again)
     const k = Math.max(1, Math.min(3, speedK));
-    const goals = herd.map(h => animalGoal(h, homes, c, this._agents.get(h.id)?.noWay));
+    const goals = herd.map(h => animalGoal(h, homes, c, this._agents.get(h.id)?.noWay, ctx.free));
     spreadGoals(herd, goals, homes);
     for (let gi = 0; gi < herd.length; gi++) {
       const h = herd[gi], goal = goals[gi];

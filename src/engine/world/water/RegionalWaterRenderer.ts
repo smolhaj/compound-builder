@@ -126,6 +126,7 @@ export class RegionalWaterRenderer {
         wEdge = (1.0 - smoothstep(0.0, 0.05, dm)) * inN;`,
       flow: flowU,
       rippleScale: 0.7,
+      lite: q === 'low',
       detailFade: [90, 650],
     });
     applyEdgeHaze(mat, [cx, cz], R_MAX * 0.72, R_MAX * 0.995);

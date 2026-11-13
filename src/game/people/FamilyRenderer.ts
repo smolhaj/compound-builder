@@ -5,8 +5,9 @@
  * goes indoors. At fast-forward they walk faster (the sim moves on).
  */
 import type * as THREE from 'three';
-import { FigureLayer, FIG_POSE, type FigurePose } from '../../engine/world/people/figureKit';
-import { pickPersonaWear, type Wear, type WearSeason } from '../../engine/world/people/crowdWear';
+import { FigureLayer, FIG_POSE, stridePhase, type FigurePose } from '../../engine/world/people/figureKit';
+import type { Wear, WearSeason } from '../../engine/world/people/crowdWear';
+import { wearForRole, dressForTask, roleOfPerson, seedOf, climateOfCold } from '../../engine/world/people/roleWear';
 import type { Person } from '../../sim/family';
 import type { PersonState } from '../../sim/state';
 import { goalFor, type GoalCtx } from './peopleGoals';
@@ -24,6 +25,12 @@ interface Agent {
   phase: number;
   placed: boolean;
   wear: Wear | null;
+  /** The look as dressed for the current task (apron, gloves, vest…), and the task it was dressed for. */
+  dressed: Wear | null; dressedFor: string;
+  /** Head turn toward what they look at (smoothed), radians from the heading. */
+  look: number;
+  /** Where they were last frame (the walk cycle follows the ground covered). */
+  px: number; pz: number;
   /** The way along the paths to the goal (game/paths), the goal it was found for. */
   via: Wp[];
   viaFor: { x: number; z: number } | null;
@@ -33,11 +40,6 @@ interface Agent {
   wait: number;
   /** Seconds until a walker held at a fallen tunnel looks again whether the way is open. */
   retry: number;
-}
-
-function hashRnd(seed: number): () => number {
-  let s = seed >>> 0;
-  return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
 }
 
 export class FamilyRenderer {
@@ -66,7 +68,7 @@ export class FamilyRenderer {
   }
 
   update(dt: number, people: readonly Person[], states: readonly PersonState[], hour: number, clock: number, ctx: GoalCtx,
-    ground: (x: number, z: number) => number, season: WearSeason, speedK: number, sick?: ReadonlyMap<string, SickPose>): void {
+    ground: (x: number, z: number) => number, season: WearSeason, speedK: number, sick?: ReadonlyMap<string, SickPose>, cold = 0.3): void {
     this._time += dt;
     // the sim clock jumped (load, debug advance): everyone is simply where they should be
     const first = this._lastClock < 0;
@@ -85,24 +87,21 @@ export class FamilyRenderer {
       if (!a) {
         // taken in just now (not a load): they walk up the drive from the road
         const walkIn = role === 'arriving' && ctx.entry && !first && !jumped;
-        a = { x: walkIn ? ctx.entry!.x : goal.x, z: walkIn ? ctx.entry!.z : goal.z, rot: 0, phase: i, placed: true, wear: null, via: [], viaFor: null, y: null, wait: 0, retry: 0 };
+        a = { x: walkIn ? ctx.entry!.x : goal.x, z: walkIn ? ctx.entry!.z : goal.z, rot: 0, phase: i, placed: true, wear: null, dressed: null, dressedFor: '', look: 0, px: walkIn ? ctx.entry!.x : goal.x, pz: walkIn ? ctx.entry!.z : goal.z, via: [], viaFor: null, y: null, wait: 0, retry: 0 };
         this._agents.set(p.id, a);
       }
       if (redress || !a.wear) {
-        const persona = p.kid ? 'kid' : 'resident';
-        const keep = a.wear ? { skin: a.wear.skin, hair: a.wear.hair, longHair: a.wear.longHair, pack: a.wear.pack } : undefined;
-        const w = pickPersonaWear(hashRnd(p.id.charCodeAt(1) * 7919 + (p.body === 'f' ? 1 : 2)), persona, { season, team: null }, keep);
-        w.hasPack = false;
-        w.longHair = keep?.longHair ?? p.body === 'f';
-        if (!p.kid) { w.shirt = p.shirt; w.pants = season === 'summer' ? 0x4a5a7a : 0x3b4a66; w.shorts = false; }
-        a.wear = w;
-        this._layer.setWear(n, w);
+        // who they are comes from their id (deterministic: no save), what they wear from their role, the weather and the season
+        const w = wearForRole(seedOf(p.id), roleOfPerson(p), { season, climate: climateOfCold(cold), female: p.body === 'f', age: p.age });
+        if (!p.kid && !p.elder) w.shirt = p.shirt;
+        a.wear = w; a.dressed = null;
       }
+      if (!a.dressed || a.dressedFor !== st.task) { a.dressed = dressForTask(a.wear, st.task, { season, climate: climateOfCold(cold), armed: ctx.armed, kid: p.kid }); a.dressedFor = st.task; }
+      this._layer.setWear(n, a.dressed);
       // in the sickbay (sickbayPlan): the patient lying on the bed, the medic at the bedside; put there, not walked there
       const bed = sick?.get(p.id);
       if (bed) {
         a.x = bed.x; a.z = bed.z; a.rot = bed.rot; a.via = []; a.viaFor = null; a.y = null; a.wait = 0;
-        if (!redress && a.wear) this._layer.setWear(n, a.wear);
         this._layer.setPose(n, { x: bed.x, y: bed.y, z: bed.z, rot: bed.rot, scale: bed.scale, pose: bed.pose, phase: 0, amp: 0, ...(bed.pitch ? { pitch: bed.pitch } : {}) });
         n++;
         return;
@@ -147,18 +146,33 @@ export class FamilyRenderer {
       }
       if (!moving && goal.hidden) return;     // indoors
       this.shown.add(p.id);
-      a.phase += dt * (moving ? 9 * Math.min(2.5, Math.max(1, speedK)) : 0);
+      // the walk cycle follows the ground covered (the planted foot does not slide)
+      const fsc = figureScale(p);
+      a.phase = (a.phase + (moving ? stridePhase(Math.hypot(a.x - a.px, a.z - a.pz), fsc, 0.5) : 0)) % 6283.19;
       // at work: hammer (reach / stand) on a beat, or kneel
       let pose = moving ? goal.walkPose ?? FIG_POSE.STAND : goal.pose;
       if (!moving && goal.work && goal.pose === FIG_POSE.REACH) pose = Math.sin(this._time * 6 + i * 1.7) > 0 ? FIG_POSE.REACH : FIG_POSE.STAND;
+      // head: toward the nearest other person within a few steps when standing; the slope under the feet along the heading
+      let lookT = 0;
+      if (!moving) {
+        let best = 1.6;
+        for (const [oid, o] of this._agents) {
+          if (oid === p.id || !this.shown.has(oid)) continue;
+          const d = Math.hypot(o.x - a.x, o.z - a.z);
+          if (d < best) { best = d; const br = Math.atan2(o.x - a.x, o.z - a.z) - a.rot; lookT = Math.atan2(Math.sin(br), Math.cos(br)); }
+        }
+        if (Math.abs(lookT) > 1.1) lookT = 0;
+      }
+      a.look += (lookT - a.look) * Math.min(1, dt * 3);
+      const slope = a.y === null ? (ground(a.x + Math.sin(a.rot) * 0.1, a.z + Math.cos(a.rot) * 0.1) - ground(a.x - Math.sin(a.rot) * 0.1, a.z - Math.cos(a.rot) * 0.1)) / 0.2 : 0;
       const fp: FigurePose = {
+        look: a.look, slope,
         x: a.x, y: (a.y ?? ground(a.x, a.z)) + (a.y === null && (!moving || d < 0.3) ? goal.y ?? 0 : 0), z: a.z, rot: a.rot,
         scale: figureScale(p),
         pose, phase: a.phase, amp: moving ? 0.5 : 0,
         tool: goal.tool ?? 0,
       };
-      // the wear slot must follow the draw slot
-      if (!redress && a.wear) this._layer.setWear(n, a.wear);
+      a.px = a.x; a.pz = a.z;
       this._layer.setPose(n, fp);
       n++;
     });

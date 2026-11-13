@@ -16,6 +16,7 @@
  */
 import * as THREE from 'three';
 import type { WearClass } from './aging';
+import { BLDG } from '../buildkit/buildingDetail';
 
 /** Exterior kit materials and how they weather (others never age). */
 export const WEAR_CLASS: Readonly<Record<string, WearClass>> = {
@@ -33,18 +34,22 @@ varying vec4 vWear;
 varying vec3 vWearL;
 varying vec3 vWearW;
 varying vec3 vWearN;
+varying vec2 vBdO;
 `;
 const VERT = /* glsl */`
   vWear = aWear;
   vWearL = transformed;
   vWearW = ( modelMatrix * vec4( transformed, 1.0 ) ).xyz;
   vWearN = normalize( mat3( modelMatrix ) * objectNormal );
+  vBdO = vec2( modelMatrix[3].x, modelMatrix[3].z );
 `;
 const FRAG_PARS = /* glsl */`
 varying vec4 vWear;
 varying vec3 vWearL;
 varying vec3 vWearW;
 varying vec3 vWearN;
+varying vec2 vBdO;
+uniform vec4 uBd;
 float wearHash( vec2 p ) { vec3 p3 = fract( vec3( p.xyx ) * 0.1031 ); p3 += dot( p3, p3.yzx + 33.33 ); return fract( ( p3.x + p3.y ) * p3.z ); }
 float wearNoise( vec2 p ) {
   vec2 i = floor( p ), f = fract( p ), u = f * f * ( 3.0 - 2.0 * f );
@@ -135,6 +140,50 @@ const FRAG = /* glsl */`
 }
 `;
 
+/**
+ * Building detail (the second block): per-building tint, sun-fade on the south and west faces, algae streaks down shaded
+ * north walls and dirt runs under sills and eaves (both scaled by the wear's moss and grime), wet runs and sheen while it
+ * rains, and rime speckle in a cold dawn. `uBd` = (detail on, rain, roof snow, rime); all of it is off on the Low tier.
+ */
+const FRAG_DETAIL = /* glsl */`
+if ( uBd.x > 0.5 ) {
+  vec3 bP = vWearW;
+  vec3 bN = normalize( vWearN );
+  float bWall = 1.0 - smoothstep( 0.3, 0.65, abs( bN.y ) );
+  float bUp = clamp( bN.y, 0.0, 1.0 );
+  vec2 bO = floor( vBdO * 4.0 );
+  float bh1 = wearHash( bO + 1.3 ), bh2 = wearHash( bO + 9.1 );
+  vec3 bC = diffuseColor.rgb;
+  // one building: its own brightness and a little warm / cool drift
+  bC *= ( 0.92 + 0.16 * bh1 ) * mix( vec3( 1.045, 1.0, 0.955 ), vec3( 0.96, 1.0, 1.04 ), bh2 );
+  float bLum = dot( bC, vec3( 0.2126, 0.7152, 0.0722 ) );
+  // sun fade: south (+z) and west (-x) walls and the roofs bleach with age
+  float bAge = clamp( vWear.y * 0.5 + ( 1.0 - vWear.w ) * 0.7, 0.0, 1.0 );
+  float bSun = max( clamp( 0.55 * bN.z - 0.35 * bN.x + 0.1, 0.0, 1.0 ) * bWall, bUp * 0.6 );
+  bC = mix( bC, vec3( bLum ) * 1.1 + 0.015, bSun * bAge * 0.3 );
+  float bAlong = abs( bN.x ) > abs( bN.z ) ? bP.z : bP.x;
+  float bS = wearNoise( vec2( bAlong * 36.0, bP.y * 1.5 ) ) * 0.65 + wearNoise( vec2( bAlong * 91.0, bP.y * 3.7 + 4.0 ) ) * 0.35;
+  float bRun = smoothstep( 0.5, 0.8, bS ) * bWall;
+  float bMoss = vWear.z - floor( vWear.z + 1e-4 );
+  float bGrime = floor( vWear.x * 0.5 + 1e-4 ) * 0.1;
+  float bNorth = smoothstep( -0.05, -0.7, bN.z );
+  float bLow = 1.0 - smoothstep( 0.05, 0.55, vWearL.y );
+  bC = mix( bC, vec3( 0.085, 0.12, 0.06 ) * ( 0.8 + 0.4 * bS ), bRun * bNorth * bMoss * ( 0.4 + 0.5 * bLow ) * 0.65 );
+  bC *= 1.0 - 0.22 * bGrime * bRun;
+  // rain: the runs darken and shine
+  bC *= 1.0 - 0.12 * uBd.y * bRun;
+  roughnessFactor = mix( roughnessFactor, roughnessFactor * 0.62, uBd.y * bRun * 0.8 );
+  // a cold dawn: rime speckle, most on what faces up
+  if ( uBd.w > 0.01 ) {
+    float bR = wearNoise( bP.xz * 55.0 + bP.y * 31.0 ) * 0.6 + wearNoise( bP.xz * 140.0 - bP.y * 70.0 ) * 0.4;
+    float bRm = smoothstep( 0.62 - uBd.w * 0.35, 0.78 - uBd.w * 0.3, bR ) * ( 0.45 + 0.55 * max( bUp, 0.5 * bWall ) );
+    bC = mix( bC, vec3( 0.86, 0.91, 0.97 ), bRm * 0.8 );
+    roughnessFactor = mix( roughnessFactor, 0.55, bRm * 0.5 );
+  }
+  diffuseColor.rgb = bC;
+}
+`;
+
 const _patched = new WeakSet<THREE.Material>();
 
 /** Add the weathering patch to a shared kit material (idempotent). */
@@ -150,9 +199,21 @@ export function patchWear(m: THREE.MeshStandardMaterial, cls: WearClass): void {
       .replace('#include <project_vertex>', '#include <project_vertex>\n' + VERT);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\n' + FRAG_PARS)
-      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n' + FRAG);
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\n' + FRAG + FRAG_DETAIL);
+    sh.uniforms.uBd = BLDG.uBd;
   };
   m.customProgramCacheKey = () => `wear:${cls}`;
+}
+
+/** The winter roof's snow slabs: their top face drops toward the roof as the snow thins (`aLift`: the slab's up times its depth, w = 1 on the top face; `uIce.x` the snow). */
+export function patchSnowSlab(m: THREE.MeshStandardMaterial): void {
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uIce = BLDG.uIce;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute vec4 aLift;\nuniform vec4 uIce;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\ntransformed -= aLift.xyz * aLift.w * ( 1.0 - mix( 0.3, 1.0, uIce.x ) );');
+  };
+  m.customProgramCacheKey = () => 'snowslab';
 }
 
 /** Set a mesh's wear (packed, aging.packWear): one value for every vertex. */
