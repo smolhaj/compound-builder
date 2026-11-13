@@ -88,7 +88,14 @@ try {
   for (const [name, h] of [['dawn', 6.8], ['noon', 12], ['dusk', 19.1], ['night', 22.5]]) {
     await page.evaluate(h => window.__cb.store.getState().setTimeOfDay(h), h);
     await run(250, h);
-    await page.evaluate(() => { const w = window.__cb.world, c = w.camp; window.__cb.qa.pose = null; const [ex, ez] = w.openSpotNear(c.x + 9, c.z + 11, 0.5); window.__cb.cam.placeEye(ex, ez, c.x + 3, c.z + 5, 0.3); });
+    await page.evaluate(() => {
+      const cb = window.__cb, w = cb.world;
+      // the yard: the middle of the cows, steers and goats by day (remembered for the night shot, when they are inside)
+      const an = w.livestock.animals().filter(a => !a.inside && ['cow', 'steer', 'goat'].includes(a.kind));
+      if (an.length) window.__yardT = [an.reduce((s, a) => s + a.x, 0) / an.length, an.reduce((s, a) => s + a.z, 0) / an.length];
+      const [tx, tz] = window.__yardT ?? [w.camp.x, w.camp.z], [ex, ez] = w.openSpotNear(tx + 3.2, tz + 3.4, 0.4);
+      cb.qa.pose = null; cb.cam.placeEye(ex, ez, tx - 1.5, tz - 1.5, 0.32);
+    });
     await shot(`07-yard-${name}`);
   }
   // 4. the chicken coop run
