@@ -593,6 +593,26 @@ export class TerrainRenderer {
     geo.computeVertexNormals();
   }
 
+  /** The ground's live grass colors (the ground cover tints from these same objects) and its dry share. */
+  groundColors(): { grass: THREE.Color; dryGrass: THREE.Color; dry: number } | null {
+    if (!this._u || !this._look) return null;
+    return { grass: this._u['uGrass'].value as THREE.Color, dryGrass: this._u['uDryGrass'].value as THREE.Color, dry: this._look.dry };
+  }
+
+  /** Forest and farmland shares (0..1) at the nearest grid vertex: what the ground cover reads. */
+  coverAt(x: number, z: number): { forest: number; field: number } {
+    const mesh = this._mesh, xs = this._gx, zs = this._gz;
+    if (!mesh || xs.length < 2) return { forest: 0, field: 0 };
+    const near = (a: number[], v: number): number => {
+      let lo = 0, hi = a.length - 1;
+      while (lo < hi) { const m = (lo + hi) >> 1; if (a[m] < v) lo = m + 1; else hi = m; }
+      return lo > 0 && v - a[lo - 1] < a[lo] - v ? lo - 1 : lo;
+    };
+    const k = near(zs, z) * xs.length + near(xs, x);
+    const aF = mesh.geometry.getAttribute('aForest') as THREE.BufferAttribute, aD = mesh.geometry.getAttribute('aField') as THREE.BufferAttribute;
+    return { forest: aF.getX(k), field: aD.getX(k) };
+  }
+
   /**
    * Height of the drawn surface at (x, z): the same two triangles per cell
    * the mesh uses, so anything draped on it sits exactly on the ground.
