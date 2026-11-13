@@ -378,6 +378,8 @@ describe('building geometry audit: the second sweep (kinds first viewed in the 4
     const roofTop = Math.max(...b.comps.filter(c => c.layer === 'roof').map(c => c.box.max.y));
     expect(top).toBeLessThanOrEqual(roofTop);
   });
+});
+
 // ─────────────────────────────────────────────────────────────────────────
 // Warm lit interiors (oasis): the cosy decor of a settled home, its light pools and its window sills
 // ─────────────────────────────────────────────────────────────────────────
