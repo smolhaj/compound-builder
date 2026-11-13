@@ -57,6 +57,8 @@ import { leaveAftermath } from './aftermath';
 import { peopleAfterFight } from './people';
 import { fightNerves } from './mind';
 import { hourOf, type GameState } from './state';
+import { MAX_GUARDS, onDuty } from './guards';
+import { cameraAim, cameraNightSee, wallDogEffect } from './defenseTune';
 import { pluralize } from './words';
 import { FireMap, PARTIAL_HIT, fireBoxesOf, fireLine, FIRE_SOLID, stepHeight, type Sight, type Stance } from './lineOfFire';
 import { stepSegments, stepHeightAt } from './standingSurfaces';
@@ -114,6 +116,10 @@ export const FISTS: Arm = { range: 0.6, rate: 0.5, acc: 0.8, auto: false, cal: n
  * A militia is not a gang (balance pass: the two battle rows were identical): drilled and better armed, so more of them carry a rifle and soft armor,
  * they shoot a point better, they hold their ranks after the first man falls and take heavier losses before they break. A gang is the baseline.
  */
+/** A contract guard's marksmanship (armory skill scale 1-10): trained, not a veteran. */
+export const GUARD_SKILL = 4;
+/** Seconds an off-shift guard needs to be up and at a post. */
+export const GUARD_LATE_S = 20;
 export const MILITIA = { rifleShare: [0.55, 0.8] as const, skill: 1, soft: 0.2, helmet: 0.12, morale: 0.1 } as const;
 /** The share of hits that still land on a defender at a wall post (lower is better cover): thin fences hide a man, a heavy wall shelters him (it was 0.22 for every wall: now 0.25 for a rail fence down to 0.16 for poured concrete). */
 export const wallPostCover = (kind: string): number => (kind in PERIMETER ? 0.25 - 0.09 * wallToughness(kind as PerimeterKind) : 0.22);
@@ -532,6 +538,20 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     f.traits = traitsOf(s, p, pid => (alive.some(a => a.p.id === pid) ? `h_${pid}` : undefined));
     F.push(f); units.push({ id: f.id, side: 'home', personId: p.id, x: r2(x), z: r2(z), post: 'open', traits: { trauma: f.traits.trauma, stress: f.traits.stress, grief: f.traits.grief, experience: f.traits.experience, veteran: f.traits.veteran, firstFight: f.traits.firstFight, courage: f.traits.courage, kin: f.traits.kin.map(k => ({ ...k })), history: [...f.traits.history] } });
   }
+  // contract guards (sim/guards.ts) stand a post with their own rifle: the one on shift is up with the alarm, the others are off the property or asleep
+  // in the gate house and come up late. Peacetime break-ins and tunnel surprises find them where they are not (they never replace a family fighter).
+  const guardIds = new Set<string>(), guardLate = new Set<string>();
+  if (!peace && opts.ambush === undefined) {
+    const duty = new Set(onDuty(s, hr).map(x => x.id));
+    for (const gd of (s.guards?.staff ?? []).slice(0, MAX_GUARDS)) {
+      if (gd.turned || gd.plant) continue;   // a bought guard is a danger, not a defender (sim/insider.ts)
+      const id = `h_${gd.person.id}`, gr = mulberry32(seed * 7907 + gd.person.age * 31);
+      const arm: Arm = { ...ARMS.semi_rifle, cal: null };
+      const f: Fighter = { id, side: 'home', x: C.x + (gr() - 0.5) * 2, z: C.z + (gr() - 0.5) * 2, y: 0, hp: 100, out: false, dead: false, arm, skill: GUARD_SKILL, readyAt: Infinity, post: null, cover: 0.8, moving: false, nextMove: 0, shelter: false, grenades: 0, rockets: 0, armor: { plate: false, soft: true, helmet: false }, vet: true, inGun: arm.mag, spare: 3, bleed: 0, supp: 0, nvg: false, wear: 1 };
+      F.push(f); units.push({ id, side: 'home', personId: gd.person.id, x: r2(f.x), z: r2(f.z), post: 'open', y: 0, armor: f.armor });
+      guardIds.add(id); if (!duty.has(gd.id)) guardLate.add(id);
+    }
+  }
   // explosives are rare in an American collapse: a looted Guard armory, a veteran's souvenir. An organized crew may carry
   // a few grenades and, late, a rocket; a pickup of desperate men a grenade now and then, never a rocket
   // (round 4: a rocket came with every other pair of looters after day 120 and one blast took a whole family in the house)
@@ -649,8 +669,12 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   // fog (sim/fog.ts): the towers and the people on watch see a crew a fraction as far out in dense fog (thermal gear keeps its reach, and it is in `detection`)
   const fogEye = fogSightK(s, 'eye');
   const detectAt = lineR + (towerReach(s, night, lightsOn) * fogEye + Math.max(2, (6 + detection * 0.24) * (darkBlind ? 0.7 : 1), night ? 0 : (16 + detection * 0.06) * fogEye)) * env.detect + env.animalNoise;   // (storms deaden the sound, the livestock in the yard add to it: sim/raidConditions.ts)
+  // powered cameras (sim/defenseTune.ts): the watch sees where the crew is, so the shots land more often by day and the dark costs the defenders less
+  const camCount = powered ? n('cameras') + 2 * n('thermal_cam') : 0;
+  const camAim = cameraAim(camCount), camSee = cameraNightSee(camCount);
   const what: 'dog' | 'sensor' | 'tripwire' | 'camera' | 'watch' = dogCount(s) ? 'dog' : n('driveway_alarm') ? 'sensor' : n('tripwire') ? 'tripwire' : powered && (n('cameras') || n('thermal_cam')) ? 'camera' : 'watch';
   let alarmed = false;
+  const wallDogs = wallDogEffect(livingDogs(s));
   const mines = Math.min(n('mines'), 12);
   let minesLeft = mines;
   const mineR = lineR + 4;
@@ -840,7 +864,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     // the dark: half the hits, unless they have night vision; rounds snapping past spoil the aim (less so for those who served)
     const see = night && !lightsOn && !(t >= flareFrom && t < flareUntil) ? (a.nvg ? 0.9 : 0.5) : 1;
     const steady = 1 / (1 + a.supp * (a.vet ? 0.07 : 0.16));
-    let p = (0.06 + 0.025 * a.skill) * a.arm.acc * rangeF * tgtCover * see * steady * (a.side === 'home' ? a.post?.acc ?? 1 : 1);
+    let p = (0.06 + 0.025 * a.skill) * a.arm.acc * rangeF * tgtCover * (a.side === 'home' ? Math.max(see, camSee) * camAim : see) * steady * (a.side === 'home' ? a.post?.acc ?? 1 : 1);
     if (a.side === 'home' && a.moving) p *= 0.5;
     if (b.side === 'home' && b.post?.kind === 'tower') p *= TOWER_PARAPET;   // up a tower behind the parapet, shot at from below at a steep angle: fewer rounds find the cab
     if (sortie > 1 && a.side === 'home' && b.side === 'raider' && dist(b, C) <= lineR + 2) p *= sortie;
@@ -1171,6 +1195,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         return raidDelta({ at: st ? { x: st.x, z: st.z } : null, role: st ? (s.quarters?.roles[st.id] ?? null) : null, tower: false, house: C, gate: gateAt, night });
       };
       for (const f of H) if (f.shelter) toShelter(f, t + Math.max(0, qDelta(f))); else { assignPost(f, t); if (!f.vet && opts.ambush === undefined) f.readyAt += 1 + r() * 3 + (f.pid ? fightNerves(s, s.people.find(q => q.id === f.pid)!).freeze : 0); if (opts.ambush === undefined && f.readyAt < Infinity) f.readyAt = Math.max(t, f.readyAt + qDelta(f)); }   // civilians freeze a moment; those who served go straight to it
+      for (const f of H) if (guardLate.has(f.id) && f.readyAt < Infinity) f.readyAt += GUARD_LATE_S;
       // scouts the watch saw: the family is warned and stands ready sooner
       if (scoutsSeen) for (const f of H) if (!f.shelter && f.readyAt < Infinity) f.readyAt = Math.max(t, f.readyAt - (prepared ? 6 : 2));
       // a diversion: half the defenders run to the noise on the wrong side (sim/raidOpeners.ts)
@@ -1447,6 +1472,13 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         hurt(f, moat.hazard.min + r() * (moat.hazard.max - moat.hazard.min), t + 0.1, undefined, 'leg');
         if (!f.dead && r() < 0.7) say(t + 0.3, pick(moat.frozen ? ['The ice — it went — it went under me —', 'It cracked — get me out — GET ME OUT —'] : ['Cold — Christ, it\'s cold — I can\'t feel my — ', 'It\'s over my head — I\'ve lost the rifle —', 'The bank is slick — I can\'t climb out —']), f);
       }
+      // the guard dogs posted at the wall bite whoever is on the ladder, and the crew loses heart (sim/defenseTune.ts)
+      if (wallDogs.n) for (const f of atLine) if (r() < wallDogs.bitePerS) {
+        bitten++;
+        ev.push({ t: r2(t + 0.1), kind: 'snag', unit: f.id, x: r2(f.x), z: r2(f.z), what: 'a guard dog' });
+        hurt(f, wallDogs.minHurt + r() * wallDogs.spanHurt, t + 0.1, undefined, 'leg');
+        if (!f.dead && r() < 0.6) say(t + 0.3, pick(['The dog — get it off me — GET IT OFF!', 'Dog! It\'s got my leg — aah —']), f);
+      }
       if (temper !== 'savage' && !peace && t - lineSince >= 6) for (const f of atLine) if (!f.fled && !f.out && r() < 0.03 + 0.05 * Math.min(1, losses / Math.max(1, raiders)) + 0.03 * bitten) {
         f.fled = true; ev.push({ t, kind: 'flee', unit: f.id });
         if (r() < 0.5) say(t + 0.2, pick(['Fuck this — I\'m not going over that.', 'It\'s not worth it — back, get BACK!', 'No way — I\'m out — I\'m out of here!']), f);
@@ -1580,12 +1612,12 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   let raid: RaidFacts | undefined;
   if (!peace) {
     const linePassed = breached, reached: RaidStage = end === 'overrun' ? 'house' : reachedStage !== 'wall' ? reachedStage : synth && R.some(f => dist(f, C) < wallR0 - 1) ? 'yard' : 'wall';
-    const fateOf = (k: Fate) => fates.filter(f => f.fate === k).length;
+    const fateOf = (k: Fate) => fates.filter(f => f.fate === k && !guardIds.has(f.unit)).length;
     const takenBy = new Map<string, string>();
     for (const e of ev) if (e.kind === 'taken') takenBy.set(e.unit, e.by);
     const hostages = [...takenBy].map(([unit, by]) => ({ unit, by }));
     const yardLoot = lootList.filter(l => l.from === 'yard'), houseLoot = lootList.filter(l => l.from === 'house');
-    const deadHome = H.filter(h => h.dead).length;
+    const deadHome = H.filter(h => h.dead && !guardIds.has(h.id)).length;
     const bi = breachInfo as { method: BreachHow; where: BreachWhere | null; t: number } | null;
     const partial = { result: end, linePassed, beatenBack: beatenBack && (end === 'fled' || end === 'repelled'), reached, breach: bi ? { method: bi.method, where: bi.where, t: bi.t, attempts, crewHad: { truck: means.truck, satchels: means.satchels } } : attempts.length ? { method: 'climb' as const, where: target, t: -1, attempts, crewHad: { truck: means.truck, satchels: means.satchels } } : undefined, ending: parleyEnd, loot: lootList, fires: fireList, hostages, disposition };
     raid = {
@@ -1600,7 +1632,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       loss: {
         yard: [...yardLoot.map(l => `${l.n} ${l.what}`), ...fireList.filter(f => !isHome(fin.find(x => x.id === f.structure)?.kind ?? '')).map(f => `burned: ${f.structure}`)],
         house: [...houseLoot.map(l => `${l.n} ${l.what}`), ...fireList.filter(f => isHome(fin.find(x => x.id === f.structure)?.kind ?? '')).map(f => `burned: ${f.structure}`)],
-        people: { killed: deadHome, wounded: H.filter(h => h.out && !h.dead).length, taken: fateOf('taken') + H.filter(h => h.taken && !fates.some(f => f.unit === h.id)).length, held: fateOf('held'), spared: fateOf('spared') },
+        people: { killed: deadHome, wounded: H.filter(h => h.out && !h.dead && !guardIds.has(h.id)).length, taken: fateOf('taken') + H.filter(h => h.taken && !guardIds.has(h.id) && !fates.some(f => f.unit === h.id)).length, held: fateOf('held'), spared: fateOf('spared') },
       },
       text: '',
     } as RaidFacts;
