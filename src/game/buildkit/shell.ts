@@ -41,11 +41,28 @@ export const WIN = { w: 0.17, h: 0.2, sill: 0.17 } as const;
 // Parts: geometry collected by layer × material, merged at the end
 // ─────────────────────────────────────────────────────────────────────────
 
+/** Remove zero-area triangles (the pole fans of capsules and spheres): they draw nothing and only cost vertices. Non-indexed geometry only. */
+export function dropDegenerate(geo: THREE.BufferGeometry): void {
+  const pos = geo.getAttribute('position');
+  const keep: number[] = [];
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let t = 0; t + 2 < pos.count; t += 3) {
+    a.fromBufferAttribute(pos, t); b.fromBufferAttribute(pos, t + 1); c.fromBufferAttribute(pos, t + 2);
+    if (b.sub(a).cross(c.sub(a)).lengthSq() > 1e-20) keep.push(t);
+  }
+  if (keep.length * 3 === pos.count) return;
+  const out = new Float32Array(keep.length * 9);
+  keep.forEach((t, i) => { for (let k = 0; k < 3; k++) { out[i * 9 + k * 3] = pos.getX(t + k); out[i * 9 + k * 3 + 1] = pos.getY(t + k); out[i * 9 + k * 3 + 2] = pos.getZ(t + k); } });
+  geo.setAttribute('position', new THREE.BufferAttribute(out, 3));
+  geo.deleteAttribute('normal'); geo.deleteAttribute('uv');
+}
+
 /** World-scaled UVs from position by dominant normal axis (walls: u along the face, v up). */
 export function worldUV(g: THREE.BufferGeometry): THREE.BufferGeometry {
   const geo = g.index ? g.toNonIndexed() : g;
   // pictures, photos, posters: their own 0–1 UVs (one image per face)
   if (g.userData.keepUV) { if (!geo.getAttribute('normal')) geo.computeVertexNormals(); return geo; }
+  dropDegenerate(geo);
   geo.computeVertexNormals();
   const p = geo.getAttribute('position'), n = geo.getAttribute('normal');
   const uv = new Float32Array(p.count * 2);
@@ -65,6 +82,8 @@ export function worldUV(g: THREE.BufferGeometry): THREE.BufferGeometry {
 export interface BuildOpts {
   /** Stairs and ramps (terraceProps.ts): the height of the +z end over the -z end (u, signed): the ground they stand on climbs this much along their length. */
   rise?: number;
+  /** A house set up on piles (stilted_house): yard dressing that stands on the ground (woodpile, a potted plant) is left out instead of hanging in the air with the house. */
+  lifted?: boolean;
   plumbed?: boolean; wired?: boolean; septic?: boolean;
   /** A vehicle yard: length of its gravel spur from the gate to the drive's edge (buildkit/yardSite `yardSpur`). */
   spur?: number;
@@ -231,8 +250,9 @@ export function windowAt(parts: Parts, cx: number, cz: number, y: number, nx: nu
   parts.add('glow', glow.translate(cx + nx * o, y + h / 2, cz + nz * o));
   parts.add(trim, bx(w + 2 * t, t, 0.016, 0, y + h, c + out));
   parts.add(trim, bx(w + 2 * t, t, 0.016, 0, y - t, c + out));
-  parts.add(trim, bx(t, h, 0.016, -w / 2 - t / 2, y, c + out));
-  parts.add(trim, bx(t, h, 0.016, w / 2 + t / 2, y, c + out));
+  // (the casings stand 0.001 off the reveal, not flush with it: flush faces of two meshes z-fight)
+  parts.add(trim, bx(t, h, 0.016, -w / 2 - t / 2 - 0.001, y, c + out));
+  parts.add(trim, bx(t, h, 0.016, w / 2 + t / 2 + 0.001, y, c + out));
   if (w < 0.3) {
     parts.add(trim, bx(0.006, h, 0.01, 0, y, c + out));
     parts.add(trim, bx(w, 0.006, 0.01, 0, y + h / 2, c + out));
@@ -329,6 +349,9 @@ export function validateSpec(s: GabledSpec): string[] {
 /** Problems found while building shells (tests fail if any). */
 export const SPEC_PROBLEMS: string[] = [];
 
+/** Test hook (buildkit/geometryAudit.test.ts): while `on`, every gabled shell built records its spec and the offset it was built at. */
+export const AUDIT: { on: boolean; shells: Array<{ spec: GabledSpec; ox: number; oz: number }>; furniture: Array<{ kind: 'I' | 'L'; c: Collider; spec: GabledSpec; ox: number; oz: number }>; partitions: Array<{ ax: number; az: number; bx: number; bz: number; h: number; spec: GabledSpec }> } = { on: false, shells: [], furniture: [], partitions: [] };
+
 // ─────────────────────────────────────────────────────────────────────────
 // Construction stages → layer fractions
 // ─────────────────────────────────────────────────────────────────────────
@@ -408,6 +431,8 @@ export interface GabledSpec {
   foundation: 'fieldstone' | 'concrete' | 'piers' | 'none';
   /** No entry steps at the front door (the building builds its own stair). */
   noSteps?: boolean;
+  /** Steps at the back and side doors too (default: unless `noSteps`); a house that builds its own front stair but has a plain side door says so. */
+  sideSteps?: boolean;
   floorMat: KitMaterialId;
   /** Outer cladding, inner lining (null = single skin, studs show inside). */
   outer: KitMaterialId; inner: KitMaterialId | null;
@@ -461,6 +486,7 @@ export interface GabledResult {
  */
 export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, parts = new Parts(), extras?: (p: Parts) => void): GabledResult {
   for (const p of validateSpec(s)) if (!SPEC_PROBLEMS.includes(p)) SPEC_PROBLEMS.push(p);
+  if (AUDIT.on) AUDIT.shells.push({ spec: s, ox: parts.ox, oz: parts.oz });
   const { W, D } = s;
   const hw = W / 2, hd = D / 2;
   const y0 = s.floor, yE = s.floor + s.wallH;
@@ -506,12 +532,24 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
   else slab(s.floorMat, W - 0.01, D - 0.01, y0 - 0.002, 0.004);
   const frontDoor = (s.front ?? []).find(o => o.kind === 'door' || o.kind === 'arch');
   if (s.porch > 0) {
-    parts.add('deck', box(W + 0.02, 0.025, s.porch, 0, y0 - 0.025, (hd + pz1) / 2));
+    // (starts just past the foundation's edge: its top is at the same height, and the strip where they overlapped flickered)
+    parts.add('deck', box(W + 0.016, 0.025, s.porch - 0.02, 0, y0 - 0.025, (hd + 0.016 + pz1 - 0.004) / 2));
   }
   if (frontDoor && y0 > 0.04 && !s.noSteps) {
     const sz = hd + Math.max(0, s.porch);
     parts.add('deck', box(0.32, 0.03, 0.06, frontDoor.at, y0 * 0.5 - 0.03, sz + 0.03));
     parts.add('deck', box(0.32, 0.03, 0.06, frontDoor.at, -0.03, sz + 0.09));
+  }
+  // a back or side door on a raised floor opens onto steps too (not a drop); a building with its own steps says `noSteps`
+  if (y0 > 0.04 && (s.sideSteps ?? !s.noSteps)) {
+    for (const [side, list] of [['back', s.back], ['left', s.left], ['right', s.right]] as const) for (const o of list ?? []) {
+      if (o.kind !== 'door' && o.kind !== 'arch') continue;
+      const n = Math.max(2, Math.ceil(y0 / 0.055)), rise = y0 / n;
+      for (let i = 1; i < n; i++) {
+        const out = 0.03 + (i - 1) * 0.06, top = y0 - i * rise;
+        parts.add('deck', side === 'back' ? box(0.32, 0.03, 0.06, o.at, top - 0.03, -hd - out) : box(0.06, 0.03, 0.32, (side === 'left' ? -1 : 1) * (hw + out), top - 0.03, o.at));
+      }
+    }
   }
 
   // ── Wall framing: plates, studs ~40 cm apart, gable studs, porch posts ──
@@ -656,8 +694,8 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
     // casing in the wall's own frame (a = along the wall, outward = +z), then turned onto the wall
     const onWall = (g: THREE.BufferGeometry) => g.rotateY(rot).translate(fx, 0, fz);
     const ow = 0.004;
-    parts.add(s.trim, onWall(box(p.w + 0.04, 0.02, 0.018, 0, y0 + p.h, ow)));
-    for (const e of [-1, 1]) parts.add(s.trim, onWall(box(0.02, p.h, 0.018, e * (p.w / 2 + 0.01), y0, ow)));
+    parts.add(s.trim, onWall(box(p.w + 0.04, 0.02, 0.018, 0, y0 + p.h + 0.001, ow)));
+    for (const e of [-1, 1]) parts.add(s.trim, onWall(box(0.02, p.h, 0.018, e * (p.w / 2 + 0.011), y0, ow)));
     if (o.kind === 'door') {
       doorDetail(parts, s.trim, onWall, p.w, p.h, y0);
       // plank door standing open into the room, hinged on its left jamb
@@ -728,9 +766,10 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
       left: -hw + T, right: hw - T, front: hd - T, back: -hd + T,
       rnd: parts.rnd,
       C: (p, fn, prob = 0.75) => { if (parts.rnd() < prob) piece(parts.sink, (p.y ?? y0) > y0 + CUT_H ? 'decor' : 'interior', { ...p, y: p.y ?? y0 + 0.004 }, fn, false, clear); },
-      I: (p, fn, solid = true) => { const c = piece(parts.sink, 'interior', { ...p, y: p.y ?? y0 + 0.004 }, fn, solid, clear); if (c) parts.collide(c); },
-      L: (p, fn, solid = false) => { const c = piece(parts.sink, 'loft', { ...p, y: p.y ?? yE }, fn, solid); if (c) parts.collide(c); },
+      I: (p, fn, solid = true) => { const c = piece(parts.sink, 'interior', { ...p, y: p.y ?? y0 + 0.004 }, fn, solid, clear); if (c) { parts.collide(c); if (AUDIT.on) AUDIT.furniture.push({ kind: 'I', c, spec: s, ox: parts.ox, oz: parts.oz }); } },
+      L: (p, fn, solid = false) => { const c = piece(parts.sink, 'loft', { ...p, y: p.y ?? yE }, fn, solid); if (c) { parts.collide(c); if (AUDIT.on) AUDIT.furniture.push({ kind: 'L', c, spec: s, ox: parts.ox, oz: parts.oz }); } },
       partition: (ax, az, bx, bz, openings = [], mat = s.inner ?? 'pine_panel', h = s.wallH) => {
+        if (AUDIT.on) AUDIT.partitions.push({ ax, az, bx, bz, h, spec: s });
         parts.collide(...wallRun(parts.sink, 'walls', mat, { ax, az, bx, bz, y0, h, t: 0.02, openings }));
         wallRun(parts.sink, 'cutwalls', mat, { ax, az, bx, bz, y0, h, t: 0.02, openings, cut: CUT_H });
       },

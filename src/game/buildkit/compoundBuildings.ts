@@ -24,14 +24,16 @@ function cottage(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
     foundation: 'concrete', floorMat: 'floorboards', outer: 'timber_lap', inner: 'whitewash', roof: 'metal_roof', trim: 'trim',
     front: [{ kind: 'door', at: 0.12 }, { kind: 'window', at: -0.25 }],
     back: [{ kind: 'window', at: -0.2 }, { kind: 'window', at: 0.22 }],
-    left: small ? [{ kind: 'window', at: 0 }] : [{ kind: 'window', at: -0.35 }, { kind: 'window', at: 0.3 }],
-    right: small ? [{ kind: 'window', at: 0 }] : [{ kind: 'window', at: -0.35 }, { kind: 'door', at: 0.38 }],
+    left: small ? [{ kind: 'window', at: 0.18 }] : [{ kind: 'window', at: -0.35 }, { kind: 'window', at: 0.3 }],   // (the guest house's was at 0, where the bedroom partition ends: seen through the glass)
+    right: small ? [{ kind: 'window', at: 0.18 }] : [{ kind: 'window', at: -0.35 }, { kind: 'door', at: 0.38 }],
     chimney: { kind: 'pipe', x: STOVE.x + STOVE_PIPE.x, z: STOVE.z + STOVE_PIPE.z },
     corners: 'boards', curtains: 'curtain',
   }, (c: FurnishCtx) => {
     const { I, left, right, back, front } = c;
     const o = c.parts.opts;
-    const wallZ = -0.08;
+    // the guest house is 3 m shallower: the front room's furniture is drawn closer in so no counter or chair stands in the front wall
+    const fz = (z: number) => small ? z * 0.55 : z;
+    const wallZ = small ? -0.02 : -0.08;
     // bedroom (back): a double bed for the grandparents and a single for a grandchild
     c.partition(left, wallZ, right, wallZ, [{ at: 0.25, w: 0.14, sill: 0, h: 0.36 }], 'whitewash');
     I({ x: -0.2, z: back + 0.18 }, a => Furniture.bed(a, true, 'quilt_red'));
@@ -39,7 +41,7 @@ function cottage(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
     I({ x: right - 0.05, z: wallZ - 0.12, rot: -Math.PI / 2 }, a => Furniture.dresser(a, 1.0));
     I({ x: left + 0.05, z: back + 0.05 }, a => Furniture.nightstand(a));
     // front room: counter and sink along the left wall, the wood cookstove on its hearth, a table with chairs
-    I({ x: left + 0.05, z: 0.3, rot: Math.PI / 2 }, a => Furniture.counter(a, 2.4, 0.4, !!o.plumbed));
+    I({ x: left + 0.05, z: fz(0.3), rot: Math.PI / 2 }, a => Furniture.counter(a, small ? 1.5 : 2.4, 0.4, !!o.plumbed));
     I({ x: STOVE.x, z: STOVE.z }, a => {
       a('fieldstone', box(1.35 * M, HEARTH, 1.05 * M, 0, 0, 0.12 * M));
       Furniture.cookstove((m, g) => a(m, g.translate(0, HEARTH, 0)));
@@ -51,33 +53,35 @@ function cottage(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
     c.parts.add('iron', new THREE.CylinderGeometry(0.1 * M, 0.1 * M, 0.03 * M, 10).translate(pipeX, pipeY - 0.25 * M, pipeZ), 'decor');   // damper collar
     I({ x: STOVE.x + 0.165, z: STOVE.z - 0.005 }, a => Furniture.woodbox(a));
     if (o.wired) I({ x: left + 0.065, z: front - 0.1, rot: Math.PI / 2 }, a => Furniture.fridge(a));
-    I({ x: 0.22, z: 0.35 }, a => { Furniture.table(a, 1.0, 0.8); Furniture.oilLamp(a, 0.25, 0.76, -0.15); });
-    dressEvenings(c, { x: 0.22, z: 0.35 });
-    I({ x: 0.22, z: 0.35 - 0.1 }, a => Furniture.chair(a));
-    I({ x: 0.22, z: 0.35 + 0.1, rot: Math.PI }, a => Furniture.chair(a));
+    I({ x: 0.22, z: fz(0.35) }, a => { Furniture.table(a, 1.0, 0.8); Furniture.oilLamp(a, 0.25, 0.76, -0.15); });
+    dressEvenings(c, { x: 0.22, z: fz(0.35) });
+    I({ x: 0.22, z: fz(0.35) - 0.1 }, a => Furniture.chair(a));
+    I({ x: 0.22, z: fz(0.35) + 0.1, rot: Math.PI }, a => Furniture.chair(a));
     I({ x: 0.3, z: 0.05, rot: Math.PI }, a => Furniture.armchair(a, 'quilt_blue'));
-    I({ x: 0.0, z: 0.3 }, a => Furniture.rug(a, 1.6, 1.2), false);
+    I({ x: 0.0, z: fz(0.3) }, a => Furniture.rug(a, 1.6, 1.2), false);
     I({ x: -0.18, z: back + 0.36 }, a => Furniture.rug(a, 1.4, 0.7), false);
     // jars of the summer's canning on shelves on the partition, coats and hats by the front door
     I({ x: -0.38, z: wallZ + 0.01 + 0.125 * M, rot: 0 }, a => Furniture.wallShelf(a, 0.95, 1.4, 2, 'jars'), false);
     I({ x: 0.33, z: front - 0.008, rot: Math.PI }, a => Furniture.coatPegs(a, 0.9), false);
-    if (o.wired) for (const [x, z] of [[0.22, 0.35], [-0.1, -0.4]]) I({ x, z, y: c.yE - 0.03 }, a => Furniture.pendant(a, 0.5), false);
+    if (o.wired) for (const [x, z] of [[0.22, fz(0.35)], [-0.1, -0.4]]) I({ x, z, y: c.yE - 0.03 }, a => Furniture.pendant(a, 0.5), false);
     // lived in: rockers on the porch, flowers, a cat, the woodpile, boots
     c.C({ x: -0.3, z: c.hd + 0.16, y: c.y0, rot: 0.2 }, a => Clutter.rocker(a), 0.95);
     c.C({ x: 0.36, z: c.hd + 0.16, y: c.y0, rot: -0.3 }, a => Clutter.rocker(a), 0.7);
-    c.C({ x: 0.22, z: 0.35, y: c.y0 + 0.004 + 0.76 * M }, a => Clutter.vaseFlowers(a), 0.8);
+    c.C({ x: 0.22, z: fz(0.35), y: c.y0 + 0.004 + 0.76 * M }, a => Clutter.vaseFlowers(a), 0.8);
     c.C({ x: 0.3, z: 0.05, y: c.y0 + 0.004 + 0.42 * M, rot: Math.PI }, a => Clutter.cat(a), 0.5);
     c.C({ x: 0.08, z: front - 0.06, rot: 0.3 }, a => Clutter.slippers(a), 0.7);
     c.C({ x: left + 0.002, z: 0.0, y: c.y0 + 1.4 * M, rot: Math.PI / 2 }, a => Clutter.picture(a, 0.5, 0.4, 'photo_family'), 0.9);
-    c.C({ x: -c.hw - 0.12, z: -0.3, y: 0.004, rot: Math.PI / 2 }, a => Clutter.woodpile(a, 3.0, 1.1), 0.9);
-    c.C({ x: c.hw + 0.1, z: -0.4, y: 0.004 }, a => Clutter.plant(a), 0.6);
+    if (!o.lifted) {
+      c.C({ x: -c.hw - 0.12, z: -0.3, y: 0.004, rot: Math.PI / 2 }, a => Clutter.woodpile(a, 3.0, 1.1), 0.9);
+      c.C({ x: c.hw + 0.1, z: -0.4, y: 0.004 }, a => Clutter.plant(a), 0.6);
+    }
     // kitchen: dishes by the sink, a pot on the stove, bread on the table, a mug
     const counterY = c.y0 + 0.004 + 0.9 * M, tableY = c.y0 + 0.004 + 0.76 * M;
-    c.C({ x: left + 0.05, z: 0.4, y: counterY, rot: Math.PI / 2 }, a => Clutter.dishes(a), 0.9);
-    c.C({ x: left + 0.05, z: 0.18, y: counterY, rot: Math.PI / 2 }, a => Clutter.cuttingBoard(a), 0.7);
+    c.C({ x: left + 0.05, z: fz(0.4), y: counterY, rot: Math.PI / 2 }, a => Clutter.dishes(a), 0.9);
+    c.C({ x: left + 0.05, z: fz(0.18), y: counterY, rot: Math.PI / 2 }, a => Clutter.cuttingBoard(a), 0.7);
     c.C({ x: STOVE.x + 0.03, z: STOVE.z + 0.01, y: c.y0 + 0.004 + HEARTH + 0.87 * M }, a => Clutter.potOnStove(a), 0.85);
-    c.C({ x: 0.2, z: 0.36, y: tableY }, a => Clutter.bread(a), 0.6);
-    c.C({ x: 0.25, z: 0.31, y: tableY }, a => Clutter.mug(a), 0.8);
+    c.C({ x: 0.2, z: fz(0.36), y: tableY }, a => Clutter.bread(a), 0.6);
+    c.C({ x: 0.25, z: fz(0.31), y: tableY }, a => Clutter.mug(a), 0.8);
     c.C({ x: -0.2, z: back + 0.36 }, a => Clutter.slippers(a), 0.6);
   }, new Parts(seed, opts));
   return group;

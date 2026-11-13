@@ -290,6 +290,7 @@ export const Clutter = {
     add('paint_red', box(0.03 * M, 0.03 * M, 0.7 * M, 0, 0.42 * M, 0));
     add('paint_red', box(0.03 * M, 0.25 * M, 0.03 * M, 0, 0.22 * M, -0.1 * M));
     add('iron', box(0.4 * M, 0.03 * M, 0.03 * M, 0, 0.62 * M, 0.3 * M));
+    add('iron', box(0.02 * M, 0.4 * M, 0.02 * M, 0, 0.22 * M, 0.31 * M));   // the fork, up from the front wheel to the handlebar (which hung in the air)
     add('iron', box(0.12 * M, 0.04 * M, 0.2 * M, 0, 0.5 * M, -0.12 * M));
   },
   dogHouse(add: Add): void {
