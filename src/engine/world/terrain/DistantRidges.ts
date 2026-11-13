@@ -32,14 +32,14 @@ export function ridgePlan(q: Quality): { rings: number; seg: number } {
 }
 
 /** Haze of ring k of n: the nearest is already veiled, the farthest almost sky. */
-export const ringHaze = (k: number, n: number): number => 0.38 + 0.5 * (n <= 1 ? 0 : k / (n - 1));
+export const ringHaze = (k: number, n: number): number => 0.2 + 0.55 * (n <= 1 ? 0 : k / (n - 1));
 
 /** Extra relief the regions would carry beyond the square (units): large for the high ranges, tiny for a plains horizon. */
 export function extraRelief(kind: RegionKind): number {
   switch (kind) {
-    case 'mountain': return 95;
-    case 'sound': return 70;
-    case 'coast': return 55;
+    case 'mountain': return 150;
+    case 'sound': return 120;
+    case 'coast': return 70;
     case 'desert': return 42;
     case 'appalachia': case 'north_woods': case 'ozarks': return 30;
     case 'hill_country': case 'drumlin': return 22;
@@ -87,7 +87,7 @@ void main() {
   body *= lit;
   float dist = length(vWPos - cameraPosition);
   float foot = 1.0 - smoothstep(0.0, 0.5, vRidge.x);
-  float haze = clamp(vRidge.y + foot * 0.7 + smoothstep(1500.0, 2560.0, dist), 0.0, 1.0);
+  float haze = clamp(vRidge.y + foot * 0.6 + smoothstep(2250.0, 2900.0, dist), 0.0, 1.0);
   gl_FragColor = vec4(mix(body, sky, haze), 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -133,7 +133,7 @@ export class DistantRidges {
     geo.setAttribute('aRidge', new THREE.BufferAttribute(att, 3));
     geo.setIndex(idx);
     geo.computeBoundingSphere();
-    const body = new THREE.Color(o.look.rock).multiplyScalar(0.55).lerp(new THREE.Color(o.look.forest), 0.45 * o.look.evergreen + 0.2);
+    const body = new THREE.Color(o.look.rock).multiplyScalar(0.42).lerp(new THREE.Color(o.look.forest), 0.45 * o.look.evergreen + 0.2);
     const hi = new THREE.Color(o.look.rock).multiplyScalar(0.85);
     this._u = {
       uBody: { value: body }, uBodyHi: { value: hi }, uSnow: { value: 0 }, uSnowLine: { value: 1e9 },

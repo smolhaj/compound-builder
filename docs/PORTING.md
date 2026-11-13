@@ -31,3 +31,5 @@ placement) live in `src/game/`.
 Ported since: a figure kit for instanced people (`engine/world/people/figureKit.ts`, `crowdWear.ts`), road ribbons (`engine/world/roads/`), tilt-shift post (`post/tiltShift.ts`), valley fog (`fog/`), and building far-LOD (`game/buildkit/buildingLod.ts`). Photo capture is a game feature (`sim/photos.ts`).
 
 Not ported: UE's living clock / window spill (`life/`), regional rail, `mergeCompat`, house rendering from `houseStyles` specs for a town, `streetTextures`. Compound Builder adds its own night windows (`game/atmosphere/nightLife.ts`).
+
+Distance pass (own modules, not UE ports): `terrain/terrainLod.ts` (adaptive terrain tiling), `terrain/DistantRidges.ts` (ridge rings beyond the square), aerial-perspective tint in `fog/heightFog.ts`.

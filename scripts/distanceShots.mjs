@@ -34,7 +34,7 @@ const draw = async name => {
   await page.screenshot({ path: `${outDir}/${name}.png` }); console.error('shot', name, JSON.stringify(stats[name]));
 };
 // the bearing with the highest ground 600 units out: look across the valley at that range
-const bearing = await page.evaluate(() => { const w = window.__cb.world, c = w.camp; let best = 0, bh = -1e9; for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, h = w.groundAt(c.x + Math.cos(a) * 600, c.z + Math.sin(a) * 600); if (h > bh) { bh = h; best = a; } } return best; });
+const bearing = await page.evaluate(() => { const w = window.__cb.world, c = w.camp; let best = 0, bh = -1e9; for (let k = 0; k < 16; k++) { const a = k / 16 * Math.PI * 2, h = w.parcel.sample(c.x + Math.cos(a) * 600, c.z + Math.sin(a) * 600).h; if (h > bh) { bh = h; best = a; } } return best; });
 for (const h of times) {
   await page.evaluate(h => { const cb = window.__cb; cb.store.getState().setTimeOfDay(h); }, h);
   for (const v of views) {
