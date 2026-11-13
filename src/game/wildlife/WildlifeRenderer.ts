@@ -1,8 +1,9 @@
 /**
- * WildlifeRenderer — the native wildlife of the land (sim/wildlife.ts) as small procedural animals:
- * deer, elk, moose, pronghorn, javelina, turkeys, rabbits, squirrels, grouse, ducks, bears, cougars,
- * wolves and coyotes. One InstancedMesh per body part (body, neck, head, tail, legs, horns: 6 draw
- * calls for every animal on the land), per-instance colors, no shadows and no SSAO (the perf rules).
+ * WildlifeRenderer — the native wildlife of the land (sim/wildlife.ts) as modelled procedural animals
+ * (docs/DECISIONS.md, "Realistic wildlife and dogs"): deer (antlers grow with the season), elk, moose, pronghorn, javelina, turkeys, rabbits,
+ * squirrels, grouse, ducks and geese, bears, cougars, wolves and coyotes. Each species is one lofted, skinned model (game/wildlife/models,
+ * game/livestock/animalKit) drawn as one InstancedMesh per (model, level of detail) in use; the walk, the head up, the graze, the peck and the
+ * flee are all posed in the vertex shader from per-instance numbers, the coats painted in the fragment shader. No shadow-map casters, no SSAO.
  * The animals follow the sim's count and the hour (deer out at dawn and dusk, predators at night);
  * where each stands and what it does is wildlifeAI (graze, wander, lift the head, bolt from people
  * and dogs). Sizes are SCALE v2: a person is 0.28, a deer 0.17 at the shoulder.
@@ -11,40 +12,19 @@ import * as THREE from 'three';
 import { SPECIES, count, wildlifeView, type SpeciesId } from '../../sim/wildlife';
 import { ownedRects } from '../../sim/enclosure';
 import type { Rect } from '../../sim/land';
-import { dayIndex, hourOf, type GameState } from '../../sim/state';
+import { calendarOf, dayIndex, hourOf, type GameState } from '../../sim/state';
 import { stepBeast, type Beast, type StepCtx } from './wildlifeAI';
 import { CROSS_PER_S, deckFrom, planCross, type Bridge } from './wildlifeCrossing';
 import { crossingDeck, onRoad, planRoadCrossings, ROAD_CROSSERS, stillDue, type RoadCross } from './roadCrossing';
 import { animalRoute } from '../paths/groundMovers';
 import { crossesHard } from '../paths/walkRoute';
+import { AnimalBatches } from '../livestock/animalBatches';
+import { type Quality } from '../livestock/LivestockRenderer';
+import { wildModelOf } from './wildModels';
+import { antlerGrowth } from './models/hoofed';
+import { drawPlan } from './wildlifeLook';
 
 const CAP = 120;
-const LEG_PER = 4, HORN_PER = 2;
-
-interface Pal { body: number; head: number; leg: number; horn: number }
-const PAL: Record<SpeciesId, Pal> = {
-  deer: { body: 0xcfa874, head: 0xbf9966, leg: 0xb08a5a, horn: 0xefe4c8 },
-  elk: { body: 0xc89c68, head: 0x6a4a32, leg: 0x8a6444, horn: 0xefe4c8 },
-  moose: { body: 0x6b5442, head: 0x5a4434, leg: 0x9a8a78, horn: 0xd8caa6 },
-  antelope: { body: 0xdba462, head: 0xe0b078, leg: 0xf2e6cc, horn: 0x2a2a28 },
-  javelina: { body: 0x77716a, head: 0x6a645e, leg: 0x55504b, horn: 0x55504b },
-  turkey: { body: 0x7a6248, head: 0xd45a5a, leg: 0xa88060, horn: 0x7a6248 },
-  rabbit: { body: 0xb9a48a, head: 0xb9a48a, leg: 0xa89478, horn: 0xb9a48a },
-  squirrel: { body: 0xa4a29c, head: 0xa4a29c, leg: 0x88857e, horn: 0xa4a29c },
-  grouse: { body: 0xa4845a, head: 0x94744a, leg: 0x94744a, horn: 0xa4845a },
-  waterfowl: { body: 0x9a8668, head: 0x2f8a5f, leg: 0xe09a38, horn: 0x9a8668 },
-  bear: { body: 0x3e2f25, head: 0x7a5a3e, leg: 0x33261e, horn: 0x3e2f25 },
-  cougar: { body: 0xd6a766, head: 0xcc9c5c, leg: 0xba8c50, horn: 0xd6a766 },
-  wolf: { body: 0xb4b2ac, head: 0xa4a29c, leg: 0x8c8a84, horn: 0xb4b2ac },
-  coyote: { body: 0xc8803f, head: 0xbd7638, leg: 0xa8672f, horn: 0xc8803f },
-};
-
-const tmpM = new THREE.Matrix4(), tmpB = new THREE.Matrix4(), tmpL = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpE = new THREE.Euler(),
-  tmpV = new THREE.Vector3(), tmpS = new THREE.Vector3(), tmpC = new THREE.Color();
-
-const COLOR_CACHE = new Map<number, THREE.Color>();
-
-interface Part { mesh: THREE.InstancedMesh; per: number; n: number }
 
 export interface WildlifeCtx {
   ground: (x: number, z: number) => number;
@@ -61,8 +41,10 @@ export interface WildlifeCtx {
   bridgesOpen?: boolean;
   /** The county road past the gate: animals cross it at dawn and dusk (game/wildlife/roadCrossing). `y` is the surface; `halfW` half the carriageway; `gateZ` where along it. */
   road?: { x(z: number): number; y(x: number, z: number): number; halfW: number; gateZ: number };
-  /** Camera position: animals farther than DRAW_RANGE are not drawn (a deer is 0.17 tall: a speck past that). */
-  cam?: { x: number; z: number };
+  /** Camera position: animals farther than DRAW_RANGE are not drawn (a deer is 0.17 tall: a speck past that); `y` picks the level of detail. */
+  cam?: { x: number; z: number; y?: number };
+  /** Day of the year (1..365) as the seasons draw it: the winter coat, the antlers. Absent: the game clock's. */
+  doy?: number;
 }
 
 /** World units beyond which an animal is not put in the instance buffers. */
@@ -74,7 +56,9 @@ function hashRnd(seed: number): () => number {
 }
 
 export class WildlifeRenderer {
-  private readonly _parts: Record<'body' | 'neck' | 'head' | 'tail' | 'leg' | 'horn', Part>;
+  private readonly _batches: AnimalBatches;
+  private _region = 'plains';
+  private _doy = 180;
   private readonly _beasts = new Map<string, Beast>();
   private _rects: Rect[] = [];
   private _rnd = hashRnd(0x51ed);
@@ -88,23 +72,12 @@ export class WildlifeRenderer {
   private _plan: { key: string; list: RoadCross[]; done: Set<string> } = { key: '', list: [], done: new Set() };
   private _roadHalf = 0.5;
 
-  constructor(scene: THREE.Scene) {
-    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0 });
-    const mk = (name: string, g: THREE.BufferGeometry, per: number): Part => {
-      const mesh = new THREE.InstancedMesh(g, mat, CAP * per);
-      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAP * per * 3), 3);
-      mesh.count = 0; mesh.castShadow = false; mesh.receiveShadow = false; mesh.frustumCulled = false;
-      mesh.name = `wild_${name}`; mesh.userData = { type: 'wildlife', noSSAO: true };
-      scene.add(mesh);
-      return { mesh, per, n: 0 };
-    };
-    const ball = new THREE.SphereGeometry(1, 10, 7);
-    // (a leg hangs from its hip; a horn rises from its base)
-    const leg = new THREE.CylinderGeometry(1, 0.7, 1, 6).translate(0, -0.5, 0);
-    const horn = new THREE.ConeGeometry(1, 1, 5).translate(0, 0.5, 0);
-    this._parts = { body: mk('body', ball, 1), neck: mk('neck', ball, 1), head: mk('head', ball, 1), tail: mk('tail', ball, 1), leg: mk('leg', leg, LEG_PER), horn: mk('horn', horn, HORN_PER) };
-  }
+  constructor(scene: THREE.Scene) { this._batches = new AnimalBatches(scene, CAP, 'wildlife', wildModelOf); }
+
+  /** The draw detail tier (the meshes are rebuilt lazily at the next draw when it changes). */
+  setQuality(q: Quality): void { this._batches.setQuality(q); }
+  /** Draw calls of the animals drawn now (QA / tests). */
+  drawCalls(): number { return this._batches.drawCalls(); }
 
   /** The animals that exist now (QA / camera): id, species, position, mood. */
   animals(): Array<{ id: string; sp: SpeciesId; x: number; z: number; mood: string; vis: number }> {
@@ -172,6 +145,8 @@ export class WildlifeRenderer {
 
   update(dt: number, game: GameState, clock: number, c: WildlifeCtx, speedK: number): void {
     this._time += dt;
+    this._region = game.site.region;
+    this._doy = c.doy ?? calendarOf(game.clock).doy;
     if (game.seed !== this._seed) { this._seed = game.seed; this._beasts.clear(); this._viewKey = ''; }
     this._rects = ownedRects(game);
     const hour = hourOf(clock);
@@ -285,97 +260,28 @@ export class WildlifeRenderer {
     if (nb) { b.x = b.hx = b.tx = nb.x; b.z = b.hz = b.tz = nb.z; b.vis = 0; }
   }
 
-  private _put(part: Part, m: THREE.Matrix4, color: number, tone: number): void {
-    const i = part.n++;
-    part.mesh.setMatrixAt(i, m);
-    let base = COLOR_CACHE.get(color);
-    if (!base) COLOR_CACHE.set(color, base = new THREE.Color().setHex(color));
-    tmpC.copy(base).multiplyScalar(0.88 + tone * 0.24);
-    part.mesh.setColorAt(i, tmpC);
-  }
-  /** local → matrix: position, euler (x pitch, y yaw, z roll) and a non-uniform scale, on the animal's base. */
-  private _loc(x: number, y: number, z: number, rx: number, ry: number, rz: number, sx: number, sy: number, sz: number): THREE.Matrix4 {
-    tmpQ.setFromEuler(tmpE.set(rx, ry, rz));
-    tmpL.compose(tmpV.set(x, y, z), tmpQ, tmpS.set(sx, sy, sz));
-    return tmpM.multiplyMatrices(tmpB, tmpL);
-  }
-
   private _draw(c: WildlifeCtx): void {
-    for (const p of Object.values(this._parts)) p.n = 0;
-    for (const b of this._beasts.values()) {
+    const B = this._batches, tier = B.tier(), cam = c.cam;
+    B.begin();
+    // nearest first: at the Low tier only the first few animals are drawn
+    const order = [...this._beasts.values()];
+    if (cam) order.sort((a, b) => Math.abs(a.x - cam.x) + Math.abs(a.z - cam.z) - Math.abs(b.x - cam.x) - Math.abs(b.z - cam.z));
+    for (const b of order) {
       if (b.vis < 0.02) continue;
-      if (c.cam && Math.abs(b.x - c.cam.x) + Math.abs(b.z - c.cam.z) > DRAW_RANGE * 1.42) continue;
-      const sd = SPECIES[b.sp], pal = PAL[b.sp], size = b.vis * (b.sp === 'moose' || b.sp === 'elk' ? 0.94 + b.k * 0.1 : 0.94 + b.k * 0.12);
+      if (cam && Math.abs(b.x - cam.x) + Math.abs(b.z - cam.z) > DRAW_RANGE * 1.42) continue;
       let gy = b.y ?? c.ground(b.x, b.z);
-      if (b.sp === 'waterfowl' && c.creek && Math.abs(b.z - c.creek.zAt(b.x)) < c.creek.halfWidth) gy = Math.max(gy, c.creek.waterY(b.x)) - 0.004;
-      tmpB.compose(tmpV.set(b.x, gy, b.z), tmpQ.setFromEuler(tmpE.set(0, b.rot, 0)), tmpS.set(size, size, size));
-      const H = sd.h, L = sd.len, swing = Math.sin(b.phase) * Math.min(0.7, b.v * 0.7 + 0.05) * (b.v > 0.01 ? 1 : 0);
-      const bird = sd.kind === 'bird';
-      const graze = b.mood === 'graze' ? 1 - b.head : 0;
-      const bounce = b.v > 0.4 && (b.sp === 'rabbit' || b.sp === 'squirrel') ? Math.abs(Math.sin(b.phase * 0.7)) * H * 0.6 : b.v > 0.4 ? Math.abs(Math.sin(b.phase)) * H * 0.04 : 0;
-      const tone = b.k;
-      if (!bird) {
-        const legLen = H * (b.sp === 'rabbit' || b.sp === 'squirrel' ? 0.35 : b.sp === 'javelina' || b.sp === 'bear' ? 0.38 : 0.44);
-        const by = legLen + H * 0.24 + bounce, bw = H * (b.sp === 'bear' ? 0.3 : b.sp === 'javelina' ? 0.27 : 0.24), bh = H * (b.sp === 'bear' ? 0.36 : 0.32), bl = L * 0.4;
-        this._put(this._parts.body, this._loc(0, by, 0, 0, 0, 0, bw, bh, bl), pal.body, tone);
-        // legs: front pair and hind pair swing in opposition
-        for (let i = 0; i < 4; i++) {
-          const fz = i < 2 ? bl * 0.62 : -bl * 0.62, fx = (i % 2 ? 1 : -1) * bw * 0.6, sw = swing * ((i < 2) === (i % 2 === 0) ? 1 : -1);
-          const lr = H * (b.sp === 'bear' ? 0.1 : b.sp === 'rabbit' || b.sp === 'squirrel' ? 0.09 : 0.07);
-          this._put(this._parts.leg, this._loc(fx, by - bh * 0.2, fz, sw, 0, 0, lr, legLen + bh * 0.2, lr), pal.leg, tone);
-        }
-        // neck and head: down to graze, up to look
-        const neckLen = H * (b.sp === 'moose' ? 0.5 : b.sp === 'bear' ? 0.22 : b.sp === 'rabbit' || b.sp === 'squirrel' ? 0.1 : 0.42);
-        const pitch = (b.sp === 'rabbit' || b.sp === 'squirrel') ? 0.15 + b.head * 0.5 : (-0.75 + b.head * 1.45 + (b.mood === 'walk' ? -0.15 : 0)) * (b.sp === 'bear' || b.sp === 'cougar' || b.sp === 'wolf' || b.sp === 'coyote' ? 0.55 : 1) + (graze > 0.5 ? -0.1 : 0);
-        const sy = by + bh * 0.35, sz = bl * 0.8;
-        const dy = Math.sin(pitch), dz = Math.cos(pitch);
-        const nr = H * (b.sp === 'bear' ? 0.17 : 0.085);
-        // the neck is a stretched ball along (0, dy, dz): rotate about x by -(pitch)
-        this._put(this._parts.neck, this._loc(0, sy + dy * neckLen * 0.5, sz + dz * neckLen * 0.5, -pitch, 0, 0, nr, nr, neckLen * 0.62), pal.body, tone);
-        const hr = H * (b.sp === 'bear' ? 0.15 : b.sp === 'moose' ? 0.11 : 0.075), hl = hr * (b.sp === 'rabbit' ? 1.5 : 1.9);
-        const hy = sy + dy * neckLen, hz = sz + dz * neckLen;
-        const headPitch = -pitch * 0.35 + 0.35 * (1 - b.head);
-        this._put(this._parts.head, this._loc(0, hy, hz + hl * 0.35, -headPitch - (graze > 0.5 ? 0.35 : 0), 0, 0, hr, hr * 0.9, hl), pal.head, tone);
-        // tail
-        const tl = b.sp === 'rabbit' ? 0.025 : H * 0.06;
-        this._put(this._parts.tail, this._loc(0, by + bh * 0.4, -bl * 0.95, 0.5, 0, 0, tl, tl, b.sp === 'coyote' || b.sp === 'wolf' ? H * 0.28 : tl * 1.5), b.sp === 'rabbit' ? 0xe8e0d4 : b.sp === 'bear' ? pal.body : b.sp === 'deer' ? 0xeee8dd : pal.body, tone);
-        // antlers on the bucks and bulls; the rabbit's ears
-        const antler = b.male && (b.sp === 'deer' || b.sp === 'elk' || b.sp === 'moose');
-        if (antler) {
-          const al = H * (b.sp === 'elk' ? 0.62 : b.sp === 'moose' ? 0.5 : 0.4);
-          for (let i = 0; i < 2; i++) {
-            const side = i ? 1 : -1;
-            this._put(this._parts.horn, this._loc(side * hr * 0.55, hy + hr * 0.5, hz + hl * 0.1, -0.5 + (b.sp === 'moose' ? 0.9 : 0), 0, -side * 0.55, hr * 0.28, al, hr * 0.28), pal.horn, tone);
-          }
-        } else if (b.sp === 'rabbit') {
-          for (let i = 0; i < 2; i++) this._put(this._parts.horn, this._loc((i ? 1 : -1) * 0.006, hy + 0.01, hz, -0.1, 0, (i ? -1 : 1) * 0.15, 0.007, 0.05, 0.004), pal.body, tone);
-        } else if (b.sp === 'deer' || b.sp === 'elk' || b.sp === 'antelope' || b.sp === 'javelina' || b.sp === 'cougar' || b.sp === 'wolf' || b.sp === 'coyote' || b.sp === 'bear') {
-          // ears
-          for (let i = 0; i < 2; i++) this._put(this._parts.horn, this._loc((i ? 1 : -1) * hr * 0.75, hy + hr * 0.55, hz - hl * 0.05, -0.2, 0, (i ? -1 : 1) * 0.7, hr * 0.38, hr * 1.0, hr * 0.2), pal.head, tone);
-        }
-      } else {
-        // birds: a leaning body, a neck and small head on top, two legs, a tail
-        const legLen = H * 0.42, by = legLen + H * 0.2 + (b.sp === 'waterfowl' ? -legLen * 0.8 : 0), lean = -0.25;
-        this._put(this._parts.body, this._loc(0, by, 0, lean, 0, 0, H * 0.24, H * 0.24, L * 0.4), pal.body, tone);
-        if (b.sp !== 'waterfowl') for (let i = 0; i < 2; i++) this._put(this._parts.leg, this._loc((i ? 1 : -1) * H * 0.07, by - H * 0.1, 0, swing * (i ? 1 : -1), 0, 0, H * 0.018, legLen + H * 0.1, H * 0.018), pal.leg, tone);
-        else for (let i = 0; i < 2; i++) this._put(this._parts.leg, this._loc((i ? 1 : -1) * H * 0.07, by - H * 0.1, 0, 0, 0, 0, 0.001, 0.001, 0.001), pal.leg, tone);
-        const nl = H * (b.sp === 'turkey' ? 0.55 : 0.4) * (b.mood === 'graze' ? 0.55 : 1);
-        const np = b.mood === 'graze' ? 0.55 : 1.15;
-        this._put(this._parts.neck, this._loc(0, by + H * 0.1 + Math.sin(np) * nl * 0.5, L * 0.3 + Math.cos(np) * nl * 0.5, -np, 0, 0, H * 0.05, H * 0.05, nl * 0.55), b.sp === 'turkey' ? pal.head : pal.head, tone);
-        this._put(this._parts.head, this._loc(0, by + H * 0.1 + Math.sin(np) * nl, L * 0.3 + Math.cos(np) * nl + H * 0.04, 0, 0, 0, H * 0.055, H * 0.05, H * 0.08), pal.head, tone);
-        const fan = b.sp === 'turkey' ? (b.male ? H * 0.5 : H * 0.3) : H * 0.18;
-        this._put(this._parts.tail, this._loc(0, by + H * 0.1, -L * 0.42, 0.5, 0, 0, fan * (b.sp === 'turkey' && b.male ? 0.9 : 0.4), fan * 0.7, H * 0.03), b.sp === 'turkey' ? 0x6a4a2c : pal.body, tone);
-      }
+      const wet = b.sp === 'waterfowl' && c.creek && Math.abs(b.z - c.creek.zAt(b.x)) < c.creek.halfWidth;
+      if (wet) gy = Math.max(gy, c.creek!.waterY(b.x)) - 0.004;
+      const d = cam ? Math.hypot(b.x - cam.x, gy - (cam.y ?? gy + 8), b.z - cam.z) : 0, li = d < tier.at[0] ? 0 : d < tier.at[1] ? 1 : 2;
+      const p = drawPlan(b, this._region, this._doy, antlerGrowth(this._doy), wet ? 1 : 0);
+      B.put({
+        id: p.model, breed: p.breed, x: b.x, y: gy - (wet ? 0.012 : 0), z: b.z, rot: b.rot, phase: b.phase, gait: p.gait, graze: p.graze, seed: b.k, tone: b.k,
+        size: b.vis * p.size, adorn: p.adorn, alert: p.alert, li,
+        nx: (c.ground(b.x - 0.05, b.z) - c.ground(b.x + 0.05, b.z)) / 0.1, nz: (c.ground(b.x, b.z - 0.05) - c.ground(b.x, b.z + 0.05)) / 0.1,
+      });
     }
-    for (const p of Object.values(this._parts)) {
-      p.mesh.count = p.n;
-      p.mesh.instanceMatrix.needsUpdate = true;
-      if (p.mesh.instanceColor) p.mesh.instanceColor.needsUpdate = true;
-    }
+    B.flush(this._time);
   }
 
-  dispose(): void {
-    for (const p of Object.values(this._parts)) { p.mesh.removeFromParent(); p.mesh.geometry.dispose(); }
-    (this._parts.body.mesh.material as THREE.Material).dispose();
-  }
+  dispose(): void { this._batches.dispose(); }
 }

@@ -9,7 +9,7 @@ import { BONE, REGION, append, blob, newMesh, skin, tube, type Lod, type Mesh, t
 export type LimbRow = [y: number, z: number, w: number, h: number, bones: Skin];
 
 /** A limb on side `sx` (+1 left) at lateral offset `x`, the first row the top (hip or shoulder). `coatFrom`: rows from here down are leg-coloured. */
-export function limb(sx: number, x: number, rows: LimbRow[], lod: Lod, o: { coatFrom?: number; col?: V3; pw?: number; cap?: boolean; sub?: number } = {}): Mesh {
+export function limb(sx: number, x: number, rows: LimbRow[], lod: Lod, o: { coatFrom?: number; col?: V3; pw?: number; cap?: boolean; sub?: number; capStart?: boolean } = {}): Mesh {
   const rs: Ring[] = [];
   rows.forEach((r, i) => {
     const reg = i >= (o.coatFrom ?? 4) ? REGION.LEG : REGION.BODY;
@@ -18,7 +18,7 @@ export function limb(sx: number, x: number, rows: LimbRow[], lod: Lod, o: { coat
     if (i === (o.coatFrom ?? 4) && i > 0) rs.push(ring(REGION.BODY));
     rs.push(ring(reg));
   });
-  return tube(rs, { seg: Math.max(5, Math.round(lod.seg * 0.6)), sub: o.sub ?? (lod.sub > 2 ? 2 : 1), up: [0, 0, 1], capEnd: o.cap });
+  return tube(rs, { seg: Math.max(5, Math.round(lod.seg * 0.6)), sub: o.sub ?? (lod.sub > 2 ? 2 : 1), up: [0, 0, 1], capEnd: o.cap, capStart: o.capStart });
 }
 
 /** Rotate a mesh built in a local frame about x by `pitch` (positive: the +z axis tilts up), then translate. */
@@ -116,4 +116,35 @@ export function bodyRings(rows: BodyRow[], b = BONE.ROOT): Ring[] {
 export function strand(pts: Array<[number, number, number, number]>, b: Skin, lod: Lod, o: { x?: number; region?: number; col?: V3; coat?: number; up?: V3; capEnd?: boolean; flat?: boolean } = {}): Mesh {
   const rs: Ring[] = pts.map(([x, y, z, r]) => ({ p: [x, y, z] as V3, w: r, h: r, skin: b, col: o.col ?? [1, 1, 1], coat: o.coat ?? 1, region: o.region ?? REGION.BODY }));
   return tube(rs, { seg: Math.max(5, lod.seg - 6), sub: lod.sub, up: o.up ?? [0, 0, 1], capEnd: o.capEnd ?? true, flat: o.flat ?? true });
+}
+
+// ---------------------------------------------------------------- wildlife and pets (docs/DECISIONS.md, "Realistic wildlife and dogs")
+
+/** A tapered curved strand along points (x, y, z, radius) in the part's own frame with a fixed colour: an antler tine, a claw, a feather shaft. */
+export function spike(pts: Array<[number, number, number, number]>, b: Skin, lod: Lod, o: { region?: number; col?: V3; colTip?: V3; seg?: number } = {}): Mesh {
+  const rs: Ring[] = pts.map(([x, y, z, r], i) => {
+    const t = i / Math.max(1, pts.length - 1), c0 = o.col ?? [1, 1, 1], c1 = o.colTip ?? c0;
+    return { p: [x, y, z] as V3, w: r, h: r, skin: b, coat: 0, region: o.region ?? REGION.HORN, col: [c0[0] + (c1[0] - c0[0]) * t, c0[1] + (c1[1] - c0[1]) * t, c0[2] + (c1[2] - c0[2]) * t] as V3 };
+  });
+  return tube(rs, { seg: o.seg ?? Math.max(4, Math.round(lod.seg * 0.42)), sub: lod.sub > 1 ? 2 : 1, up: [0, 0, 1], capEnd: true, flat: true });
+}
+
+export interface PawOpts {
+  /** Half-width and length (m) of the pad, and how many toes show. */
+  r: number; len: number; toes: number;
+  skin: Skin; col?: V3; coat?: number; region?: number;
+  /** Claw length (m); 0: none (a cat's are in). */
+  claw?: number; clawCol?: V3;
+}
+/** A paw on the ground at (x, 0, z): a flattened pad, toe bumps along the front, claws (the full-detail LOD only). */
+export function paw(x: number, z: number, o: PawOpts, lod: Lod): Mesh {
+  const out = newMesh(), col = o.col ?? [1, 1, 1], region = o.region ?? REGION.LEG;
+  append(out, blob([x, o.r * 0.5, z + o.len * 0.2], [o.r, o.r * 0.55, o.len * 0.62], { seg: Math.max(6, Math.round(lod.seg * 0.6)), rings: 3, col, coat: o.coat ?? 1, region, skin: o.skin, flat: true }));
+  if (lod.detail >= 1) return out;
+  for (let i = 0; i < o.toes; i++) {
+    const f = o.toes === 1 ? 0 : (i / (o.toes - 1)) * 2 - 1, tx = x + f * o.r * 0.62, tz = z + o.len * (0.62 - Math.abs(f) * 0.14);
+    append(out, blob([tx, o.r * 0.32, tz], [o.r * 0.34, o.r * 0.34, o.r * 0.42], { seg: 5, rings: 2, col, coat: o.coat ?? 1, region, skin: o.skin, flat: true }));
+    if (o.claw) append(out, spike([[tx, o.r * 0.2, tz + o.r * 0.3, o.r * 0.1], [tx, o.r * 0.14, tz + o.r * 0.3 + o.claw * 0.6, o.r * 0.07], [tx, o.r * 0.04, tz + o.r * 0.3 + o.claw, o.r * 0.015]], o.skin, lod, { col: o.clawCol ?? [0.18, 0.15, 0.12], seg: 4 }));
+  }
+  return out;
 }

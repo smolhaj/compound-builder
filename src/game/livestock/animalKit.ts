@@ -21,7 +21,7 @@ export const BONE_COUNT = 26;
 export const LEG_BONES = [BONE.FL, BONE.FR, BONE.HL, BONE.HR] as const;
 
 /** Region codes of `aMark.y`. Below 10 the procedural coat applies; 10 and up are fixed colours with their own gloss. */
-export const REGION = { BODY: 0, HEAD: 1, LEG: 2, TAIL: 3, EAR: 4, UDDER: 5, WOOL: 6, EYE: 10, HOOF: 11, HORN: 12, NOSE: 13, FLESH: 14, BEAK: 15, TEETH: 16 } as const;
+export const REGION = { BODY: 0, HEAD: 1, LEG: 2, TAIL: 3, EAR: 4, UDDER: 5, WOOL: 6, ACC1: 7, ACC2: 8, ACC3: 9, EYE: 10, HOOF: 11, HORN: 12, NOSE: 13, FLESH: 14, BEAK: 15, TEETH: 16, ADORN: 17 } as const;
 
 export interface Skin { a: number; b: number; w: number }
 export const skin = (a: number, b = a, w = 0): Skin => ({ a, b, w });

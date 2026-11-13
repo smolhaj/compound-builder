@@ -624,6 +624,8 @@ export class HomesteadWorld {
     if (trimWas !== detailGeometryOn()) for (const b of this._built.values()) this._rebuild(b, b.opts);
     this.roadLife.setQuality(q);
     this.livestock.setQuality(q);
+    this.wildlife.setQuality(q);
+    this.dogs.setQuality(q);
     this.contact.setQuality(q);
     this._bandKey = '';
     this.terrain.build({
@@ -2318,7 +2320,8 @@ export class HomesteadWorld {
       bridges: this._wildBridges(),
       bridgesOpen: !(this.doorLock ?? locksNow(game)),
       road: { x: this.county.x, y: (x, z) => (Math.abs(x - this.county.x(z)) < ROAD_W / 2 + 0.3 ? this.countyY(x, z) : this.groundAt(x, z)), halfW: ROAD_W / 2, gateZ: this._truckRoute()[0][1] },
-      cam: { x: this._ws.camera.position.x, z: this._ws.camera.position.z },
+      cam: { x: this._ws.camera.position.x, z: this._ws.camera.position.z, y: this._ws.camera.position.y },
+      doy: this._seasonDoy,
     }, speedK);
   }
   /** The standing tunnel-bridges as the animals see them (deck and mouths); a rock tunnel is closed to them. */
@@ -2515,6 +2518,7 @@ export class HomesteadWorld {
       const outer = guards.slice(0, 2).map((_, i) => postSpot(dctx, i)).slice(0, 1);
       this.guardPosts.sync([...outer, ...(guards.length > 1 && dctx.inner ? [dctx.inner] : [])], this.groundAt);
     } else this.guardPosts.sync([], this.groundAt);
+    this.dogs.setCamera(this._ws.camera.position.x, this._ws.camera.position.y, this._ws.camera.position.z);
     this.dogs.update(dt, game, hour, game.clock.t, dctx, this.walkHeight, speedK);
     this._syncBands();
     this.contact.begin();
@@ -2901,8 +2905,11 @@ export class HomesteadWorld {
     return [x, z];
   }
 
+  /** The day of the year the seasons are drawn for (the wildlife wears its winter coat and its antlers by it). */
+  private _seasonDoy = 180;
   /** Per frame: seasons (eased toward the calendar / pinned season) then terrain uniforms. */
   tick(dt: number, doy: number, totalDays: number, mode: SeasonMode): void {
+    this._seasonDoy = doy;
     this._poolTunnelLights();
     // underground (walking in a bunker, a QA pose inside a room): no daylight, only the lamps
     const cam = this._ws.camera.position;
