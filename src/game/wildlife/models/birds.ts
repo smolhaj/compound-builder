@@ -20,7 +20,7 @@ const ringOf = (r: Row, b: ReturnType<typeof sk>, region: number = REGION.BODY, 
 /** A neck through (y, z, radius) points, skinned from the body up to the head. */
 function neckTube(pts: Array<[number, number, number]>, lod: Lod, o: { region?: number; coat?: number; col?: (i: number) => V3 } = {}): Mesh {
   const n = pts.length;
-  return tube(pts.map(([y, z, r], i) => ({ p: [0, y, z] as V3, w: r, h: r * 1.05, skin: i === 0 ? sk(BONE.ROOT) : i === n - 1 ? sk(BONE.NECK, BONE.HEAD, 0.5) : i === 1 ? sk(BONE.ROOT, BONE.NECK, 0.5) : sk(BONE.NECK), coat: o.coat ?? 1, region: o.region ?? REGION.BODY, col: o.col ? o.col(i) : [1, 1, 1] as V3 })), { seg: Math.max(6, lod.seg - 3), sub: lod.sub });
+  return tube(pts.map(([y, z, r], i) => ({ p: [0, y, z] as V3, w: r, h: r * 1.05, skin: i === 0 ? sk(BONE.ROOT) : i === n - 1 ? sk(BONE.NECK, BONE.HEAD, 0.5) : i === 1 ? sk(BONE.ROOT, BONE.NECK, 0.5) : sk(BONE.NECK), coat: o.coat ?? 1, region: o.region ?? REGION.BODY, col: o.col ? o.col(i) : [1, 1, 1] as V3 })), { seg: Math.max(6, lod.seg - 3), sub: lod.sub, up: [0, 0, 1] });   // (a near-vertical path with the default up axis flipped the cross-sections: the bow-tie pinches)
 }
 
 /** A bill: a tapered tube along +z in the head frame with a flat or a deep section, a hooked tip if `hook`. */
@@ -185,13 +185,13 @@ export const DUCK_MODEL = (): AnimalModel => bird('duck', buildDuck, DUCK_BONES,
 // ---------------------------------------------------------------- Canada goose
 const G = 1.55;
 const GOOSE_BODY: Row[] = DUCK_BODY.map(r => ({ z: r.z * G, y: r.y * G + 0.02, w: r.w * G, h: r.h * G }));
-const GNECK: Array<[number, number, number]> = [[0.33, 0.24, 0.075], [0.43, 0.31, 0.055], [0.54, 0.35, 0.045], [0.65, 0.35, 0.04], [0.73, 0.36, 0.036], [0.76, 0.375, 0.034]];
+const GNECK: Array<[number, number, number]> = [[0.29, 0.2, 0.09], [0.43, 0.31, 0.055], [0.54, 0.35, 0.045], [0.65, 0.35, 0.04], [0.73, 0.36, 0.036], [0.76, 0.375, 0.034]];
 const GHP = c3(0, 0.77, 0.385);
 function buildGoose(lod: Lod): Mesh[] {
   const out: Mesh[] = [], { seg, sub } = lod;
   out.push(tube(GOOSE_BODY.map((r, i) => ringOf(r, sk(BONE.ROOT), i >= 4 ? REGION.ACC3 : REGION.BODY)), { seg, sub, capStart: true, capEnd: true }));
   out.push(wings(0.32, -0.04, 0.16, 0.26, 0.11, lod, -0.02));
-  out.push(neckTube(GNECK, lod, { coat: 0, col: i => (i === 0 ? [0.2, 0.17, 0.12] : [0.03, 0.03, 0.03]) }));
+  out.push(neckTube(GNECK, lod, { coat: 0, col: () => [0.03, 0.03, 0.03] }));
   const head = newMesh();
   append(head, blob([0, 0, 0.014], [0.03, 0.032, 0.05], { seg: Math.max(6, seg - 3), rings: 5, col: [1, 1, 1], coat: 1, region: REGION.ACC3, skin: sk(BONE.HEAD) }));
   if (lod.detail < 2) append(head, blob([0, -0.014, 0.012], [0.032, 0.012, 0.03], { seg: 6, rings: 3, col: [1, 1, 1], coat: 1, region: REGION.ACC1, skin: sk(BONE.HEAD), flat: true }));           // the white chin strap
