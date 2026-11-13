@@ -7,6 +7,8 @@ import { improvementSpots } from '../game/buildkit/improvementSpots';
 import { fenceLineProblems } from './starterCompound';
 import { planPropertyWall } from './propertyWall';
 import { newGame } from './state';
+import { culvertEnds } from '../game/region/roadWorks';
+import { roadPlanFor } from './roadState';
 import { animalGoal, doorOf, type Home } from '../game/livestock/livestockPlan';
 
 /**
@@ -126,5 +128,26 @@ describe('scene audit: the rules the scenes caught', () => {
     const creekZ = () => 39.5;
     const plan = planPropertyWall(g, 'woven_wire', { creekZ, creekHalf: 0.7 }, { rects: [{ x0: 10, z0: 30, x1: 20, z1: 39.0 }] });
     expect(plan.runs.some(r => r.kind === 'creek_bars')).toBe(true);
+  });
+});
+
+describe('scene audit: road culverts on the real, carved terrain', () => {
+  it('every culvert pipe on the market listings runs under the road surface, never on top of it', { timeout: 120_000 }, () => {
+    const bad: string[] = [];
+    let n = 0;
+    for (const seed of [1, 2]) for (const spec of corpus([seed])) {
+      const sc = makeScene(spec.site, spec.seed, spec.label), plan = roadPlanFor(spec.site, spec.seed, sc.parcel);
+      for (const sx of plan.structures) {
+        if (sx.kind !== 'culvert' && sx.kind !== 'arch_culvert') continue;
+        n++;
+        const m = Math.round((sx.s0 + sx.s1) / 2), p = plan.pts[m], q = plan.pts[Math.min(plan.pts.length - 1, m + 1)], o = plan.pts[Math.max(0, m - 1)];
+        const L = Math.hypot(q.x - o.x, q.z - o.z) || 1, f = { x: p.x, z: p.z, y: p.y, nx: -(q.z - o.z) / L, nz: (q.x - o.x) / L };
+        const { A, B, r } = culvertEnds(f, (x, z) => sc.parcel.height(x, z), (x, z) => sc.parcel.natural(x, z).h, sx.kind === 'arch_culvert');
+        const top = Math.max(A[1], B[1]) + r;
+        if (top > p.y - 0.02) bad.push(`${spec.label} ${sx.kind}: pipe top ${top.toFixed(2)} over road ${p.y.toFixed(2)}`);
+      }
+    }
+    expect(n).toBeGreaterThan(10);
+    expect(bad).toEqual([]);
   });
 });
