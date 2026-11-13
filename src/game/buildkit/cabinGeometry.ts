@@ -16,6 +16,7 @@ import { CELL, type KitPieceDef } from './kit';
 import { Furniture, M, sickSlot } from './interior';
 import { Clutter } from './clutter';
 import { dressEvenings } from './goodsDress';
+import { dressCozy } from './cozyDress';
 import { box, buildGabled, Parts, layerFractions, showStage, BUILD_LAYERS, CUTAWAY_HIDE, CUT_H, XRAY_LAYERS, type BuildLayer, type BuildOpts, type FurnishCtx, type GabledSpec } from './shell';
 
 export { layerFractions, CUTAWAY_HIDE, XRAY_LAYERS, CUT_H };
@@ -169,6 +170,16 @@ function dressCabin(c: FurnishCtx): void {
   C({ x: -0.3, z: hd + 0.32, y: y0, rot: 0.6 }, a => Clutter.boots(a, 'wood_dark'), 0.6);
   C({ x: hw + 0.08, z: 0.7, y: 0.004, rot: 1.3 }, a => Clutter.bike(a), 0.6);
   C({ x: hw + 0.06, z: -0.5, y: 0.004 }, a => Clutter.bucket(a), 0.6);
+  // the cosy layer: the lamp's pool, the stove's fire and its pool, pillows and a throw, herbs by the stove, a kettle, a second rug
+  dressCozy(c, {
+    seats: [{ x: 0.11, z: -0.34, rot: Math.PI - 0.35, kind: 'armchair' }, { x: 0.38, z: -0.33, rot: Math.PI + 0.35, kind: 'armchair' }],
+    hearth: { x: 0.26, z: back + 0.075, fwd: 0.13, w: 0.34, d: 0.26 },
+    kettle: { x: 0.26 - 0.15 * M, z: back + 0.075, topM: 0.88 },
+    lamps: [{ x: -0.25, z: 0.02, r: 0.3 }],
+    herbs: { x: 0.15, z: back + 0.004, yM: 1.9, lenM: 0.5 },
+    garlic: { x: left + 0.004, z: -0.42, rot: Math.PI / 2, yM: 1.75 },
+    rug2: { x: 0.24, z: -0.36, rot: 0.3, w: 1.3, d: 0.9 },
+  });
 }
 
 /** Evening seats (local x, z, face-toward x, z): table chairs and armchairs. */

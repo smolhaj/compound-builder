@@ -10,6 +10,7 @@
  */
 import { bondOf, ageYears, temperOf, type Dog } from '../../sim/pets';
 import type { Wp } from '../paths/linkRoute';
+import { stovePlace } from './ritualGoals';
 
 export type Stance = 'stand' | 'sit' | 'lie' | 'alert' | 'bark';
 export interface DogGoal {
@@ -40,6 +41,8 @@ export interface DogCtx {
   inner?: { x: number; z: number; face: number };
   /** A crew that means harm is at the gate or the raid is being played back. */
   raided?: boolean;
+  /** The household's calm (0 alarm to 1 peace; sim/rituals.ts): in the evening and at night a calm house's dog curls up by the stove. */
+  calm?: number;
   /** Real seconds a keyholder's dog waits at a corridor door point (0: it stands open). */
   doorWait?: (tag: number, x: number, z: number) => number;
 }
@@ -81,6 +84,11 @@ export function dogGoal(d: Dog, index: number, hour: number, day: number, ctx: D
     if (ctx.atGate) return { x: p.x, z: p.z, stance: 'bark', face: p.face, frisky: false, follow: false };
     if (lazy && !night) return { x: p.x, z: p.z, stance: 'lie', face: p.face, frisky: false, follow: false };
     return { x: p.x, z: p.z, stance: night ? 'alert' : 'stand', face: p.face, frisky: false, follow: false };
+  }
+  // the evening by the fire: after supper (and through the night) the house dog curls up on the floor by the stove, not on a chair
+  if ((night || (hour >= 19 && hour < 21)) && ctx.home?.seats?.length && !d.guard && (ctx.calm ?? 1) >= 0.5) {
+    const sp = stovePlace(ctx.home, Math.floor(hash(d.id, 8) * 4));
+    if (sp) return { x: sp.x, z: sp.z, stance: 'lie', face: ctx.home.rot + Math.PI / 2, frisky: false, follow: false };
   }
   const bond = bondOf(d).id;
   const who = bond ? ctx.person(bond) : null;

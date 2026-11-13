@@ -49,7 +49,14 @@ export type KitMaterialId = 'snow' | 'timber_lap' | 'trim' | 'fieldstone' | 'met
   // housing styles (sim/housingStyles.ts): painted standing-seam roofs, rammed earth, lime plaster
   | 'metal_roof_green' | 'metal_roof_grey' | 'adobe' | 'plaster'
   // a house's shipping container, painted (less metal sheen than the perimeter's)
-  | 'shell_blue' | 'shell_rust' | 'shell_tan' | 'shell_green';
+  | 'shell_blue' | 'shell_rust' | 'shell_tan' | 'shell_green'
+  // warm interiors (game/atmosphere/hearth.ts): per-room colour temperatures of the lit window, the light a lamp or a window
+  // throws on the floor, porch and yard (additive, soft-edged, per building), and the fire's glow and its pool on the floor
+  | 'glow_oil_b' | 'glow_oil_c' | 'glow_electric_b' | 'glow_electric_c'
+  | 'spill_glow' | 'spill_oil' | 'spill_oil_b' | 'spill_oil_c' | 'spill_electric' | 'spill_electric_b' | 'spill_electric_c' | 'spill_off'
+  | 'hearth_glow'
+  // cosy decor: a woollen throw, dried herbs, a braid of garlic, a pot of tea
+  | 'wool_grey' | 'herb_green' | 'herb_dry' | 'garlic';
 
 /** World units covered by one texture repeat. Fieldstone: 0.14 u (84 cm) a repeat, so a stone is 5-12 cm in world units (30-70 cm was bigger than a head). */
 const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
@@ -731,6 +738,45 @@ function paintSolar(): HTMLCanvasElement {
 
 const _cache = new Map<KitMaterialId, THREE.MeshStandardMaterial>();
 
+/** Colours of the lit window by room (the three colour temperatures of game/atmosphere/hearth.ts `roomVariant`). */
+const GLOW_COLOR: Partial<Record<KitMaterialId, THREE.Color>> = {
+  glow_oil_b: new THREE.Color(1.0, 0.5, 0.2), glow_oil_c: new THREE.Color(1.0, 0.68, 0.33),
+  glow_electric_b: new THREE.Color(1.0, 0.8, 0.56), glow_electric_c: new THREE.Color(1.0, 0.9, 0.74),
+};
+const SPILL_COLOR: Partial<Record<KitMaterialId, THREE.Color>> = {
+  spill_oil: new THREE.Color(1.0, 0.6, 0.27), spill_oil_b: new THREE.Color(1.0, 0.5, 0.2), spill_oil_c: new THREE.Color(1.0, 0.68, 0.33),
+  spill_electric: new THREE.Color(1.0, 0.86, 0.66), spill_electric_b: new THREE.Color(1.0, 0.8, 0.56), spill_electric_c: new THREE.Color(1.0, 0.9, 0.74),
+};
+
+let _pool: THREE.CanvasTexture | null = null;
+/** A soft round pool of light (white centre to nothing at the edge, smooth falloff): the emissive map of every spill and hearth pool. */
+function poolTexture(): THREE.CanvasTexture {
+  if (_pool) return _pool;
+  const n = 64, c = document.createElement('canvas');
+  c.width = c.height = n;
+  const x = c.getContext('2d')!, g = x.createRadialGradient(n / 2, n / 2, 0, n / 2, n / 2, n / 2);
+  for (const [t, a] of [[0, 1], [0.25, 0.7], [0.55, 0.28], [0.8, 0.07], [1, 0]] as const) g.addColorStop(t, `rgba(255,255,255,${a})`);
+  x.fillStyle = '#000'; x.fillRect(0, 0, n, n);   // (the emissive map reads colour, not alpha: black outside, the falloff as grey)
+  x.fillStyle = g; x.fillRect(0, 0, n, n);
+  _pool = new THREE.CanvasTexture(c);
+  _pool.colorSpace = THREE.SRGBColorSpace;
+  return _pool;
+}
+
+/** Shared flicker clock for the hearth materials (seconds), set by setWindowGlow. */
+const HEARTH_T = { value: 0 };
+/** Fire light that moves: the emissive is modulated by a few travelling sines of the position, so the glow licks instead of pulsing flat. */
+function patchFlicker(m: THREE.MeshStandardMaterial): void {
+  m.onBeforeCompile = sh => {
+    sh.uniforms.uHearthT = HEARTH_T;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vHearthP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvHearthP = (modelMatrix * vec4(position, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform float uHearthT;\nvarying vec3 vHearthP;')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n{ float fl = 0.80 + 0.12 * sin(uHearthT * 9.0 + vHearthP.x * 55.0 + vHearthP.z * 40.0) + 0.08 * sin(uHearthT * 23.0 + vHearthP.y * 90.0 + vHearthP.x * 30.0); totalEmissiveRadiance *= fl; }');
+  };
+  m.customProgramCacheKey = () => 'hearth_flicker';
+}
+
+
 function texMat(id: KitMaterialId, paint: () => HTMLCanvasElement, strength: number, roughness: number, metalness = 0, ns = 1): THREE.MeshStandardMaterial {
   const cv = paint();
   const map = new THREE.CanvasTexture(cv);
@@ -774,6 +820,23 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
       m = new THREE.MeshStandardMaterial({ color: id === 'glow_curtain' ? 0x1a1512 : 0x000000, roughness: 1, transparent: true, opacity: 0, depthWrite: false, emissive: e, emissiveMap: glowAtlas(), emissiveIntensity: 0, side: THREE.FrontSide });
       m.visible = false; break;
     }
+    // the light a lit room throws outside and on its floor: a soft additive pool, invisible until the building's lamp is lit
+    // (Atmosphere swaps the per-building variants); 'spill_glow' is what a building is built with
+    case 'spill_glow': case 'spill_off': case 'spill_oil': case 'spill_oil_b': case 'spill_oil_c': case 'spill_electric': case 'spill_electric_b': case 'spill_electric_c': {
+      m = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, emissive: SPILL_COLOR[id] ?? new THREE.Color(1, 0.6, 0.27), emissiveMap: poolTexture(), emissiveIntensity: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+      m.visible = false; break;
+    }
+    // per-room colour temperature of the lit window (oil 2000-2400 K, electric 2700-3300 K)
+    case 'glow_oil_b': case 'glow_oil_c': case 'glow_electric_b': case 'glow_electric_c': {
+      m = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, transparent: true, opacity: 0, depthWrite: false, emissive: GLOW_COLOR[id], emissiveMap: glowAtlas(), emissiveIntensity: 0, side: THREE.FrontSide });
+      m.visible = false; break;
+    }
+    // the fire: the glow in the stove door and the pool it throws on the floor (one additive, flickering mesh per home); lit by the hearth's fire level, not the lamp
+    case 'hearth_glow': { m = new THREE.MeshStandardMaterial({ color: 0x000000, roughness: 1, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, emissive: new THREE.Color(1.0, 0.3, 0.05), emissiveMap: poolTexture(), emissiveIntensity: 1, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }); patchFlicker(m); m.visible = false; break; }
+    case 'wool_grey': m = new THREE.MeshStandardMaterial({ color: 0x8a8782, roughness: 1 }); break;
+    case 'herb_green': m = new THREE.MeshStandardMaterial({ color: 0x5f7a45, roughness: 0.95 }); break;
+    case 'herb_dry': m = new THREE.MeshStandardMaterial({ color: 0x9a8a55, roughness: 0.95 }); break;
+    case 'garlic': m = new THREE.MeshStandardMaterial({ color: 0xe6dcc6, roughness: 0.85 }); break;
     // the winter roof: snow slabs that rise with the snow and icicles on the gutters; not drawn (material.visible) until it snows
     case 'snow': { const mm = new THREE.MeshStandardMaterial({ color: 0xf1f5fa, roughness: 0.92 }); mm.visible = false; patchSnowSlab(mm); m = mm; break; }
     case 'pine_panel': m = texMat(id, paintPinePanel, 1.2, 0.7); break;
@@ -904,18 +967,41 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
   return m;
 }
 
-/** Interior lights behind the glass (0 = off … 1 = a warm lit room at night). */
-export function setWindowGlow(k: number, time = 0): void {
+/**
+ * Interior lights behind the glass (0 = off … 1 = a warm lit room at night).
+ * `warmth` 0–1 is the compound's sense of safety (atmosphere/hearth.ts): lamps dim and the fire sinks as it falls.
+ * `fire` 0–1 is how hard the stoves and hearths burn (hearth.ts `fireLevel`).
+ */
+export function setWindowGlow(k: number, time = 0, warmth = 1, fire = 0): void {
+  const lw = 0.3 + 0.7 * Math.max(0, Math.min(1, warmth));
+  const kk = k * lw;
   const g = _cache.get('glow');
-  if (g) { g.emissiveIntensity = 1.1 * k; g.opacity = Math.min(0.9, k * 1.2); g.visible = k > 0.02; }
+  if (g) { g.emissiveIntensity = 1.1 * kk; g.opacity = Math.min(0.9, kk * 1.2); g.visible = kk > 0.02; }
   const l = _cache.get('lamp');
-  if (l) l.emissiveIntensity = 0.4 + 2.6 * k;
+  if (l) l.emissiveIntensity = 0.4 + 2.6 * kk;
   // an oil lamp's flame breathes; electric light holds steady; a blackout curtain lets a glimmer round its edges
   const flick = 0.9 + 0.06 * Math.sin(time * 7.1) + 0.04 * Math.sin(time * 17.3 + 1.3);
-  const o = _cache.get('glow_oil');
-  if (o) { o.emissiveIntensity = 0.95 * k * flick; o.opacity = Math.min(0.88, k * 1.2); o.visible = k > 0.02; }
-  const e = _cache.get('glow_electric');
-  if (e) { e.emissiveIntensity = 1.5 * k; e.opacity = Math.min(0.92, k * 1.3); e.visible = k > 0.02; }
+  for (const id of ['glow_oil', 'glow_oil_b', 'glow_oil_c'] as const) {
+    const o = _cache.get(id);
+    if (o) { o.emissiveIntensity = 0.95 * kk * flick; o.opacity = Math.min(0.88, kk * 1.2); o.visible = kk > 0.02; }
+  }
+  for (const id of ['glow_electric', 'glow_electric_b', 'glow_electric_c'] as const) {
+    const e = _cache.get(id);
+    if (e) { e.emissiveIntensity = 1.5 * kk; e.opacity = Math.min(0.92, kk * 1.3); e.visible = kk > 0.02; }
+  }
   const c = _cache.get('glow_curtain');
   if (c) { c.emissiveIntensity = 0.05 * k; c.opacity = Math.min(0.97, k * 2); c.visible = k > 0.02; }
+  // the light on the porch, the yard and the floor: oil breathes with the lamp, electric holds
+  for (const id of ['spill_oil', 'spill_oil_b', 'spill_oil_c'] as const) {
+    const o = _cache.get(id);
+    if (o) { o.opacity = Math.min(0.55, kk * 0.5) * flick; o.visible = kk > 0.02; }
+  }
+  for (const id of ['spill_electric', 'spill_electric_b', 'spill_electric_c'] as const) {
+    const e = _cache.get(id);
+    if (e) { e.opacity = Math.min(0.55, kk * 0.55); e.visible = kk > 0.02; }
+  }
+  // the fire: flickers in place (shader), sinks faster than the lamps as safety falls
+  HEARTH_T.value = time;
+  const h = _cache.get('hearth_glow');
+  if (h) { h.opacity = Math.min(0.7, 0.7 * fire); h.emissiveIntensity = 1.0; h.visible = fire > 0.03; }
 }

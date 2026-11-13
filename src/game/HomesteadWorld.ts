@@ -15,6 +15,9 @@ import { planParcelTrees, planUnderstory, type ParcelTree } from './parcel/parce
 import { buildWoods, fallHeading, trunkRadius } from './forestry/woodsGeometry';
 import type { Forestry } from '../sim/state';
 import { goodsKey, houseGoods } from '../sim/evenings';
+import { cozyForHome } from './atmosphere/cozyHome';
+import { COZY_NONE, cozyKey } from './buildkit/cozy';
+import { lampScale } from './atmosphere/hearth';
 import { plant, serviceOf } from '../sim/utilities';
 import { StreamRenderer } from '../engine/world/water/StreamRenderer';
 import { RegionalWaterRenderer } from '../engine/world/water/RegionalWaterRenderer';
@@ -151,6 +154,12 @@ import { sleepSpotFor, tentsPitched } from '../sim/housing';
 import { planShelves, propsWanted, splitInUse } from './props/foodShelfPlan';
 import type { FoodSlot, SickSlot } from './buildkit/shell';
 import { sickbayPlan, type BedSlot } from './people/sickbayPlan';
+import { sleepPlan } from './people/sleepPlan';
+import { ritualCtx } from './people/ritualGoals';
+import { homeSafety, homeSafetyInput, type HomeSafety } from './atmosphere/homeSafety';
+import { ritualsOf, stanceOf, tableSet } from '../sim/rituals';
+import { bedHour, pickHomeLine } from '../sim/domesticLines';
+import { FOOD, type FoodItemId } from '../sim/pantry';
 
 /** The order the stores take their turns: the buried storeroom, the root cellar, the bunker's galley and container, then the house pantries. */
 const FOOD_ORDER: Record<string, number> = { bunker_stores: 0, root_cellar: 1, bunker_galley: 2, bunker_container: 3, bunker_corridor: 4 };
@@ -286,6 +295,11 @@ export class HomesteadWorld {
   doorLock: boolean | null = null;
   /** QA: the animals and guard dogs act as if a hostile crew were at the gate. */
   qaRaid = false;
+  /** The live safety level (game/atmosphere/homeSafety.ts, read about once a second, smoothed) the evening rituals and the dog follow. */
+  private _safety: HomeSafety = { level: 1, target: 1, reasons: [] };
+  private _safetyAcc = 99;
+  private _lineAcc = 0;
+  private _lineN = 0;
   /** The dry-stack retaining walls round graded pads, with their stairs (game/terrain/RetainWalls). */
   readonly walls = new RetainWallLayer();
   private _wallVer = 0;
@@ -2098,13 +2112,16 @@ export class HomesteadWorld {
       // wired but no power yesterday (a blackout, a flat battery): back to lamplight
       const powered = sv.wired && game.utilities.lit.includes(b.placed.id);
       const mine = b.placed.id === mainId && gk !== '000000' ? gk : '';
-      const key = `${+opts.plumbed}${+opts.wired}${+opts.septic}${+powered}${mine}`;
+      // how lived-in a home looks: how long the family has been in it, and what they own (buildkit/cozy.ts)
+      const st = KIT[b.placed.kind].sleeps > 0 ? game.structures.find(x => x.id === b.placed.id) : undefined;
+      const cozy = st ? cozyForHome(game, st) : undefined, ck = cozy ? cozyKey(cozy) : '', plain = !cozy || ck === cozyKey(COZY_NONE);
+      const key = `${+opts.plumbed}${+opts.wired}${+opts.septic}${+powered}${mine}${cozy ? '|' + ck : ''}`;
       if (key === b.services) continue;
       const geo = key.slice(0, 3) !== (b.services ?? '000').slice(0, 3) || key.slice(4) !== (b.services ?? '').slice(4);
       b.services = key;
       if (b.light && !b.under) b.light.color.set(powered ? 0xfff0d8 : 0xffc27a);
-      if (!geo || (key.startsWith('000') && !mine && !b.group.userData.opts?.plumbed && !b.group.userData.opts?.wired && !b.group.userData.opts?.goods)) continue;
-      this._rebuild(b, { ...b.opts, ...opts, goods: mine ? goods : undefined });
+      if (!geo || (key.startsWith('000') && !mine && plain && !b.group.userData.opts?.plumbed && !b.group.userData.opts?.wired && !b.group.userData.opts?.goods && !b.group.userData.opts?.cozy)) continue;
+      this._rebuild(b, { ...b.opts, ...opts, goods: mine ? goods : undefined, cozy: plain ? undefined : cozy });
       if (b.light && !b.under) b.light.color.set(powered ? 0xfff0d8 : 0xffc27a);
     }
   }
@@ -2241,7 +2258,7 @@ export class HomesteadWorld {
       const room = this.atmos.room(b.placed.id);
       const home = KIT[b.placed.kind].sleeps > 0;
       const fill = this._view === 'full' ? 0.25 : 0.12;
-      b.light.intensity = room !== undefined ? fill * (0.3 + 0.7 * this.air.daylight) + room * 1.4 * night : fill + (home ? (lit ? night * 1.25 : night * 0.25) : night * 0.1);
+      b.light.intensity = room !== undefined ? fill * (0.3 + 0.7 * this.air.daylight) + room * 1.4 * night * lampScale(this.atmos.warmth) : fill + (home ? (lit ? night * 1.25 : night * 0.25) : night * 0.1);
       if (pick) this._noteLight(cands, b, above);
     }
     // only the lights that can matter stay on (every light costs every lit pixel); a fixed count, so no recompiles
@@ -2445,7 +2462,7 @@ export class HomesteadWorld {
     const w = this._walkWorld();
     this.livestock.update(dt, game.stock as unknown as Record<string, number>, coops, homes,
       { hour, raided: hostileAtGate(game.gate.pending) || this.doorLock === true || this.qaRaid, storm: seasonState.params.snow > 0.6, house, clock: game.clock.t },
-      { ground: this.groundAt, via: (kind, a, b) => animalRoute(a, b, this._animalHard(kind), (x, z) => w.cost?.(x, z) ?? 1, 0.14, 1.3), free: (x, z) => !this.onBuilding(x, z, 0.1, false) && !this.onAccess(x, z, 0.05) && !this.parcel.isCreek(x, z) },
+      { ground: this.groundAt, floor: this.walkHeight, via: (kind, a, b) => animalRoute(a, b, this._animalHard(kind), (x, z) => w.cost?.(x, z) ?? 1, 0.14, 1.3), free: (x, z) => !this.onBuilding(x, z, 0.1, false) && !this.onAccess(x, z, 0.05) && !this.parcel.isCreek(x, z) },
       speedK, { x: this._ws.camera.position.x, z: this._ws.camera.position.z, y: this._ws.camera.position.y });
     // a shelter the animals cannot get to (across the creek, behind a wall): one line in the log
     const cut = this.livestock.takeNoWay().filter(k => !this._noWayLogged.has(k));
@@ -2485,13 +2502,46 @@ export class HomesteadWorld {
     return out;
   }
 
+  /** Who lies where: the sick in their beds first, then everyone asleep in a real bed (game/people/sleepPlan.ts). */
+  private _bedPlan(game: GameState) {
+    const slots = this._bedSlots(), sick = sickbayPlan(game, slots);
+    const taken = new Set([...sick.values()].map(p => p.bed));
+    for (const [id, p] of sleepPlan(game, slots, i => sleepSpotFor(game, i), taken)) if (!sick.has(id)) sick.set(id, p);
+    return sick;
+  }
+
+  /** A line from the family now and then, while the camera is near the house (sim/domesticLines.ts). One at a time, every ten seconds or so. */
+  private _homeLines(dt: number, game: GameState, hour: number, calm: number, ctx: GoalCtx): void {
+    this._lineAcc += dt;
+    if (this._lineAcc < 11 || !ctx.home) return;
+    const cam = this._ws.camera.position, near = Math.hypot(cam.x - ctx.home.x, cam.z - ctx.home.z) < 7;
+    if (!near) { this._lineAcc = 8; return; }
+    this._lineAcc = 0;
+    const R = ctx.ritual!;
+    const speakers = game.people.map((p, i) => ({ p, i })).filter(x => this.family.shown.has(x.p.id) && game.personState[x.i].needs.died == null);
+    if (!speakers.length) return;
+    this._lineN++;
+    const { p, i } = speakers[(this._lineN * 7 + Math.floor(game.clock.t * 97)) % speakers.length];
+    const stance = stanceOf(calm, i), ps = game.personState[i];
+    let ritual = R.kind(i) ?? (bedHour(p.kid, hour) ? 'bed' as const : null);
+    if (stance !== 'settled' && calm >= 0.35 && !R.kind(i)) ritual = null;
+    const ate = game.pantry?.ate ?? [];
+    const top = [...ate].filter(([k]) => k in FOOD).sort((a, b) => b[1] - a[1])[0]?.[0] as FoodItemId | undefined;
+    const stored = game.stock.canned + game.stock.staples + game.stock.frozen, food = tableSet(game) ? 'plenty' as const : stored > 0 ? 'lean' as const : 'bare' as const;
+    const line = pickHomeLine({
+      ritual, stance, hour, kid: p.kid, elder: !!p.elder, morale: ps.needs.morale, food,
+      dish: top ? FOOD[top].name.split(',')[0].toLowerCase() : undefined, cold: seasonState.params.cold, snowing: seasonState.params.snow > 0.3, seed: this._lineN * 31 + i,
+    });
+    if (line) useWorldStore.getState().setHomeLine({ who: p.first, text: line.text, tone: line.tone, at: performance.now() });
+  }
+
   /** People: walk the family to their tasks; tend the campfire. */
   updatePeople(dt: number, game: GameState, hour: number, speedK: number): void {
     const site = (id: string): Site | null => {
       const b = this._built.get(id);
       if (!b) return null;
       const def = KIT[b.placed.kind];
-      return { x: b.placed.x, z: b.placed.z, rot: b.placed.rot * Math.PI / 2, w: def.cellsX * CELL, d: def.cellsZ * CELL, seats: b.group.userData.seats as Seat[] };
+      return { x: b.placed.x, z: b.placed.z, rot: b.placed.rot * Math.PI / 2, w: def.cellsX * CELL, d: def.cellsZ * CELL, seats: b.group.userData.seats as Seat[], seatRoles: b.group.userData.seatRoles as Array<'fire' | 'table'> | undefined };
     };
     // home: the finished house that sleeps the most
     const homeB = [...this._built.values()].filter(b => b.finished && KIT[b.placed.kind].sleeps > 0).sort((a, b) => KIT[b.placed.kind].sleeps - KIT[a.placed.kind].sleeps)[0];
@@ -2508,15 +2558,25 @@ export class HomesteadWorld {
       footing: (x, z) => walkFactor(this.paths.surfaceAt(x, z), this._underfoot), via: (fx, fz, tx, tz) => this._walkVia(fx, fz, tx, tz), doorWait: tag => this.doorWait(tag),
       ...dailyCtx(refs, game, this.access.yard, seasonState.params.cold < 0.35),
     };
+    // the family's evening (sim/rituals.ts): the calm is the lower of the sim's and the live safety level, so a raid stops the table at once
+    this._safetyAcc += dt;
+    if (this._safetyAcc >= 1) {
+      const raid = hostileAtGate(game.gate.pending) || this.doorLock === true || this.qaRaid ? 'attack' : game.gate.pending ? 'knock' : 'none';
+      this._safety = homeSafety({ ...homeSafetyInput(game, { raid }), prev: this._safetyAcc > 30 ? undefined : this._safety.level, dt: this._safetyAcc });
+      this._safetyAcc = 0;
+    }
+    const calm = Math.min(this._safety.level, ritualsOf(game).calm);
+    ctx.ritual = ritualCtx(game.people, game.personState.map(ps => ps.task), hour, calm);
+    this._homeLines(dt, game, hour, calm, ctx);
     const fx = yardFx(game, hour);
     this._yard.update(this._clock, fx.lights, fx.smoke);
     const season = (seasonState.visual === 'winter' && !seasonState.climate.freeze ? 'fall' : seasonState.visual) as WearSeason;
-    this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.walkHeight, season, speedK, sickbayPlan(game, this._bedSlots()), seasonState.params.cold);
+    this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.walkHeight, season, speedK, this._bedPlan(game), seasonState.params.cold);
     const dctx: DogCtx = {
       home: ctx.home, camp: this.camp, gate: this.access.gate, yard: this.access.yard, atGate: !!game.gate.pending,
       person: id => (this.family.shown.has(id) ? this.family.poseOf(id) : null),
       via: (fx, fz, tx, tz) => this._walkVia(fx, fz, tx, tz), doorWait: tag => this.doorWait(tag),
-      inner: this._innerPost(game), raided: hostileAtGate(game.gate.pending) || this.doorLock === true || this.qaRaid,
+      inner: this._innerPost(game), raided: hostileAtGate(game.gate.pending) || this.doorLock === true || this.qaRaid, calm,
     };
     const guards = livingDogs(game).filter(d => d.guard && ageYears(d, dayIndex(game.clock.t)) >= 0.5);
     if (guards.length) {

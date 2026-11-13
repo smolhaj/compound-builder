@@ -104,6 +104,10 @@ export interface BuildOpts {
   hatches?: Array<{ x0: number; z0: number; x1: number; z1: number }>;
   /** Bunkroom: what the family owns for the long evenings (sim stock: games, an instrument, paperbacks); the room shows them. */
   morale?: { games: boolean; music: boolean; books: boolean };
+  /** A place people sleep (set by buildLayers): its lit windows throw light on the porch and the yard. */
+  home?: boolean;
+  /** How lived-in the home is (buildkit/cozy.ts): from how long the family has been there and what they own. Absent = the plain furnishing. */
+  cozy?: import('./cozy').Cozy;
   /** The evenings' goods on and by the family's table (sim/evenings.ts `houseGoods`): 1 in good shape, 2 worn thin. Only the main home gets them. */
   goods?: Partial<Record<'games' | 'guitar' | 'player' | 'books' | 'toys' | 'kidbooks', 1 | 2>>;
 }
@@ -142,6 +146,10 @@ export class Parts {
   layer: BuildLayer = 'stakes';
   /** Shift applied to everything added (and to colliders): a shell set off-center in its footprint. */
   ox = 0; oz = 0;
+  /** The shell's floor height and porch depth, and the z of its front wall (set by buildGabled): where a lit window's light falls. */
+  deckY = 0; porchD = 0; frontZ = Infinity;
+  /** Window sills inside a home (where a candle, a jar or a pot can stand): the middle of the board's top, the turn that faces into the room, the width. */
+  readonly sills: Array<{ x: number; z: number; y: number; rot: number; w: number }> = [];
   /** Seeded random for this building (clutter varies house to house). */
   readonly rnd: () => number;
   /** Services the building has (interiors change: faucets, lights, fridge, flush toilet). */
@@ -149,6 +157,8 @@ export class Parts {
   constructor(seed = 1, opts: BuildOpts = {}) { this.rnd = rng(seed); this.opts = opts; }
   readonly map = new Map<string, THREE.BufferGeometry[]>();
   readonly colliders: Collider[] = [];
+  /** The solid ground-floor pieces placed so far (building frame, before the offset): decor that stands on a sill checks them. */
+  readonly furniture: Collider[] = [];
   /** Shelf boards and pallets where stored food goes (game/props/FoodShelfRenderer), in the building's frame. */
   readonly foodSlots: FoodSlot[] = [];
   /** Beds the sick are put in (game/people/sickbayPlan), in the building's frame. */
@@ -179,10 +189,10 @@ export class Parts {
       if (!g) continue;
       g.computeBoundingSphere();
       const mesh = new THREE.Mesh(g, kitMaterial(m));
-      mesh.castShadow = m !== 'glass' && m !== 'polycarb' && m !== 'snow' && m !== 'glow' && m !== 'string' && m !== 'wire_mesh' && m !== 'oil_stain';
+      mesh.castShadow = m !== 'glass' && m !== 'polycarb' && m !== 'snow' && m !== 'glow' && !m.endsWith('_glow') && m !== 'string' && m !== 'wire_mesh' && m !== 'oil_stain';
       mesh.receiveShadow = true;
       mesh.name = `bldg_${layer}_${m}`;
-      mesh.userData = { layer, vertexCount: g.getAttribute('position').count };
+      mesh.userData = { layer, mat: m, vertexCount: g.getAttribute('position').count };
       group.add(mesh);
     }
     group.userData.colliders = this.colliders;
@@ -229,6 +239,21 @@ export function gable(halfW: number, rise: number, t: number, y0: number, z: num
   return new THREE.ExtrudeGeometry(s, { depth: t, bevelEnabled: false }).translate(0, y0, z - t / 2);
 }
 
+/**
+ * The light a lit window throws outside: a soft pool on the porch deck (sized to the porch) or on the yard by the wall. It is part of the
+ * 'spill_glow' mesh Atmosphere lights only when the building's lamp is on (invisible by day).
+ */
+export function windowSpill(parts: Parts, cx: number, cz: number, nx: number, nz: number, w: number): void {
+  const onPorch = nz > 0 && parts.porchD > 0.05 && Math.abs(cz - parts.frontZ) < 0.05;
+  const depth = onPorch ? parts.porchD * 1.05 : 0.34, y = onPorch ? parts.deckY + 0.004 : 0.004;
+  const wide = Math.max(w * 2.4, 0.3);
+  const g = new THREE.PlaneGeometry(wide, depth).rotateX(-Math.PI / 2);
+  g.userData.keepUV = true;
+  const off = depth * 0.5 - 0.01;
+  if (nx !== 0) { g.rotateY(Math.PI / 2); g.translate(cx + nx * off, y, cz); } else g.translate(cx, y, cz + nz * off);
+  parts.add('spill_glow', g, 'interior');
+}
+
 /** A window on a wall face: frame, glass, muntins, sill. (cx, cz) on the face, `nx/nz` the outward normal. */
 export function windowAt(parts: Parts, cx: number, cz: number, y: number, nx: number, nz: number, wallT: number, w: number = WIN.w, h: number = WIN.h, trim: KitMaterialId = 'trim'): void {
   const t = 0.012, out = wallT / 2 + 0.004;
@@ -248,6 +273,14 @@ export function windowAt(parts: Parts, cx: number, cz: number, y: number, nx: nu
   }
   const o = c + out - 0.002;
   parts.add('glow', glow.translate(cx + nx * o, y + h / 2, cz + nz * o));
+  if (parts.opts.home && y - parts.deckY < 0.35) windowSpill(parts, cx, cz, nx, nz, w);
+  if (parts.opts.home && y - parts.deckY < 0.5 && w >= 0.1) {
+    // an inside sill board under the glass, a shelf for a candle, jars or a pot (buildkit/cozyDress.ts)
+    const inX = -wallT - 0.015, bw = w - 0.02;
+    const board = alongX ? new THREE.BoxGeometry(bw, 0.008, 0.034).translate(cx, y - 0.004, cz + nz * inX) : new THREE.BoxGeometry(0.034, 0.008, bw).translate(cx + nx * inX, y - 0.004, cz);
+    parts.add('trim', board, 'interior');
+    parts.sills.push({ x: cx + nx * (-wallT - 0.017), z: cz + nz * (-wallT - 0.017), y, rot: Math.atan2(-nx, -nz), w: bw });
+  }
   parts.add(trim, bx(w + 2 * t, t, 0.016, 0, y + h, c + out));
   parts.add(trim, bx(w + 2 * t, t, 0.016, 0, y - t, c + out));
   // (the casings stand 0.001 off the reveal, not flush with it: flush faces of two meshes z-fight)
@@ -350,7 +383,7 @@ export function validateSpec(s: GabledSpec): string[] {
 export const SPEC_PROBLEMS: string[] = [];
 
 /** Test hook (buildkit/geometryAudit.test.ts): while `on`, every gabled shell built records its spec and the offset it was built at. */
-export const AUDIT: { on: boolean; shells: Array<{ spec: GabledSpec; ox: number; oz: number }>; furniture: Array<{ kind: 'I' | 'L'; c: Collider; spec: GabledSpec; ox: number; oz: number }>; partitions: Array<{ ax: number; az: number; bx: number; bz: number; h: number; spec: GabledSpec }> } = { on: false, shells: [], furniture: [], partitions: [] };
+export const AUDIT: { on: boolean; shells: Array<{ spec: GabledSpec; ox: number; oz: number }>; furniture: Array<{ kind: 'I' | 'L'; c: Collider; spec: GabledSpec; ox: number; oz: number }>; decor: Array<{ name: string; box: THREE.Box3; spec: GabledSpec; ox: number; oz: number }>; partitions: Array<{ ax: number; az: number; bx: number; bz: number; h: number; spec: GabledSpec }> } = { on: false, shells: [], furniture: [], decor: [], partitions: [] };
 
 // ─────────────────────────────────────────────────────────────────────────
 // Construction stages → layer fractions
@@ -490,6 +523,7 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
   const { W, D } = s;
   const hw = W / 2, hd = D / 2;
   const y0 = s.floor, yE = s.floor + s.wallH;
+  parts.deckY = s.floor; parts.porchD = s.porch; parts.frontZ = hd;
   const pitch = Math.atan2(s.rise, hw);
   const z0 = -hd - s.gableOver, z1 = hd + (s.porch > 0 ? s.porch + 0.03 : s.gableOver);
   const pz1 = hd + s.porch;
@@ -766,7 +800,7 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
       left: -hw + T, right: hw - T, front: hd - T, back: -hd + T,
       rnd: parts.rnd,
       C: (p, fn, prob = 0.75) => { if (parts.rnd() < prob) piece(parts.sink, (p.y ?? y0) > y0 + CUT_H ? 'decor' : 'interior', { ...p, y: p.y ?? y0 + 0.004 }, fn, false, clear); },
-      I: (p, fn, solid = true) => { const c = piece(parts.sink, 'interior', { ...p, y: p.y ?? y0 + 0.004 }, fn, solid, clear); if (c) { parts.collide(c); if (AUDIT.on) AUDIT.furniture.push({ kind: 'I', c, spec: s, ox: parts.ox, oz: parts.oz }); } },
+      I: (p, fn, solid = true) => { const c = piece(parts.sink, 'interior', { ...p, y: p.y ?? y0 + 0.004 }, fn, solid, clear); if (c) { parts.collide(c); parts.furniture.push(c); if (AUDIT.on) AUDIT.furniture.push({ kind: 'I', c, spec: s, ox: parts.ox, oz: parts.oz }); } },
       L: (p, fn, solid = false) => { const c = piece(parts.sink, 'loft', { ...p, y: p.y ?? yE }, fn, solid); if (c) { parts.collide(c); if (AUDIT.on) AUDIT.furniture.push({ kind: 'L', c, spec: s, ox: parts.ox, oz: parts.oz }); } },
       partition: (ax, az, bx, bz, openings = [], mat = s.inner ?? 'pine_panel', h = s.wallH) => {
         if (AUDIT.on) AUDIT.partitions.push({ ax, az, bx, bz, h, spec: s });
