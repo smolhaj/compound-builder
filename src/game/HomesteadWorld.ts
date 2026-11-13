@@ -107,6 +107,7 @@ import { seasons } from '../sim/regions';
 import { blueprintOf } from '../sim/construction';
 import { BLUEPRINTS } from '../sim/blueprints';
 import { SmokePlume } from '../engine/world/fx/SmokePlume';
+import { ContactShadows, groundNormal } from '../engine/world/fx/ContactShadows';
 import type { Pad, Pit } from './parcel/parcelTerrain';
 import { pitReach } from './parcel/parcelTerrain';
 import { SeasonController, climateFor, type SeasonMode } from '../engine/world/season/seasonState';
@@ -269,6 +270,8 @@ export class HomesteadWorld {
   readonly wildlife: WildlifeRenderer;
   /** The farm animals (goats, sheep, cows, pigs, rabbits, hens) between the paddock and their shelter, on the same route network. */
   readonly livestock: LivestockRenderer;
+  /** One shared layer of soft contact shadows / wall-foot occlusion (people, dogs, animals, vehicles, walls): `engine/world/fx/ContactShadows`. */
+  readonly contact: ContactShadows;
   /** Night life, weathering and the deeper seasons (atmosphere/). */
   readonly atmos: Atmosphere;
   /** The footpaths between the stops on the place, worn and laid (game/paths). */
@@ -356,7 +359,8 @@ export class HomesteadWorld {
     this.guardPosts = new GuardPostProp(ws.scene);
     this.fleet = new FleetRenderer(ws.scene);
     this.wildlife = new WildlifeRenderer(ws.scene);
-    this.livestock = new LivestockRenderer(ws.scene);
+    this.contact = new ContactShadows(ws.scene);
+    this.livestock = new LivestockRenderer(ws.scene, this.contact);
     this._campGroup = buildCamp({ fire: false });
     this._campGroup.position.set(this.camp.x, this.parcel.height(this.camp.x, this.camp.z), this.camp.z);
     // on a slope (a hillside or the island's knoll) the tent's uphill wall and the woodpile's tin sheet sink into the ground: raise the camp (and its yard) toward the highest ground under it, by at most about 40 cm (more would float the downhill side)
@@ -620,6 +624,10 @@ export class HomesteadWorld {
     if (trimWas !== detailGeometryOn()) for (const b of this._built.values()) this._rebuild(b, b.opts);
     this.roadLife.setQuality(q);
     this.livestock.setQuality(q);
+    this.wildlife.setQuality(q);
+    this.dogs.setQuality(q);
+    this.contact.setQuality(q);
+    this._bandKey = '';
     this.terrain.build({
       source: this._terrainSource,
       kind: this.regionWorld.kind, cx: this.center.x, cz: this.center.z,
@@ -2312,7 +2320,8 @@ export class HomesteadWorld {
       bridges: this._wildBridges(),
       bridgesOpen: !(this.doorLock ?? locksNow(game)),
       road: { x: this.county.x, y: (x, z) => (Math.abs(x - this.county.x(z)) < ROAD_W / 2 + 0.3 ? this.countyY(x, z) : this.groundAt(x, z)), halfW: ROAD_W / 2, gateZ: this._truckRoute()[0][1] },
-      cam: { x: this._ws.camera.position.x, z: this._ws.camera.position.z },
+      cam: { x: this._ws.camera.position.x, z: this._ws.camera.position.z, y: this._ws.camera.position.y },
+      doy: this._seasonDoy,
     }, speedK);
   }
   /** The standing tunnel-bridges as the animals see them (deck and mouths); a rock tunnel is closed to them. */
@@ -2361,6 +2370,65 @@ export class HomesteadWorld {
       return { id: st.id, kind: st.kind, x: st.x, z: st.z, rot: st.rot, w: def.cellsX * CELL, d: def.cellsZ * CELL, depth: ringsAround(game, [st.x, st.z]).length };
     });
     return this._homes;
+  }
+
+  private _bandKey = '';
+  private readonly _fleetSize = new WeakMap<THREE.Object3D, { rx: number; rz: number }>();
+  private readonly _cN = new THREE.Vector3();
+
+  /** Start the frame's contact shadows (people, dogs, animals and vehicles add theirs through the frame; `endContact` uploads them). */
+  beginContact(): void { this.contact.begin(); }
+
+  private _syncBands(): void {
+    const c = this.contact, ws = this._ws;
+    c.setLight(ws.sunDirection, ws.nightFactor);
+    // wall-foot bands: a dark falloff along each side of every building, on its pad (rewritten only when the buildings change)
+    let sum = this._built.size, fin = 0;
+    for (const b of this._built.values()) { if (b.finished) fin++; sum += b.placed.x * 3.1 + b.placed.z * 1.7 + b.placed.rot; }
+    const key = `${c.wantsBands}|${this._built.size}|${fin}|${sum.toFixed(2)}`;
+    if (key !== this._bandKey) {
+      this._bandKey = key;
+      c.clearStatic(); c.begin();
+      if (c.wantsBands) {
+        const W = 0.2;
+        for (const b of this._built.values()) {
+          if (b.under || !b.finished) continue;
+          const f = b.fpBody;
+          if (f.x1 - f.x0 < 0.3 || f.z1 - f.z0 < 0.3) continue;
+          // each side in short pieces, every one on the ground (or the pad, where that stands higher) and tilted to it, so a band follows a slope instead of floating or sinking
+          const sides: Array<[number, number, number, number, number, number]> = [[f.x0, f.z0, f.x1, f.z0, 0, -1], [f.x0, f.z1, f.x1, f.z1, 0, 1], [f.x0, f.z0, f.x0, f.z1, -1, 0], [f.x1, f.z0, f.x1, f.z1, 1, 0]];
+          for (const [x0, z0, x1, z1, ox, oz] of sides) {
+            const len = Math.hypot(x1 - x0, z1 - z0), m = Math.max(1, Math.ceil(len / 1.6));
+            for (let i = 0; i < m; i++) {
+              const ax = x0 + (x1 - x0) * i / m, az = z0 + (z1 - z0) * i / m, bx = x0 + (x1 - x0) * (i + 1) / m, bz = z0 + (z1 - z0) * (i + 1) / m;
+              const mx = (ax + bx) / 2 + ox * W / 2, mz = (az + bz) / 2 + oz * W / 2, gy = this.groundAt(mx, mz);
+              c.strip(ax, az, bx, bz, Math.max(gy, b.padY), ox, oz, W, 0.9, gy >= b.padY ? groundNormal(this.groundAt, mx, mz, this._cN) : null);
+            }
+          }
+        }
+      }
+      c.endStatic();
+    }
+  }
+
+  /** Close the frame's contact shadows: vehicles, then upload. */
+  endContact(): void {
+    const c = this.contact;
+    // vehicles: a blob the size of the body
+    for (const g of this.fleet.group.children) {
+      if (!g.visible) continue;
+      let sz = this._fleetSize.get(g);
+      if (!sz) {
+        const ry = g.rotation.y; g.rotation.y = 0; g.updateMatrixWorld(true);
+        const bx = new THREE.Box3().setFromObject(g); g.rotation.y = ry; g.updateMatrixWorld(true);
+        sz = { rx: Math.max(0.15, (bx.max.x - bx.min.x) * 0.5), rz: Math.max(0.2, (bx.max.z - bx.min.z) * 0.5) };
+        this._fleetSize.set(g, sz);
+      }
+      const p = g.position;
+      c.blob(p.x, p.y, p.z, groundNormal(this.groundAt, p.x, p.z, this._cN), sz.rx * 1.02, sz.rz * 1.02, g.rotation.y, 0.3, 0.85);
+    }
+    c.end();
+    if (this._view !== 'full' || this._under) c.mesh.visible = false;
   }
 
   /** Livestock: out in the paddock by day, in the barn, coop or barnyard at night, in a storm and when the place is raided (the innermost shelter). */
@@ -2450,7 +2518,19 @@ export class HomesteadWorld {
       const outer = guards.slice(0, 2).map((_, i) => postSpot(dctx, i)).slice(0, 1);
       this.guardPosts.sync([...outer, ...(guards.length > 1 && dctx.inner ? [dctx.inner] : [])], this.groundAt);
     } else this.guardPosts.sync([], this.groundAt);
+    this.dogs.setCamera(this._ws.camera.position.x, this._ws.camera.position.y, this._ws.camera.position.z);
     this.dogs.update(dt, game, hour, game.clock.t, dctx, this.walkHeight, speedK);
+    this._syncBands();
+    this.contact.begin();
+    for (const p of this.family.positions()) {
+      if (!this.family.shown.has(p.id)) continue;
+      const y = p.y ?? this.walkHeight(p.x, p.z);
+      this.contact.blob(p.x, y, p.z, groundNormal(this.walkHeight, p.x, p.z, this._cN, 0.08), 0.13, 0.13, 0, 0.28, 0.9);
+    }
+    for (const d of this.dogs.positions()) {
+      const y = d.y ?? this.walkHeight(d.x, d.z);
+      this.contact.blob(d.x, y, d.z, groundNormal(this.walkHeight, d.x, d.z, this._cN, 0.08), 0.07, 0.13, 0, 0.15, 0.8);
+    }
     this.updateDoors(dt, game);
     // crops stand in the ground from planting (mid-May) to the last of the harvest (late October); bare soil the rest of the year
     const doy = calendarOf(game.clock).doy, [c0, c1] = seasons(regionFor(game.site)).crops, growing = doy >= c0 && doy < c1;
@@ -2825,8 +2905,11 @@ export class HomesteadWorld {
     return [x, z];
   }
 
+  /** The day of the year the seasons are drawn for (the wildlife wears its winter coat and its antlers by it). */
+  private _seasonDoy = 180;
   /** Per frame: seasons (eased toward the calendar / pinned season) then terrain uniforms. */
   tick(dt: number, doy: number, totalDays: number, mode: SeasonMode): void {
+    this._seasonDoy = doy;
     this._poolTunnelLights();
     // underground (walking in a bunker, a QA pose inside a room): no daylight, only the lamps
     const cam = this._ws.camera.position;

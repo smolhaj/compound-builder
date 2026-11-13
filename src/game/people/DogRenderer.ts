@@ -1,16 +1,18 @@
 /**
- * DogRenderer — the family's dogs as small procedural quadrupeds (about 0.1
- * tall at the shoulder, 0.15 long: SCALE v2, a person is 0.28), one
- * InstancedMesh per part (body, head, snout, nose, ears, tail, legs: 7 draw
- * calls for any number of dogs, coat colors per instance). Where they are and
- * what they do comes from dogGoals (follow the bonded person, sleep by the
- * house, stand the post at the gate, bark); here they walk there, trot with
- * swinging legs, sit, lie, stand alert and bark. No shadows, no SSAO (perf rule).
+ * DogRenderer — the family's dogs as modelled procedural quadrupeds (docs/DECISIONS.md, "Realistic wildlife and dogs"): one skinned model per breed
+ * (game/wildlife/models/dogs: lab, shepherd, hound, collie, terrier, mutt; lofted body, digitigrade legs, drop / pricked / folded ears, the breed's tail, three
+ * coats painted in the shader), about 0.1 tall at the shoulder (SCALE v2: a person is 0.28), one InstancedMesh per breed in use and level of detail. Where they
+ * are and what they do comes from dogGoals (follow the bonded person, sleep by the house, stand the post at the gate, bark); here they walk there, trot with the
+ * feet advancing by distance, sit, lie, stand alert, bark and wag. No shadow-map casters, no SSAO (perf rule).
  */
 import * as THREE from 'three';
 import { ageYears, livingDogs, type Dog } from '../../sim/pets';
-import { dogShape, lookOf } from './dogModel';
+import { AnimalBatches } from '../livestock/animalBatches';
+import { UNIT } from '../livestock/LivestockRenderer';
+import { dogModelId } from '../wildlife/models/dogs';
+import { wildModelOf } from '../wildlife/wildModels';
 import { dayIndex, type GameState } from '../../sim/state';
+import type { Quality } from '../livestock/LivestockRenderer';
 import { dogGoal, type DogCtx, type Stance } from './dogGoals';
 import { stepToward, isStop, type Mover } from '../paths/deckWalk';
 import type { Wp } from '../paths/linkRoute';
@@ -18,11 +20,10 @@ import type { Wp } from '../paths/linkRoute';
 const CAP = 24;
 /** Dog speeds (world units per real second at 1x). A dog trots faster than a person walks. */
 const TROT = 0.8, RUN = 1.6;
-const BLOBS = 48, BONES = 18;      // instances per dog
 
 interface Agent {
   x: number; z: number; rot: number; phase: number; stance: Stance; placed: boolean;
-  lie: number; sit: number; up: number; bark: number; moving: boolean;
+  lie: number; sit: number; up: number; bark: number; moving: boolean; dist?: number;
   via?: Wp[]; viaFor?: { x: number; z: number };
   /** Deck height inside a tunnel or on a tunnel-bridge (null: on the ground). */
   y?: number | null;
@@ -30,34 +31,22 @@ interface Agent {
   retry?: number;
 }
 
-const tmpA = new THREE.Matrix4(), tmpB = new THREE.Matrix4(), tmpV = new THREE.Vector3(), tmpS = new THREE.Vector3(), tmpQ = new THREE.Quaternion(), tmpE = new THREE.Euler(), tmpC = new THREE.Color(), UP = new THREE.Vector3(0, 1, 0), tmpD = new THREE.Vector3();
-
 export interface PreviewDog { dog: Dog; x: number; z: number; rot: number; stance: Stance; moving?: boolean; phase?: number; up?: number }
 
 export class DogRenderer {
-  private readonly _blob: THREE.InstancedMesh;
-  private readonly _bone: THREE.InstancedMesh;
+  private readonly _batches: AnimalBatches;
   private readonly _agents = new Map<string, Agent>();
   private _time = 0;
   private _lastClock = -1;
-  private _scene: THREE.Scene | null;
+  private _drawn: Array<{ id: string; y: number; scale: number; breed: string }> = [];
+  private _cam: { x: number; y: number; z: number } | null = null;
 
-  constructor(scene: THREE.Scene) {
-    this._scene = scene;
-    const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0 });
-    const mk = (name: string, g: THREE.BufferGeometry, per: number): THREE.InstancedMesh => {
-      const mesh = new THREE.InstancedMesh(g, mat, CAP * per);
-      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAP * per * 3), 3);
-      mesh.count = 0; mesh.castShadow = false; mesh.receiveShadow = false; mesh.frustumCulled = false;
-      mesh.name = `dog_${name}`; mesh.userData = { type: 'dogs', noSSAO: true };
-      scene.add(mesh);
-      return mesh;
-    };
-    // a unit sphere (scaled into ellipsoids) and a tapered limb that runs from y = 0 (radius 1) to y = 1 (radius 0.72)
-    this._blob = mk('blobs', new THREE.SphereGeometry(1, 12, 8), BLOBS);
-    this._bone = mk('bones', new THREE.CylinderGeometry(0.72, 1, 1, 8, 1, false).translate(0, 0.5, 0), BONES);
-  }
+  constructor(scene: THREE.Scene) { this._batches = new AnimalBatches(scene, CAP, 'dogs', wildModelOf); }
+
+  /** The draw detail tier. */
+  setQuality(q: Quality): void { this._batches.setQuality(q); }
+  /** Where the camera is (for the level of detail). */
+  setCamera(x: number, y: number, z: number): void { this._cam = { x, y, z }; }
 
   /** Where a dog stands (QA / camera / the barn). */
   poseOf(id: string): { x: number; z: number; rot: number; stance: Stance } | null {
@@ -75,7 +64,7 @@ export class DogRenderer {
     const live = new Set(dogs.map(d => d.id));
     for (const k of [...this._agents.keys()]) if (!live.has(k)) this._agents.delete(k);
     const guards = dogs.filter(d => d.guard && ageYears(d, day) >= 0.5);
-    let n = 0;
+    this._batches.begin(); this._drawn = [];
     dogs.forEach((d, i) => {
       const idx = d.guard ? guards.indexOf(d) : i;
       const goal = dogGoal(d, Math.max(0, idx), hour, day, ctx, clock);
@@ -93,6 +82,7 @@ export class DogRenderer {
       const leg = a.via![0], gx = leg ? leg[0] : goal.x, gz = leg ? leg[1] : goal.z;
       const dx = gx - a.x, dz = gz - a.z, dist = leg ? Math.hypot(goal.x - a.x, goal.z - a.z) : Math.hypot(dx, dz), legD = Math.hypot(dx, dz);
       let moving = false;
+      const px0 = a.x, pz0 = a.z;
       const tol = goal.follow ? 0.1 : 0.04;
       if ((a.wait ?? 0) > 0) { a.wait = Math.max(0, a.wait! - dt * Math.max(1, speedK)); if (a.wait === 0) a.via!.shift(); }
       else if (dist > tol || (leg && a.via!.length > 1)) {
@@ -125,68 +115,52 @@ export class DogRenderer {
       a.sit += ((stance === 'sit' ? 1 : 0) - a.sit) * k;
       a.up += ((stance === 'alert' || stance === 'bark' ? 1 : 0) - a.up) * k;
       a.bark = stance === 'bark' ? a.bark + dt * 7 : 0;
-      a.phase += dt * (moving ? (dist > 0.5 ? 16 : 11) * Math.min(2.2, Math.max(1, speedK)) : 0);
+      // the legs advance with the distance walked (no sliding): one gait cycle per stride
+      if (moving) a.phase += Math.hypot(a.x - px0, a.z - pz0) * Math.PI * 2 / (Math.max(0.05, stride(d) * UNIT * (dist > 0.5 ? 1.8 : 1)));
+      a.dist = dist;
       a.moving = moving;
-      this._draw(n++, d, a, ground, day);
+      this._draw(d, a, ground, day);
     });
-    this._commit(n);
+    this._commit();
   }
 
-  /** World y of the first body blob of dog `slot` (test hook). */
-  bodyY(slot = 0): number { const m = new THREE.Matrix4(); this._blob.getMatrixAt(slot * BLOBS, m); return new THREE.Vector3().setFromMatrixPosition(m).y; }
+  /** What was drawn last frame (test hook): the dog's id, the ground it stands on, its scale and breed model. */
+  drawn(): ReadonlyArray<{ id: string; y: number; scale: number; breed: string }> { return this._drawn; }
+  /** Draw calls and dogs drawn now (QA / tests). */
+  drawCalls(): number { return this._batches.drawCalls(); }
 
   /** Draw dogs exactly as given (the dog viewer / QA): no walking, no goals. */
   preview(items: PreviewDog[], ground: (x: number, z: number) => number = () => 0): void {
-    let n = 0;
+    this._batches.begin(); this._drawn = [];
     for (const it of items.slice(0, CAP)) {
       const a: Agent = { x: it.x, z: it.z, rot: it.rot, phase: it.phase ?? 0, stance: it.stance, placed: true, lie: it.stance === 'lie' ? 1 : 0, sit: it.stance === 'sit' ? 1 : 0, up: it.stance === 'alert' || it.stance === 'bark' ? 1 : it.up ?? 0, bark: 0, moving: !!it.moving };
-      this._draw(n++, it.dog, a, ground, 365 * 3 + it.dog.born);
+      this._draw(it.dog, a, ground, 365 * 3 + it.dog.born);
     }
-    this._commit(n);
+    this._batches.flush(this._time);
   }
 
-  private _commit(n: number): void {
-    for (const [m, per] of [[this._blob, BLOBS], [this._bone, BONES]] as const) {
-      m.count = n * per; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true;
-    }
-  }
+  private _commit(): void { this._batches.flush(this._time); }
 
-  private _draw(n: number, d: Dog, a: Agent, ground: (x: number, z: number) => number, day: number): void {
+  private _draw(d: Dog, a: Agent, ground: (x: number, z: number) => number, day: number): void {
     const pup = ageYears(d, day) < 0.5;
     const grow = pup ? 0.55 + 0.45 * Math.max(0, ageYears(d, day)) / 0.5 : 1;
-    const look0 = lookOf(d.breed, d.tone);
-    const look = pup ? { ...look0, head: look0.head * (1 + 0.3 * (1 - grow)), muzzle: look0.muzzle * 0.85 } : look0;
-    const sc = grow * look.size;
     const happy = d.mood > 60 ? 1 : d.mood > 35 ? 0.4 : 0;
-    const seed = (d.born * 0.37 + d.tone * 0.11) % 1;
-    const shape = dogShape(look, { lie: a.lie, sit: a.sit, up: a.up, phase: a.phase, moving: a.moving, t: this._time, happy: d.mood < 35 ? 0 : happy, bark: a.stance === 'bark' ? Math.sin(a.bark * 3) * 0.2 : 0, seed: Math.abs(seed) });
-    const gy = a.y ?? ground(a.x, a.z);
-    const world = tmpA.compose(tmpV.set(a.x, gy, a.z), tmpQ.setFromAxisAngle(UP, a.rot), tmpS.set(sc, sc, sc));
-    const W = new THREE.Matrix4().copy(world);
-    let i = n * BLOBS;
-    for (const b of shape.blobs) {
-      if (i >= (n + 1) * BLOBS) break;
-      tmpB.compose(tmpV.set(b.c[0], b.c[1], b.c[2]), tmpQ.setFromEuler(tmpE.set(b.rot[0], b.rot[1], b.rot[2], 'XYZ')), tmpS.set(b.r[0], b.r[1], b.r[2]));
-      this._blob.setMatrixAt(i, tmpB.premultiply(W)); this._blob.setColorAt(i, tmpC.setHex(b.col)); i++;
-    }
-    // unused slots collapse to nothing
-    for (; i < (n + 1) * BLOBS; i++) { tmpB.makeScale(0, 0, 0); this._blob.setMatrixAt(i, tmpB); }
-    let j = n * BONES;
-    for (const b of shape.bones) {
-      if (j >= (n + 1) * BONES) break;
-      tmpD.set(b.b[0] - b.a[0], b.b[1] - b.a[1], b.b[2] - b.a[2]);
-      const len = tmpD.length() || 1e-6;
-      tmpQ.setFromUnitVectors(UP, tmpD.multiplyScalar(1 / len));
-      tmpB.compose(tmpV.set(b.a[0], b.a[1], b.a[2]), tmpQ, tmpS.set(b.r, len, b.r));
-      this._bone.setMatrixAt(j, tmpB.premultiply(W)); this._bone.setColorAt(j, tmpC.setHex(b.col)); j++;
-    }
-    for (; j < (n + 1) * BONES; j++) { tmpB.makeScale(0, 0, 0); this._bone.setMatrixAt(j, tmpB); }
+    const seed = Math.abs((d.born * 0.37 + d.tone * 0.11) % 1);
+    const gy = a.y ?? ground(a.x, a.z), id = dogModelId(d.breed), model = wildModelOf(id);
+    const tier = this._batches.tier(), cam = this._cam;
+    const dd = cam ? Math.hypot(a.x - cam.x, gy - cam.y, a.z - cam.z) : 0, li = dd < tier.at[0] ? 0 : dd < tier.at[1] ? 1 : 2;
+    // a barking dog throws its head up; the sit is the haunches folding; the lie wins over the sit
+    const bark = a.stance === 'bark' ? 0.75 + 0.25 * Math.sin(a.bark * 3) : 0;
+    this._batches.put({
+      id, breed: d.tone % 3, x: a.x, y: gy, z: a.z, rot: a.rot, phase: a.phase, gait: a.moving ? ((a.dist ?? 0) > 0.5 ? 1.25 : 1) : 0, graze: a.sit * (1 - a.lie), seed, tone: seed,
+      size: grow, lie: a.lie, alert: Math.max(a.up * (1 - a.lie), bark), wag: d.mood < 35 ? 0 : happy, li,
+      nx: (ground(a.x - 0.05, a.z) - ground(a.x + 0.05, a.z)) / 0.1, nz: (ground(a.x, a.z - 0.05) - ground(a.x, a.z + 0.05)) / 0.1,
+    });
+    this._drawn.push({ id: d.id, y: gy, scale: grow * UNIT * (model.spec.breeds[d.tone % 3].size ?? 1), breed: id });
   }
 
-  dispose(): void {
-    if (!this._scene) return;
-    for (const m of [this._blob, this._bone]) { this._scene.remove(m); m.geometry.dispose(); m.dispose(); }
-    (this._blob.material as THREE.Material).dispose();
-    this._scene = null;
-  }
+  dispose(): void { this._batches.dispose(); }
 }
+
+/** Metres a dog covers per gait cycle: about the length of its own body (a trot). */
+function stride(d: Dog): number { return wildModelOf(dogModelId(d.breed)).stride; }
