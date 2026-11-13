@@ -30,6 +30,8 @@ import { MATERIAL_IDS, MATERIALS, type MaterialId } from './materials';
 import { isAre, materialCount, pluralize } from './words';
 import { crewProblem, crewQuote } from './crews';
 import { crewNudge } from './crewNudge';
+import { wallCrewCard, wallFirstCard } from './wallCrew';
+import { eta } from './pace';
 import { idleCash } from './idleCash';
 import { permitWait, permitWaitText } from './permitWait';
 import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind, type Pt } from './perimeter';
@@ -171,7 +173,9 @@ export type SuggestionAct =
   /** All hands on the fires a raid set (sim/raidFire.ts), or back to the usual share. */
   | { type: 'fire'; on: boolean }
   /** Hire the crew for a project; with `lines`, order those materials first (one tap). */
-  | { type: 'crew'; id: string; lines?: OrderLine[] }
+  | { type: 'crew'; id: string; lines?: OrderLine[]; /** Crews to hire side by side (a perimeter run takes several; default 1). */ count?: number }
+  /** Put a project (a wall run) ahead of the other work (sim/priority.ts setFocus). */
+  | { type: 'focus'; id: string }
   /** Hire the contractor for the gravel drive (or the power line). */
   | { type: 'hookup'; what: 'drive' | 'power' }
   | { type: 'open'; right: 'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle'; supplies?: 'stores' | 'farm' }
@@ -323,6 +327,15 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
     if (n) out.push({ id: 'house_crew', kind: '', title: n.title, urgency: 93, why: n.why,
       acts: [{ label: n.lines.length ? `Order the materials and hire the crew (~${usd(n.totalUsd)})` : `Hire the crew (~${usd(n.usd)})`, act: { type: 'crew', id: n.id, ...(n.lines.length ? { lines: n.lines } : {}) } },
         ...(n.tents > 0 ? [{ label: `Or buy ${pluralize(n.tents, 'tent')} for now (${usd(n.tentUsd)})`, act: { type: 'order' as const, lines: [{ material: 'tent' as const, qty: n.tents }] } }] : [{ label: 'Show me', act: { type: 'select' as const, id: n.id } }])] }); }
+  // the wall ring: the family builds structures first, so a ring can sit at zero for a year; offer to put it first, and to hire crews for it (sim/wallCrew.ts)
+  { const w = wallCrewCard(s);
+    if (w) out.push({ id: 'wall_crew', kind: '', title: `Hire ${pluralize(w.add, 'crew')} to put up the ${w.name} in about ${pluralize(w.crewWeeks, 'week')} (~${usd(w.lines.length ? w.totalUsd : w.wagesUsd)})`, urgency: 92,
+      why: `${w.familyWeeks === null ? 'No one is free to build it' : `The family alone would take ${eta(w.familyWeeks)}`} (${Math.round(w.hours).toLocaleString('en-US')} person-hours). Crews of four work every weekday, side by side on different stretches of the wall, and you pay only for the hours they work: about ${usd(w.wagesUsd)} in wages. Money buys speed here; more crews finish sooner for the same wages. ${w.lines.length ? 'One tap orders the materials and hires them; they start when the delivery lands.' : 'The materials are in.'}`,
+      acts: [{ label: `${w.lines.length ? 'Order and hire' : 'Hire'} ${pluralize(w.add, 'crew')} (~${usd(w.totalUsd)})`, act: { type: 'crew', id: w.run.id, count: w.add, ...(w.lines.length ? { lines: w.lines } : {}) } }, { label: 'Show me', act: { type: 'select', id: w.run.id } }] }); }
+  { const w = wallFirstCard(s);
+    if (w) out.push({ id: 'wall_first', kind: '', title: `Work on the ${w.name} first`, urgency: 74,
+      why: `The family finishes buildings before wall, so a ${w.name} of ${Math.round(w.hours).toLocaleString('en-US')} person-hours can wait for months while the other projects go on. This puts it at the front of the list; the family still works on something else whenever it is waiting for materials. You can clear it in the Projects tab.`,
+      acts: [{ label: 'Wall first', act: { type: 'focus', id: w.run.id } }] }); }
   // spare cash with a job to do: another crew, a few months of guards once the warning is up, a small metals hedge (sim/idleCash.ts; advice only)
   { const ic = idleCash(s);
     if (ic) {

@@ -427,12 +427,15 @@ export function runBlocked(s: GameState, r: PerimeterRun): string | null {
   return waitingFor(miss);
 }
 
-/** Add person-hours to a run (takes its materials first). */
-export function addRunWork(s: GameState, r: PerimeterRun, hours: number): void {
-  if (runFinished(r)) return;
+/**
+ * Add person-hours to a run (takes its materials first). Returns the person-hours actually worked (a hired crew bills that:
+ * it brings its own tools, so `crew` skips the family's tool upkeep and wear and works at full speed).
+ */
+export function addRunWork(s: GameState, r: PerimeterRun, hours: number, crew = false): number {
+  if (runFinished(r)) return 0;
   if (!r.supplied) {
     const bill = runBill(r.kind, wallLength(r));
-    if (!hasAll(s.stock, bill)) return;
+    if (!hasAll(s.stock, bill)) return 0;
     for (const [k, n] of Object.entries(bill) as Array<[MaterialId, number]>) s.stock[k] -= n;
     r.supplied = true;
     // a berm takes what it can from the spoil pile (bunker digs, ditches): much less shovel work
@@ -444,11 +447,13 @@ export function addRunWork(s: GameState, r: PerimeterRun, hours: number): void {
     }
   }
   // the family's shovel, pliers and so on (sim/tools.ts)
-  hours = payUpkeep(s, hours);
-  const task = { kind: 'fence', run: r.kind } as const, m = workSpeed(s, task);
-  if (m <= 0) return;
-  wearTools(s, task, hours);
+  if (!crew) hours = payUpkeep(s, hours);
+  const task = { kind: 'fence', run: r.kind } as const, m = crew ? 1 : workSpeed(s, task);
+  if (m <= 0) return 0;
+  const before = r.done;
   r.done = Math.min(r.hours, r.done + hours * m);
+  const used = (r.done - before) / m;
+  if (!crew) wearTools(s, task, used);
   if (r.done >= r.hours - 1e-9) {
     r.finishedAt = s.clock.t;
     if (r.kind === 'ditch') s.stock.spoil += Math.round(DITCH_M3 * wallLength(r));
@@ -469,6 +474,7 @@ export function addRunWork(s: GameState, r: PerimeterRun, hours: number): void {
     }
     log(s, d.growYears ? `${d.name} planted. Give it ${pluralize(d.growYears, 'year')}.` : `${d.name} ${r.kind === 'water_pipe' || r.kind === 'power_cable' || r.kind === 'drain_channel' ? 'laid' : 'finished'}.`);
   }
+  return used;
 }
 
 /** Built fraction 0–1 (drawn along the run). */

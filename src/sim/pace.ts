@@ -8,7 +8,7 @@
  */
 import { buildRate, workHoursPerDay } from './family';
 import { isFinished } from './construction';
-import { CREW_SIZE, hoursLeft } from './crews';
+import { CREW_WEEK, crewHoursLeft, crewsOn, hoursLeft } from './crews';
 import { isAway } from './rescue';
 import { runFinished, type PerimeterRun } from './perimeter';
 import type { GameState } from './state';
@@ -53,14 +53,13 @@ const runLeft = (r: PerimeterRun) => (runFinished(r) ? 0 : Math.max(0, r.hours -
 export interface QueueItem { id: string; name: string; hours: number }
 
 /** Hours a week a hired crew puts in (four people, 9 hours, 5 weekdays). */
-export const CREW_WEEK_HOURS = CREW_SIZE * 9 * 5;
+export const CREW_WEEK_HOURS = CREW_WEEK;
 
 const crewed = (s: GameState, id: string): boolean => (s.crews ?? []).some(c => c.target === id);
 
-/** Weeks a hired crew needs for what is left on a building (null: no crew on it). */
+/** Weeks the hired crews need for what is left on a building or a run (null: no crew on it); several crews on a run work side by side. */
 export function crewWeeksFor(s: GameState, id: string): number | null {
-  const st = s.structures.find(x => x.id === id);
-  return st && crewed(s, id) ? hoursLeft(st) / CREW_WEEK_HOURS : null;
+  return crewed(s, id) ? crewHoursLeft(s, id) / (CREW_WEEK_HOURS * crewsOn(s, id)) : null;
 }
 
 export function workQueue(s: GameState): QueueItem[] {
@@ -68,7 +67,7 @@ export function workQueue(s: GameState): QueueItem[] {
   const first = s.focus;
   // a building with a hired crew on it is the crew's work, not the family's
   for (const st of s.structures) if (!isFinished(st) && !crewed(s, st.id)) out.push({ id: st.id, name: st.kind, hours: hoursLeft(st) });
-  for (const r of s.perimeter) if (!runFinished(r)) out.push({ id: r.id, name: r.kind, hours: runLeft(r) });
+  for (const r of s.perimeter) if (!runFinished(r) && !crewed(s, r.id)) out.push({ id: r.id, name: r.kind, hours: runLeft(r) });
   for (const j of s.hardenJobs) if (j.finishedAt === null) out.push({ id: j.id, name: 'hardening', hours: Math.max(0, j.hours - j.done) });
   // "work on this first" (sim/priority.ts) jumps the queue
   const i = first ? out.findIndex(q => q.id === first) : -1;

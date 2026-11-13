@@ -72,8 +72,8 @@ describe('idle cash', () => {
 });
 
 describe('start funds, independent families', () => {
-  it('trims the independent range by about 30 percent', () => {
-    expect(FUNDS_RANGE.independent).toEqual([700_000, 1_400_000]);
+  it('keeps the independent range at 1.0 to 2.0 million (money buys build speed: crews build walls)', () => {
+    expect(FUNDS_RANGE.independent).toEqual([1_000_000, 2_000_000]);
     for (let seed = 1; seed <= 20; seed++) {
       const f = startFunds(generateFamily(seed), 'independent', seed);
       expect(f.budget).toBeGreaterThanOrEqual(FUNDS_RANGE.independent[0]);

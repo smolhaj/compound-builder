@@ -24,8 +24,8 @@ export const IDLE_FLOOR = 200_000;
 export const IDLE_CREW_SHARE = 0.4;
 /** Hours below which a project is not worth a crew of its own. */
 export const IDLE_CREW_MIN_HOURS = 150;
-/** Spare cash that supports a third crew at once (two otherwise). */
-export const IDLE_THIRD_CREW = Infinity;
+/** Two crews at once, and one more for every this much spare cash (money buys build speed: no fixed cap on how many a rich family can run). */
+export const IDLE_MORE_CREWS_PER = 150_000;
 /** The metals hedge: this share of the spare cash, in $1,000s, at most the cap, once the warning signs are up. */
 export const IDLE_METALS_SHARE = 0.2;
 export const IDLE_METALS_MIN = 80_000;
@@ -57,7 +57,7 @@ export function idleCash(s: GameState): IdleCash | null {
   if (spare < IDLE_MIN) return null;
 
   let crew: IdleCrew | null = null;
-  if ((s.crews ?? []).length < (spare >= IDLE_THIRD_CREW ? 3 : 2)) {
+  if ((s.crews ?? []).length < 2 + Math.floor(spare / IDLE_MORE_CREWS_PER)) {
     const open = s.structures
       .filter(st => !st.unplaced && !st.pre && !isFinished(st) && !(s.crews ?? []).some(c => c.target === st.id) && hoursLeft(st) >= IDLE_CREW_MIN_HOURS && !crewProblem(s, st))
       // a crew cannot fell trees: with the logs for the walls still standing it would only wait on the payroll
