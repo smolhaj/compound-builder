@@ -16,6 +16,7 @@ import { useEffect, useRef } from 'react';
 import type { GameState } from '../sim/state';
 import { MushroomCloud } from './fx/MushroomCloud';
 import { collapseLook, withWeather } from '../sim/collapseLook';
+import { OasisState } from './atmosphere/OasisState';
 import { applyDust, dustStorm } from '../engine/world/weather/dustStorm';
 import * as THREE from 'three';
 import { WorldScene } from '../engine/world/WorldScene';
@@ -461,6 +462,7 @@ export function GameCanvas() {
     let camBefore: { x: number; y: number; z: number; radius: number; pitch: number; yaw: number } | null = null, camBack = false;
     let promptAt = -1, skipScene = useCutsceneView.getState().skipScene, skipAll = useCutsceneView.getState().skipAll;
     let battleView: { x: number; z: number; radius: number; pitch: number } | null = null;
+    const oasis = new OasisState();
     const qa: { /** QA: force the dust-storm strength 0-1. */ dust?: number; noCover?: boolean; /** QA: run the frame (sim, camera, effects) without drawing it, to skip ahead cheaply. */ skipDraw?: boolean; frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
     // window.__cb.qa.renderNow(): draw one frame (a promise); renderFull('high'|'medium'): one slow full-quality, full-resolution shot
     if (lowRender.on) Object.assign(qa, { lowrender: true, renderNow: () => renderReq.request(), renderFull: (q: QaQuality = 'high') => renderReq.request(q) });
@@ -622,7 +624,7 @@ export function GameCanvas() {
       setWindowGlow(Math.max(0, Math.min(1, (ws.nightFactor - 0.25) / 0.4)), now / 1000, world.atmos.warmth, world.atmos.hearthFire);
       world.updateAtmosphere({
         dt, time: now / 1000, hour: t, night: ws.nightFactor, daylight: 1 - ws.nightFactor * 0.85, wind: wx.wind, rain: wx.rain, cloud: wx.cloud,
-        snow: Math.max(sp.snow, wx.snowCover * seasonState.weatherSnow) * (wx.rain > 0.3 ? 0.4 : 1), viewportH: canvas.clientHeight || 800, battle: battle.playing,
+        snow: Math.max(sp.snow, wx.snowCover * seasonState.weatherSnow) * (wx.rain > 0.3 ? 0.4 : 1), viewportH: canvas.clientHeight || 800, battle: battle.playing, fov: ws.camera.fov,
       }, gs, seasonState.doy);
       if (tour.active) {
         const f = tour.update(dt);
@@ -701,6 +703,8 @@ export function GameCanvas() {
         if (battleSync > 0.2 && battle.playing) { battleSync = 0; bs.setProgress(battle.time, battle.lines); }
       }
       ws.tick(dt);
+      // the oasis contrast: warm inside the held walls, cold and ashy outside, dimmed by a breach or a raid (atmosphere/OasisState.ts)
+      { const o = oasis.update(dt, gs, ws.camera.position, cam.target, world.groundAt(ws.camera.position.x, ws.camera.position.z), battle.playing ? 'attack' : gs.gate.pending ? 'knock' : 'none'); ws.setOasis(o.collapse, o.safety, o.inside); }
       ws.updateDayNight(t);
       blueprintOv.update(performance.now());
       if (!lowRender.on) {
@@ -731,7 +735,7 @@ export function GameCanvas() {
     if (!showcaseNext) requestAnimationFrame(() => requestAnimationFrame(() => { if (!cancelled) useWorldStore.getState().setBoot(null); }));
 
     // QA hook (screenshot harness, console poking).
-    (window as unknown as Record<string, unknown>).__cb = { census: () => sceneCensus(ws.scene), terrainOv, blueprintOv, player, ws, world, weather, valley, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
+    (window as unknown as Record<string, unknown>).__cb = { oasis, census: () => sceneCensus(ws.scene), terrainOv, blueprintOv, player, ws, world, weather, valley, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
       demoBattle: () => {
         const g = useGameStore.getState().game;
         const b = demoBattle(g.structures, g.people, g.structures.length ? undefined : world.camp);

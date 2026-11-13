@@ -61,7 +61,9 @@ export const RISE_TAU = 22;
 export function safetyTarget(i: HomeSafetyInput): { target: number; reasons: string[] } {
   const c = clamp01(i.collapse);
   const parts: Array<[number, string]> = [];
-  parts.push([0.5 * c * (1 - clamp01(i.perimeter)), 'The line is open: the walls are thin or missing']);
+  // a wall that holds (barrier 75 or better) costs nothing; thin or missing walls cost more as the world falls
+  const held = clamp01((i.perimeter - 0.35) / 0.4);
+  parts.push([0.5 * c * (1 - held * held * (3 - 2 * held)), 'The line is open: the walls are thin or missing']);
   parts.push([Math.min(0.5, 0.3 * i.breaches), 'A breach stands open']);
   parts.push([i.raid === 'attack' ? 0.45 : i.raid === 'knock' ? 0.12 : 0, i.raid === 'attack' ? 'Raiders are at the walls' : 'A stranger is at the gate']);
   parts.push([i.power ? 0 : 0.1 * c, 'The power is out']);
