@@ -15,6 +15,7 @@
  *    the shared length.
  */
 import { CELL, footprint, KIT, placementProblem, rotQ, type KitPieceDef, type Placed, type PlaceProblem, type SiteQuery } from './kit';
+import { WALLLESS, planPad } from '../../sim/retainPlan';
 
 /** Floor of a bunker below the ground at its entrance (world units; ≈ 4.8 m). */
 export const DEPTH = 0.8;
@@ -162,7 +163,25 @@ export function undergroundProblem(def: KitPieceDef, x: number, z: number, rot: 
 
 /** Every placement rule, surface and underground (null = it can go here). */
 export function siteProblem(def: KitPieceDef, x: number, z: number, rot: number, site: SiteQuery, placed: readonly Placed[]): PlaceProblem | null {
-  return placementProblem(def, x, z, rot, site, placed) ?? undergroundProblem(def, x, z, rot, site.height, placed);
+  return placementProblem(def, x, z, rot, site, placed) ?? undergroundProblem(def, x, z, rot, site.height, placed) ?? padOverBlocked(def, x, z, rot, site);
+}
+
+/**
+ * The flat ground graded for a piece reaches past its footprint (its edge, and the apron on the sides that carry a retaining wall): that ground must not be the
+ * drive, the camp or the road's cut banks and fills either, or the road is re-graded under it (and the bench buries the apron). The footprint itself is tested
+ * by placementProblem; this tests the ring round it.
+ */
+function padOverBlocked(def: KitPieceDef, x: number, z: number, rot: number, site: SiteQuery): PlaceProblem | null {
+  if (!site.blocked || isUnderground(def) || def.climbs || def.waterside || def.stilts || WALLLESS.test(def.id) || !Number.isInteger(rot)) return null;
+  const fp = footprint(def, x, z, rot), pad = planPad(fp, site.height).rect;
+  if (pad.x0 >= fp.x0 - 0.065 && pad.x1 <= fp.x1 + 0.065 && pad.z0 >= fp.z0 - 0.065 && pad.z1 <= fp.z1 + 0.065) return null;     // (no apron: the margin was tested)
+  const nx = Math.min(40, Math.ceil((pad.x1 - pad.x0) / 0.3)), nz = Math.min(40, Math.ceil((pad.z1 - pad.z0) / 0.3));
+  for (let i = 0; i <= nx; i++) for (let j = 0; j <= nz; j++) {
+    const px = pad.x0 + (pad.x1 - pad.x0) * i / nx, pz = pad.z0 + (pad.z1 - pad.z0) * j / nz;
+    if (px > fp.x0 - 0.065 && px < fp.x1 + 0.065 && pz > fp.z0 - 0.065 && pz < fp.z1 + 0.065) continue;
+    if (site.blocked(px, pz)) return 'pad_over_road';
+  }
+  return null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────

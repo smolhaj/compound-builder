@@ -25,7 +25,7 @@ import { loadGame, AUTOSAVE } from './sim/save/saveSystem';
 import { newGame } from './sim/state';
 import { makeLotSite } from './sim/lotListing';
 import type { LotKind } from './sim/lots';
-import { CLASSIC, type Acres } from './sim/site';
+import { CLASSIC, listings, ANY_WISH, type Acres } from './sim/site';
 import type { RegionId } from './sim/regions';
 
 /**
@@ -43,8 +43,10 @@ export default function App() {
       const lotKind = q.get('lot') as LotKind | null;
       const lotSite = lotKind ? makeLotSite({ kind: lotKind, relief: Number(q.get('relief') ?? 8), acres: Number(q.get('acres') ?? 40) as Acres, region: (q.get('region') ?? 'mountain_west') as RegionId, seed: Number(q.get('lotseed') ?? 3), outlier: q.has('outlier'), creek: q.has('lotcreek'), cutbank: q.has('lotcut'), flip: q.get('flip') === '-1' ? -1 : 1, elevM: Number(q.get('elev') ?? 2000) }) : null;
       // QA: ?region=plains (no lot) is the classic forty in that region; &drive puts the gravel drive in (the road works are drawn only once it is built)
-      const regionSite = !lotSite && q.has('region') ? { ...CLASSIC, region: q.get('region') as RegionId, creek: !q.has('nocreek') } : null;
-      const qaSite = lotSite ?? regionSite;
+      // QA: ?seed=2&listing=mountain_west.4 starts on that real listing of the market (region.index, the seed is the game seed): the scene the audit (sim/sceneAudit) walked
+      const lst = q.get('listing')?.split('.'), listed = lst && !lotSite ? listings(Number(q.get('seed') ?? 1), lst[0] as RegionId, ANY_WISH, 6, 5_000_000)[Number(lst[1] ?? 0)] : null;
+      const regionSite = !lotSite && !listed && q.has('region') ? { ...CLASSIC, region: q.get('region') as RegionId, creek: !q.has('nocreek') } : null;
+      const qaSite = lotSite ?? listed ?? regionSite;
       if (qaSite && q.has('drive')) qaSite.improvements = { ...qaSite.improvements, drive: true };
       const game = saved ?? (qaSite ? newGame(useWorldStore.getState().seed, undefined, undefined, { site: qaSite }) : newGame(useWorldStore.getState().seed));
       if (!saved && q.has('bridgedown')) game.roadBridge = { down: true, due: null };   // QA: the bridge on the way in, brought down
