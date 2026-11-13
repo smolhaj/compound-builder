@@ -2445,7 +2445,7 @@ export class HomesteadWorld {
     const w = this._walkWorld();
     this.livestock.update(dt, game.stock as unknown as Record<string, number>, coops, homes,
       { hour, raided: hostileAtGate(game.gate.pending) || this.doorLock === true || this.qaRaid, storm: seasonState.params.snow > 0.6, house, clock: game.clock.t },
-      { ground: this.groundAt, via: (kind, a, b) => animalRoute(a, b, this._animalHard(kind), (x, z) => w.cost?.(x, z) ?? 1, 0.14, 1.3), free: (x, z) => !this.onBuilding(x, z, 0.1, false) && !this.onAccess(x, z, 0.05) && !this.parcel.isCreek(x, z) },
+      { ground: this.groundAt, floor: this.walkHeight, via: (kind, a, b) => animalRoute(a, b, this._animalHard(kind), (x, z) => w.cost?.(x, z) ?? 1, 0.14, 1.3), free: (x, z) => !this.onBuilding(x, z, 0.1, false) && !this.onAccess(x, z, 0.05) && !this.parcel.isCreek(x, z) },
       speedK, { x: this._ws.camera.position.x, z: this._ws.camera.position.z, y: this._ws.camera.position.y });
     // a shelter the animals cannot get to (across the creek, behind a wall): one line in the log
     const cut = this.livestock.takeNoWay().filter(k => !this._noWayLogged.has(k));

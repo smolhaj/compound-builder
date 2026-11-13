@@ -142,13 +142,16 @@ function buildBird(rooster: boolean, lod: Lod) {
   const blades = rooster ? 7 : 8;
   for (let i = 0; i < blades; i++) {
     const f = (i / (blades - 1)) * 2 - 1, sx = f * 0.03, mid = 1 - Math.abs(f);
-    const len = rooster ? (i === 4 ? 0.34 : 0.2 + mid * 0.16) : 0.1 + mid * 0.075;
-    const up = rooster ? 0.55 : 0.85, w = rooster ? 0.034 : 0.03;
-    const P = (t: number): V3 => {
-      const arch = rooster ? Math.sin(t * Math.PI * 0.9) * 0.1 * (1 - Math.abs(f) * 0.4) : 0;
-      return [sx * (1 + t * 2.4), 0.31 + up * len * t * 0.9 + arch - (rooster ? t * t * 0.14 * len * 4 : 0) - (rooster ? 0 : Math.abs(f) * t * 0.03), -0.17 - len * t * (rooster ? 1.0 : 0.85)];
-    };
-    const rs: Ring[] = [0, 0.3, 0.65, 1].map((t, j) => ({ p: P(t), h: 0.0035, w: j === 3 ? 0.003 : w * (j === 0 ? 0.5 : j === 1 ? 1 : 0.8), skin: sk(BONE.TAIL), coat: 1, region: REGION.TAIL, col: [0.95 - Math.abs(f) * 0.08, 0.95 - Math.abs(f) * 0.08, 0.95 - Math.abs(f) * 0.08] as V3 }));
+    const len = rooster ? 0.2 + mid * mid * 0.36 : 0.1 + mid * 0.075;
+    const up = 0.85, w = rooster ? 0.03 : 0.03;
+    // a rooster's are sickles: each leaves the rump rising steeply, then bends over and falls in a long arc (the middle ones longest and most curled)
+    const a0 = 1.3 - Math.abs(f) * 0.25, kap = 1.9 + mid * 0.7;
+    const P = (t: number): V3 => rooster
+      ? [sx * (1 + t * 1.6), 0.31 + len * (Math.cos(a0 - kap * t) - Math.cos(a0)) / kap, -0.17 - len * (Math.sin(a0) - Math.sin(a0 - kap * t)) / kap]
+      : [sx * (1 + t * 2.4), 0.31 + up * len * t * 0.9 - Math.abs(f) * t * 0.03, -0.17 - len * t * 0.85];
+    const ts = rooster ? [0, 0.34, 0.7, 1] : [0, 0.3, 0.65, 1];
+    const wk = rooster ? [0.45, 1.1, 0.95, 0.12] : [0.5, 1, 0.8, 0.1];
+    const rs: Ring[] = ts.map((t, j) => ({ p: P(t), h: 0.0035, w: Math.max(0.003, w * wk[j]), skin: sk(BONE.TAIL), coat: 1, region: REGION.TAIL, col: [0.95 - Math.abs(f) * 0.08, 0.95 - Math.abs(f) * 0.08, 0.95 - Math.abs(f) * 0.08] as V3 }));
     out.push(tube(rs, { seg: lod.detail ? 6 : 4, sub: Math.min(lod.sub, 2), up: [1, 0, 0], flat: true, capEnd: true }));
   }
   if (lod.detail < 1) {
