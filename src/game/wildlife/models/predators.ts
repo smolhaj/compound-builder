@@ -43,9 +43,11 @@ interface Canid {
   pets?: boolean;
   withers: number; length: number; stride: number;
   paws?: number;
+  /** Limb thickness factor (default 1.3: a wolf's legs are not sticks). */
+  limbW?: number;
 }
 function canid(o: Canid): Quad {
-  const k = o.k, hs = (o.head ?? 1) * 1.3, ch = o.chest ?? 1, wd = o.width ?? 1, lk = o.legK ?? 1, nk = (o.neckK ?? 1) * 1.15, sw = o.skullW ?? 1, mz = o.muzzle ?? 1, sl = o.slope ?? 0;
+  const k = o.k, hs = (o.head ?? 1) * 1.3, ch = o.chest ?? 1, wd = o.width ?? 1, lk = o.legK ?? 1, nk = (o.neckK ?? 1) * 1.4, sw = o.skullW ?? 1, mz = o.muzzle ?? 1, sl = o.slope ?? 0;
   // wolf base proportions, scaled: legs by lk (the body rides on them), the chest by ch
   const lift = (lk - 1) * 0.36, st = o.stretch ?? 1;
   const Y = (y: number): number => (y + lift) * k, Z = (z: number): number => z * k * st;
@@ -53,7 +55,7 @@ function canid(o: Canid): Quad {
     .map(([z, t, b, hw]) => [Z(z), Y(t), Y(b), hw * k * wd, 2.2] as [number, number, number, number, number]);
   const neck: NeckRow[] = [{ y: 0.72 + sl, z: 0.36, w: 0.085, h: 0.12, dn: 0.12 }, { y: 0.77 + sl, z: 0.5, w: 0.066, h: 0.095, dn: 0.095 }, { y: 0.79 + sl, z: 0.6, w: 0.052, h: 0.07, dn: 0.07 }].map(n => ({ y: Y(n.y), z: Z(n.z), w: n.w * k * nk * wd, h: n.h * k * nk, dn: n.dn * k * nk }));
   const hz = (z: number): number => (z > 0.1 ? 0.1 + (z - 0.1) * mz : z);
-  const mw = 1.12;
+  const mw = 1.12, LW = o.limbW ?? 1.3;
   const head: HeadRow[] = ([[-0.05, 0, 0.05 * sw, 0.062, 0.062], [0.03, 0, 0.06 * sw, 0.067, 0.064], [0.1, -0.012, 0.045 * sw, 0.05, 0.048], [0.17, -0.024, 0.032 * sw * mw, 0.036, 0.035], [0.22, -0.03, 0.026 * sw * mw, 0.028, 0.026]] as HeadRow[])
       .map(([z, cy, w, h, dn]) => [hz(z) * k, cy * k * hs, w * k * hs, h * k * hs, dn * k * hs] as HeadRow);
   const headAt: V3 = c3(0, Y(0.78 + sl), Z(0.6)), HP = -0.16;
@@ -61,11 +63,11 @@ function canid(o: Canid): Quad {
   const fore = (b: number): LimbRow[] => ([
     [0.66, 0.35, 0.04, 0.06, sk(b)], [0.57, 0.35, 0.048, 0.072, sk(b, b + 1, 0.2)], [0.4, 0.24, 0.036, 0.05, sk(b, b + 1, 0.6)], [0.28, 0.265, 0.03, 0.04, sk(b + 1)],
     [0.17, 0.295, 0.024, 0.03, sk(b + 1, b + 2, 0.5)], [0.09, 0.315, 0.0205, 0.026, sk(b + 2, b + 3, 0.5)], [0.04, 0.325, 0.021, 0.027, sk(b + 3)],
-  ] as Array<[number, number, number, number, ReturnType<typeof sk>]>).map(([y, z, w, h, s]) => [Y(y + (y > 0.1 ? 0 : 0)) - (y < 0.1 ? lift * k : 0), Z(z), w * k, h * k, s] as LimbRow);
+  ] as Array<[number, number, number, number, ReturnType<typeof sk>]>).map(([y, z, w, h, s]) => [Y(y + (y > 0.1 ? 0 : 0)) - (y < 0.1 ? lift * k : 0), Z(z), w * k * LW, h * k * LW, s] as LimbRow);
   const hind = (b: number): LimbRow[] => ([
     [0.72, -0.35, 0.055, 0.085, sk(b)], [0.62, -0.34, 0.07, 0.115, sk(b)], [0.5, -0.26, 0.055, 0.09, sk(b, b + 1, 0.3)], [0.43, -0.19, 0.04, 0.06, sk(b, b + 1, 0.6)], [0.34, -0.3, 0.03, 0.045, sk(b + 1)],
     [0.24, -0.4, 0.026, 0.036, sk(b + 1, b + 2, 0.5)], [0.12, -0.37, 0.02, 0.025, sk(b + 2)], [0.05, -0.34, 0.02, 0.028, sk(b + 2, b + 3, 0.5)], [0.025, -0.33, 0.021, 0.028, sk(b + 3)],
-  ] as Array<[number, number, number, number, ReturnType<typeof sk>]>).map(([y, z, w, h, s]) => [Y(y) - (y < 0.1 ? lift * k : 0), Z(z), w * k, h * k, s] as LimbRow);
+  ] as Array<[number, number, number, number, ReturnType<typeof sk>]>).map(([y, z, w, h, s]) => [Y(y) - (y < 0.1 ? lift * k : 0), Z(z), w * k * LW, h * k * LW, s] as LimbRow);
   const fl = fore(0), hl = hind(0);
   const pawW = 0.034 * k * (o.paws ?? 1), pawL = 0.1 * k * (o.paws ?? 1);
   const earBone = (sx: number) => (sx > 0 ? BONE.EAR_L : BONE.EAR_R);
@@ -151,7 +153,7 @@ const WOLF = canid({
   id: 'wolf', k: 1, chest: 0.95, legK: 1.1, muzzle: 1.1, ear: { kind: 'prick', len: 0.11, wd: 0.042 }, tail: { kind: 'bush', len: 0.42, thick: 1.15 }, ruff: 1, tipAcc: true, paws: 1.15,
   withers: 0.8, length: 1.15, stride: 1.5,
   breeds: [
-    cb('Grey wolf', { base: c3(0.46, 0.43, 0.38), style: 7, dorsal: 0.62, patch: c3(0.2, 0.18, 0.16), cover: 0.5, belt: [0.0, 0.3], face: c3(0.5, 0.46, 0.4), faceMix: 0.5, leg: c3(0.5, 0.42, 0.32), legMix: 0.35, belly: c3(0.75, 0.72, 0.66), bellyMix: 0.8, bellyY: 0.5, acc1: c3(0.72, 0.68, 0.6), acc1Mix: 0.8, acc3: c3(0.08, 0.07, 0.07), fur: 1.0, furFreq: 45 }),
+    cb('Gray wolf', { base: c3(0.46, 0.43, 0.38), style: 7, dorsal: 0.62, patch: c3(0.2, 0.18, 0.16), cover: 0.5, belt: [0.0, 0.3], face: c3(0.5, 0.46, 0.4), faceMix: 0.5, leg: c3(0.5, 0.42, 0.32), legMix: 0.35, belly: c3(0.75, 0.72, 0.66), bellyMix: 0.8, bellyY: 0.5, acc1: c3(0.72, 0.68, 0.6), acc1Mix: 0.8, acc3: c3(0.08, 0.07, 0.07), fur: 1.0, furFreq: 45 }),
     cb('Timber wolf', { base: c3(0.4, 0.34, 0.27), style: 7, dorsal: 0.62, patch: c3(0.17, 0.14, 0.11), cover: 0.55, belt: [0.0, 0.3], face: c3(0.45, 0.38, 0.3), faceMix: 0.5, leg: c3(0.46, 0.36, 0.26), legMix: 0.35, belly: c3(0.7, 0.64, 0.55), bellyMix: 0.8, bellyY: 0.5, acc1: c3(0.66, 0.6, 0.5), acc1Mix: 0.8, acc3: c3(0.08, 0.07, 0.06), fur: 1.0, furFreq: 45 }),
     cb('Black wolf', { base: c3(0.1, 0.095, 0.09), face: c3(0.1, 0.095, 0.09), faceMix: 0.3, belly: c3(0.14, 0.13, 0.12), bellyMix: 0.3, bellyY: 0.5, acc1: c3(0.2, 0.18, 0.16), acc1Mix: 0.6, acc3: c3(0.05, 0.05, 0.05), fur: 1.0, furFreq: 45 }),
     cb('White wolf', { base: c3(0.78, 0.76, 0.72), face: c3(0.8, 0.78, 0.74), faceMix: 0.3, belly: c3(0.85, 0.83, 0.8), bellyMix: 0.5, bellyY: 0.5, acc1: c3(0.82, 0.8, 0.76), acc1Mix: 0.8, acc3: c3(0.4, 0.38, 0.35), fur: 1.0, furFreq: 45, size: 0.97 }),
@@ -164,15 +166,15 @@ const COY = canid({
   withers: 0.62, length: 0.9, stride: 1.2,
   breeds: [
     cb('Coyote', { base: c3(0.58, 0.46, 0.32), style: 7, dorsal: 0.45, patch: c3(0.3, 0.24, 0.18), cover: 0.45, belt: [0.0, 0.3], face: c3(0.62, 0.48, 0.32), faceMix: 0.5, leg: c3(0.62, 0.4, 0.22), legMix: 0.75, belly: c3(0.88, 0.84, 0.76), bellyMix: 0.9, bellyY: 0.5, acc1: c3(0.9, 0.87, 0.8), acc1Mix: 0.85, acc3: c3(0.07, 0.06, 0.06), fur: 1.0, furFreq: 50 }),
-    cb('Coyote (grey)', { base: c3(0.5, 0.45, 0.38), style: 7, dorsal: 0.45, patch: c3(0.24, 0.21, 0.18), cover: 0.45, belt: [0.0, 0.3], face: c3(0.55, 0.45, 0.34), faceMix: 0.5, leg: c3(0.55, 0.4, 0.26), legMix: 0.7, belly: c3(0.84, 0.8, 0.72), bellyMix: 0.9, bellyY: 0.5, acc1: c3(0.88, 0.85, 0.78), acc1Mix: 0.85, acc3: c3(0.07, 0.06, 0.06), fur: 1.0, furFreq: 50, size: 0.97 }),
-    cb('Coyote (winter)', { base: c3(0.55, 0.5, 0.42), style: 6, patch: c3(0.3, 0.27, 0.22), cover: 0.3, scale: 26, face: c3(0.6, 0.52, 0.4), faceMix: 0.5, leg: c3(0.55, 0.42, 0.3), legMix: 0.6, belly: c3(0.86, 0.83, 0.76), bellyMix: 0.9, bellyY: 0.5, acc1: c3(0.9, 0.87, 0.8), acc1Mix: 0.85, acc3: c3(0.07, 0.06, 0.06), fur: 1.2, furFreq: 45, size: 1.03 }),
+    cb('Coyote (gray)', { base: c3(0.5, 0.45, 0.38), style: 7, dorsal: 0.45, patch: c3(0.24, 0.21, 0.18), cover: 0.45, belt: [0.0, 0.3], face: c3(0.55, 0.45, 0.34), faceMix: 0.5, leg: c3(0.55, 0.4, 0.26), legMix: 0.7, belly: c3(0.84, 0.8, 0.72), bellyMix: 0.9, bellyY: 0.5, acc1: c3(0.88, 0.85, 0.78), acc1Mix: 0.85, acc3: c3(0.07, 0.06, 0.06), fur: 1.0, furFreq: 50, size: 0.97 }),
+    cb('Coyote (winter)', { base: c3(0.55, 0.5, 0.42), style: 8, patch: c3(0.3, 0.27, 0.22), cover: 0.4, scale: 12, face: c3(0.6, 0.52, 0.4), faceMix: 0.5, leg: c3(0.55, 0.42, 0.3), legMix: 0.6, belly: c3(0.86, 0.83, 0.76), bellyMix: 0.9, bellyY: 0.5, acc1: c3(0.9, 0.87, 0.8), acc1Mix: 0.85, acc3: c3(0.07, 0.06, 0.06), fur: 1.2, furFreq: 45, size: 1.03 }),
   ],
 });
 export const COYOTE_MODEL = (): AnimalModel => quadModel(COY);
 
 // ---------------------------------------------------------------- cougar
 const CAT = canid({
-  id: 'cougar', k: 0.9, chest: 0.9, legK: 0.78, stretch: 1.12, muzzle: 0.5, skullW: 1.12, head: 0.8, neckK: 1.2, width: 1.1,
+  id: 'cougar', k: 0.9, chest: 0.9, legK: 0.78, stretch: 1.12, muzzle: 0.5, skullW: 1.12, head: 1.0, neckK: 1.2, width: 1.1, limbW: 1.55,
   ear: { kind: 'prick', len: 0.055, wd: 0.034 }, tail: { kind: 'long', len: 0.75, thick: 1.35 }, tipAcc: true, paws: 1.2, collar: false,
   withers: 0.72, length: 1.25, stride: 1.4,
   breeds: [
@@ -197,13 +199,13 @@ const BEAR: Quad = {
   id: 'bear',
   body: [[0.55, 0.74, 0.42, 0.12, 2.2], [0.38, 0.99, 0.34, 0.185, 2.2], [0.08, 0.92, 0.3, 0.22, 2.2], [-0.2, 0.88, 0.3, 0.225, 2.2], [-0.42, 0.88, 0.34, 0.2, 2.2], [-0.56, 0.76, 0.4, 0.13, 2.0]],
   neck: [{ y: 0.8, z: 0.45, w: 0.17, h: 0.2, dn: 0.2 }, { y: 0.84, z: 0.61, w: 0.145, h: 0.16, dn: 0.16 }, { y: 0.82, z: 0.74, w: 0.11, h: 0.12, dn: 0.12 }],
-  head: [[-0.06, 0, 0.09, 0.095, 0.1], [0.03, 0, 0.1, 0.102, 0.108], [0.1, -0.01, 0.085, 0.085, 0.09], [0.17, -0.035, 0.068, 0.065, 0.065], [0.22, -0.05, 0.062, 0.056, 0.05]],
+  head: [[-0.06, 0, 0.09, 0.095, 0.1], [0.03, 0, 0.1, 0.102, 0.108], [0.1, -0.01, 0.085, 0.085, 0.09], [0.17, -0.035, 0.074, 0.07, 0.068], [0.225, -0.05, 0.07, 0.064, 0.056]],
   headAt: BH, headPitch: -0.3, eye: [0.066, 0.04, 0.085, 0.0095],
   fore: BR_FORE, hind: BR_HIND, foreX: 0.12, hindX: 0.12, coatFrom: 3,
   foot: (sx, b, hind, lod) => [paw(sx * (hind ? 0.15 : 0.14), hind ? -0.37 : 0.37, { r: 0.058, len: hind ? 0.27 : 0.21, toes: 5, skin: sk(b), claw: 0.035, coat: 1, region: REGION.LEG, clawCol: [0.12, 0.1, 0.09] }, lod)],
   headExtras: (h, lod) => {
-    append(h, blob([0, -0.045, 0.17], [0.062, 0.05, 0.065], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: REGION.ACC1, skin: sk(BONE.HEAD), flat: true }));      // the pale muzzle
-    append(h, blob([0, -0.05, 0.225], [0.034, 0.025, 0.017], { seg: lod.seg, rings: 4, col: [0.04, 0.035, 0.035], region: REGION.NOSE, skin: sk(BONE.HEAD), flat: true }));
+    append(h, blob([0, -0.045, 0.165], [0.074, 0.06, 0.072], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: REGION.ACC1, skin: sk(BONE.HEAD), flat: true }));      // the pale muzzle
+    append(h, blob([0, -0.05, 0.228], [0.038, 0.028, 0.019], { seg: lod.seg, rings: 4, col: [0.04, 0.035, 0.035], region: REGION.NOSE, skin: sk(BONE.HEAD), flat: true }));
     append(h, nostrils([0, -0.05, 0.238], 0.014, 0.007, sk(BONE.HEAD), lod));
     for (const sx of [-1, 1]) append(h, ear(sx, sx > 0 ? BONE.EAR_L : BONE.EAR_R, [sx * 0.06, 0.082, -0.04], 0.062, 0.048, 0.55, lod, { back: 0.05 }));
   },

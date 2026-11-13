@@ -116,7 +116,7 @@ export class DogRenderer {
       a.up += ((stance === 'alert' || stance === 'bark' ? 1 : 0) - a.up) * k;
       a.bark = stance === 'bark' ? a.bark + dt * 7 : 0;
       // the legs advance with the distance walked (no sliding): one gait cycle per stride
-      if (moving) a.phase += Math.hypot(a.x - px0, a.z - pz0) * Math.PI * 2 / (Math.max(0.05, stride(d) * UNIT));
+      if (moving) a.phase += Math.hypot(a.x - px0, a.z - pz0) * Math.PI * 2 / (Math.max(0.05, stride(d) * UNIT * (dist > 0.5 ? 1.8 : 1)));
       a.dist = dist;
       a.moving = moving;
       this._draw(d, a, ground, day);

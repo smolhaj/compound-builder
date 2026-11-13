@@ -58,8 +58,8 @@ export function buildQuad(q: Quad, lod: Lod) {
   // the far levels keep every other row of a limb (the joints stay: their rows carry the skin blend)
   const thin = (rows: LimbRow[]): LimbRow[] => (lod.detail >= 1 ? rows.filter((r, i) => i === 0 || i === rows.length - 1 || r[4].w > 0 || i % 2 === 0) : rows);
   for (const [sx, bF, bH] of [[1, BONE.FL, BONE.HL], [-1, BONE.FR, BONE.HR]] as const) {
-    out.push(limb(sx, q.foreX, thin(q.fore(bF)), lod, { coatFrom: q.coatFrom ?? 5, capStart: true }));
-    out.push(limb(sx, q.hindX, thin(q.hind(bH)), lod, { coatFrom: q.coatFrom ?? 5, capStart: true }));
+    out.push(limb(sx, q.foreX, thin(q.fore(bF)), lod, { coatFrom: q.coatFrom ?? 5 }));
+    out.push(limb(sx, q.hindX, thin(q.hind(bH)), lod, { coatFrom: q.coatFrom ?? 5 }));
     out.push(...q.foot(sx, bF + 3, false, lod), ...q.foot(sx, bH + 3, true, lod));
   }
   return toGeometry(out);

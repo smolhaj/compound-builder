@@ -3,7 +3,7 @@
  * javelina. Real anatomy in metres (a whitetail doe about 0.9 m at the withers, 1.7 m nose to tail; an elk 1.4 m; a bull moose 1.9 m; a pronghorn
  * 0.85 m; a javelina 0.5 m), forward +z, left +x, ground y = 0; the instance scale is 1/6 (SCALE v2). Legs are long and thin with the real joints (elbow,
  * knee, fetlock; stifle, hock, fetlock: the hind leg has its Z shape), cloven hooves with dewclaws. Coats are painted in the shader (summer red / winter
- * grey, white belly, rump patch, throat patch, muzzle); antlers are REGION.ADORN, grown by the season (`antlerGrowth`).
+ * gray, white belly, rump patch, throat patch, muzzle); antlers are REGION.ADORN, grown by the season (`antlerGrowth`).
  */
 import { BONE, REGION, append, blob, clovenHoof, newMesh, skin, tube, type Lod, type Mesh, type Ring, type V3 } from '../../livestock/animalKit';
 import type { Breed } from '../../livestock/animalMaterial';
@@ -120,7 +120,7 @@ function cervid(o: Cerv): Quad {
   const fore = (b: number) => sc(DEER_FORE(b)), hind = (b: number) => sc(DEER_HIND(b));
   const body = (o.body ?? DEER_BODY).map(([z, t, bt, hw, pw]) => [z * k, t * k + lift, bt * k + lift, hw * k, pw] as [number, number, number, number, number]);
   const nk = o.neckK ?? 1;
-  const neck: NeckRow[] = DEER_NECK.map((n, i) => ({ y: n.y * k + lift, z: n.z * k, w: n.w * k * nk, h: n.h * k * nk, dn: n.dn * k * nk, region: i === 0 ? undefined : o.neckRegion }));
+  const neck: NeckRow[] = DEER_NECK.map(n => ({ y: n.y * k + lift, z: n.z * k, w: n.w * k * nk, h: n.h * k * nk, dn: n.dn * k * nk, region: o.neckRegion }));
   const head = (o.head ?? DEER_HEAD).map(([z, cy, w, h, dn]) => [z * k, cy * k, w * k, h * k, dn * k] as HeadRow);
   const headAt = o.headAt ?? c3(0, 1.055 * k + lift, 0.715 * k), headPitch = o.headPitch ?? -0.62;
   const fx = 0.072 * k, hx = 0.066 * k;
@@ -164,9 +164,9 @@ const DEER = cervid({
   extras: (out, lod) => { if (lod.detail < 2) out.push(blob([0, 0.76, -0.55], [0.06, 0.1, 0.045], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: REGION.ACC2, skin: sk(BONE.ROOT), flat: true })); },
   breeds: [
     deerBreed('Whitetail (summer)', { base: c3(0.6, 0.36, 0.19), face: c3(0.52, 0.34, 0.21), faceMix: 0.7, leg: c3(0.55, 0.34, 0.19), legMix: 0.6, belly: c3(0.9, 0.86, 0.78), bellyMix: 0.95, bellyY: 0.5, acc1: c3(0.93, 0.9, 0.86), acc2: c3(0.95, 0.93, 0.89) }),
-    deerBreed('Whitetail (winter)', { base: c3(0.5, 0.39, 0.28), style: 6, patch: c3(0.4, 0.3, 0.21), cover: 0.3, scale: 30, face: c3(0.36, 0.3, 0.25), faceMix: 0.7, leg: c3(0.38, 0.3, 0.23), legMix: 0.6, belly: c3(0.84, 0.8, 0.74), bellyMix: 0.9, bellyY: 0.5, fur: 0.7, furFreq: 50, acc1: c3(0.88, 0.86, 0.82), acc2: c3(0.92, 0.9, 0.86) }),
+    deerBreed('Whitetail (winter)', { base: c3(0.5, 0.39, 0.28), style: 8, patch: c3(0.4, 0.3, 0.21), cover: 0.4, scale: 14, face: c3(0.36, 0.3, 0.25), faceMix: 0.7, leg: c3(0.38, 0.3, 0.23), legMix: 0.6, belly: c3(0.84, 0.8, 0.74), bellyMix: 0.9, bellyY: 0.5, fur: 0.7, furFreq: 50, acc1: c3(0.88, 0.86, 0.82), acc2: c3(0.92, 0.9, 0.86) }),
     deerBreed('Mule deer (summer)', { base: c3(0.58, 0.4, 0.25), face: c3(0.44, 0.32, 0.22), faceMix: 0.6, leg: c3(0.5, 0.35, 0.22), legMix: 0.6, belly: c3(0.88, 0.84, 0.76), bellyMix: 0.95, bellyY: 0.5, acc1: c3(0.92, 0.9, 0.86), acc2: c3(0.94, 0.9, 0.82), size: 1.05 }),
-    deerBreed('Mule deer (winter)', { base: c3(0.45, 0.4, 0.35), style: 6, patch: c3(0.33, 0.29, 0.25), cover: 0.3, scale: 30, face: c3(0.32, 0.28, 0.24), faceMix: 0.6, leg: c3(0.36, 0.32, 0.28), legMix: 0.6, belly: c3(0.84, 0.8, 0.74), bellyMix: 0.9, bellyY: 0.5, fur: 0.7, furFreq: 50, acc1: c3(0.88, 0.86, 0.82), acc2: c3(0.9, 0.88, 0.84), size: 1.05 }),
+    deerBreed('Mule deer (winter)', { base: c3(0.45, 0.4, 0.35), style: 8, patch: c3(0.33, 0.29, 0.25), cover: 0.4, scale: 14, face: c3(0.32, 0.28, 0.24), faceMix: 0.6, leg: c3(0.36, 0.32, 0.28), legMix: 0.6, belly: c3(0.84, 0.8, 0.74), bellyMix: 0.9, bellyY: 0.5, fur: 0.7, furFreq: 50, acc1: c3(0.88, 0.86, 0.82), acc2: c3(0.9, 0.88, 0.84), size: 1.05 }),
   ],
 });
 export const DEER_MODEL = (): AnimalModel => quadModel(DEER);
@@ -186,19 +186,19 @@ const ELK = cervid({
     cervHeadParts(t, lod, { nose: 0.27, earLen: 0.17, earWd: 0.04, throat: false, eyeRing: false, muzzleW: 1.05 });
     append(head, scaleMesh(t, k));
     // a bull's rack: beams sweep up and back over the shoulders, tines point forward and up
-    append(head, unpitch(antlers([0, 0.11, -0.05], [[0.06, 0, 0, 0.026], [0.1, 0.12, -0.04, 0.022], [0.17, 0.3, -0.12, 0.02], [0.2, 0.5, -0.28, 0.018], [0.19, 0.68, -0.5, 0.016], [0.15, 0.8, -0.75, 0.013], [0.11, 0.86, -0.98, 0.005]],
-      [[0.13, 0.36, -0.3, 0.9], [0.22, 0.4, -0.2, 0.9], [0.36, 0.32, 0.0, 0.6], [0.52, 0.4, 0.2, 0.4], [0.72, 0.3, 0.3, 0.2]], lod), -0.55, [0, 0.11, -0.05]));
+    append(head, unpitch(antlers([0, 0.11, -0.05], [[0.06, 0, 0, 0.026], [0.1, 0.12, -0.05, 0.022], [0.16, 0.26, -0.2, 0.02], [0.2, 0.38, -0.45, 0.018], [0.2, 0.46, -0.75, 0.016], [0.16, 0.5, -1.05, 0.013], [0.12, 0.5, -1.3, 0.005]],
+      [[0.13, 0.36, -0.3, 0.9], [0.22, 0.42, -0.1, 0.9], [0.36, 0.34, 0.1, 0.7], [0.52, 0.4, 0.2, 0.45], [0.72, 0.3, 0.3, 0.2]], lod), -0.35, [0, 0.11, -0.05]));
   },
   tail: shortTail(REGION.ACC2, 0.12, 0.05),
   extras: (out, lod, k) => {
     if (lod.detail < 2) {
-      out.push(blob([0, 0.82 * k, -0.52 * k], [0.12 * k, 0.12 * k, 0.1 * k], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: REGION.ACC2, skin: sk(BONE.ROOT), flat: true }));      // the cream rump patch
-      out.push(blob([0, 0.72 * k, 0.42 * k], [0.12 * k, 0.17 * k, 0.15 * k], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: REGION.ACC3, skin: sk(BONE.ROOT), flat: true }));        // dark chest
+      out.push(blob([0, 0.8 * k, -0.55 * k], [0.08 * k, 0.1 * k, 0.07 * k], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: REGION.ACC2, skin: sk(BONE.ROOT), flat: true }));      // the cream rump patch
+      out.push(blob([0, 0.66 * k, 0.45 * k], [0.09 * k, 0.12 * k, 0.1 * k], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: REGION.ACC3, skin: sk(BONE.ROOT), flat: true }));        // dark chest
     }
   },
   breeds: [
     elkBreed('Elk (summer)', { base: c3(0.66, 0.5, 0.33), face: c3(0.32, 0.22, 0.15), faceMix: 0.9, leg: c3(0.3, 0.2, 0.13), legMix: 0.9, belly: c3(0.5, 0.38, 0.26), bellyMix: 0.4, bellyY: 0.62, acc1: c3(0.55, 0.45, 0.35), acc1Mix: 0.6, acc2: c3(0.88, 0.8, 0.62), acc3: c3(0.27, 0.18, 0.12) }),
-    elkBreed('Elk (winter)', { base: c3(0.52, 0.44, 0.34), style: 6, patch: c3(0.4, 0.32, 0.24), cover: 0.3, scale: 24, fur: 0.8, face: c3(0.27, 0.19, 0.14), faceMix: 0.9, leg: c3(0.26, 0.18, 0.13), legMix: 0.9, belly: c3(0.4, 0.32, 0.25), bellyMix: 0.4, bellyY: 0.62, acc1: c3(0.5, 0.42, 0.34), acc1Mix: 0.6, acc2: c3(0.82, 0.76, 0.6), acc3: c3(0.22, 0.16, 0.11) }),
+    elkBreed('Elk (winter)', { base: c3(0.52, 0.44, 0.34), style: 8, patch: c3(0.4, 0.32, 0.24), cover: 0.4, scale: 12, fur: 0.8, face: c3(0.27, 0.19, 0.14), faceMix: 0.9, leg: c3(0.26, 0.18, 0.13), legMix: 0.9, belly: c3(0.4, 0.32, 0.25), bellyMix: 0.4, bellyY: 0.62, acc1: c3(0.5, 0.42, 0.34), acc1Mix: 0.6, acc2: c3(0.82, 0.76, 0.6), acc3: c3(0.22, 0.16, 0.11) }),
   ],
 });
 export const ELK_MODEL = (): AnimalModel => quadModel(ELK);
@@ -231,7 +231,7 @@ const MOOSE = cervid({
     append(head, unpitch(rack, -0.82 + 0.3, [0, 0.12, -0.06]));
   },
   tail: shortTail(REGION.TAIL, 0.1, 0.03),
-  extras: (out, lod, k) => { if (lod.detail < 2) out.push(blob([0, 0.92 * k, 0.42 * k], [0.14 * k, 0.15 * k, 0.17 * k], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: REGION.BODY, skin: sk(BONE.ROOT), flat: true })); },       // the shoulder hump
+  extras: () => undefined,
   breeds: [
     mooseBreed('Moose', { base: c3(0.2, 0.14, 0.1), face: c3(0.18, 0.13, 0.1), faceMix: 0.7, leg: c3(0.5, 0.45, 0.38), legMix: 0.9, belly: c3(0.17, 0.12, 0.09), bellyMix: 0.3, bellyY: 0.7, acc1: c3(0.4, 0.3, 0.24), acc3: c3(0.17, 0.12, 0.09) }),
     mooseBreed('Moose (brown)', { base: c3(0.32, 0.22, 0.15), face: c3(0.28, 0.2, 0.14), faceMix: 0.7, leg: c3(0.55, 0.5, 0.42), legMix: 0.9, belly: c3(0.28, 0.2, 0.14), bellyMix: 0.3, bellyY: 0.7, acc1: c3(0.45, 0.34, 0.26), acc3: c3(0.25, 0.18, 0.12), size: 0.97 }),
@@ -282,28 +282,28 @@ const JV_HIND = (b: number): LimbRow[] => [
   [0.5, -0.33, 0.07, 0.1, sk(b)], [0.42, -0.31, 0.06, 0.09, sk(b)], [0.34, -0.27, 0.04, 0.06, sk(b, b + 1, 0.5)], [0.25, -0.33, 0.026, 0.035, sk(b + 1)],
   [0.18, -0.38, 0.02, 0.027, sk(b + 1, b + 2, 0.5)], [0.1, -0.36, 0.015, 0.019, sk(b + 2)], [0.05, -0.34, 0.015, 0.02, sk(b + 2, b + 3, 0.5)], [0.025, -0.335, 0.016, 0.022, sk(b + 3)],
 ];
-const jvBreed = (name: string, o: Partial<Breed> & { base: V3 }): Breed => ({ name, style: 6, patch: c3(0.5, 0.46, 0.4), cover: 0.35, scale: 22, fur: 1.4, furFreq: 40, nose: c3(0.1, 0.08, 0.08), acc1Mix: 0.9, ...o });
+const jvBreed = (name: string, o: Partial<Breed> & { base: V3 }): Breed => ({ name, style: 8, patch: c3(0.42, 0.38, 0.32), cover: 0.45, scale: 14, fur: 1.4, furFreq: 40, nose: c3(0.1, 0.08, 0.08), acc1Mix: 0.9, ...o });
 const JAV: Quad = {
   id: 'javelina',
   body: [[0.4, 0.46, 0.3, 0.09, 2.1], [0.28, 0.54, 0.26, 0.14, 2.2], [0.06, 0.53, 0.25, 0.16, 2.3], [-0.16, 0.51, 0.26, 0.155, 2.3], [-0.33, 0.46, 0.29, 0.12, 2.1], [-0.4, 0.4, 0.31, 0.07, 2.0]],
   neck: [{ y: 0.42, z: 0.36, w: 0.12, h: 0.15, dn: 0.14 }, { y: 0.44, z: 0.5, w: 0.1, h: 0.12, dn: 0.11 }, { y: 0.4, z: 0.6, w: 0.085, h: 0.09, dn: 0.09 }],
-  head: [[-0.05, 0, 0.07, 0.085, 0.085], [0.05, 0, 0.08, 0.088, 0.088], [0.14, -0.018, 0.064, 0.07, 0.065], [0.22, -0.035, 0.05, 0.052, 0.05], [0.27, -0.045, 0.047, 0.047, 0.043]],
+  head: [[-0.05, 0, 0.075, 0.09, 0.09], [0.05, 0, 0.088, 0.095, 0.095], [0.13, -0.018, 0.072, 0.075, 0.07], [0.2, -0.035, 0.058, 0.058, 0.054], [0.24, -0.045, 0.055, 0.052, 0.047]],
   headAt: c3(0, 0.4, 0.62), headPitch: -0.55, eye: [0.058, 0.04, 0.115, 0.0095],
   fore: JV_FORE, hind: JV_HIND, foreX: 0.07, hindX: 0.075, coatFrom: 3,
   foot: (sx, b, hind, lod) => [clovenHoof(sx * (hind ? 0.085 : 0.075), hind ? -0.34 : 0.362, 0.0125, { seg: lod.seg, skin: sk(b), col: HC, split: 0.3 })],
   headExtras: (head, lod) => {
-    append(head, blob([0, -0.047, 0.285], [0.045, 0.036, 0.022], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: REGION.NOSE, skin: sk(BONE.HEAD), flat: true }));      // the flat snout disc
-    append(head, nostrils([0, -0.045, 0.305], 0.017, 0.008, sk(BONE.HEAD), lod));
+    append(head, blob([0, -0.047, 0.245], [0.052, 0.04, 0.022], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: REGION.NOSE, skin: sk(BONE.HEAD), flat: true }));      // the flat snout disc
+    append(head, nostrils([0, -0.045, 0.265], 0.018, 0.008, sk(BONE.HEAD), lod));
     if (lod.detail < 2) for (const sx of [-1, 1]) {
-      append(head, spike([[sx * 0.036, -0.06, 0.2, 0.007], [sx * 0.04, -0.045, 0.215, 0.005], [sx * 0.038, -0.025, 0.222, 0.0015]], sk(BONE.HEAD), lod, { region: REGION.TEETH, col: [0.85, 0.82, 0.7], seg: 4 }));    // the tusk tips
+      append(head, spike([[sx * 0.04, -0.06, 0.16, 0.007], [sx * 0.044, -0.045, 0.175, 0.005], [sx * 0.042, -0.025, 0.182, 0.0015]], sk(BONE.HEAD), lod, { region: REGION.TEETH, col: [0.85, 0.82, 0.7], seg: 4 }));    // the tusk tips
     }
-    for (const sx of [-1, 1]) append(head, ear(sx, sx > 0 ? BONE.EAR_L : BONE.EAR_R, [sx * 0.045, 0.075, -0.02], 0.065, 0.026, 0.55, lod, { back: 0.1 }));
+    for (const sx of [-1, 1]) append(head, ear(sx, sx > 0 ? BONE.EAR_L : BONE.EAR_R, [sx * 0.05, 0.08, -0.02], 0.085, 0.036, 0.5, lod, { back: 0.1 }));
   },
   tail: lod => strand([[0, 0.5, -0.44, 0.012], [0, 0.46, -0.48, 0.01], [0, 0.43, -0.49, 0.004]], sk(BONE.TAIL, BONE.TAIL2, 0.5), lod, { region: REGION.TAIL, up: [1, 0, 0] }),
   extras: (out, lod) => {
     // the pale collar over the shoulders and a ridge of bristles down the spine
     if (lod.detail < 2) out.push(tube([-150, -120, -85, -50, -20, 20, 50, 85, 120, 150].map(d => d * Math.PI / 180).map(th => [0.168 * Math.sin(th), 0.385 + 0.165 * Math.cos(th)]).map(([x, y]) => ({ p: [x, y, 0.3] as V3, w: 0.026, h: 0.024, skin: sk(BONE.ROOT), coat: 1, region: REGION.ACC1, col: [1, 1, 1] as V3 })), { seg: 6, sub: 1, up: [0, 0, 1], flat: true }));
-    out.push(tube([[0.36, 0.51, 0.012], [0.28, 0.555, 0.02], [0.1, 0.55, 0.022], [-0.15, 0.53, 0.02], [-0.32, 0.485, 0.012]].map(([z, y, w]) => ({ p: [0, y, z] as V3, w, h: 0.028, dn: 0.004, skin: sk(BONE.ROOT), coat: 1, region: REGION.TAIL, col: [1, 1, 1] as V3 })), { seg: 6, sub: 1, up: [0, 1, 0], flat: true }));
+    out.push(tube([[0.36, 0.495, 0.012], [0.28, 0.535, 0.02], [0.1, 0.53, 0.022], [-0.15, 0.51, 0.02], [-0.32, 0.465, 0.012]].map(([z, y, w]) => ({ p: [0, y, z] as V3, w, h: 0.028, dn: 0.004, skin: sk(BONE.ROOT), coat: 1, region: REGION.TAIL, col: [1, 1, 1] as V3 })), { seg: 6, sub: 1, up: [0, 1, 0], flat: true }));
   },
   bones: quadBones(
     { fore: [[0.075, 0.46, 0.34], [0.075, 0.38, 0.32], [0.075, 0.27, 0.33], [0.075, 0.07, 0.35]], hind: [[0.085, 0.5, -0.33], [0.085, 0.34, -0.27], [0.085, 0.18, -0.38], [0.085, 0.05, -0.34]],
@@ -312,7 +312,7 @@ const JAV: Quad = {
       graze: { neck: -0.4, head: 0.1, bob: 0.1 }, alert: { neck: 0.25, head: 0.2, tail: -0.3 }, gallop: true }),
   breeds: [
     jvBreed('Javelina', { base: c3(0.2, 0.19, 0.17), face: c3(0.18, 0.17, 0.15), faceMix: 0.5, leg: c3(0.17, 0.15, 0.13), legMix: 0.6, belly: c3(0.28, 0.26, 0.23), bellyMix: 0.3, bellyY: 0.3, acc1: c3(0.72, 0.68, 0.58) }),
-    jvBreed('Javelina (grey)', { base: c3(0.28, 0.27, 0.25), face: c3(0.2, 0.19, 0.17), faceMix: 0.5, leg: c3(0.2, 0.18, 0.16), legMix: 0.6, belly: c3(0.34, 0.32, 0.28), bellyMix: 0.3, bellyY: 0.3, acc1: c3(0.78, 0.74, 0.64), size: 0.95 }),
+    jvBreed('Javelina (gray)', { base: c3(0.28, 0.27, 0.25), face: c3(0.2, 0.19, 0.17), faceMix: 0.5, leg: c3(0.2, 0.18, 0.16), legMix: 0.6, belly: c3(0.34, 0.32, 0.28), bellyMix: 0.3, bellyY: 0.3, acc1: c3(0.78, 0.74, 0.64), size: 0.95 }),
   ],
   withers: 0.53, length: 0.95, stride: 0.6, graze: { neck: -0.4, head: 0.1 }, root: { bob: 0.01, pitch: 0.02, cy: 0.42 }, rootPose: { alertPitch: 0.02 }, extra: true,
 };

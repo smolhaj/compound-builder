@@ -1,6 +1,6 @@
 /**
  * The small game: the wild rabbit (cottontail and jackrabbit: arched back, big haunches, long ears with dark tips, a white puff of a tail, a hopping
- * gait with the fore pair and the hind pair together) and the grey squirrel (hunched, big hind feet, a bushy tail carried in an S over the back).
+ * gait with the fore pair and the hind pair together) and the gray squirrel (hunched, big hind feet, a bushy tail carried in an S over the back).
  * Metres, forward +z, left +x, ground y = 0, instance scale 1/6 (SCALE v2): a cottontail is 0.4 m long and 0.15 m at the shoulder; a squirrel 0.25 m
  * plus a 0.22 m tail. Built on animalQuad like the larger animals.
  */
@@ -33,7 +33,7 @@ const RABBIT: Quad = {
   headExtras: (h, lod) => {
     append(h, blob([0, -0.03, 0.118], [0.021, 0.017, 0.012], { seg: Math.max(6, lod.seg - 4), rings: 3, col: [1, 1, 1], coat: 1, region: REGION.NOSE, skin: sk(BONE.HEAD), flat: true }));
     append(h, nostrils([0, -0.03, 0.127], 0.006, 0.0035, sk(BONE.HEAD), lod));
-    for (const sx of [-1, 1]) append(h, ear(sx, sx > 0 ? BONE.EAR_L : BONE.EAR_R, [sx * 0.025, 0.04, -0.01], 0.115, 0.03, 0.22, lod, { back: 0.12 }));
+    for (const sx of [-1, 1]) append(h, ear(sx, sx > 0 ? BONE.EAR_L : BONE.EAR_R, [sx * 0.025, 0.04, -0.01], 0.14, 0.042, 0.22, lod, { back: 0.12 }));
   },
   tail: lod => { void lod; return { pos: [], nor: [], col: [], skn: [], mark: [], idx: [] }; },
   extras: (out, lod) => {
@@ -47,10 +47,10 @@ const RABBIT: Quad = {
     return b;
   })(),
   breeds: [
-    rb('Cottontail', { base: c3(0.4, 0.3, 0.2), style: 6, patch: c3(0.16, 0.12, 0.09), cover: 0.4, scale: 40, belly: c3(0.85, 0.8, 0.72), bellyMix: 0.85, bellyY: 0.09, face: c3(0.38, 0.28, 0.19), faceMix: 0.5, acc1: c3(0.94, 0.92, 0.88), acc3: c3(0.06, 0.05, 0.05), size: 0.92 }),
-    rb('Cottontail (grey)', { base: c3(0.36, 0.33, 0.28), style: 6, patch: c3(0.15, 0.13, 0.11), cover: 0.4, scale: 40, belly: c3(0.85, 0.82, 0.76), bellyMix: 0.85, bellyY: 0.09, acc1: c3(0.94, 0.92, 0.88), acc3: c3(0.06, 0.05, 0.05), size: 0.9 }),
-    rb('Jackrabbit', { base: c3(0.52, 0.4, 0.26), style: 6, patch: c3(0.18, 0.14, 0.1), cover: 0.3, scale: 40, belly: c3(0.88, 0.85, 0.78), bellyMix: 0.85, bellyY: 0.09, leg: c3(0.55, 0.42, 0.28), legMix: 0.4, acc1: c3(0.3, 0.26, 0.2), acc1Mix: 0.5, acc3: c3(0.06, 0.05, 0.05), size: 1.2 }),
-    rb('Jackrabbit (pale)', { base: c3(0.6, 0.5, 0.34), style: 6, patch: c3(0.22, 0.17, 0.12), cover: 0.3, scale: 40, belly: c3(0.9, 0.87, 0.8), bellyMix: 0.85, bellyY: 0.09, acc1: c3(0.4, 0.34, 0.26), acc1Mix: 0.5, acc3: c3(0.06, 0.05, 0.05), size: 1.15 }),
+    rb('Cottontail', { base: c3(0.4, 0.3, 0.2), style: 8, patch: c3(0.16, 0.12, 0.09), cover: 0.45, scale: 16, belly: c3(0.85, 0.8, 0.72), bellyMix: 0.85, bellyY: 0.09, face: c3(0.38, 0.28, 0.19), faceMix: 0.5, acc1: c3(0.94, 0.92, 0.88), acc3: c3(0.06, 0.05, 0.05), size: 0.92 }),
+    rb('Cottontail (gray)', { base: c3(0.36, 0.33, 0.28), style: 8, patch: c3(0.15, 0.13, 0.11), cover: 0.45, scale: 16, belly: c3(0.85, 0.82, 0.76), bellyMix: 0.85, bellyY: 0.09, acc1: c3(0.94, 0.92, 0.88), acc3: c3(0.06, 0.05, 0.05), size: 0.9 }),
+    rb('Jackrabbit', { base: c3(0.52, 0.4, 0.26), style: 8, patch: c3(0.18, 0.14, 0.1), cover: 0.45, scale: 16, belly: c3(0.88, 0.85, 0.78), bellyMix: 0.85, bellyY: 0.09, leg: c3(0.55, 0.42, 0.28), legMix: 0.4, acc1: c3(0.3, 0.26, 0.2), acc1Mix: 0.5, acc3: c3(0.06, 0.05, 0.05), size: 1.2 }),
+    rb('Jackrabbit (pale)', { base: c3(0.6, 0.5, 0.34), style: 8, patch: c3(0.22, 0.17, 0.12), cover: 0.45, scale: 16, belly: c3(0.9, 0.87, 0.8), bellyMix: 0.85, bellyY: 0.09, acc1: c3(0.4, 0.34, 0.26), acc1Mix: 0.5, acc3: c3(0.06, 0.05, 0.05), size: 1.15 }),
   ],
   withers: 0.3, length: 0.52, stride: 0.45, graze: { neck: -0.7, head: -0.05 }, root: { bob: 0.06, pitch: 0.25, cy: 0.17, hop: true }, rootPose: { alertPitch: 0.04 }, extra: true,
 };
@@ -79,7 +79,7 @@ const SQUIRREL: Quad = {
   },
   tail: lod => {
     // bushy, an S over the back: up from the rump, a curve forward, the tip nodding
-    const pts: Array<[number, number, number, number]> = [[0, 0.15, -0.17, 0.016], [0, 0.22, -0.22, 0.034], [0, 0.32, -0.23, 0.042], [0, 0.4, -0.18, 0.04], [0, 0.44, -0.1, 0.03], [0, 0.44, -0.05, 0.012]];
+    const pts: Array<[number, number, number, number]> = [[0, 0.15, -0.17, 0.016], [0, 0.2, -0.22, 0.03], [0, 0.27, -0.23, 0.038], [0, 0.33, -0.19, 0.036], [0, 0.35, -0.12, 0.028], [0, 0.34, -0.07, 0.01]];
     return strand(pts, sk(BONE.TAIL, BONE.TAIL2, 0.6), lod, { region: REGION.TAIL, up: [1, 0, 0], coat: 1, flat: false });
   },
   extras: () => undefined,
@@ -87,8 +87,8 @@ const SQUIRREL: Quad = {
     { fore: [c3(0.032, 0.14, 0.09), c3(0.032, 0.1, 0.1), c3(0.032, 0.06, 0.12), c3(0.032, 0.025, 0.13)], hind: [c3(0.05, 0.15, -0.08), c3(0.05, 0.11, -0.05), c3(0.05, 0.04, -0.13), c3(0.05, 0.02, -0.09)], swing: [0.6, 0.7], flexF: [0, 0, -0.6, 0.3], flexH: [0, -0.5, 0.8, -0.3], foot: -0.2 },
     { neck: c3(0, 0.14, 0.11), head: SH, tail: c3(0, 0.15, -0.17), tailBob: 0.15, earAt: headPoint(SH, SP, c3(0.022, 0.032, -0.012)), rootY: 0.14, earFlick: 0.25, tailLen: 0.1, graze: { neck: -1.0, head: 0.0, bob: 0.3 }, alert: { neck: 0.3, head: 0.25, ear: 0, tail: 0.1 }, hop: true }),
   breeds: [
-    sb('Grey squirrel', { base: c3(0.32, 0.31, 0.29), style: 6, patch: c3(0.12, 0.11, 0.1), cover: 0.35, scale: 60, belly: c3(0.86, 0.84, 0.8), bellyMix: 0.9, bellyY: 0.1, leg: c3(0.4, 0.36, 0.3), legMix: 0.4, acc1: c3(0.82, 0.8, 0.76), acc1Mix: 0.8, fur: 0.9 }),
-    sb('Fox squirrel', { base: c3(0.4, 0.26, 0.12), style: 6, patch: c3(0.15, 0.12, 0.09), cover: 0.35, scale: 60, belly: c3(0.7, 0.45, 0.2), bellyMix: 0.85, bellyY: 0.1, leg: c3(0.5, 0.32, 0.15), legMix: 0.5, acc1: c3(0.75, 0.5, 0.25), acc1Mix: 0.8, fur: 0.9, size: 1.1 }),
+    sb('Gray squirrel', { base: c3(0.32, 0.31, 0.29), style: 8, patch: c3(0.12, 0.11, 0.1), cover: 0.45, scale: 18, belly: c3(0.86, 0.84, 0.8), bellyMix: 0.9, bellyY: 0.1, leg: c3(0.4, 0.36, 0.3), legMix: 0.4, acc1: c3(0.82, 0.8, 0.76), acc1Mix: 0.8, fur: 0.9 }),
+    sb('Fox squirrel', { base: c3(0.4, 0.26, 0.12), style: 8, patch: c3(0.15, 0.12, 0.09), cover: 0.45, scale: 18, belly: c3(0.7, 0.45, 0.2), bellyMix: 0.85, bellyY: 0.1, leg: c3(0.5, 0.32, 0.15), legMix: 0.5, acc1: c3(0.75, 0.5, 0.25), acc1Mix: 0.8, fur: 0.9, size: 1.1 }),
   ],
   withers: 0.2, length: 0.3, stride: 0.25, graze: { neck: -1.0, head: 0.0 }, root: { bob: 0.04, pitch: 0.25, cy: 0.14, hop: true }, rootPose: { alertPitch: 0.05 }, extra: true,
 };

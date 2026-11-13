@@ -36,7 +36,7 @@ export interface BoneAnim {
 export interface Breed {
   name: string;
   base: V3;
-  /** 0 solid, 1 blotches, 2 bars, 3 belt, 4 spots, 5 saddle, 6 speckle, 7 dorsal saddle. Regions 7, 8 and 9 take the accents below (a muzzle, an eye ring, a throat patch, a duck's breast). */
+  /** 0 solid, 1 blotches, 2 bars, 3 belt, 4 spots, 5 saddle, 6 speckle, 7 dorsal saddle, 8 soft mottling. Regions 7, 8 and 9 take the accents below (a muzzle, an eye ring, a throat patch, a duck's breast). */
   style: number;
   patch?: V3; cover?: number; scale?: number;
   face?: V3; faceMix?: number;
@@ -218,6 +218,9 @@ vec3 coatColor(out float fur, out float freq) {
       mask = 1.0 - smoothstep(c6.z * 0.45, c6.z * 1.15, d + (afbm(p * 22.0) - 0.5) * 0.09);
     } else if (style < 6.5) {               // speckle
       mask = step(1.0 - c1.w, an(p * c0.w * 3.0));
+    } else if (style > 7.5) {               // soft mottling: grizzled fur without hard-edged specks (a javelina, a squirrel, a hen mallard, a winter coat)
+      float n = afbm(p * c0.w * 1.6);
+      mask = smoothstep(1.0 - c1.w - 0.2, 1.0 - c1.w + 0.2, n) * 0.85;
     } else {                                // dorsal saddle: a band along the back that fades down the flanks (a wolf's, a shepherd's)
       float d = abs(vRest.z - c6.y);
       mask = (1.0 - smoothstep(c6.z * 0.45, c6.z * 1.15, d + (afbm(p * 18.0) - 0.5) * 0.12)) * smoothstep(c6.x - 0.06, c6.x + 0.1 + (an(p * 14.0) - 0.5) * 0.12, vRest.y);
