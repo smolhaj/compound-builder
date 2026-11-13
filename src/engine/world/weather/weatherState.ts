@@ -217,6 +217,8 @@ export interface RegionSky {
   supercell: Partial<Record<WeatherSeason, number>>;
   /** Chance a summer / spring morning dawns under a marine layer that burns off by noon. */
   marine?: Partial<Record<WeatherSeason, number>>;
+  /** Chance a fair visual day turns into a dry blow (a gale on a rainless day: the desert's gust front, a Plains spring wind, the Santa Ana) that lifts dust from open ground. */
+  blow?: Partial<Record<WeatherSeason, number>>;
 }
 
 const BASE_HAZE: Record<WeatherSeason, number> = { spring: 0.45, summer: 0.55, fall: 0.35, winter: 0.4 };
@@ -224,17 +226,17 @@ const BASE_HAZE: Record<WeatherSeason, number> = { spring: 0.45, summer: 0.55, f
 export const REGION_SKY: Record<string, RegionSky> = {
   new_england:         { cumulus: 1.0,  rain: 1.0,  haze: { spring: 0.4, summer: 0.5, fall: 0.12, winter: 0.25 }, supercell: { summer: 0.12 } },
   pacific_northwest:   { cumulus: 0.8,  rain: 0.55, haze: { spring: 0.45, summer: 0.4, fall: 0.5, winter: 0.55 }, supercell: {} },
-  southern_california: { cumulus: 0.45, rain: 0.9,  haze: { spring: 0.45, summer: 0.5, fall: 0.4, winter: 0.3 }, supercell: {}, marine: { spring: 0.45, summer: 0.6 } },
+  southern_california: { cumulus: 0.45, rain: 0.9,  haze: { spring: 0.45, summer: 0.5, fall: 0.4, winter: 0.3 }, supercell: {}, marine: { spring: 0.45, summer: 0.6 } , blow: { fall: 0.2, spring: 0.08 } },
   deep_south:          { cumulus: 1.15, rain: 1.15, haze: { spring: 0.55, summer: 0.8, fall: 0.5, winter: 0.45 }, supercell: { spring: 0.3, summer: 0.5 } },
-  midwest_plains:      { cumulus: 1.3,  rain: 1.05, haze: { spring: 0.35, summer: 0.45, fall: 0.25, winter: 0.3 }, supercell: { spring: 0.4, summer: 0.5, fall: 0.1 } },
-  mountain_west:       { cumulus: 1.1,  rain: 0.8,  haze: { spring: 0.15, summer: 0.2, fall: 0.1, winter: 0.12 }, supercell: { summer: 0.4 } },
+  midwest_plains:      { cumulus: 1.3,  rain: 1.05, haze: { spring: 0.35, summer: 0.45, fall: 0.25, winter: 0.3 }, supercell: { spring: 0.4, summer: 0.5, fall: 0.1 } , blow: { spring: 0.1 } },
+  mountain_west:       { cumulus: 1.1,  rain: 0.8,  haze: { spring: 0.15, summer: 0.2, fall: 0.1, winter: 0.12 }, supercell: { summer: 0.4 } , blow: { spring: 0.12, summer: 0.08 } },
   // the Smokies' blue summer haze; monsoon towers over the desert; Plains supercells
   appalachia:          { cumulus: 1.1,  rain: 1.05, haze: { spring: 0.5, summer: 0.75, fall: 0.35, winter: 0.4 }, supercell: { spring: 0.15, summer: 0.25 } },
-  desert_southwest:    { cumulus: 1.2,  rain: 0.9,  haze: { spring: 0.15, summer: 0.25, fall: 0.1, winter: 0.1 }, supercell: { summer: 0.55 } },
+  desert_southwest:    { cumulus: 1.2,  rain: 0.9,  haze: { spring: 0.15, summer: 0.25, fall: 0.1, winter: 0.1 }, supercell: { summer: 0.55 } , blow: { spring: 0.3, summer: 0.2, fall: 0.12 } },
   north_woods:         { cumulus: 0.9,  rain: 1.0,  haze: { spring: 0.25, summer: 0.35, fall: 0.15, winter: 0.2 }, supercell: { summer: 0.15 } },
-  great_plains:        { cumulus: 1.35, rain: 1.05, haze: { spring: 0.3, summer: 0.4, fall: 0.2, winter: 0.25 }, supercell: { spring: 0.5, summer: 0.55, fall: 0.1 } },
+  great_plains:        { cumulus: 1.35, rain: 1.05, haze: { spring: 0.3, summer: 0.4, fall: 0.2, winter: 0.25 }, supercell: { spring: 0.5, summer: 0.55, fall: 0.1 } , blow: { spring: 0.3, summer: 0.16, fall: 0.1 } },
   ozarks:              { cumulus: 1.2,  rain: 1.05, haze: { spring: 0.45, summer: 0.65, fall: 0.3, winter: 0.35 }, supercell: { spring: 0.35, summer: 0.3 } },
-  hill_country:        { cumulus: 1.1,  rain: 1.1,  haze: { spring: 0.4, summer: 0.5, fall: 0.3, winter: 0.3 }, supercell: { spring: 0.35, summer: 0.15, fall: 0.15 } },
+  hill_country:        { cumulus: 1.1,  rain: 1.1,  haze: { spring: 0.4, summer: 0.5, fall: 0.3, winter: 0.3 }, supercell: { spring: 0.35, summer: 0.15, fall: 0.15 } , blow: { spring: 0.12, summer: 0.08 } },
   rust_belt:           { cumulus: 1.0,  rain: 1.0,  haze: { spring: 0.45, summer: 0.55, fall: 0.35, winter: 0.45 }, supercell: { spring: 0.15, summer: 0.25 } },
   upper_midwest:       { cumulus: 1.2,  rain: 1.0,  haze: { spring: 0.35, summer: 0.45, fall: 0.25, winter: 0.3 }, supercell: { spring: 0.25, summer: 0.35 } },
 };
@@ -254,6 +256,15 @@ export function supercellCurve(hour: number): number {
   if (hour < 16.5) { const t = (hour - 13) / 3.5; return t * t * (3 - 2 * t); }
   if (hour < 21) return 1;
   const t = (hour - 21) / 3;
+  return 1 - t * t * (3 - 2 * t);
+}
+
+/** A dry blow over a day (0-1): the wind builds from late morning, blows hardest in the afternoon, and drops by evening. */
+export function blowCurve(hour: number): number {
+  if (hour < 10 || hour >= 21.5) return 0;
+  if (hour < 13.5) { const t = (hour - 10) / 3.5; return t * t * (3 - 2 * t); }
+  if (hour < 18) return 1;
+  const t = (hour - 18) / 3.5;
   return 1 - t * t * (3 - 2 * t);
 }
 
@@ -374,6 +385,7 @@ export class WeatherSim {
   private _foggyDay = 0;
   private _cellDay = 0;
   private _marineDay = 0;
+  private _blowDay = 0;
   /** QA: force a distant storm cell on the horizon (0–1, null = the seeded roll). */
   forceDistantStorm: number | null = null;
 
@@ -450,6 +462,7 @@ export class WeatherSim {
       this._cellDay = hash01(this._seed ^ 0x68e31da4, this._dayIdx) < (sky.supercell[s] ?? 0)
         ? 0.7 + 0.3 * hash01(this._seed, this._dayIdx * 11 + 5) : 0;
       this._marineDay = hash01(this._seed ^ 0x1b873593, this._dayIdx) < (sky.marine?.[s] ?? 0) ? 1 : 0;
+      this._blowDay = hash01(this._seed ^ 0x7f4a7c15, this._dayIdx) < (sky.blow?.[s] ?? 0) ? 0.85 + 0.15 * hash01(this._seed, this._dayIdx * 13 + 7) : 0;
     }
     this._prevHour = hour;
 
@@ -501,6 +514,8 @@ export class WeatherSim {
     if (mode !== 'auto' && k === 'storm') {
       tDistant = 0.6;   // forced storm: more cells round the horizon
     }
+    // A dry blow: on a rainless spell the wind climbs through the afternoon (the dust storm reads it, see dustStorm.ts)
+    if (this._blowDay && (k === 'clear' || k === 'partly' || k === 'overcast')) tWind = Math.max(tWind, this._blowDay * blowCurve(hour));
     if (this.forceDistantStorm !== null) tDistant = this.forceDistantStorm;
 
     o.cloud = approach(o.cloud, tCloud, dt, 9);
