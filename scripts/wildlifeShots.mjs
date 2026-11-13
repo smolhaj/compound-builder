@@ -66,7 +66,7 @@ try {
       }
       const [sx, sz] = best ?? world.openSpotNear(c.x + 7, c.z + 6, 1.2), gy = (x, z) => world.groundAt(x, z), K = 1 / 6;
       // the animals: the renderer's own debug hook; offsets are in metres
-      world._seasonDoy = s.doy; world.wildlife.clearDebug();
+      world.wildlife.clearDebug();
       for (const [sp, dx, dz, face, male, mood] of s.animals) {
         world.wildlife.spawnDebug(sp, sx + dx * K, sz + dz * K, (face * Math.PI) / 180 + (s.cam?.bearing ?? 0.4) + Math.PI, male);
         const b = [...world.wildlife._beasts.values()].pop();
@@ -91,6 +91,7 @@ try {
       window.__cb.qa.pose = { x: ex, y: gy + s.cam.h, z: ez, lx: cx, ly: world.groundAt(cx, cz) + 0.09, lz: cz, fov: s.cam.fov };
     }, s);
     await frames(); await frames();
+    if (process.env.WDBG) console.error(JSON.stringify(await page.evaluate(() => { const { world, cam } = window.__cb; return { qa: world.wildlife.animals().filter(a => a.id.startsWith('qa:')).map(a => [a.sp, +a.x.toFixed(1), +a.z.toFixed(1), a.vis]), meshes: world._ws.scene.children.filter(o => o.name.startsWith('wildlife_')).map(o => `${o.name}:${o.visible}:${o.count}`), pose: window.__cb.qa.pose, cam: world._ws.camera.position.toArray(), ndc: (() => { const a = world.wildlife.animals().find(q => q.id.startsWith('qa:')); const v = world._ws.camera.position.clone().set(a.x, world.groundAt(a.x, a.z) + 0.08, a.z).project(world._ws.camera); return [v.x, v.y, v.z]; })(), mats: world._ws.scene.children.filter(o => o.name.startsWith('wildlife_deer')).map(o => [o.name, o.geometry.attributes.position.count, o.geometry.boundingSphere?.radius, o.material.type, o.frustumCulled, o.layers.mask]) }; })));
     await page.screenshot({ path: `${out}/${s.name}.png` }); lap(s.name);
   }
 } finally { await browser.close(); vite.kill(); setTimeout(() => process.exit(0), 200); }

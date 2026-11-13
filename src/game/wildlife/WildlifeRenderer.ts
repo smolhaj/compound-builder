@@ -263,7 +263,10 @@ export class WildlifeRenderer {
   private _draw(c: WildlifeCtx): void {
     const B = this._batches, tier = B.tier(), cam = c.cam;
     B.begin();
-    for (const b of this._beasts.values()) {
+    // nearest first: at the Low tier only the first few animals are drawn
+    const order = [...this._beasts.values()];
+    if (cam) order.sort((a, b) => Math.abs(a.x - cam.x) + Math.abs(a.z - cam.z) - Math.abs(b.x - cam.x) - Math.abs(b.z - cam.z));
+    for (const b of order) {
       if (b.vis < 0.02) continue;
       if (cam && Math.abs(b.x - cam.x) + Math.abs(b.z - cam.z) > DRAW_RANGE * 1.42) continue;
       let gy = b.y ?? c.ground(b.x, b.z);
