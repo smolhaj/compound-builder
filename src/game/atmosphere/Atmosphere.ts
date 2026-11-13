@@ -36,11 +36,15 @@ import { writeSeasonExtras } from '../../engine/world/season/seasonShader';
 import { containerWear, overgrowth, packWear, structureAge, wearFor, wetnessOf, type Wear } from './aging';
 import { curtainSets, lightsOutNow } from '../../sim/blackout';
 import { awakeAtHome, firePitLit, flashlightCarriers, generatorRunning, windowLight, type LampKind, type NightPerson } from './nightLife';
+import { homeSafety, homeSafetyInput, type HomeSafety, type HomeSafetyInput } from './homeSafety';
+import { fireLevel, roomVariant } from './hearth';
 import { frostAt, mudSeason, troughIce } from './seasonCover';
 import { kitIdOf, setMeshWear, WEAR_CLASS } from './weathering';
 import { SnowDrifts, type DriftWall } from './snowDrifts';
 import { setBuildingWeather, SNOW_MESH, WINTER } from '../buildkit/buildingDetail';
 import { Overgrowth, type WildArea } from './Overgrowth';
+import { WallLanterns } from './WallLanterns';
+import { homeSafetyNow } from './OasisState';
 import { regionFor } from '../../sim/climate';
 
 /** What the atmosphere needs of a built structure. */
@@ -80,9 +84,16 @@ export interface AtmosFrame {
   snow: number;
   viewportH: number;
   battle: boolean;
+  /** Vertical field of view of the view camera, degrees (sizes the lantern glow). */
+  fov?: number;
 }
 
 const LAMP_MAT: Record<LampKind, KitMaterialId> = { off: 'glow_off', oil: 'glow_oil', electric: 'glow_electric', curtained: 'glow_curtain' };
+/** The lit window and the light it throws, by lamp kind and the room's colour temperature (hearth.ts `roomVariant`). */
+const GLOW_VARIANT: Record<'oil' | 'electric', readonly KitMaterialId[]> = { oil: ['glow_oil', 'glow_oil_b', 'glow_oil_c'], electric: ['glow_electric', 'glow_electric_b', 'glow_electric_c'] };
+const SPILL_VARIANT: Record<'oil' | 'electric', readonly KitMaterialId[]> = { oil: ['spill_oil', 'spill_oil_b', 'spill_oil_c'], electric: ['spill_electric', 'spill_electric_b', 'spill_electric_c'] };
+const glowFor = (kind: LampKind, v: number): KitMaterialId => (kind === 'oil' || kind === 'electric' ? GLOW_VARIANT[kind][v] : LAMP_MAT[kind]);
+const spillFor = (kind: LampKind, v: number): KitMaterialId => (kind === 'oil' || kind === 'electric' ? SPILL_VARIANT[kind][v] : 'spill_off');
 /** Layers that are the building's inside (never weathered). */
 const INSIDE = new Set(['interior', 'decor', 'loft']);
 /** No drifts against these (open, flat or tiny). */
@@ -97,6 +108,7 @@ export class Atmosphere {
   private readonly _flash: Flashlights;
   private readonly _drifts: SnowDrifts;
   private readonly _wild: Overgrowth;
+  readonly lanterns: WallLanterns;
   private readonly _fireFx = new FireFx();
   private readonly _fireBoxes = new Map<string, FireBox>();
   /** Char on a building that has burned this session (0-1, only ever up): soot on its walls and roof. */
@@ -104,6 +116,13 @@ export class Atmosphere {
   private _tank: StockTank | null = null;
   private _tankKey = '';
   private _q: Quality = 'high';
+  /** The sense of safety (homeSafety.ts) and the warmth of the lit interiors that follows it: falls fast, recovers slowly (hearth.ts). */
+  safety: HomeSafety = { level: 1, target: 1, reasons: [] };
+  warmth = 1;
+  private _safetyT = 0;
+  private _safetyIn: HomeSafetyInput | null = null;
+  /** How hard the stoves and hearths burn now, 0–1. */
+  hearthFire = 0;
   /** Room brightness per building (0–1), for its lamp. */
   private readonly _room = new Map<string, number>();
   private readonly _wearKey = new Map<string, string>();
@@ -117,7 +136,7 @@ export class Atmosphere {
   /** Wet surfaces after rain (rises with the rain, dries over about a minute). */
   private _wet = 0;
   /** QA: force every window's lamp kind / the fire. */
-  qa: { lamp?: LampKind; fire?: number } = {};
+  qa: { lamp?: LampKind; fire?: number; /** Hold the sense of safety (0-1) instead of reading the game. */ safety?: number } = {};
 
   constructor(host: AtmosHost) {
     this._h = host;
@@ -131,6 +150,7 @@ export class Atmosphere {
     this._flash = new Flashlights(host.scene);
     this._drifts = new SnowDrifts(host.scene);
     this._wild = new Overgrowth(host.scene);
+    this.lanterns = new WallLanterns(host.scene, host.groundAt);
     this._fireFx.addTo(host.scene);
   }
 
@@ -139,6 +159,7 @@ export class Atmosphere {
     this.firePit.setQuality(q);
     this._flash.setQuality(q);
     this._wild.setQuality(q);
+    this.lanterns.setQuality(q);
     this._fireFx.setQuality(q);
   }
 
@@ -156,6 +177,11 @@ export class Atmosphere {
       return { id: p.id, task: st?.task ?? 'idle', kid: !!p.kid, gone: st?.needs.died != null };
     });
     const lightsOut = lightsOutNow(game), curtains = curtainSets(game);
+    // ── the sense of safety → the warmth of every lit room (homeSafety.ts: drops in about a second, recovers in about 25) ──
+    this._safetyT -= f.dt;
+    if (this._safetyT <= 0 || !this._safetyIn) { this._safetyT = 0.5; this._safetyIn = homeSafetyInput(game, f.battle ? { raid: 'attack' } : {}); }
+    this.safety = homeSafety({ ...this._safetyIn, prev: this.warmth, dt: f.dt });
+    this.warmth = this.qa.safety ?? this.safety.level;
     const built = [...this._h.buildings()];
     // ── seasons: mud, frost, drifts, the stock tank ──
     const R = regionFor(game.site);
@@ -187,7 +213,7 @@ export class Atmosphere {
     const watch = people.some(p => !p.gone && p.task === 'watch');
     const homes = built.filter(b => b.finished && !b.under && isHome(b.kind)).sort((a, b) => KIT[b.kind].sleeps - KIT[a.kind].sleeps);
     for (const b of built) {
-      if (!b.finished || b.under || !KIT[b.kind].light) { if (!b.under) this._setLamp(b.group, 'off'); continue; }
+      if (!b.finished || b.under || !KIT[b.kind].light) { if (!b.under) this._setLamp(b.group, 'off', 0); continue; }
       const home = KIT[b.kind].sleeps > 0;
       const rank = homes.indexOf(b);
       // the main house holds the household; another house is lit when there are more people than the first sleeps
@@ -198,8 +224,9 @@ export class Atmosphere {
       const w = windowLight({ hour: f.hour, night: f.night, home, awake: here, powered, blackout: covered, dark: lightsOut && !covered, watch: watch && rank === 0 });
       const kind = this.qa.lamp ?? w.kind;
       this._room.set(b.id, this.qa.lamp ? (kind === 'off' ? 0 : 0.8) : w.room);
-      this._setLamp(b.group, kind);
+      this._setLamp(b.group, kind, roomVariant(b.id));
     }
+    this.hearthFire = fireLevel(f.night, sp.cold, this.warmth);
     // ── the fire pit ──
     const hasHome = homes.length > 0;
     let sitting = 0;
@@ -236,6 +263,8 @@ export class Atmosphere {
     const carriers: Carrier[] = [];
     for (const id of ids) { const p = this._h.family.poseOf(id); if (p) carriers.push({ x: p.x, y: this._h.groundAt(p.x, p.z), z: p.z, rot: p.rot }); }
     this._flash.update(carriers, f.night, f.time);
+    // lanterns on the wall ring and over the gates: lit from dusk, dark under a blackout
+    this.lanterns.update([...this._h.runs()].map(x => x.run), f.hour, lightsOut, homeSafetyNow().level, f.time, f.fov ?? 55, f.viewportH);
     // ── the generator ──
     this._syncGenerators(built, game, f, wx, wz);
     // ── aging (a few times a second is plenty: it changes over years) ──
@@ -249,15 +278,21 @@ export class Atmosphere {
   }
 
   // ── night ───────────────────────────────────────────────────────────────
-  private _setLamp(group: THREE.Group, kind: LampKind): void {
-    const want = kitMaterial(LAMP_MAT[kind]);
+  private _setLamp(group: THREE.Group, kind: LampKind, variant: number): void {
+    const wantGlow = kitMaterial(glowFor(kind, variant)), wantSpill = kitMaterial(spillFor(kind, variant));
     for (const o of group.children) {
       const m = o as THREE.Mesh;
       if (!m.isMesh) continue;
-      const ud = m.userData as { baseMat?: THREE.Material; glow?: boolean };
+      const ud = m.userData as { baseMat?: THREE.Material; glow?: boolean; mat?: string };
+      // the fire's glow and its pool on the floor: drawn only while the stove burns (no draw call by day)
+      if (ud.mat === 'hearth_glow') { m.visible = this.hearthFire > 0.03; continue; }
       const base = ud.baseMat ?? (m.material as THREE.Material);
-      if (!ud.glow && !base.name.startsWith('kit_glow')) continue;
+      const spill = base.name.startsWith('kit_spill');
+      if (!ud.glow && !spill && !base.name.startsWith('kit_glow')) continue;
       ud.glow = true;
+      const want = spill ? wantSpill : wantGlow;
+      // the light a window throws on the yard: no draw call while the lamp is off (by day)
+      if (spill) m.visible = kind === 'oil' || kind === 'electric';
       if (base === want) continue;
       if (m.material === base) m.material = want;
       ud.baseMat = want;
@@ -428,6 +463,7 @@ export class Atmosphere {
     this._flash.dispose();
     this._drifts.dispose();
     this._wild.dispose();
+    this.lanterns.dispose();
     this._fireFx.dispose();
     if (this._tank) { this._h.scene.remove(this._tank.group); this._tank.dispose(); }
     for (const g of this._gens.values()) { g.smoke.points.parent?.remove(g.smoke.points); g.smoke.dispose(); g.lamp.parent?.remove(g.lamp); }

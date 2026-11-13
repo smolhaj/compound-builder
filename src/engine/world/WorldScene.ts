@@ -30,6 +30,7 @@ import { godRayStrength, milkyWayVisibility, moonAngle, moonIllumination, starVi
 import { phaseWeights, type DayPhase } from './sky/dayPhase';
 import { installSeasonShaderPatch } from './season/seasonShader';
 import { weatherFogAerialScale } from './fog/aerialFog';
+import { gradeDelta, oasisFactors, FIRE_HAZE, GOLD_HAZE, type GradeDelta } from './post/oasisGrade';
 import { AERIAL_TINT, NO_HEIGHT_FOG, installHeightFogPatch, setAerialSky, setHeightFog as applyHeightFog, type HeightFogParams } from './fog/heightFog';
 
 export type Quality = 'high' | 'medium' | 'low';
@@ -113,6 +114,9 @@ export class WorldScene {
   private _envBakeTint = 0;
   /** The collapse's look (setCollapseLook): sun dim, sky tint, grade cast. Neutral = nothing. */
   private readonly _collapse = { dim: 1, tint: new THREE.Color(), amt: 0, night: false, cast: new THREE.Color(1, 1, 1), sat: 1, contrast: 0, townGlow: 1, flicker: 0, fireGlow: 0, smoke: 0, nightLift: 0, nightGlow: new THREE.Color(0, 0, 0), fog: 0, haze: 0, townLights: 0, traffic: 0, convoy: 0, flashes: 0, aurora: 0, comet: 0, az: { town: 3.14, road: 3.09, fire: 3.14, war: 3.14 } };
+  /** The oasis contrast grade (setOasis): warm inside a held compound, cold and ashy outside. Neutral = nothing (peacetime). */
+  private _oasis: GradeDelta = gradeDelta(oasisFactors({ collapse: 0, safety: 1, inside: 1 }), 0, 0);
+  private readonly _oasisIn = { collapse: 0, safety: 1, inside: 1 };
   private readonly _skyState = createSkyPalette();
   private readonly _phase: DayPhase = { day: 1, golden: 0, night: 0 };
   private _quality: Quality = 'high';
@@ -274,6 +278,15 @@ export class WorldScene {
     if (l.nightGlow) c.nightGlow.setRGB(l.nightGlow[0], l.nightGlow[1], l.nightGlow[2]); else c.nightGlow.setRGB(0, 0, 0);
     c.fog = l.fog ?? 0; c.haze = l.haze ?? 0; c.townLights = l.townLights ?? 0; c.traffic = l.traffic ?? 0; c.convoy = l.convoy ?? 0; c.flashes = l.flashes ?? 0; c.aurora = l.aurora ?? 0; c.comet = l.comet ?? 0;
     if (l.az) c.az = l.az;
+  }
+
+  /**
+   * The oasis contrast for the next updateDayNight() (post/oasisGrade.ts): how far the world has fallen, the home safety level and how far
+   * inside the held walls the camera is (all smooth, 0-1). Peacetime (collapse 0) changes nothing.
+   */
+  setOasis(collapse: number, safety: number, inside: number): void {
+    const o = this._oasisIn;
+    o.collapse = collapse; o.safety = safety; o.inside = inside;
   }
 
   /** The raid cutscene is playing: at night the eye-level rig gets a moonlit lift (0-1) so terrain and silhouettes read. */
@@ -474,6 +487,7 @@ export class WorldScene {
     phaseWeights(timeOfDay, ph);
     const { day: wd, golden: wg, night: wn } = ph;
     const isMorning = timeOfDay < 12;
+    const oa = this._oasis = gradeDelta(oasisFactors(this._oasisIn), wn, wg);
 
     const sky = blendSkyPalettes(this._skyState, [
       [SKY_PALETTES.day, wd],
@@ -493,6 +507,17 @@ export class WorldScene {
       if (col.fireGlow > 0.001) sky.glow.add(this._c.tmp.setRGB(0.22, 0.075, 0.014).multiplyScalar(0.4 * col.fireGlow * (0.25 + 0.75 * wn + 0.5 * wg)));
     }
     if (wn > 0.01 && (col.nightGlow.r + col.nightGlow.g + col.nightGlow.b) > 0.0005) sky.glow.add(this._c.tmp.copy(col.nightGlow).multiplyScalar(wn));
+    if (oa.horizonFire > 0.001) {
+      // the world outside is burning a long way off: an orange band along the far horizon at dusk and night
+      sky.glow.add(this._c.tmp.setRGB(0.5, 0.16, 0.02).multiplyScalar(0.9 * oa.horizonFire * (0.6 + 0.4 * wn)));
+    }
+    if (oa.fogDark > 0.001 || oa.fogGold > 0.001) {
+      // the haze: darker and warmer toward fire glow outside, a touch of gold inside
+      const lum = (sky.fog.r + sky.fog.g + sky.fog.b) / 3;
+      if (oa.fogFire > 0.001) sky.fog.lerp(this._c.tmp.setRGB(FIRE_HAZE[0], FIRE_HAZE[1], FIRE_HAZE[2]).multiplyScalar(Math.max(0.05, lum) / 0.16), Math.min(0.6, oa.fogFire * 0.55));
+      if (oa.fogGold > 0.001) sky.fog.lerp(this._c.tmp.setRGB(GOLD_HAZE[0], GOLD_HAZE[1], GOLD_HAZE[2]).multiplyScalar(Math.max(0.05, lum) / 0.75), oa.fogGold);
+      sky.fog.multiplyScalar(1 - oa.fogDark);
+    }
     const tintAmt = col.amt * (col.night ? Math.max(0, Math.min(1, (wn - 0.3) / 0.5)) : 1 - 0.6 * wn);
     if (tintAmt > 0.001) this._applyCollapseToSky(sky, tintAmt);
 
@@ -578,7 +603,7 @@ export class WorldScene {
       // weather fog thins as the camera climbs (eye level stays stormy, the aerial view stays readable): see weatherFogAerialScale
       const wk = weatherFogAerialScale(this.camera.position.y);
       fog.density = this._fogConfig.density * (wd + wg * 1.12 + wn * 1.35)
-        * (1 + (fogW * 6.5 + wx.rain * 1.4 + wx.snow * 2.2) * wk) * (0.8 + 0.5 * hazeW);
+        * (1 + (fogW * 6.5 + wx.rain * 1.4 + wx.snow * 2.2) * wk) * (0.8 + 0.5 * hazeW) * oa.fogDensityMul;
       const r = this._viewRadius;
       if (r > WorldScene.FOG_FULL_RADIUS) {
         fog.density = Math.min(fog.density * (WorldScene.FOG_FULL_RADIUS / r) ** 2, WorldScene.FOG_OVERVIEW_DEPTH / r);
@@ -599,6 +624,7 @@ export class WorldScene {
       this.scene.environmentIntensity *= k;
     }
     if (this._bloomPass) this._bloomPass.threshold = 0.85 + (1 - wn) * 0.75;
+    this._sunLight.shadow.intensity *= oa.sunShadow;   // softer shadows in the held compound
     this._applyGradeForTime();
     // the rig as the clock and weather set it; renderFrame lifts it from there when the camera is high at night
     const ab = this._aerialBase;
@@ -614,7 +640,7 @@ export class WorldScene {
       this._sky.setMoonDirection(tmpV);
       this._sky.setNight(wn);
       this._sky.setSmoke(col.smoke * (1 - 0.5 * overcast));
-      this._sky.setSkyline({ town: col.townLights, flashes: col.flashes, traffic: col.traffic, fire: col.fireGlow, convoy: col.convoy, twilight: wg, aurora: col.aurora, comet: col.comet, az: col.az });
+      this._sky.setSkyline({ town: col.townLights, flashes: col.flashes, traffic: col.traffic, fire: Math.max(col.fireGlow, 0.8 * oa.horizonFire), convoy: col.convoy, twilight: wg, aurora: col.aurora, comet: col.comet, az: col.az });
       const sw = this._skyWeather;
       const nightSee = Math.max(0, Math.min(1, (wn - 0.35) / 0.65));
       sw.cumulus = wx.cumulus * (1 - overcast * 0.6);
@@ -997,9 +1023,20 @@ export class WorldScene {
     const col = this._collapse;
     u['uSaturation'].value *= col.sat;
     u['uContrast'].value += col.contrast;
-    (u['uCast'].value as { r: number; g: number; b: number }).r = col.cast.r;
-    (u['uCast'].value as { r: number; g: number; b: number }).g = col.cast.g;
-    (u['uCast'].value as { r: number; g: number; b: number }).b = col.cast.b;
+    // the oasis: the held, safe compound eases the collapse's grade (relief) and warms; outside and breached it goes cold, ashy and dark
+    const oa = this._oasis, rl = oa.relief;
+    u['uSaturation'].value = (u['uSaturation'].value + (1 - col.sat) * g.saturation * rl) * oa.satMul + oa.satAdd;
+    u['uContrast'].value += oa.contrastAdd - col.contrast * rl;
+    u['uWarmStrength'].value += oa.warmAdd;
+    u['uWarmThreshold'].value += oa.warmThresholdAdd;
+    u['uShadowTintStrength'].value *= oa.shadowTint;
+    u['uNight'].value *= oa.nightKeep;
+    const lift = u['uLift'].value as { r: number; g: number; b: number };
+    lift.r = oa.lift[0]; lift.g = oa.lift[1]; lift.b = oa.lift[2];
+    const cast = u['uCast'].value as { r: number; g: number; b: number };
+    cast.r = (col.cast.r + (1 - col.cast.r) * rl) * oa.cast[0];
+    cast.g = (col.cast.g + (1 - col.cast.g) * rl) * oa.cast[1];
+    cast.b = (col.cast.b + (1 - col.cast.b) * rl) * oa.cast[2];
   }
 
   dispose(): void {

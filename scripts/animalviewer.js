@@ -1,5 +1,6 @@
 // Standalone turntable contact sheet for the farm animals: the real LivestockRenderer, one animal per breed row, four angles, a neutral lit ground.
 //   &hz=1.5&hy=1.1 head position in model metres, for view=headside|face
+//   &multi=dog_lab,dog_shepherd,... &cols=stand:side,sit:side,lie:side,stand:eye (pose:view per column; &person=1 stands a person beside each animal): one page, a grid of models by pose
 //   ?kind=cow|steer|goat|sheep|pig|rabbit|hen|deer|elk|...|dog_lab (any wildlife / dog model id)  &rooster=1  &pose=stand|walk|run|graze|alert|sit|lie  &adorn=1 (antlers, beard)  &lod=0..2  &q=high|medium|low  &ph=0.6  &cw=360  &person=1  &breeds=0,1  &view=side,front,rear,top
 import * as THREE from 'three';
 import { LivestockRenderer, UNIT } from '/src/game/livestock/LivestockRenderer.ts';
@@ -55,6 +56,31 @@ const VIEWS = {
   face: { eye: [-D * 0.2, HY * 1.05, HZ + D * 0.3], at: [0, HY * 0.9, HZ], up: [0, 1, 0], fov: 24 },
   eye: { eye: [-D * 0.5, 0.17, D * 0.7], at: [0, H * 0.5, 0], up: [0, 1, 0], fov: 38 },
 };
+if (q.get('multi')) {
+  // a grid: one row per model (its first coat), one column per pose:view; the whole sheet costs one page load
+  const kinds = q.get('multi').split(','), cols = (q.get('cols') || 'stand:side,sit:side,lie:side,stand:eye').split(',').map(c => c.split(':'));
+  renderer.setSize(cols.length * CW, kinds.length * CH);
+  const PO = { walk: { gait: 1 }, run: { gait: 1.25 }, graze: { graze: 1 }, alert: { alert: 1 }, sit: { graze: 1 }, lie: { lie: 1 }, stand: {} };
+  kinds.forEach((k, r) => {
+    const m = wildModelOf(k), Hh = m.withers * UNIT, Ll = m.length * UNIT, Dd = Math.max(Ll * 3.0, Hh * 5);
+    cols.forEach(([pn, vn], c) => {
+      if (fig) {
+        if (vn === 'eye') fig.setPose(0, { x: 0.42, y: 0, z: 0.05, rot: -Math.PI / 2, scale: 1, pose: FIG_POSE.STAND, phase: 0, amp: 0 }), fig.commit(1, true);
+        else fig.setPose(0, { x: 50, y: 0, z: 50, rot: 0, scale: 1, pose: FIG_POSE.STAND, phase: 0, amp: 0 }), fig.commit(1, true);
+      }
+      wb.begin();
+      const P = PO[pn] || {};
+      wb.put({ id: k, breed: 0, x: 0, y: 0, z: 0, rot: 0, phase: ph, gait: P.gait ?? 0, graze: P.graze ?? 0, seed: 0.31, tone: 0.5, size: 1, adorn, lie: P.lie ?? 0, alert: P.alert ?? 0, wag: 0, li: lod });
+      wb.flush(0.4);
+      const V = { side: { eye: [-Dd, Hh * 0.6, 0], at: [0, Hh * 0.5, 0], fov: 24 }, front: { eye: [-Dd * 0.62, Hh * 0.9, Dd * 0.8], at: [0, Hh * 0.5, 0], fov: 24 }, eye: { eye: [-Dd * 0.8, 0.17, Dd * 1.1], at: [0.2, 0.12, 0], fov: 46 } }[vn] || null;
+      cam.fov = V.fov; cam.aspect = CW / CH; cam.position.set(...V.eye); cam.up.set(0, 1, 0); cam.lookAt(...V.at); cam.updateProjectionMatrix();
+      const x = c * CW, y = (kinds.length - 1 - r) * CH;
+      renderer.setViewport(x, y, CW, CH); renderer.setScissor(x, y, CW, CH);
+      renderer.render(scene, cam);
+    });
+  });
+  window.__done = true; window.__info = { multi: kinds };
+} else {
 breeds.forEach((b, r) => {
   const rate = pose === 'walk' ? 1 : 0, gr = pose === 'graze' ? 1 : 0;
   if (fig) fig.setPose(0, { x: 0.42, y: 0, z: 0.05, rot: -Math.PI / 2, scale: 1, pose: FIG_POSE.STAND, phase: 0, amp: 0 }), fig.commit(1, true);
@@ -74,3 +100,4 @@ breeds.forEach((b, r) => {
 });
 window.__done = true;
 window.__info = { tris: 0, withers: model.withers, breeds: model.spec.breeds.map(b => b.name) };
+}

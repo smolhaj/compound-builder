@@ -36,6 +36,14 @@ const box = (w: number, h: number, d: number, x: number, y: number, z: number) =
 const cyl = (r: number, h: number, x: number, y: number, z: number, seg = 10) =>
   new THREE.CylinderGeometry(r, r, h, seg).translate(x, y + h / 2, z);
 
+/** A box of fire glow (a stove door's window): every face samples the middle of the glow map, so it is lit evenly, not as a pool. */
+const ember = (w: number, h: number, d: number, x: number, y: number, z: number): THREE.BufferGeometry => {
+  const g = box(w, h, d, x, y, z), uv = g.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, 0.5, 0.5);
+  g.userData.keepUV = true;
+  return g;
+};
+
 type V3 = readonly [number, number, number];
 const _up = new THREE.Vector3(0, 1, 0);
 
@@ -251,8 +259,12 @@ export const Furniture = {
     legs(add, w, d, lift + 0.06 * M, 0.03 * M, 'iron');
     add('iron', box(w, h, d, 0, lift + 0.06 * M, 0));
     add('iron', box(w + 0.04 * M, 0.04 * M, d + 0.04 * M, 0, lift + 0.06 * M + h, 0));
-    add('lamp', box(w * 0.5, h * 0.35, 0.01 * M, 0, lift + 0.2 * M, d / 2 + 0.002 * M));   // fire glowing behind the door glass
-    add('iron', box(w * 0.62, h * 0.5, 0.02 * M, 0, lift + 0.15 * M, d / 2 + 0.01 * M));
+    // the door: an iron frame round a window onto the fire (the fire's glow flickers, atmosphere/hearth.ts)
+    const dw = w * 0.62, dh = h * 0.5, dy = lift + 0.15 * M, dz = d / 2 + 0.01 * M;
+    add('iron', box(dw, dh * 0.25, 0.02 * M, 0, dy, dz));
+    add('iron', box(dw, dh * 0.25, 0.02 * M, 0, dy + dh * 0.75, dz));
+    for (const sx of [-1, 1]) add('iron', box(dw * 0.19, dh * 0.5, 0.02 * M, sx * dw * 0.405, dy + dh * 0.25, dz));
+    add('hearth_glow', ember(dw * 0.62, dh * 0.5, 0.012 * M, 0, dy + dh * 0.25, d / 2 + 0.012 * M));
     const pr = 0.075 * M, py = lift + 0.1 * M + h;
     add('iron', cyl(pr, pipeUp * M, 0, py, -0.05 * M));
     add('iron', new THREE.CylinderGeometry(pr, pr, pipeBack * M, 10).rotateX(Math.PI / 2).translate(0, py + pipeUp * M - pr, -0.05 * M - pipeBack * M / 2));
@@ -641,7 +653,7 @@ export const Furniture = {
     add('fieldstone', box(1.9 * M, hm * M, 0.7 * M, 0, 0, 0));
     add('fieldstone', box(2.1 * M, 0.25 * M, 0.75 * M, 0, 0, 0.6 * M));
     add('iron', box(0.9 * M, 0.75 * M, 0.04 * M, 0, 0.35 * M, 0.34 * M));
-    add('lamp', box(0.6 * M, 0.25 * M, 0.02 * M, 0, 0.4 * M, 0.37 * M));
+    add('hearth_glow', ember(0.6 * M, 0.25 * M, 0.02 * M, 0, 0.4 * M, 0.37 * M));
     add('wood_dark', box(2.0 * M, 0.12 * M, 0.3 * M, 0, 1.35 * M, 0.42 * M));
     add('crockery', cyl(0.06 * M, 0.25 * M, -0.6 * M, 1.47 * M, 0.42 * M, 8));
     Furniture.oilLamp(add, 0.6, 1.47, 0.42);
@@ -727,6 +739,7 @@ export const Furniture = {
     add('iron', box(1.1 * M, 0.75 * M, 0.65 * M, 0, 0.12 * M, 0));
     legs(add, 1.1 * M, 0.65 * M, 0.12 * M, 0.035 * M, 'iron');
     add('steel', box(0.45 * M, 0.35 * M, 0.02 * M, 0.2 * M, 0.25 * M, 0.33 * M));
+    add('hearth_glow', ember(0.2 * M, 0.1 * M, 0.012 * M, 0.2 * M, 0.37 * M, 0.352 * M));   // the firebox window
     add('iron', box(1.1 * M, 0.3 * M, 0.25 * M, 0, 1.2 * M, -0.2 * M));
     add('iron', cyl(0.07 * M, 1.4 * M, -0.35 * M, 0.87 * M, -0.2 * M));
     add('enamel', cyl(0.12 * M, 0.16 * M, 0.25 * M, 0.87 * M, 0.05 * M));

@@ -12,6 +12,7 @@ import { CELL, type KitPieceDef } from './kit';
 import { Furniture, M, sickSlot } from './interior';
 import { Clutter } from './clutter';
 import { dressEvenings } from './goodsDress';
+import { dressCozy } from './cozyDress';
 import { box, buildGabled, Parts, type BuildOpts, type FurnishCtx } from './shell';
 
 /** 9 × 12 m two-storey farmhouse (1920s–70s): front porch, kitchen and parlor down, bedrooms up. */
@@ -45,6 +46,9 @@ function farmhouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Grou
     const o = c.parts.opts;
     I({ x: left + 0.05, z: -0.5, rot: Math.PI / 2 }, a => Furniture.counter(a, 3.0, 0.4, !!o.plumbed));
     I({ x: left + 0.06, z: -0.05, rot: Math.PI / 2 }, a => Furniture.cookstove(a));
+    // two armchairs by the range for the evening (game/people/ritualGoals: the fireside seats)
+    I({ x: left + 0.27, z: -0.11, rot: -Math.PI / 2 }, a => Furniture.armchair(a, 'quilt_red'));
+    I({ x: left + 0.27, z: 0.03, rot: -Math.PI / 2 }, a => Furniture.armchair(a, 'quilt_blue'));
     if (o.wired) I({ x: left + 0.065, z: back + 0.12, rot: Math.PI / 2 }, a => Furniture.fridge(a));
     I({ x: 0.0, z: -0.55 }, a => Furniture.diningTable(a));
     dressEvenings(c, { x: 0.0, z: -0.55 });
@@ -67,6 +71,14 @@ function farmhouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Grou
     c.C({ x: -0.45, z: 0.0 }, a => Clutter.dogBed(a, c.rnd() < 0.5), 0.6);
     c.C({ x: -c.hw - 0.12, z: -0.4, y: 0.004, rot: Math.PI / 2 }, a => Clutter.woodpile(a, 5.0, 1.3), 1);   // (turned along the wall: unturned it lay across the wall and into the kitchen)
     c.C({ x: c.hw + 0.12, z: -0.9, y: 0.004 }, a => Clutter.washtub(a), 0.6);
+    dressCozy(c, {
+      seats: [{ x: -0.25, z: 0.3, kind: 'sofa' }],
+      hearth: { x: left + 0.06, z: -0.05, rot: Math.PI / 2, fwd: 0.1, w: 0.24, d: 0.3 },
+      kettle: { x: left + 0.06, z: -0.05 - 0.07, rot: Math.PI / 2, topM: 0.87 },
+      lamps: [{ x: 0.0, z: -0.55, r: 0.32 }],
+      herbs: { x: left + 0.004, z: -0.28, rot: Math.PI / 2, yM: 1.9, lenM: 0.6 },
+      rug2: { x: -0.25, z: 0.55, rot: 0.3, w: 1.5, d: 1.0 },
+    });
   }, new Parts(seed, opts));
   return group;
 }

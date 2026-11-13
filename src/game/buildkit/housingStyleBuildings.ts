@@ -10,6 +10,7 @@ import type { KitPieceDef } from './kit';
 import { Furniture, M, foodSlot, piece, pipe, sickSlot, wallRun, type Add, type Collider } from './interior';
 import { Clutter } from './clutter';
 import { dressEvenings } from './goodsDress';
+import { dressCozy } from './cozyDress';
 import { box, buildGabled, minusHoles, Parts, windowAt, type BuildOpts, type FurnishCtx, type WallOpening } from './shell';
 import type { KitMaterialId } from './materials';
 
@@ -430,6 +431,14 @@ function furnishTwoStorey(c: FurnishCtx, o: TwoStorey): void {
   c.C({ x: left + 0.002, z: -0.65, y: c.y0 + 1.3 * M, rot: Math.PI / 2 }, a => Clutter.picture(a, 0.8, 0.6, c.rnd() < 0.5 ? 'art_mountains' : 'art_sunset'), 1);
   c.C({ x: 0.1, z: front - 0.06, rot: 0.2 }, a => Clutter.boots(a), 0.95);
   c.C({ x: c.hw + 0.12, z: -0.5, y: 0.004, rot: -Math.PI / 2 }, a => Clutter.woodpile(a, 5.0, 1.3), 1);
+  dressCozy(c, {
+    seats: [{ x: -0.47, z: 0.3, rot: Math.PI, kind: 'sofa' }, { x: -0.6, z: 0.62, rot: Math.PI / 2, kind: 'armchair' }, { x: -0.34, z: 0.6, rot: -Math.PI / 2, kind: 'armchair' }],
+    hearth: { x: -0.3, z: back + 0.06, fwd: 0.27, w: 0.5, d: 0.34 },
+    mantel: { x: -0.3, z: back + 0.06, topM: 1.47, zM: 0.42 },
+    kettle: { x: right - 0.06, z: 0.81 - 0.07, rot: -Math.PI / 2, topM: 0.87 },
+    lamps: [{ x: -0.55, z: -0.5, r: 0.32 }],
+    rug2: { x: -0.47, z: 0.55, rot: 0.3, w: 1.6, d: 1.5 },
+  });
   } else {
   // great room at the back, round the hearth
   I({ x: -0.3, z: back + 0.06 }, a => Furniture.fireplace(a, o.hearth));
@@ -476,6 +485,14 @@ function furnishTwoStorey(c: FurnishCtx, o: TwoStorey): void {
   c.C({ x: -0.15, z: front - 0.005, y: c.y0 + 2.1 * M, rot: Math.PI }, a => Clutter.riflePegs(a), 0.6);
   c.C({ x: -0.35, z: c.hd + 0.2, y: c.y0, rot: 0.25 }, a => Clutter.rocker(a), 0.9);
   c.C({ x: c.hw + 0.12, z: -0.5, y: 0.004, rot: -Math.PI / 2 }, a => Clutter.woodpile(a, 5.0, 1.3), 1);
+  dressCozy(c, {
+    seats: [{ x: -0.3, z: -0.42, rot: Math.PI, kind: 'sofa' }, { x: -0.6, z: -0.66, rot: Math.PI / 2 + 0.4, kind: 'armchair' }, { x: 0.0, z: -0.66, rot: -Math.PI / 2 - 0.4, kind: 'armchair' }],
+    hearth: { x: -0.3, z: back + 0.06, fwd: 0.27, w: 0.5, d: 0.34 },
+    mantel: { x: -0.3, z: back + 0.06, topM: 1.47, zM: 0.42 },
+    kettle: { x: left + 0.06, z: 0.2 - 0.07, rot: Math.PI / 2, topM: 0.87 },
+    lamps: [{ x: 0.3, z: 0.62, r: 0.32 }],
+    rug2: { x: -0.3, z: -0.55, rot: 0.2, w: 1.6, d: 1.2 },
+  });
   }
   // the upper floor: boards over the plan, a hole for the stair, a landing between the rooms
   const top = o.open ?? front;

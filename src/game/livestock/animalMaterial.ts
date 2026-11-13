@@ -262,17 +262,23 @@ vec3 coatColor(out float fur, out float freq) {
   gWool = 0.0;
   if (c7.w > 0.01 && (region < 0.5 || (region > 2.5 && region < 3.5))) {
     // feathers: rows of rounded scales (every second row shifted half a scale), soft at the edges, a touch darker where they overlap
-    float row = floor(vRest.y * 26.0);
-    float off = ah(vec3(row, 1.3, 2.1));
-    float u = fract(-vRest.z * 21.0 + off + abs(vRest.x) * 5.0);
-    float v = fract(vRest.x * 30.0 + 0.5 * mod(row, 2.0) + off * 0.3);
-    float d = length((vec2(u, v) - 0.5) * vec2(1.0, 1.25));
+    // (rows slant back and down with the body's curve, each feather is a pointed teardrop with a shaft and its own small tilt and tone: no square grid)
+    // (feathers lie tip-back along z and are laid round the body by angle and arc length, so they cover flank, back and breast alike; the rows ripple a little)
+    vec2 rad = vec2(vRest.x, vRest.y - 0.28);
+    float arc = atan(rad.x, rad.y) * max(length(rad), 0.045);
+    float uc0 = -vRest.z * 21.0 + 0.5 * sin(arc * 11.0 + vRest.z * 7.0);
+    float cu = floor(uc0);
+    float off = ah(vec3(cu, 1.3, 2.1));
+    float vc = arc * 30.0 + 0.5 * mod(cu, 2.0) + off;
+    float jit = ah(vec3(cu, floor(vc), 5.0));
+    float u = fract(uc0), v = fract(vc);
+    float d = length((vec2(u, v) - 0.5) * vec2(1.0, 1.15 + 0.5 * jit));
     float dome = 1.0 - smoothstep(0.25, 0.85, d);
     float pxf = length(fwidth(vRest)) * 26.0;
     float wf = 1.0 - smoothstep(0.09, 0.3, pxf);
     gDome = dome * wf + 0.5 * (1.0 - wf);
     gWool = c7.w * wf * 0.35;
-    col *= mix(1.0, 0.94 + 0.1 * dome, c7.w * wf);
+    col *= mix(1.0, (0.9 + 0.12 * dome) * (0.96 + 0.08 * jit), c7.w * wf);
   }
   if (c5.w > 0.01 && (region < 0.5 || (region > 2.5 && region < 3.5))) {
     // locks: big domes with a finer crimp riding on them; fades to a smooth tone when a pixel covers more than a lock

@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { ContactShadows } from '../../engine/world/fx/ContactShadows';
 import type { Pt } from '../../sim/pathRoute';
-import { animalGoal, doorOf, drawnHerd, type AnimalGoal, type Home, type HerdCtx, type StockKind } from './livestockPlan';
+import { animalGoal, doorOf, drawnHerd, entryOf, restSlots, type AnimalGoal, type Home, type HerdCtx, type StockKind } from './livestockPlan';
 import { slopePace } from '../paths/walkRoute';
 import { climbLimit, gradeBetween } from '../paths/groundMovers';
 import { LODS, type Lod } from './animalKit';
@@ -41,7 +41,14 @@ interface Agent {
   id: string; kind: StockKind;
   x: number; z: number; rot: number; phase: number; tone: number;
   via: Pt[]; viaFor: string; wait: number;
+  /** Settled at its rest spot inside its shelter (drawn there: a barn's open door shows the herd). */
   inside: boolean; v: number;
+  /** The home it is walking in or out of, from the staging spot outside the doorway to the rest spot, and how far along the doorway points it is. */
+  shelter: string | null; leg: number; out: boolean;
+  /** Seconds it has stood still short of its doorway (a crowd or a snag in the route): past a few it is stepped up to the doorway. */
+  stall: number;
+  /** Height it is drawn at (eased: the barn floor is a step above the yard). */
+  y: number | null;
   /** Size variation (1 +- 5 %). */
   size: number;
   /** Heading into its shelter (the ones queueing at a door do not shove each other). */
@@ -87,6 +94,8 @@ export interface LivestockCtx {
   ground: (x: number, z: number) => number;
   /** The way from a to b for this kind: [] = straight, null = none (game/paths/groundMovers animalRoute over the walk world). */
   via: (kind: StockKind, a: Pt, b: Pt) => Pt[] | null;
+  /** Height of what it stands on, floors inside a shelter included (omitted: the ground). */
+  floor?: (x: number, z: number) => number;
   /** Ground an animal can stand on in the paddock (not inside a building, in the creek or on the road); omitted: anywhere. */
   free?: (x: number, z: number) => boolean;
 }
@@ -104,6 +113,7 @@ export class LivestockRenderer {
   private readonly _scene: THREE.Scene;
   private _budget = 0;
   private _age = 0;
+  private _dt = 0.016;
   private _time = 0;
   private _quality: Quality = 'medium';
   /** Kinds that found no way to a shelter since the last `takeNoWay` (the world writes one log line for them). */
@@ -171,8 +181,8 @@ export class LivestockRenderer {
   }
 
   /** Where the animals are (QA / tests). */
-  animals(): Array<{ id: string; kind: StockKind; x: number; z: number; inside: boolean; moving: boolean; wait: number; legs: number; goal: string }> {
-    return [...this._agents.values()].map(a => ({ id: a.id, kind: a.kind, x: a.x, z: a.z, inside: a.inside, moving: a.v > 0.01, wait: a.wait, legs: a.via.length, goal: a.viaFor }));
+  animals(): Array<{ id: string; kind: StockKind; x: number; z: number; y: number | null; rot: number; inside: boolean; shelter: string | null; moving: boolean; wait: number; legs: number; goal: string }> {
+    return [...this._agents.values()].map(a => ({ id: a.id, kind: a.kind, x: a.x, z: a.z, y: a.y, rot: a.rot, inside: a.inside, shelter: a.shelter, moving: a.v > 0.01, wait: a.wait, legs: a.via.length, goal: a.viaFor }));
   }
 
   update(dt: number, stock: Readonly<Record<string, number>>, coops: number, homes: readonly Home[], c: HerdCtx, ctx: LivestockCtx, speedK: number, cam?: { x: number; z: number; y?: number }): void {
@@ -185,15 +195,18 @@ export class LivestockRenderer {
     const k = Math.max(1, Math.min(3, speedK));
     const goals = herd.map(h => animalGoal(h, homes, c, this._agents.get(h.id)?.noWay, ctx.free));
     spreadGoals(herd, goals, homes);
+    restSlots(herd, goals, homes, kind => LOOK[kind].len);
+    const byId = new Map(homes.map(h => [h.id, h]));
+    this._dt = dt;
     for (let gi = 0; gi < herd.length; gi++) {
       const h = herd[gi], goal = goals[gi];
       let a = this._agents.get(h.id);
       if (!a) {
         // a new animal starts at its own spot (a load puts everyone where they belong)
-        a = { id: h.id, kind: h.kind, x: goal.x, z: goal.z, rot: hash(h.id, 9) * 6.28, phase: hash(h.id, 8) * 6, tone: hash(h.id, 7), via: [], viaFor: '', wait: 0, inside: goal.inside, v: 0, goingIn: goal.inside, size: 0.95 + hash(h.id, 11) * 0.1, gait: 0, graze: 0, noWay: new Set(), homeId: goal.home };
+        a = { id: h.id, kind: h.kind, x: goal.x, z: goal.z, rot: hash(h.id, 9) * 6.28, phase: hash(h.id, 8) * 6, tone: hash(h.id, 7), via: [], viaFor: '', wait: 0, inside: goal.inside, v: 0, goingIn: goal.inside, shelter: goal.inside ? goal.home : null, leg: 99, out: false, stall: 0, y: null, size: 0.95 + hash(h.id, 11) * 0.1, gait: 0, graze: 0, noWay: new Set(), homeId: goal.home };
         this._agents.set(h.id, a);
       }
-      this._step(a, goal, dt, k, ctx);
+      this._step(a, goal, dt, k, ctx, byId);
     }
     this._separate(dt * k);
     this._draw(herd, ctx, cam);
@@ -201,7 +214,7 @@ export class LivestockRenderer {
 
   /** Bodies in the field never stand inside each other: two that meet (one walked up to the other's spot) ease apart. */
   private _separate(dt: number): void {
-    const out = [...this._agents.values()].filter(a => !a.inside);
+    const out = [...this._agents.values()].filter(a => !a.inside && !a.shelter);
     for (let i = 0; i < out.length; i++) for (let j = i + 1; j < out.length; j++) {
       const A = out[i], B = out[j];
       if (A.goingIn || B.goingIn) continue;
@@ -214,16 +227,57 @@ export class LivestockRenderer {
     }
   }
 
-  private _step(a: Agent, goal: AnimalGoal, dt: number, k: number, ctx: LivestockCtx): void {
+  /**
+   * Walk the doorway points of a shelter in order (straight lines: the doorway is the one gap in the wall, so no route search and no wall to
+   * stop at). Returns true while there is still a point to go to.
+   */
+  private _through(a: Agent, pts: ReadonlyArray<Pt>, dt: number, v: number): boolean {
+    while (a.leg < pts.length && Math.hypot(pts[a.leg][0] - a.x, pts[a.leg][1] - a.z) < 0.035) a.leg++;
+    if (a.leg >= pts.length) return false;
+    const [tx, tz] = pts[a.leg], dx = tx - a.x, dz = tz - a.z, d = Math.hypot(dx, dz), step = Math.min(d, v * dt);
+    a.x += dx / d * step; a.z += dz / d * step; a.v = v;
+    a.phase += step * Math.PI * 2 / (modelOf(modelFor(a.kind, a.id)).stride * UNIT * a.size);
+    a.gait += (Math.min(1.25, v / (LOOK[a.kind].speed)) - a.gait) * Math.min(1, dt * 6);
+    const want = Math.atan2(dx, dz);
+    a.rot += Math.atan2(Math.sin(want - a.rot), Math.cos(want - a.rot)) * Math.min(1, dt * 8);
+    return true;
+  }
+
+  private _step(a: Agent, goal0: AnimalGoal, dt: number, k: number, ctx: LivestockCtx, homes: ReadonlyMap<string, Home>): void {
+    let goal = goal0;
+    const look0 = LOOK[a.kind], pace = (g: AnimalGoal) => look0.speed * k * (g.panic ? 2.4 : 1);
+    const home = goal.home ? homes.get(goal.home) : undefined;
+    if (goal.inside && goal.entry && home) {
+      // going in: by the route to the spot outside the doorway, then in through it to the rest spot
+      const en = goal.entry;
+      a.out = false;
+      if (a.shelter !== goal.home) { a.shelter = null; if (Math.hypot(en.stage[0] - a.x, en.stage[1] - a.z) < 0.08) { a.shelter = goal.home; a.leg = 0; } }
+      if (a.shelter === goal.home) {
+        a.homeId = goal.home; a.goingIn = true; a.gait *= Math.max(0, 1 - dt * 5); a.v = 0; a.inside = false;
+        if (!this._through(a, [en.door, en.inner, [goal.x, goal.z]], dt, pace(goal) * slopePace(0))) a.inside = true;
+        return;
+      }
+      goal = { ...goal, x: en.stage[0], z: en.stage[1] };
+      if (a.v < 0.01 && a.wait <= 0) a.stall += dt; else a.stall = 0;
+      if (a.stall > 4 && Math.hypot(goal.x - a.x, goal.z - a.z) < 1.6) { a.x = goal.x; a.z = goal.z; a.shelter = goal0.home; a.leg = 0; a.stall = 0; return; }
+    } else if (a.shelter) {
+      // out for the day (or to another home): back through the doorway the way it came, then on by the route
+      const h = homes.get(a.shelter);
+      if (h) {
+        a.homeId = goal.home; a.goingIn = false; a.gait *= Math.max(0, 1 - dt * 5); a.v = 0; a.inside = false;
+        const en = entryOf(h, (hash(a.id, 12) - 0.5) * 0.5, look0.len);
+        if (!a.out) { a.out = true; a.leg = 0; }
+        if (this._through(a, [en.inner, en.door, en.stage], dt, pace(goal) * slopePace(0))) return;
+      }
+      a.shelter = null; a.out = false; a.leg = 0; a.via = []; a.viaFor = '';
+    }
     a.homeId = goal.home;
     a.goingIn = goal.inside;
     a.gait *= Math.max(0, 1 - dt * 5);
     const look = LOOK[a.kind], key = `${goal.x.toFixed(1)},${goal.z.toFixed(1)}`;
     a.v = 0;
     const away = Math.hypot(goal.x - a.x, goal.z - a.z);
-    if (away > 40) { a.x = goal.x; a.z = goal.z; a.via = []; a.viaFor = key; a.inside = goal.inside; return; }       // far (a load, a long skip): simply there
-    // at the door of its shelter (within a body length of the doorway: the wall stops it getting nearer) it goes in
-    if (goal.inside && away < 0.4 + look.len * 0.5) { a.inside = true; a.via = []; a.viaFor = key; return; }
+    if (away > 40) { a.x = goal0.x; a.z = goal0.z; a.via = []; a.viaFor = key; a.inside = goal0.inside; a.shelter = goal0.inside ? goal0.home : null; a.leg = 99; a.out = false; return; }       // far (a load, a long skip): simply there
     if (a.wait > 0) { a.wait -= dt; return; }
     if (a.viaFor !== key) {
       if (away > 0.05 && this._budget > 0) {
@@ -249,7 +303,7 @@ export class LivestockRenderer {
       a.gait += (Math.min(1.25, v / (look.speed * k)) - a.gait) * Math.min(1, dt * 6);
       a.rot += Math.atan2(Math.sin(Math.atan2(dx, dz) - a.rot), Math.cos(Math.atan2(dx, dz) - a.rot)) * Math.min(1, dt * 6);
     } else if (!a.via.length) {
-      a.inside = goal.inside;
+      a.inside = false;
       // grazing: the head goes down now and then (no motion), nothing more to do
     }
   }
@@ -286,15 +340,18 @@ export class LivestockRenderer {
     const { at } = lodTier(this._quality);
     for (const h of herd) {
       const a = this._agents.get(h.id);
-      if (!a || a.inside) continue;
+      if (!a) continue;
       if (cam && Math.abs(a.x - cam.x) + Math.abs(a.z - cam.z) > 140) continue;
-      const gy = ctx.ground(a.x, a.z);
+      const floor = ctx.floor ?? ctx.ground, ty = floor(a.x, a.z);
+      // (eased: the barn floor is a step above the yard, and nothing pops up or floats)
+      a.y = a.y === null || Math.abs(ty - a.y) > 0.25 ? ty : a.y + (ty - a.y) * Math.min(1, this._dt * 10);
+      const gy = a.y;
       // grazing: now and then the head goes down (or the beak pecks); eased in and out
       const want = a.v < 0.01 && hash(a.id, 6) < 0.7 && Math.sin(this._time * 0.1 + hash(a.id, 5) * 9 + a.phase * 0.0 + (hash(a.id, 4) * 40)) > 0.1 ? 1 : 0;
       a.graze += (want - a.graze) * 0.06;
       const d = cam ? Math.hypot(a.x - cam.x, gy - (cam.y ?? gy + 8), a.z - cam.z) : 0, li = d < at[0] ? 0 : d < at[1] ? 1 : 2;
       this._put(a.kind, a.kind === 'hen' && h.id === 'hen0', Math.floor(hash(a.id, 1) * 4), a.x, gy, a.z, a.rot, a.phase, a.gait, a.graze, hash(a.id, 8), a.size, a.tone, li,
-        (ctx.ground(a.x - 0.05, a.z) - ctx.ground(a.x + 0.05, a.z)) / 0.1, (ctx.ground(a.x, a.z - 0.05) - ctx.ground(a.x, a.z + 0.05)) / 0.1);
+        a.shelter ? 0 : (ctx.ground(a.x - 0.05, a.z) - ctx.ground(a.x + 0.05, a.z)) / 0.1, a.shelter ? 0 : (ctx.ground(a.x, a.z - 0.05) - ctx.ground(a.x, a.z + 0.05)) / 0.1);
     }
     this._flush();
   }
