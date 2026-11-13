@@ -609,7 +609,7 @@ export function GameCanvas() {
       ws.cutsceneLift = player.active ? 1 : 0;
       ws.setWeather(wx, Math.max(weather.flash, look.flash), weather.skyLightning);
       // lamps on inside from dusk (which windows, and how, is the atmosphere's: who's up, power, blackout curtains)
-      setWindowGlow(Math.max(0, Math.min(1, (ws.nightFactor - 0.25) / 0.4)), now / 1000);
+      setWindowGlow(Math.max(0, Math.min(1, (ws.nightFactor - 0.25) / 0.4)), now / 1000, world.atmos.warmth, world.atmos.hearthFire);
       world.updateAtmosphere({
         dt, time: now / 1000, hour: t, night: ws.nightFactor, daylight: 1 - ws.nightFactor * 0.85, wind: wx.wind, rain: wx.rain, cloud: wx.cloud,
         snow: Math.max(sp.snow, wx.snowCover * seasonState.weatherSnow) * (wx.rain > 0.3 ? 0.4 : 1), viewportH: canvas.clientHeight || 800, battle: battle.playing,

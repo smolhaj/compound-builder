@@ -9,6 +9,7 @@ import { CELL, KIT, type KitPieceDef } from './kit';
 import { foodSlot, Furniture, M, wallRun, sickSlot } from './interior';
 import { buildCabinLayers } from './cabinGeometry';
 import { box, buildGabled, CUT_H, Parts, showStage, type BuildOpts, type FurnishCtx } from './shell';
+import { dressCozy } from './cozyDress';
 import { Clutter } from './clutter';
 import { dressEvenings } from './goodsDress';
 import { UTILITY_BUILDERS } from './utilityBuildings';
@@ -487,6 +488,14 @@ function dressLogHouse(c: FurnishCtx): void {
   C({ x: hw + 0.18, z: -0.7, y: 0.004, rot: -Math.PI / 2 }, a => Clutter.dogHouse(a), 0.7);
   C({ x: 0.55, z: -hd - 0.12, y: 0.004 }, a => Clutter.washtub(a), 0.6);
   void right;
+  dressCozy(c, {
+    seats: [{ x: -0.4, z: -0.45, rot: Math.PI, kind: 'sofa' }, { x: -0.64, z: -0.8, rot: Math.PI / 2 + 0.4, kind: 'armchair' }, { x: -0.12, z: -0.82, rot: -Math.PI / 2 - 0.4, kind: 'armchair' }],
+    hearth: { x: -0.4, z: back + 0.06, fwd: 0.27, w: 0.5, d: 0.34 },
+    mantel: { x: -0.4, z: back + 0.06, topM: 1.47, zM: 0.42 },
+    kettle: { x: left + 0.06, z: 0.22 - 0.07, rot: Math.PI / 2, topM: 0.87 },
+    lamps: [{ x: 0.35, z: 0.78, r: 0.32 }],
+    rug2: { x: -0.4, z: -0.62, rot: 0.2, w: 1.7, d: 1.2 },
+  });
 }
 
 /** Evening seats per kind (local). */
@@ -524,6 +533,7 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpt
 
 /** Every layer of a kit piece (construction shows them stage by stage). */
 export function buildLayers(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
+  if (def.sleeps > 0 && !opts.home) opts = { ...opts, home: true };
   const g = BUILDERS[def.id](def, seed, opts);
   g.userData.opts = opts;
   g.userData.seats ??= SEATS[def.id] ?? [];

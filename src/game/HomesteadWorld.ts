@@ -15,6 +15,9 @@ import { planParcelTrees, planUnderstory, type ParcelTree } from './parcel/parce
 import { buildWoods, fallHeading, trunkRadius } from './forestry/woodsGeometry';
 import type { Forestry } from '../sim/state';
 import { goodsKey, houseGoods } from '../sim/evenings';
+import { cozyForHome } from './atmosphere/cozyHome';
+import { COZY_NONE, cozyKey } from './buildkit/cozy';
+import { lampScale } from './atmosphere/hearth';
 import { plant, serviceOf } from '../sim/utilities';
 import { StreamRenderer } from '../engine/world/water/StreamRenderer';
 import { RegionalWaterRenderer } from '../engine/world/water/RegionalWaterRenderer';
@@ -2098,13 +2101,16 @@ export class HomesteadWorld {
       // wired but no power yesterday (a blackout, a flat battery): back to lamplight
       const powered = sv.wired && game.utilities.lit.includes(b.placed.id);
       const mine = b.placed.id === mainId && gk !== '000000' ? gk : '';
-      const key = `${+opts.plumbed}${+opts.wired}${+opts.septic}${+powered}${mine}`;
+      // how lived-in a home looks: how long the family has been in it, and what they own (buildkit/cozy.ts)
+      const st = KIT[b.placed.kind].sleeps > 0 ? game.structures.find(x => x.id === b.placed.id) : undefined;
+      const cozy = st ? cozyForHome(game, st) : undefined, ck = cozy ? cozyKey(cozy) : '', plain = !cozy || ck === cozyKey(COZY_NONE);
+      const key = `${+opts.plumbed}${+opts.wired}${+opts.septic}${+powered}${mine}${cozy ? '|' + ck : ''}`;
       if (key === b.services) continue;
       const geo = key.slice(0, 3) !== (b.services ?? '000').slice(0, 3) || key.slice(4) !== (b.services ?? '').slice(4);
       b.services = key;
       if (b.light && !b.under) b.light.color.set(powered ? 0xfff0d8 : 0xffc27a);
-      if (!geo || (key.startsWith('000') && !mine && !b.group.userData.opts?.plumbed && !b.group.userData.opts?.wired && !b.group.userData.opts?.goods)) continue;
-      this._rebuild(b, { ...b.opts, ...opts, goods: mine ? goods : undefined });
+      if (!geo || (key.startsWith('000') && !mine && plain && !b.group.userData.opts?.plumbed && !b.group.userData.opts?.wired && !b.group.userData.opts?.goods && !b.group.userData.opts?.cozy)) continue;
+      this._rebuild(b, { ...b.opts, ...opts, goods: mine ? goods : undefined, cozy: plain ? undefined : cozy });
       if (b.light && !b.under) b.light.color.set(powered ? 0xfff0d8 : 0xffc27a);
     }
   }
@@ -2241,7 +2247,7 @@ export class HomesteadWorld {
       const room = this.atmos.room(b.placed.id);
       const home = KIT[b.placed.kind].sleeps > 0;
       const fill = this._view === 'full' ? 0.25 : 0.12;
-      b.light.intensity = room !== undefined ? fill * (0.3 + 0.7 * this.air.daylight) + room * 1.4 * night : fill + (home ? (lit ? night * 1.25 : night * 0.25) : night * 0.1);
+      b.light.intensity = room !== undefined ? fill * (0.3 + 0.7 * this.air.daylight) + room * 1.4 * night * lampScale(this.atmos.warmth) : fill + (home ? (lit ? night * 1.25 : night * 0.25) : night * 0.1);
       if (pick) this._noteLight(cands, b, above);
     }
     // only the lights that can matter stay on (every light costs every lit pixel); a fixed count, so no recompiles
