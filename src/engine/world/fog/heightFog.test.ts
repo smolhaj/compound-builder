@@ -152,3 +152,14 @@ describe('ValleyFog easing', () => {
     expect(o4.cloud).toBe(0);                 // the sim says a clear day: no overcast
   });
 });
+
+import { aerialTintWeight } from './heightFog';
+describe('aerial perspective tint', () => {
+  it('is off at eye level distances, full far away, and thins with altitude and light fog', () => {
+    expect(aerialTintWeight(100, 1, 0)).toBe(0);
+    expect(aerialTintWeight(900, 1, 0)).toBeCloseTo(1, 5);
+    expect(aerialTintWeight(900, 1, 300)).toBeLessThan(0.35);
+    expect(aerialTintWeight(900, 0.1, 0)).toBeLessThan(0.2);
+    expect(aerialTintWeight(500, 1, 0)).toBeGreaterThan(aerialTintWeight(300, 1, 0));
+  });
+});

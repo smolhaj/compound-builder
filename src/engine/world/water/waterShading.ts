@@ -317,6 +317,12 @@ function outGLSL(): string {
     float facet = step(0.62, wHash(floor(wp * 9.0) + floor(uWTime * 6.0)));
     float glint = (pow(g, 2400.0) * 4.0 * (0.3 + 0.7 * facet) + pow(g, 400.0) * 0.06) * sparkle * wDetail;
     glint *= smoothstep(-0.02, 0.06, uSunDir.y) * (1.0 - wFoam);
+    // far water (past the ripple detail): ripples are sub-pixel, so the sun's glitter becomes a broad, softly twinkling path on the mean surface
+    {
+      float gm = max(dot(reflect(-Vw, vec3(0.0, 1.0, 0.0)), normalize(uSunDir)), 0.0);
+      float twinkle = 0.65 + 0.35 * wHash(floor(wp * 0.12) + floor(uWTime * 1.3));
+      glint += (0.85 * pow(gm, 120.0) + 0.08 * pow(gm, 24.0)) * (1.0 - wDetail) * twinkle * smoothstep(-0.02, 0.06, uSunDir.y) * (1.0 - wFoam);
+    }
     vec3 spec = min(uSunCol * glint, vec3(3.0));
     // Lamp reflections: vertical streaks under each lamp's mirror image
     vec3 lamps = vec3(0.0);

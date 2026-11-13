@@ -13,11 +13,11 @@ const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright')); } catch { ({ chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs')); }
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
-const tiers = opt('--tiers', 'low,medium,high').split(','), port = Number(opt('--port', 4195)), printOnly = args.includes('--print');
+const tiers = opt('--tiers', 'low,medium,high').split(','), port = Number(opt('--port', 4195)), printOnly = args.includes('--print'), showTop = args.includes('--top');
 const budget = JSON.parse(readFileSync(new URL('./perfBudget.json', import.meta.url), 'utf8'));
 const scenes = budget.scenes;
 setTimeout(() => { console.error('perfBudget watchdog: over 9 minutes, giving up'); process.exit(2); }, 9 * 60 * 1000).unref();
-const srv = spawn('node', ['node_modules/vite/bin/vite.js', 'preview', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
+const srv = spawn('node', ['node_modules/vite/bin/vite.js', 'preview', '--port', String(port), '--strictPort', ...(opt('--dist', '') ? ['--outDir', opt('--dist', '')] : [])], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise((ok, no) => { srv.stdout.on('data', d => /localhost:\d+/.test(String(d).replace(/\x1b\[[0-9;]*m/g, '')) && ok()); srv.on('exit', c => no(new Error('preview exited ' + c))); });
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-accelerated-2d-canvas', '--enable-precise-memory-info', '--js-flags=--expose-gc'] });
 let failed = false; const rows = [];
@@ -50,6 +50,7 @@ try {
     const bad = checks.filter(c => c.bad);
     console.log(`${sceneName}/${tier}: calls ${m.drawCalls} tris ${m.triangles} (${(m.triangles / 1000).toFixed(0)}k) shadowTris ${m.shadowTriangles} (${(m.shadowTriangles / 1000).toFixed(0)}k) casters ${m.shadowCasters} heap ${m.heapMB.toFixed(0)}MB load ${loadMs}ms (script ${Math.round(m.showcaseMs)}ms)`
       + (bad.length ? '  OVER BUDGET: ' + bad.map(c => `${c.k} ${Math.round(c.v)} > ${c.max}`).join(', ') : '  ok'));
+    if (showTop) console.log('  top: ' + (m.top ?? []).slice(0, 8).map(t => `${t.label}[${t.calls}c ${(t.tris / 1000).toFixed(0)}k]`).join(' '));
     if (bad.length && !printOnly) failed = true;
   }
 } finally { await browser.close(); srv.kill(); }

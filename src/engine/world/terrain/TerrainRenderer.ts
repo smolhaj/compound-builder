@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { regionLookFor, type RegionKind, type RegionLook } from './regionalLandscape';
 import { CROP_SLOTS, cropSlotsFor } from './cropCalendar';
 import { applyEdgeHaze } from './edgeHaze';
+import { applySnaps, buildAdaptiveMesh, leafSurface, planLeaves, type AdaptiveMesh } from './terrainLod';
 import { HEIGHT_FOG_GLSL } from '../fog/heightFog';
 import { applyGroundSkyFill, ensureGroundTextures, groundUniforms } from '../materials/groundTextures';
 import { seasonState } from '../season/seasonState';
@@ -46,6 +47,8 @@ export const R_MAX = 2000;
 const CORE_CELL: Record<Quality, number> = { high: 0.35, medium: 0.5, low: 0.8 };
 /** Cell growth per step outside the core. */
 const GROWTH: Record<Quality, number> = { high: 1.055, medium: 1.07, low: 1.1 };
+/** Far-field leaf size as a share of its distance from the fine core (terrainLod.ts): the old tensor bands were 5.5 / 7 / 10 % of the distance one way and slivers the other. */
+const LOD_TAU: Record<Quality, number> = { high: 0.055, medium: 0.07, low: 0.1 };
 
 /** Axis: uniform `cell` within ±core of c, then cells growing by `growth` out to ±R_MAX. */
 export function terrainAxis(c: number, core: number, cell: number, growth: number): number[] {
@@ -351,8 +354,27 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
         // floor under them: an even, darker ground with only a subtle seasonal
         // shift — the speckled far-canopy colors there read as camouflage
         // blotches across the hillside (QA, Mega Campus by the station)
-        float nearFo = 1.0 - smoothstep(110.0, 340.0, length(vRPos - cameraPosition));
+        float camDcF = length(vRPos - cameraPosition);
+        float nearFo = 1.0 - smoothstep(110.0, 340.0, camDcF);
         col = mix(col, uForest * mix((0.7 + 0.55 * nc) * (0.85 + 0.3 * na), 0.8 + 0.12 * nb, nearFo), fo);
+        // Far field (beyond the planted trees and the fine noise): the wood reads as a canopy of crowns lit from the sun side, not a flat tint,
+        // and open ground gets large-scale patches so it is never a clean sheet. Both fade out where a pixel spans several crowns (no shimmer).
+        {
+          float farG = smoothstep(150.0, 480.0, camDcF);
+          if (farG > 0.0) {
+            float pxF = clamp(camDcF * 0.0012, 0.05, 4.0);                 // world units per pixel, roughly
+            float crownF = 1.0 - smoothstep(0.35, 1.1, pxF / 3.2);          // crowns (~3 u) resolve until ~1.5 px
+            if (fo > 0.02 && crownF > 0.0) {
+              vec2 cq = xz / 3.4;
+              float c0 = rNoise(cq) * 0.6 + rNoise(cq * 2.1 + 5.3) * 0.4;
+              float c1 = rNoise(cq + vec2(0.45, 0.3)) * 0.6 + rNoise((cq + vec2(0.45, 0.3)) * 2.1 + 5.3) * 0.4;
+              float crown = clamp(0.5 + (c0 - 0.5) * 1.5 + (c0 - c1) * 2.2, 0.0, 1.0);
+              col = mix(col, col * (0.62 + 0.8 * crown), fo * farG * crownF * 0.8);
+            }
+            float patch1 = rFbm(xz * 0.0075 + 31.0), patch2 = rNoise(xz * 0.021 + 7.0);
+            col *= mix(1.0, 0.86 + 0.3 * patch1 + 0.1 * (patch2 - 0.5), farG * (1.0 - fo * 0.5) * (1.0 - smoothstep(0.35, 0.6, slope)));
+          }
+        }
         // Forest floor under the near canopy (Appalachia / PNW / north woods): brown duff with
         // drifts of leaf litter and needles, moss on the damp patches and over stones, fine speckle up close
         if (uFloorK.z > 0.0) {
@@ -489,6 +511,7 @@ export class TerrainRenderer {
   private _gx: number[] = [];
   private _gz: number[] = [];
   private _gh: Float32Array | null = null;
+  private _am: AdaptiveMesh | null = null;
 
   constructor(scene: THREE.Scene) {
     this._scene = scene;
@@ -545,36 +568,33 @@ export class TerrainRenderer {
     const xs = terrainAxis(o.cx, core.x, CORE_CELL[o.quality], GROWTH[o.quality]);
     const zs = terrainAxis(o.cz, core.z, CORE_CELL[o.quality], GROWTH[o.quality]);
     const NX = xs.length, NZ = zs.length;
-    const pos = new Float32Array(NX * NZ * 3);
-    const aF = new Float32Array(NX * NZ);
-    const aD = new Float32Array(NX * NZ);
+    const nodeH = new Float32Array(NX * NZ), nodeF = new Float32Array(NX * NZ), nodeD = new Float32Array(NX * NZ);
     for (let j = 0; j < NZ; j++) {
       for (let i = 0; i < NX; i++) {
-        const x = xs[i], z = zs[j];
-        const s = o.source.sample(x, z);
+        const s = o.source.sample(xs[i], zs[j]);
         const k = j * NX + i;
-        pos[k * 3] = x; pos[k * 3 + 1] = s.h; pos[k * 3 + 2] = z;
-        aF[k] = s.forest; aD[k] = s.field;
+        nodeH[k] = s.h; nodeF[k] = s.forest; nodeD[k] = s.field;
       }
     }
     this._gx = xs; this._gz = zs;
-    this._gh = new Float32Array(NX * NZ);
-    for (let k = 0; k < NX * NZ; k++) this._gh[k] = pos[k * 3 + 1];
-    const idx = new Uint32Array((NX - 1) * (NZ - 1) * 6);
-    let q = 0;
-    for (let j = 0; j < NZ - 1; j++) {
-      for (let i = 0; i < NX - 1; i++) {
-        const a = j * NX + i, b = a + 1, c = a + NX, d = c + 1;
-        const ya = pos[a * 3 + 1], yb = pos[b * 3 + 1], yc = pos[c * 3 + 1], yd = pos[d * 3 + 1];
-        if (Math.abs(ya - yd) <= Math.abs(yb - yc)) { idx[q++] = a; idx[q++] = c; idx[q++] = d; idx[q++] = a; idx[q++] = d; idx[q++] = b; }
-        else { idx[q++] = a; idx[q++] = c; idx[q++] = b; idx[q++] = b; idx[q++] = c; idx[q++] = d; }
-      }
+    this._gh = nodeH;
+    // the fine core keeps every cell; outside it the grid is tiled in leaves about tau x their distance wide
+    const focus = { x0: o.cx - core.x, x1: o.cx + core.x, z0: o.cz - core.z, z1: o.cz + core.z };
+    const hOut: { out: Float32Array | null } = { out: null };
+    const am = buildAdaptiveMesh(xs, zs, planLeaves(xs, zs, focus, LOD_TAU[o.quality], CORE_CELL[o.quality] * 1.01), nodeH, hOut);
+    const nv = am.nodeOf.length;
+    const pos = new Float32Array(nv * 3), aF = new Float32Array(nv), aD = new Float32Array(nv);
+    for (let v = 0; v < nv; v++) {
+      const k = am.nodeOf[v], i = k % NX, j = (k - i) / NX;
+      pos[v * 3] = xs[i]; pos[v * 3 + 1] = hOut.out![v]; pos[v * 3 + 2] = zs[j];
+      aF[v] = nodeF[k]; aD[v] = nodeD[k];
     }
+    this._am = am;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     geo.setAttribute('aForest', new THREE.BufferAttribute(aF, 1));
     geo.setAttribute('aField', new THREE.BufferAttribute(aD, 1));
-    geo.setIndex(new THREE.BufferAttribute(idx, 1));
+    geo.setIndex(new THREE.BufferAttribute(am.index, 1));
     geo.computeVertexNormals();
     geo.computeBoundingSphere();
     const { mat, u } = makeTerrainMaterial(look, o.waterY ?? null);
@@ -602,8 +622,8 @@ export class TerrainRenderer {
    * a new building): positions, cover attributes, normals and surfaceAt.
    */
   refresh(source: TerrainSource, x0: number, z0: number, x1: number, z1: number): void {
-    const mesh = this._mesh, H = this._gh;
-    if (!mesh || !H) return;
+    const mesh = this._mesh, H = this._gh, am = this._am;
+    if (!mesh || !H || !am) return;
     const geo = mesh.geometry;
     const pos = geo.getAttribute('position') as THREE.BufferAttribute;
     const aF = geo.getAttribute('aForest') as THREE.BufferAttribute;
@@ -615,11 +635,19 @@ export class TerrainRenderer {
       for (let i = i0; i <= (i1 < 0 ? NX - 1 : i1); i++) {
         const k = j * NX + i;
         const sm = source.sample(xs[i], zs[j]);
-        pos.setY(k, sm.h);
-        aF.setX(k, sm.forest); aD.setX(k, sm.field);
         H[k] = sm.h;
+        const v = am.vertexOf[k];
+        if (v < 0) continue;
+        pos.setY(v, sm.h);
+        aF.setX(v, sm.forest); aD.setX(v, sm.field);
       }
     }
+    // snapped T-junction vertices follow the (possibly changed) corners of the edge they sit on
+    const ys = pos.array as Float32Array;
+    const hv = new Float32Array(pos.count);
+    for (let v = 0; v < hv.length; v++) hv[v] = ys[v * 3 + 1];
+    applySnaps(hv, am.snaps);
+    for (const s of am.snaps) pos.setY(s.v, hv[s.v]);
     pos.needsUpdate = aF.needsUpdate = aD.needsUpdate = true;
     geo.computeVertexNormals();
   }
@@ -649,23 +677,11 @@ export class TerrainRenderer {
    * the mesh uses, so anything draped on it sits exactly on the ground.
    */
   surfaceAt(x: number, z: number): number {
-    const xs = this._gx, zs = this._gz, H = this._gh;
-    if (!H || xs.length < 2) return 0;
-    const find = (a: number[], v: number): number => {
-      let lo = 0, hi = a.length - 2;
-      if (v <= a[0]) return 0;
-      if (v >= a[a.length - 1]) return a.length - 2;
-      while (lo < hi) { const m = (lo + hi + 1) >> 1; if (a[m] <= v) lo = m; else hi = m - 1; }
-      return lo;
-    };
-    const i = find(xs, x), j = find(zs, z), NX = xs.length;
-    const u = Math.max(0, Math.min(1, (x - xs[i]) / (xs[i + 1] - xs[i])));
-    const v = Math.max(0, Math.min(1, (z - zs[j]) / (zs[j + 1] - zs[j])));
-    const ya = H[j * NX + i], yb = H[j * NX + i + 1], yc = H[(j + 1) * NX + i], yd = H[(j + 1) * NX + i + 1];
-    if (Math.abs(ya - yd) <= Math.abs(yb - yc)) {
-      return v >= u ? ya + v * (yc - ya) + u * (yd - yc) : ya + u * (yb - ya) + v * (yd - yb);
-    }
-    return u + v <= 1 ? ya + u * (yb - ya) + v * (yc - ya) : yd + (1 - u) * (yc - yd) + (1 - v) * (yb - yd);
+    const xs = this._gx, zs = this._gz, am = this._am, mesh = this._mesh;
+    if (!am || !mesh || xs.length < 2) return 0;
+    const p = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const ys = p.array as Float32Array;
+    return leafSurface(xs, zs, am, x, z, v => ys[v * 3 + 1]);
   }
 
   /**
@@ -707,5 +723,6 @@ export class TerrainRenderer {
     }
     this._u = null;
     this._gh = null;
+    this._am = null;
   }
 }

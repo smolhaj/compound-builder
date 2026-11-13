@@ -6,7 +6,7 @@
    "tiers": {
     "low": {
      "drawCalls": 430,
-     "triangles": 620000,
+     "triangles": 600000,
      "shadowTriangles": 0,
      "shadowCasters": 0,
      "heapMB": 85,
@@ -14,7 +14,7 @@
     },
     "medium": {
      "drawCalls": 430,
-     "triangles": 940000,
+     "triangles": 880000,
      "shadowTriangles": 240000,
      "shadowCasters": 345,
      "heapMB": 105,
@@ -22,7 +22,7 @@
     },
     "high": {
      "drawCalls": 430,
-     "triangles": 1400000,
+     "triangles": 1200000,
      "shadowTriangles": 295000,
      "shadowCasters": 350,
      "heapMB": 120,

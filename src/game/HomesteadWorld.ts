@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import { mulberry32 } from '../sim/rng';
 import { ShrubField, SAGE, WILLOW, type ShrubSpec } from '../engine/world/trees/ShrubField';
 import type { Quality, WorldScene } from '../engine/world/WorldScene';
-import { TerrainRenderer } from '../engine/world/terrain/TerrainRenderer';
+import { R_MAX, TerrainRenderer } from '../engine/world/terrain/TerrainRenderer';
+import { DistantRidges } from '../engine/world/terrain/DistantRidges';
 import { regionLookFor, regionWaterY } from '../engine/world/terrain/regionalLandscape';
 import { ForestRenderer } from '../engine/world/trees/ForestRenderer';
 import { FarTreeRenderer } from '../engine/world/trees/FarTreeRenderer';
@@ -228,6 +229,8 @@ export class HomesteadWorld {
   readonly center = new THREE.Vector3(PARCEL_SIZE / 2, 0, PARCEL_SIZE / 2);
   readonly parcel: ParcelTerrain;
   readonly terrain: TerrainRenderer;
+  /** The ranges beyond the modelled square (engine/world/terrain/DistantRidges). */
+  readonly ridges: DistantRidges;
   readonly forest: ForestRenderer;
   readonly sage: ShrubField;
   readonly willow: ShrubField;
@@ -344,6 +347,7 @@ export class HomesteadWorld {
     this.plan = roadPlanFor(site, seed, this.parcel);
     this.access = accessFromPlan(this.plan);
     this.terrain = new TerrainRenderer(ws.scene);
+    this.ridges = new DistantRidges(ws.scene);
     this.forest = new ForestRenderer(ws.scene);
     this.sage = new ShrubField(ws.scene, this.regionWorld.scrub === 'desert' ? 'desert_scrub' : 'sagebrush', this.regionWorld.sagePalette ?? SAGE, 1);
     this.rocks = new RockField(ws.scene);
@@ -633,6 +637,7 @@ export class HomesteadWorld {
       kind: this.regionWorld.kind, cx: this.center.x, cz: this.center.z,
       core: { x: PARCEL_SIZE / 2 + 70, z: PARCEL_SIZE / 2 + 22 }, quality: q, waterY: regionWaterY(this.regionWorld.kind),
     });
+    this.ridges.build({ kind: this.regionWorld.kind, look: regionLookFor(this.regionWorld.kind), cx: this.center.x, cz: this.center.z, half: R_MAX, height: (x, z) => this.parcel.sample(x, z).h, quality: q });
     const gc = this.terrain.groundColors();
     if (gc) this.cover.configure({ kind: this.regionWorld.kind, sampler: this._coverSampler, grass: gc.grass, dryGrass: gc.dryGrass, terrainDry: gc.dry });
     this.cover.setQuality(q);
@@ -2918,6 +2923,7 @@ export class HomesteadWorld {
     const p = this.seasons.update({ locationId: this.climate, doy, totalDays, mode, dt });
     writeSeasonUniforms(p, climateFor(this.climate));
     this.terrain.update();
+    this.ridges.update();
     this._clock += dt;
     ForestRenderer.setWindTime(this._clock);
     ForestRenderer.setGust(this.air.wind);
@@ -2944,6 +2950,7 @@ export class HomesteadWorld {
 
   dispose(): void {
     this.terrain.dispose();
+    this.ridges.dispose();
     for (const { group, smoke } of this._built.values()) {
       this._ws.scene.remove(group);
       if (smoke) { this._ws.scene.remove(smoke.points); smoke.dispose(); }
