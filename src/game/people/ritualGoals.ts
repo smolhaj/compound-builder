@@ -20,26 +20,26 @@ import type { Goal, GoalCtx, Site } from './peopleGoals';
 type Seat = readonly [number, number, number, number];
 
 /** Which kind of chair: facing the hearth against the back wall, or at the table. */
-export const seatRole = (s: Seat): 'fire' | 'table' => (s[3] <= -0.45 ? 'fire' : 'table');
+export const seatRole = (s: Seat, role?: 'fire' | 'table'): 'fire' | 'table' => role ?? (s[3] <= -0.45 ? 'fire' : 'table');
 
 /** The home's seats split by role (a house with just one kind uses them for both). */
-export function splitSeats(seats: readonly Seat[]): { table: Seat[]; fire: Seat[] } {
-  const table = seats.filter(s => seatRole(s) === 'table'), fire = seats.filter(s => seatRole(s) === 'fire');
+export function splitSeats(seats: readonly Seat[], roles?: ReadonlyArray<'fire' | 'table'>): { table: Seat[]; fire: Seat[] } {
+  const table = seats.filter((s, i) => seatRole(s, roles?.[i]) === 'table'), fire = seats.filter((s, i) => seatRole(s, roles?.[i]) === 'fire');
   return { table: table.length ? table : [...seats], fire: fire.length ? fire : [...seats] };
 }
 
 /** The hearth in local coordinates (where the fireside chairs face), or null when the home has no seats. */
-export function hearthPoint(seats: readonly Seat[] | undefined): [number, number] | null {
+export function hearthPoint(seats: readonly Seat[] | undefined, roles?: ReadonlyArray<'fire' | 'table'>): [number, number] | null {
   if (!seats?.length) return null;
-  const f = splitSeats(seats).fire;
+  const f = splitSeats(seats, roles).fire;
   return [f.reduce((a, s) => a + s[2], 0) / f.length, f.reduce((a, s) => a + s[3], 0) / f.length];
 }
 
 /** A point in front of the hearth where a dog curls up: a hand's width toward the chairs. */
 export function stovePlace(h: Site & { seats?: readonly Seat[] }, k = 0): { x: number; z: number } | null {
-  const hp = hearthPoint(h.seats);
-  if (!hp || !h.seats || !h.seats.some(s => seatRole(s) === 'fire')) return null;   // no hearth in this kit: the dog keeps to the old places
-  const f = splitSeats(h.seats).fire, cx = f.reduce((a, s) => a + s[0], 0) / f.length, cz = f.reduce((a, s) => a + s[1], 0) / f.length;
+  const hp = hearthPoint(h.seats, h.seatRoles);
+  if (!hp || !h.seats || !h.seats.some((s, i) => seatRole(s, h.seatRoles?.[i]) === 'fire')) return null;   // no hearth in this kit: the dog keeps to the old places
+  const f = splitSeats(h.seats, h.seatRoles).fire, cx = f.reduce((a, s) => a + s[0], 0) / f.length, cz = f.reduce((a, s) => a + s[1], 0) / f.length;
   const dx = cx - hp[0], dz = cz - hp[1], d = Math.hypot(dx, dz) || 1;
   const lx = hp[0] + dx / d * 0.1 + (dz / d) * 0.06 * (k % 2 ? 1 : -1), lz = hp[1] + dz / d * 0.1 - (dx / d) * 0.06 * (k % 2 ? 1 : -1);
   return world(h, lx, lz);
@@ -67,7 +67,7 @@ export function ritualGoal(i: number, kid: boolean, task: string, hour: number, 
   const stance = stanceOf(R.calm, i), kind: RitualKind | null = R.kind(i), elder = R.elder(i);
   const at = (lx: number, lz: number) => world(h, lx, lz);
   const front = Math.max(...h.seats.map(s => s[1])) + 0.18;
-  const hp = hearthPoint(h.seats) ?? [0, -0.6];
+  const hp = hearthPoint(h.seats, h.seatRoles) ?? [0, -0.6];
   if (stance === 'alert' && (kind || HOME_TASKS.has(task))) {
     const p = (kid || elder) ? at(hp[0] + (i % 3 - 1) * 0.12, hp[1] + 0.22 + 0.06 * (i % 2)) : at(-0.25 + (i % 4) * 0.2, front);
     if (kid || elder) return { x: p.x, z: p.z, pose: FIG_POSE.COVER, face: faceTo(p.x, p.z, h.x, h.z), hidden: false, work: false, pace: HURRIED };
@@ -75,7 +75,7 @@ export function ritualGoal(i: number, kid: boolean, task: string, hour: number, 
     return { x: p.x, z: p.z, pose: rifle ? FIG_POSE.RIFLE : FIG_POSE.STAND, face: h.rot, hidden: false, work: false, tool: rifle ? FIG_TOOL.RIFLE : undefined, walkPose: rifle ? FIG_POSE.RIFLE : undefined, pace: HURRIED };
   }
   if (!kind) return null;
-  const { table, fire } = splitSeats(h.seats);
+  const { table, fire } = splitSeats(h.seats, h.seatRoles);
   const { k, n } = R.rank(i);
   if (stance === 'wary') {
     const t = table[k % table.length], p = at(t[0] + 0.1 * ((k % 3) - 1), t[1] + 0.12);

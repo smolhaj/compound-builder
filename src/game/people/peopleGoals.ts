@@ -21,7 +21,7 @@ import type { Wp } from '../paths/linkRoute';
 import { ritualGoal } from './ritualGoals';
 import type { RitualKind } from '../../sim/rituals';
 
-export interface Site { x: number; z: number; rot: number; w: number; d: number; /** Evening seats (local x, z, face x, z). */ seats?: ReadonlyArray<readonly [number, number, number, number]> }
+export interface Site { x: number; z: number; rot: number; w: number; d: number; /** Evening seats (local x, z, face x, z). */ seats?: ReadonlyArray<readonly [number, number, number, number]>; /** A role per seat where the facing does not say it (game/people/ritualGoals). */ seatRoles?: ReadonlyArray<'fire' | 'table'> }
 
 export interface GoalCtx {
   /** Camp center (world) and its rotation. */

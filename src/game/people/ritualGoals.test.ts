@@ -77,6 +77,22 @@ describe('a family comes to the table and sits', () => {
   });
 });
 
+describe('the old farmhouse (explicit seat roles)', () => {
+  const FARM: Seat[] = [[-0.09, -0.667, 0, -0.55], [0.09, -0.667, 0, -0.55], [-0.09, -0.433, 0, -0.55], [0.09, -0.433, 0, -0.55], [-0.43, -0.11, -0.62, -0.11], [-0.43, 0.03, -0.62, 0.03]];
+  const ROLES = ['table', 'table', 'table', 'table', 'fire', 'fire'] as const;
+  it('all four sit at the table at dinner, and the fireside chairs face the range', () => {
+    const ctx = { ...mk(FARM, ['meal', 'meal', 'meal', 'meal'], 18.3, 1), home: { ...home(FARM), seatRoles: ROLES } };
+    const goals = people.map((p, i) => goalFor(i, p.kid, 'meal', null, 18.3, ctx, 0));
+    expect(goals.every(g => g.pose === FIG_POSE.BENCH)).toBe(true);
+    expect(new Set(goals.map(g => `${g.x.toFixed(2)},${g.z.toFixed(2)}`)).size).toBe(4);
+    const fire = { ...ctx, ritual: ritualCtx(people, ['leisure', 'leisure', 'leisure', 'leisure'], 20, 1) };
+    const fg = people.map((p, i) => goalFor(i, p.kid, 'leisure', null, 20, fire, 0));
+    expect(fg.filter(g => g.pose === FIG_POSE.BENCH).length).toBe(2);
+    expect(hearthPoint(FARM, ROLES)![0]).toBeCloseTo(-0.62);
+    expect(stovePlace({ ...home(FARM), seatRoles: ROLES })).not.toBeNull();
+  });
+});
+
 describe('a breach stops the table', () => {
   it('on alert nobody sits: the grown-ups at the front wall, the kids down by the hearth, all hurried', () => {
     const ctx = mk(CABIN_SEATS as Seat[], ['meal', 'meal', 'meal', 'meal'], 18.3, 0.1);

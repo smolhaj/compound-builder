@@ -2535,7 +2535,7 @@ export class HomesteadWorld {
       const b = this._built.get(id);
       if (!b) return null;
       const def = KIT[b.placed.kind];
-      return { x: b.placed.x, z: b.placed.z, rot: b.placed.rot * Math.PI / 2, w: def.cellsX * CELL, d: def.cellsZ * CELL, seats: b.group.userData.seats as Seat[] };
+      return { x: b.placed.x, z: b.placed.z, rot: b.placed.rot * Math.PI / 2, w: def.cellsX * CELL, d: def.cellsZ * CELL, seats: b.group.userData.seats as Seat[], seatRoles: b.group.userData.seatRoles as Array<'fire' | 'table'> | undefined };
     };
     // home: the finished house that sleeps the most
     const homeB = [...this._built.values()].filter(b => b.finished && KIT[b.placed.kind].sleeps > 0).sort((a, b) => KIT[b.placed.kind].sleeps - KIT[a.placed.kind].sleeps)[0];
