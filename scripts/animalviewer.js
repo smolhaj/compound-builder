@@ -1,4 +1,5 @@
 // Standalone turntable contact sheet for the farm animals: the real LivestockRenderer, one animal per breed row, four angles, a neutral lit ground.
+//   &hz=1.5&hy=1.1 head position in model metres, for view=headside|face
 //   ?kind=cow|steer|goat|sheep|pig|rabbit|hen|deer|elk|...|dog_lab (any wildlife / dog model id)  &rooster=1  &pose=stand|walk|run|graze|alert|sit|lie  &adorn=1 (antlers, beard)  &lod=0..2  &q=high|medium|low  &ph=0.6  &cw=360  &person=1  &breeds=0,1  &view=side,front,rear,top
 import * as THREE from 'three';
 import { LivestockRenderer, UNIT } from '/src/game/livestock/LivestockRenderer.ts';
@@ -18,6 +19,7 @@ const model = wild ? wildModelOf(kind) : modelOf(modelFor(kind, rooster ? 'roost
 const nb = model.spec.breeds.length;
 const breeds = q.get('breeds') ? q.get('breeds').split(',').map(Number) : [...Array(nb).keys()];
 const person = q.get('person') === '1';
+const HZ = Number(q.get('hz') || 0) * UNIT, HY = Number(q.get('hy') || 0) * UNIT;   // head position (m, model frame) for the headside / face close-ups
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setSize(views.length * CW, breeds.length * CH); renderer.setPixelRatio(1);
@@ -49,6 +51,8 @@ const VIEWS = {
   head: { eye: [-D * 0.28, H * 1.0, D * 0.4], at: [0, H * 0.7, L * 0.38], up: [0, 1, 0], fov: 24 },
   leg: { eye: [-D * 0.36, H * 0.3, L * 0.28], at: [0, H * 0.22, L * 0.26], up: [0, 1, 0], fov: 24 },
   legback: { eye: [-D * 0.36, H * 0.3, -L * 0.28], at: [0, H * 0.22, -L * 0.28], up: [0, 1, 0], fov: 24 },
+  headside: { eye: [-D * 0.3, HY * 1.0, HZ], at: [0, HY * 0.95, HZ], up: [0, 1, 0], fov: 24 },
+  face: { eye: [-D * 0.2, HY * 1.05, HZ + D * 0.3], at: [0, HY * 0.9, HZ], up: [0, 1, 0], fov: 24 },
   eye: { eye: [-D * 0.5, 0.17, D * 0.7], at: [0, H * 0.5, 0], up: [0, 1, 0], fov: 38 },
 };
 breeds.forEach((b, r) => {

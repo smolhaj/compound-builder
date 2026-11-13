@@ -52,6 +52,10 @@ export interface Breed {
   fur?: number; furFreq?: number;
   /** Colour and mix of the three accent regions (REGION.ACC1..3). */
   acc1?: V3; acc1Mix?: number; acc2?: V3; acc2Mix?: number; acc3?: V3; acc3Mix?: number;
+  /** Curly fleece (0..1): clumpy locks in the shader, shaded between the clumps. */
+  wool?: number;
+  /** Overlapping body feathers (0..1): rows of rounded scales shaded and bumped. */
+  feather?: number;
   /** Instance scale for this breed (a Jersey is smaller than a Holstein). */
   size?: number;
 }
@@ -186,6 +190,20 @@ float an(vec3 x) {
   return mix(mix(mix(ah(i), ah(i + vec3(1,0,0)), f.x), mix(ah(i + vec3(0,1,0)), ah(i + vec3(1,1,0)), f.x), f.y),
              mix(mix(ah(i + vec3(0,0,1)), ah(i + vec3(1,0,1)), f.x), mix(ah(i + vec3(0,1,1)), ah(i + vec3(1,1,1)), f.x), f.y), f.z);
 }
+float gDome = 0.0, gWool = 0.0;
+// Cellular noise: distance to the nearest of a jittered point per cell (clumps of wool).
+float acell(vec3 x) {
+  vec3 i = floor(x), f = fract(x);
+  vec3 o = step(0.5, f) - 1.0;   // search the 2 x 2 x 2 cells on the near side of the point
+  float d = 1.0;
+  for (int a = 0; a < 2; a++) for (int b = 0; b < 2; b++) for (int c = 0; c < 2; c++) {
+    vec3 n = vec3(float(a), float(b), float(c)) + o;
+    vec3 q = i + n;
+    vec3 pt = vec3(ah(q), ah(q + 13.7), ah(q + 29.3));
+    d = min(d, length(n + pt - f));
+  }
+  return d;
+}
 float afbm(vec3 p) { return an(p) * 0.55 + an(p * 2.03 + 7.1) * 0.3 + an(p * 4.1 + 3.7) * 0.15; }
 vec3 coatColor(out float fur, out float freq) {
   int br = int(clamp(vCoat.x + 0.5, 0.0, ${BREEDS_MAX}.0 - 1.0));
@@ -206,6 +224,7 @@ vec3 coatColor(out float fur, out float freq) {
       float s = fract((p.z + p.y * 0.5) * c0.w + n);
       mask = smoothstep(0.42, 0.5, s) * (1.0 - smoothstep(0.5, 0.58, s));
       mask = smoothstep(0.1, 0.3, mask) * c1.w;
+      mask = mix(mask, c1.w * 0.42, smoothstep(0.25, 0.6, length(fwidth(vRest)) * c0.w));   // bars thinner than a pixel average out
     } else if (style < 3.5) {               // belt: a band round the shoulders
       float d = abs(vRest.z - c6.y);
       mask = 1.0 - smoothstep(c6.z * 0.8, c6.z, d + (an(p * 25.0) - 0.5) * 0.02);
@@ -213,6 +232,7 @@ vec3 coatColor(out float fur, out float freq) {
       vec3 w = p * c0.w; vec3 cell = floor(w); vec3 fc = fract(w) - 0.5;
       float r = ah(cell) , d = length(fc + (vec3(ah(cell + 3.0), ah(cell + 5.0), ah(cell + 8.0)) - 0.5) * 0.5);
       mask = (r < c1.w ? 1.0 : 0.0) * (1.0 - smoothstep(0.22, 0.3, d));
+      mask = mix(mask, c1.w * 0.28, smoothstep(0.3, 0.7, length(fwidth(vRest)) * c0.w));
     } else if (style < 5.5) {               // saddle / coloured ends: the middle is the colour of "patch"
       float d = abs(vRest.z - c6.y);
       mask = 1.0 - smoothstep(c6.z * 0.45, c6.z * 1.15, d + (afbm(p * 22.0) - 0.5) * 0.09);
@@ -239,6 +259,33 @@ vec3 coatColor(out float fur, out float freq) {
   float px = length(fwidth(vRest)) * c5.z;           // how many noise cells one pixel covers: past about one, the detail fades out
   float fade = 1.0 - smoothstep(0.1, 0.38, px);
   fur = c5.y * fade; freq = c5.z;
+  gWool = 0.0;
+  if (c7.w > 0.01 && (region < 0.5 || (region > 2.5 && region < 3.5))) {
+    // feathers: rows of rounded scales (every second row shifted half a scale), soft at the edges, a touch darker where they overlap
+    float row = floor(vRest.y * 26.0);
+    float off = ah(vec3(row, 1.3, 2.1));
+    float u = fract(-vRest.z * 21.0 + off + abs(vRest.x) * 5.0);
+    float v = fract(vRest.x * 30.0 + 0.5 * mod(row, 2.0) + off * 0.3);
+    float d = length((vec2(u, v) - 0.5) * vec2(1.0, 1.25));
+    float dome = 1.0 - smoothstep(0.25, 0.85, d);
+    float pxf = length(fwidth(vRest)) * 26.0;
+    float wf = 1.0 - smoothstep(0.09, 0.3, pxf);
+    gDome = dome * wf + 0.5 * (1.0 - wf);
+    gWool = c7.w * wf * 0.35;
+    col *= mix(1.0, 0.94 + 0.1 * dome, c7.w * wf);
+  }
+  if (c5.w > 0.01 && (region < 0.5 || (region > 2.5 && region < 3.5))) {
+    // locks: big domes with a finer crimp riding on them; fades to a smooth tone when a pixel covers more than a lock
+    vec3 q = vRest * 15.0; q += 0.35 * vec3(an(q * 0.8), an(q * 0.8 + 5.0), an(q * 0.8 + 11.0));
+    float d1 = acell(q);
+    float dome = sqrt(max(0.0, 1.0 - min(1.0, d1 / 0.82) * min(1.0, d1 / 0.82)));
+    float crimp = an(vRest * 38.0 + 3.7);
+    float px2 = length(fwidth(vRest)) * 15.0;
+    float wf = 1.0 - smoothstep(0.2, 0.55, px2);
+    gDome = (dome * 0.8 + crimp * 0.2) * wf + 0.55 * (1.0 - wf);
+    gWool = c5.w * wf;
+    col *= mix(1.0, 0.8 + 0.28 * dome + 0.04 * crimp, c5.w * wf);
+  }
   float lum = afbm(p * c5.z * 0.5);
   float fine = an(p * c5.z * 2.0);
   col *= 1.0 + (lum - 0.5) * 0.34;
@@ -277,9 +324,9 @@ export function animalMaterial(spec: AnimalMaterialSpec): { material: THREE.Mesh
     d(2, [...(b.face ?? b.base), b.faceMix ?? 0]);
     d(3, [...(b.leg ?? b.base), b.legMix ?? 0]);
     d(4, [...(b.belly ?? b.base), b.bellyY ?? 0.5]);
-    d(5, [b.style, b.fur ?? 0.5, b.furFreq ?? 60, 0]);
+    d(5, [b.style, b.fur ?? 0.5, b.furFreq ?? 60, b.wool ?? 0]);
     d(6, [b.dorsal ?? 0, b.belt?.[0] ?? 0, b.belt?.[1] ?? 0.2, b.bellyMix ?? 0]);
-    d(7, [...(b.nose ?? [0.3, 0.22, 0.22]), 0]);
+    d(7, [...(b.nose ?? [0.3, 0.22, 0.22]), b.feather ?? 0]);
     d(8, [...(b.acc1 ?? b.base), b.acc1Mix ?? 0]);
     d(9, [...(b.acc2 ?? b.base), b.acc2Mix ?? 0]);
     d(10, [...(b.acc3 ?? b.base), b.acc3Mix ?? 0]);
@@ -321,7 +368,8 @@ export function animalMaterial(spec: AnimalMaterialSpec): { material: THREE.Mesh
         if (vMark.x > 0.01 && furK > 0.0) {
           float h = afbm(vRest * furF * 2.0) + 0.5 * an(vRest * furF * 3.5);
           normal = bumpN(normal, -vViewPosition, h, furK * 0.0012);
-        }`)
+        }
+        if (vMark.x > 0.01 && gWool > 0.0) normal = bumpN(normal, -vViewPosition, gDome, gWool * 0.011);`)
       .replace('#include <roughnessmap_fragment>', /* glsl */`
         #include <roughnessmap_fragment>
         { float rg = vMark.y;

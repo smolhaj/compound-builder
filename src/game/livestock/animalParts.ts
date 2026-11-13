@@ -9,7 +9,7 @@ import { BONE, REGION, append, blob, newMesh, skin, tube, type Lod, type Mesh, t
 export type LimbRow = [y: number, z: number, w: number, h: number, bones: Skin];
 
 /** A limb on side `sx` (+1 left) at lateral offset `x`, the first row the top (hip or shoulder). `coatFrom`: rows from here down are leg-coloured. */
-export function limb(sx: number, x: number, rows: LimbRow[], lod: Lod, o: { coatFrom?: number; col?: V3; pw?: number; capStart?: boolean } = {}): Mesh {
+export function limb(sx: number, x: number, rows: LimbRow[], lod: Lod, o: { coatFrom?: number; col?: V3; pw?: number; cap?: boolean; sub?: number; capStart?: boolean } = {}): Mesh {
   const rs: Ring[] = [];
   rows.forEach((r, i) => {
     const reg = i >= (o.coatFrom ?? 4) ? REGION.LEG : REGION.BODY;
@@ -18,7 +18,7 @@ export function limb(sx: number, x: number, rows: LimbRow[], lod: Lod, o: { coat
     if (i === (o.coatFrom ?? 4) && i > 0) rs.push(ring(REGION.BODY));
     rs.push(ring(reg));
   });
-  return tube(rs, { seg: Math.max(5, Math.round(lod.seg * 0.6)), sub: lod.sub > 2 ? 2 : 1, up: [0, 0, 1], capStart: o.capStart });
+  return tube(rs, { seg: Math.max(5, Math.round(lod.seg * 0.6)), sub: o.sub ?? (lod.sub > 2 ? 2 : 1), up: [0, 0, 1], capEnd: o.cap, capStart: o.capStart });
 }
 
 /** Rotate a mesh built in a local frame about x by `pitch` (positive: the +z axis tilts up), then translate. */
@@ -39,6 +39,16 @@ export function eye(sx: number, p: V3, r: number, sk: Skin, lod: Lod): Mesh {
   if (lod.detail >= 2) return out;
   append(out, blob([sx * p[0], p[1], p[2]], [r * 0.7, r, r], { seg: lod.detail ? 6 : 8, rings: lod.detail ? 3 : 4, col: [0.04, 0.03, 0.03], region: REGION.EYE, skin: sk, flat: true }));
   if (!lod.detail) append(out, blob([sx * (p[0] + r * 0.28), p[1] + r * 0.4, p[2] + r * 0.55], [r * 0.2, r * 0.2, r * 0.2], { seg: 5, rings: 2, col: [0.95, 0.95, 0.95], region: REGION.EYE, skin: sk, flat: true }));
+  return out;
+}
+
+/** A goat's eye: an amber iris on the side of the head with a horizontal rectangular pupil slit and a glint. */
+export function slitEye(sx: number, p: V3, r: number, sk: Skin, lod: Lod): Mesh {
+  const out = newMesh();
+  if (lod.detail >= 2) return out;
+  append(out, blob([sx * p[0], p[1], p[2]], [r * 0.6, r * 0.9, r], { seg: lod.detail ? 6 : 8, rings: lod.detail ? 3 : 4, col: [0.82, 0.58, 0.12], region: REGION.EYE, skin: sk, flat: true }));
+  append(out, blob([sx * (p[0] + r * 0.32), p[1], p[2]], [r * 0.18, r * 0.2, r * 0.72], { seg: 6, rings: 3, col: [0.03, 0.025, 0.02], region: REGION.EYE, skin: sk, flat: true }));
+  if (!lod.detail) append(out, blob([sx * (p[0] + r * 0.4), p[1] + r * 0.42, p[2] + r * 0.4], [r * 0.14, r * 0.14, r * 0.14], { seg: 5, rings: 2, col: [0.95, 0.95, 0.9], region: REGION.EYE, skin: sk, flat: true }));
   return out;
 }
 
@@ -70,6 +80,8 @@ export function legBones(bones: Array<BoneAnim | undefined>, l: LegSpec): void {
   }
 }
 /** The lateral-sequence walk: hind left, fore left, hind right, fore right a quarter cycle apart. */
+/** A walk in near-diagonal pairs (hind left with fore right, a beat apart): how sheep, goats and cattle really move at a walk. */
+export const DIAG_OFF = { HL: 0, FR: 0.3 * Math.PI, HR: Math.PI, FL: 1.3 * Math.PI } as const;
 export const WALK_OFF = { HL: 0, FL: Math.PI / 2, HR: Math.PI, FR: Math.PI * 1.5 } as const;
 export const HOP_OFF = { HL: 0.2, FL: 0, HR: 0.2, FR: 0 } as const;
 export const skinOf = skin;
