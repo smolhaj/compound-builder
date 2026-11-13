@@ -1169,6 +1169,10 @@ export class HomesteadWorld {
       },
       quality: q, season: seasonState.plants, seed: this.parcel.seed,
     });
+    // the terrain's damp bank band follows the creek's depth raster; a lot's lake sets its own shore level
+    const wb = this.stream.wetBank;
+    this.terrain.setWetBank(wb?.tex ?? null, wb?.rect ?? null);
+    this.terrain.setShoreY(this.parcel.lakeY, regionWaterY(this.regionWorld.kind));
     const kind = this.regionWorld.kind, lakeY = this.parcel.lakeY, wy = lakeY ?? regionWaterY(kind);
     if (wy !== null) {
       // a lot with a lake (the bluff, the island) has its own shore: the water follows the lot's ground, not the region's
