@@ -181,12 +181,43 @@ function moveSeamFrom(run: PerimeterRun, drive: readonly Pt[]): boolean {
   return true;
 }
 
+
+/**
+ * A run that begins or ends right on the driveway (a ring cut at the seam, a fence stopped by the creek bars beside the road) cannot hold a gate centered
+ * on the drive: the gate would hang past the run's end. The drive then simply gets a gap: the run is cut back half a gate (plus the vehicle's slack) on
+ * each side that touches it. Gates and the run's other crossings are re-measured. Returns true if it cut anything.
+ */
+export function trimRunAtDrive(run: Pick<PerimeterRun, 'pts' | 'gates'>, drive: readonly Pt[]): boolean {
+  let cut = false;
+  for (let pass = 0; pass < 4; pass++) {
+    const L = runLength(run.pts);
+    const c = crossings(run.pts, drive).find(q => !run.gates.some(g => gateTakesDrive(g, q.at, q.sin)) && (gateWidthFor(q.sin) / 2 + 0.05 > q.at || gateWidthFor(q.sin) / 2 + 0.05 > L - q.at));
+    if (!c) break;
+    const half = gateWidthFor(c.sin) / 2 + 0.03;
+    const atStart = c.at < L - c.at, s0 = atStart ? Math.min(L, c.at + half) : 0, s1 = atStart ? L : Math.max(0, c.at - half);
+    if (s1 - s0 < 0.2) break;   // nothing worth keeping beside the road: leave it to the gate rule
+    const pts: Pt[] = [], cum: number[] = [0];
+    for (let i = 1; i < run.pts.length; i++) cum.push(cum[i - 1] + Math.hypot(run.pts[i][0] - run.pts[i - 1][0], run.pts[i][1] - run.pts[i - 1][1]));
+    const at = (s: number): Pt => {
+      for (let i = 1; i < run.pts.length; i++) if (s <= cum[i] + 1e-9) { const t = cum[i] > cum[i - 1] ? (s - cum[i - 1]) / (cum[i] - cum[i - 1]) : 0; return [run.pts[i - 1][0] + (run.pts[i][0] - run.pts[i - 1][0]) * t, run.pts[i - 1][1] + (run.pts[i][1] - run.pts[i - 1][1]) * t]; }
+      return run.pts[run.pts.length - 1];
+    };
+    pts.push(at(s0));
+    for (let i = 1; i < run.pts.length - 1; i++) if (cum[i] > s0 + 1e-6 && cum[i] < s1 - 1e-6) pts.push(run.pts[i]);
+    pts.push(at(s1));
+    run.gates = run.gates.filter(g => g.at - g.w / 2 >= s0 - 1e-6 && g.at + g.w / 2 <= s1 + 1e-6).map(g => ({ ...g, at: g.at - s0 }));
+    run.pts = pts;
+    cut = true;
+  }
+  return cut;
+}
+
 /** Cut the missing gates through every wall that crosses the driveway. Returns how many. */
 export function cutRoadGates(s: GameState, drive: readonly Pt[] | undefined, quiet = false): number {
   let n = 0;
   for (const run of s.perimeter) {
     if (!isBarrierKind(run.kind) || run.pts.length < 2) continue;
-    if (drive && drive.length > 1 && !run.hostId) moveSeamFrom(run, drive);
+    if (drive && drive.length > 1 && !run.hostId) { moveSeamFrom(run, drive); if (trimRunAtDrive(run, drive)) n++; }
     const r = autoRoadGates(run.kind, run.pts, run.gates, drive);
     if (r.added.length) { run.gates = r.gates; n += r.added.length; }
   }

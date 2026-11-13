@@ -194,6 +194,18 @@ describe('(d) walls and fences drawn by hand', () => {
     const c = crossings(bent, d)[0];
     expect(gateTakesDrive(b.gates[0], c.at, c.sin)).toBe(true);
   });
+  it('a run that starts or ends exactly on the driveway leaves the drive a gap (the drive crossed the starter fence at the first point of a run with no gate)', () => {
+    const d: Pt[] = [[70, 30], [40, 30]];
+    for (const pts of [[[60, 30], [60, 44]], [[60, 16], [60, 30]], [[60, 30], [60, 44], [48, 44]], [[60, 30], [60, 44], [48, 44], [48, 16], [60, 16], [60, 30]]] as Pt[][]) {
+      const g = game();
+      planRun(g, 'woven_wire', pts.map(p => [...p] as Pt), [], 0, true);
+      expect(ungatedCrossings(g, d).length).toBeGreaterThan(0);
+      expect(cutRoadGates(g, d, true)).toBeGreaterThan(0);
+      expect(ungatedCrossings(g, d)).toEqual([]);
+      // what is left of the fence is still a fence, and the lane is clear of every post
+      for (const r of g.perimeter) { expect(runLength(r.pts)).toBeGreaterThan(5); for (const q of r.pts) if (pts.length < 5 && Math.abs(q[0] - 60) < 1e-6) expect(Math.abs(q[1] - 30) < DRIVE_HALF + 0.02 && q[1] !== 44 && q[1] !== 16 ? 'post in the lane' : 'clear').toBe('clear'); }
+    }
+  });
   it('a very slanted crossing beside a gate the wall already has: the opening takes over that gate\'s span, so the road is gated (no second gate on top)', () => {
     const d: Pt[] = [[70, 30], [40, 30]];
     // a wall at about 25 degrees to the drive (sin 0.42), with a short ring gate just beside where the drive meets it

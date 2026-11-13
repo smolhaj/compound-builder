@@ -360,3 +360,21 @@ describe('building geometry audit: seeds and services', () => {
     expect(floaters(cut.comps.filter(c => c.layer !== 'stakes' && !/_glow$/.test(c.name))).length).toBeLessThanOrEqual(FLOAT_OK.timber_cabin ?? 0);
   });
 });
+
+describe('building geometry audit: the second sweep (kinds first viewed in the 40-kind contact sheets)', () => {
+  /** The roof's underside straight above a point, by a ray up from `y`. */
+  const roofAbove = (b: Built, x: number, y: number, z: number): number => {
+    const t = rayHit(b.meshes.filter(m => m.layer === 'roof'), { o: new THREE.Vector3(x, y, z), d: new THREE.Vector3(0, 1, 0) });
+    return y + t;
+  };
+  it('forge: the stone back wall runs up to the roof (it stopped half a metre short and left a gap of sky under the eave)', () => {
+    const b = built(KIT.forge);
+    const wall = b.comps.filter(c => c.layer === 'walls');
+    expect(wall.length).toBeGreaterThan(0);
+    const top = Math.max(...wall.map(c => c.box.max.y)), D = 0.4;
+    for (const x of [-0.3, 0, 0.3]) expect(top, `roof underside at x ${x}`).toBeGreaterThanOrEqual(roofAbove(b, x, 0.3, -D / 2 + 0.03) - 0.006);
+    // and it does not poke out through the top of the roof
+    const roofTop = Math.max(...b.comps.filter(c => c.layer === 'roof').map(c => c.box.max.y));
+    expect(top).toBeLessThanOrEqual(roofTop);
+  });
+});

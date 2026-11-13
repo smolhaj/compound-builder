@@ -585,7 +585,8 @@ function forge(_def: KitPieceDef, seed = 1): THREE.Group {
   p.add('wood_dark', box(W - 0.02, 0.014, 0.014, 0, 0.48, D / 2 - 0.02), 'frame');
   // roof: a low metal roof over the working side, a back wall of stone to the hood
   p.add('metal_roof', box(W + 0.1, 0.012, D + 0.1, 0, 0.5, 0.0).rotateX(0.06), 'roof');
-  p.add('fieldstone', box(W - 0.02, 0.4, 0.03, 0, 0.02, -D / 2 + 0.015), 'walls');
+  // (the wall runs up into the roof slab: at 0.4 it stopped 0.5 m short and left a gap of sky under the eave)
+  p.add('fieldstone', box(W - 0.02, 0.49, 0.03, 0, 0.02, -D / 2 + 0.015), 'walls');
   p.add('iron', new THREE.CylinderGeometry(0.018, 0.02, 0.22, 8).translate(-0.26, 0.7, -D / 2 + 0.11), 'chimney');
   // the fire: coals in the hearth pot, a bellows on the side, a rack of tongs and hammers on the back wall (interior)
   p.add('iron', new THREE.CylinderGeometry(0.05, 0.035, 0.03, 10).translate(-0.26, 0.182, -D / 2 + 0.11), 'interior');
