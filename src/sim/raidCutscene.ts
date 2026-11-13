@@ -125,7 +125,7 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?:
   const finalBattle = (): Battle => {
     if (battle) return deco(battle, finalScene);
     if (e.kind === 'break_in') return breakInScene(game, e, stance, outcome.tone, seed);
-    return deco(gateScene(game, e, stance, outcome.tone, seed), finalScene);
+    return deco(gateScene(game, e, stance, outcome.tone, seed, outcome.bunker), finalScene);
   };
   let scenes: Scene[], battles: Battle[], spent: Array<Record<string, number>>;
   let voiceFrom = 0;
