@@ -198,8 +198,8 @@ function concreteTower(opts: ConcreteOpts): (def: KitPieceDef, seed?: number) =>
       p.add('iron', cyl(0.02, 0.17, gx, gy, gz, 8), 'openings');                                                   // pedestal
       p.add('steel', new THREE.TorusGeometry(0.09, 0.008, 5, 18).rotateX(Math.PI / 2).translate(gx, gy + 0.17, gz), 'openings');
       p.add('iron', box(0.05, 0.05, 0.2, gx, gy + 0.17, gz + 0.03), 'openings');                                  // receiver
-      p.add('steel', cyl(0.011, 0.34, gx, gy + 0.195, gz, 8).rotateX(Math.PI / 2).translate(0, 0, 0.2), 'openings'); // barrel
-      p.add('iron', cyl(0.018, 0.07, gx, gy + 0.195, gz, 8).rotateX(Math.PI / 2).translate(0, 0, 0.38), 'openings'); // muzzle brake
+      p.add('steel', new THREE.CylinderGeometry(0.011, 0.011, 0.34, 8).rotateX(Math.PI / 2).translate(gx, gy + 0.195, gz + 0.2), 'openings'); // barrel (laid along +z about its own centre, on the receiver)
+      p.add('iron', new THREE.CylinderGeometry(0.018, 0.018, 0.07, 8).rotateX(Math.PI / 2).translate(gx, gy + 0.195, gz + 0.38), 'openings'); // muzzle brake
       p.add('steel', box(0.2, 0.17, 0.014, gx, gy + 0.15, gz + 0.1), 'openings');                                 // gun shield
       p.add('steel', box(0.014, 0.15, 0.1, gx - 0.1, gy + 0.15, gz + 0.05), 'openings');                          // shield wings
       p.add('steel', box(0.014, 0.15, 0.1, gx + 0.1, gy + 0.15, gz + 0.05), 'openings');
@@ -212,7 +212,7 @@ function concreteTower(opts: ConcreteOpts): (def: KitPieceDef, seed?: number) =>
         p.add('concrete', box(0.16, 0.05, 0.16, tx, ty, 0), 'openings');
         p.add('steel', new THREE.SphereGeometry(0.085, 14, 9, 0, Math.PI * 2, 0, Math.PI / 2).translate(tx, ty + 0.05, 0), 'openings');
         p.add('iron', box(0.12, 0.07, 0.12, tx, ty + 0.1, 0), 'openings');
-        for (const dx of [-0.026, 0.026]) p.add('steel', cyl(0.009, 0.3, tx + dx, ty + 0.14, 0, 8).rotateX(Math.PI / 2).translate(0, 0, 0.19), 'openings');
+        for (const dx of [-0.026, 0.026]) p.add('steel', new THREE.CylinderGeometry(0.009, 0.009, 0.3, 8).rotateX(Math.PI / 2).translate(tx + dx, ty + 0.14, 0.19), 'openings');
         p.add('paint_red', box(0.1, 0.012, 0.1, tx, ty + 0.2, 0), 'openings');                                  // a red top plate, to read from afar
         p.add('glass', new THREE.SphereGeometry(0.022, 8, 6).translate(tx, ty + 0.17, 0.07), 'openings');
         p.add('iron', cyl(0.009, 0.3, tx + 0.02, py + 0.035, -hc + 0.06, 6), 'openings');
