@@ -135,13 +135,30 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
     const y = ground(x, z) - 0.02;
     add(m, round ? new THREE.CylinderGeometry(r, r * 1.1, h + 0.02, 7).translate(x, y + (h + 0.02) / 2, z) : new THREE.BoxGeometry(r * 2, h + 0.02, r * 2).translate(x, y + (h + 0.02) / 2, z));
   };
-  /** Bays along the spans at a spacing: f(a, b) for each bay, posts at both ends. */
+  /** Arc length of each polyline vertex (0 first): a wall bay must never straddle one, or its chord cuts the corner. */
+  const vertexS: number[] = [0];
+  for (let i = 1; i < run.pts.length; i++) vertexS.push(vertexS[i - 1] + Math.hypot(run.pts[i][0] - run.pts[i - 1][0], run.pts[i][1] - run.pts[i - 1][1]));
+  /** A span cut at the polyline's vertices: [s0, s1] pieces that are each one straight line. */
+  const straightPieces = ([s0, s1]: [number, number]): Array<[number, number]> => {
+    const cuts = vertexS.filter(v => v > s0 + 1e-4 && v < s1 - 1e-4);
+    const edges = [s0, ...cuts, s1], out: Array<[number, number]> = [];
+    for (let i = 1; i < edges.length; i++) out.push([edges[i - 1], edges[i]]);
+    return out;
+  };
+  /** Point at s heading into the piece that starts there (`along` at a vertex would give the direction of the piece before it). */
+  const alongIn = (s: number) => along(run.pts, s + 1e-5);
+  /** Bays along the spans at a spacing: f(a, b) for each bay, posts at both ends. Bays break at every corner so the wall turns it with a post. */
   const bays = (spacing: number, f: (a: ReturnType<typeof along>, b: ReturnType<typeof along>, i: number) => void) => {
-    for (const [s0, s1] of spans) {
+    let i = 0;
+    for (const span of spans) for (const [s0, s1] of straightPieces(span)) {
       const n = Math.max(1, Math.round((s1 - s0) / spacing));
-      for (let i = 0; i < n; i++) f(along(run.pts, s0 + (s1 - s0) * i / n), along(run.pts, s0 + (s1 - s0) * (i + 1) / n), i);
+      for (let k = 0; k < n; k++, i++) f(alongIn(s0 + (s1 - s0) * k / n), along(run.pts, s0 + (s1 - s0) * (k + 1) / n - 1e-5), i);
     }
   };
+  /** The corners inside a span (polyline vertices a wall passes round): the walls that are thick fill the outside of the turn here. */
+  const corners = () => spans.flatMap(([s0, s1]) => vertexS.filter(v => v > s0 + 1e-4 && v < s1 - 1e-4).map(v => alongIn(v)));
+  /** The same corners with the direction the line arrives in as well as the one it leaves in. */
+  const turns = () => spans.flatMap(([s0, s1]) => vertexS.filter(v => v > s0 + 1e-4 && v < s1 - 1e-4).map(v => ({ at: alongIn(v), from: along(run.pts, v - 1e-5) })));
   const spanEnds = () => spans.flatMap(([a, b]) => [along(run.pts, a), along(run.pts, b)]);
 
   /**
@@ -324,6 +341,40 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
         add(lit ? 'bulb' : 'enamel', new THREE.SphereGeometry(0.075 * M, 10, 7).scale(1, 0.8, 1).translate(mid.x, ground(mid.x, mid.z) + floorY + H - 0.42 * M, mid.z));
         void i;
       });
+      // a bend: the two straight bays leave a notch on the outside of the turn (and overlap inside), so each side wall is carried round the mitre point,
+      // and the floor and the roof are a wedge to it; a column stands on the mitre
+      for (const { at: o, from: f } of turns()) {
+        const nA: [number, number] = [-f.dz, f.dx], nB: [number, number] = [-o.dz, o.dx];
+        const k = 1 + nA[0] * nB[0] + nA[1] * nB[1];
+        if (k < 0.15) continue;                                         // a hairpin: no mitre (the tool never lays one)
+        for (const u of [-hw, hw]) {
+          const PA = { x: o.x + nA[0] * u, z: o.z + nA[1] * u }, PB = { x: o.x + nB[0] * u, z: o.z + nB[1] * u }, Mx = { x: o.x + (nA[0] + nB[0]) * u / k, z: o.z + (nA[1] + nB[1]) * u / k };
+          for (const [A, B] of [[PA, Mx], [Mx, PB]] as const) {
+            beam(A.x, A.z, B.x, B.z, floorY - 0.1 * M, 0.1 * M, 0.09 * M, 'steel');
+            beam(A.x, A.z, B.x, B.z, floorY + H - 0.09 * M, 0.09 * M, 0.09 * M, 'steel');
+            beam(A.x, A.z, B.x, B.z, floorY + 0.05 * M, 1.0 * M, 0.012 * M, 'wire_mesh');
+            beam(A.x, A.z, B.x, B.z, floorY + 1.05 * M, H - 1.2 * M, 0.012 * M, 'glass');
+          }
+          post(Mx.x, Mx.z, H + FL, 0.05 * M, 'steel');
+          // the floor and the roof over the notch: a wedge between the two ends and the mitre
+          const gy = ground(o.x, o.z), wedge = (m: KitMaterialId, y: number, th: number) => {
+            const pos: number[] = [];
+            /** One triangle of the slab, wound so its face looks up (`up`) or down. */
+            const tri = (a: Pt, b: Pt, c: Pt, yy: number, up: boolean) => {
+              const ny = (b[1] - a[1]) * (c[0] - a[0]) - (b[0] - a[0]) * (c[1] - a[1]);
+              const q = (ny > 0) === up ? [a, b, c] : [a, c, b];
+              for (const [x, z] of q) pos.push(x, gy + yy, z);
+            };
+            for (const [a, b, c] of [[[o.x, o.z], [PA.x, PA.z], [Mx.x, Mx.z]], [[o.x, o.z], [Mx.x, Mx.z], [PB.x, PB.z]]] as Array<[Pt, Pt, Pt]>) { tri(a, b, c, y + th, true); tri(a, b, c, y, false); }
+            const g = new THREE.BufferGeometry();
+            g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+            g.computeVertexNormals();
+            add(m, g);
+          };
+          wedge('steel', floorY - 0.12 * M, 0.06 * M);
+          wedge('metal_roof', floorY + H, 0.03 * M);
+        }
+      }
       for (const e of spanEnds()) {   // the door frame at each end where it meets a wall: a steel portal and a threshold step
         const nx = -e.dz, nz = e.dx;
         for (const u of [-hw, hw]) post(e.x + nx * u, e.z + nz * u, H + FL + 0.05 * M, 0.07 * M, 'steel');
@@ -475,7 +526,8 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
     case 'thorn_hedge': {
       const g = Math.max(0.04, growth), h = def.height * g, w = (0.4 + 1.6 * g) * M;
       let k = 0;
-      for (const [s0, s1] of spans) for (let s = s0; s < s1; s += 0.32 * M + 0.25 * M * g) {
+      // the blobs swell with growth: keep them out of a gate's gap (the span ends that are not the run's own ends)
+      for (const [s0, s1] of spans) for (let s = s0 + (s0 > 1e-6 ? w * 1.15 : 0); s < s1 - (s1 < wl - 1e-6 ? w * 1.15 : 0); s += 0.32 * M + 0.25 * M * g) {
         const p = along(run.pts, s), side = (k % 2 ? 1 : -1) * 0.25 * M, jitter = Math.sin(k * 12.9898) * 0.5 + 0.5;
         const x = p.x - p.dz * side, z = p.z + p.dx * side, y = ground(x, z);
         const r = w * (0.8 + 0.4 * jitter);
@@ -510,9 +562,9 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       const single: Partial<Record<string, KitMaterialId>> = { black: 'container_black', rust: 'container_rust', red: 'container_red', blue: 'container_blue', green: 'container_green', tan: 'container_tan' };
       const L = 12.2 * M, W = 2.44 * M, H = 2.6 * M, layers = run.kind === 'container_stack' ? 2 : 1;
       let k = Math.abs(Math.round(run.pts[0][0] * 7 + run.pts[0][1] * 13));
-      for (const [s0, s1] of spans) for (let s = s0; s < s1 - 0.3 * M; s += L) {
+      for (const [s0, s1] of spans.flatMap(straightPieces)) for (let s = s0; s < s1 - 0.3 * M; s += L) {
         const e = Math.min(s1, s + L);
-        const a = along(run.pts, s), b = along(run.pts, e);
+        const a = alongIn(s), b = along(run.pts, e - 1e-5);   // a box never spans a corner: each straight piece is laid on its own
         // set level on concrete piers at the high point (containers don't bend to the ground)
         const len = Math.hypot(b.x - a.x, b.z - a.z);
         const samples = [0, 0.25, 0.5, 0.75, 1].map(f => ground(a.x + (b.x - a.x) * f, a.z + (b.z - a.z) * f));
@@ -533,6 +585,8 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
           for (const c of [a, b]) add('iron', new THREE.BoxGeometry(0.2 * M, H + 0.02 * M, W + 0.02 * M).rotateY(-Math.atan2(c.dz, c.dx)).translate(c.x, y0 + H / 2, c.z));
         }
       }
+      // a corner post where the line turns: the boxes meet end to end, so the outside of the turn would be an open notch
+      for (const c of corners()) for (let layer = 0; layer < layers; layer++) add('iron', new THREE.BoxGeometry(W + 0.02 * M, H + 0.02 * M, W + 0.02 * M).rotateY(-Math.atan2(c.dz, c.dx)).translate(c.x, Math.max(ground(c.x, c.z), ground(c.x - c.dx * W, c.z - c.dz * W), ground(c.x + c.dx * W, c.z + c.dz * W)) + 0.015 + layer * H + H / 2, c.z));
       break;
     }
     case 'stone_wall': {
@@ -549,11 +603,11 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
         box(len + 0.01, 0.1 * M, 0.5 * M, hi + 0.02 + H * 0.88, 'wood_mid');                     // the timber coping
         box(len + 0.01, 0.1 * M, 0.34 * M, hi + 0.02 + H * 0.88 + 0.1 * M, 'wood_dark');
         // a squared timber post at the joint, standing proud of the coping
-        add('wood_dark', new THREE.BoxGeometry(0.2 * M, H * 0.28, 0.2 * M).translate(a.x, hi + 0.02 + H * 0.88, a.z));
-        add('wood_mid', new THREE.BoxGeometry(0.26 * M, 0.06 * M, 0.26 * M).translate(a.x, hi + 0.02 + H * 0.88 + H * 0.28, a.z));
+        add('wood_dark', new THREE.BoxGeometry(0.2 * M, H * 0.28, 0.2 * M).translate(a.x, hi + 0.02 + H * 0.88 + H * 0.14, a.z));
+        add('wood_mid', new THREE.BoxGeometry(0.26 * M, 0.06 * M, 0.26 * M).translate(a.x, hi + 0.02 + H * 0.88 + H * 0.28 + 0.03 * M, a.z));
         void i;
       });
-      for (const e of spanEnds()) add('fieldstone', new THREE.BoxGeometry(0.7 * M, H, 0.7 * M).translate(e.x, ground(e.x, e.z) + H / 2, e.z));
+      for (const e of [...spanEnds(), ...corners()]) add('fieldstone', new THREE.BoxGeometry(0.7 * M, H, 0.7 * M).rotateY(-Math.atan2(e.dz, e.dx)).translate(e.x, ground(e.x, e.z) + H / 2 - 0.04, e.z));   // a squared pier at each end and each turn
       break;
     }
     case 'tunnel_bridge':
@@ -987,8 +1041,10 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
         for (const p of [p0, p1]) post(p.x, p.z, def.height + 0.08 * M, 0.1 * M, 'steel');
         beam(p0.x, p0.z, p1.x, p1.z, def.height, 0.14 * M, 0.3 * M, 'steel');
       }
-      const wall = run.kind === 'log_palisade' || run.kind === 'container_wall' || run.kind === 'container_stack' || run.kind === 'stone_wall' || run.kind === 'concrete_wall';
-      const leafH = wall ? Math.abs(def.height) * 0.95 : 1.3 * M;
+      const wall = run.kind === 'log_palisade' || run.kind === 'container_wall' || run.kind === 'container_stack' || run.kind === 'stone_wall' || run.kind === 'concrete_wall' || run.kind === 'steel_wall' || run.kind === 'electric_steel';
+      // a gate stands as tall as the fence it is in: a 1.3 m farm gate in a 2.4 m wire or iron fence would leave a hole over it
+      const tallFence = run.kind === 'woven_wire' || run.kind === 'chain_link' || run.kind === 'wrought_iron' || run.kind === 'iron_barbed' || run.kind === 'bar_fence';
+      const leafH = wall ? Math.abs(def.height) * 0.95 : tallFence ? Math.abs(def.height) * 0.97 : 1.3 * M;
       const ang = -Math.atan2(p0.dz, p0.dx);
       /** A gate leaf, hinged at (hx, hz), `w` wide, swung open by `open` radians. */
       const leaf = (hx: number, hz: number, w: number, open: number, mirror: number) => {
@@ -1008,7 +1064,7 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
           bar(w / 2, leafH * 0.5, w, 0.05 * M);
         } else {
           // tube farm gate: five rails and a diagonal
-          for (const f of [0.3, 0.5, 0.7]) bar(w / 2, leafH * f, w, 0.035 * M, 'scaffold');
+          for (const f of leafH > 1.6 * M ? [0.2, 0.4, 0.6, 0.8] : [0.3, 0.5, 0.7]) bar(w / 2, leafH * f, w, 0.035 * M, 'scaffold');
           parts.push(['scaffold', new THREE.BoxGeometry(Math.hypot(w, leafH) * 0.92, 0.03 * M, 0.02 * M).rotateZ(Math.atan2(leafH, w)).translate(w / 2, leafH / 2, 0)]);
         }
         const gy = ground(hx, hz) + 0.01;
