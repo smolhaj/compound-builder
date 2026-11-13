@@ -22,7 +22,7 @@ function farmhouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Grou
     W, D, floor: 0.12, wallH: 1.0, wallT: 0.035, rise: 0.5, eave: 0.06, gableOver: 0.05, porch: 0.4,
     foundation: 'concrete', floorMat: 'deck', outer: 'lap_white', inner: 'whitewash', roof: 'shingle', trim: 'trim',
     front: [{ kind: 'door', at: 0 }, { kind: 'window', at: -0.45 }, { kind: 'window', at: 0.45 }, { kind: 'window', at: -0.22, sill: 0.64 }, { kind: 'window', at: 0.22, sill: 0.64 }],
-    back: [{ kind: 'door', at: 0.4 }, { kind: 'window', at: -0.35 }, { kind: 'window', at: 0.05, sill: 0.64 }, { kind: 'window', at: -0.6, w: 0.12, sill: 0.64 }],
+    back: [{ kind: 'door', at: 0.3 }, { kind: 'window', at: -0.35 }, { kind: 'window', at: 0.05, sill: 0.64 }, { kind: 'window', at: -0.6, w: 0.12, sill: 0.64 }],
     left: [{ kind: 'window', at: -0.6 }, { kind: 'window', at: 0.3 }, { kind: 'window', at: -0.2, sill: 0.64 }, { kind: 'window', at: 0.7, sill: 0.64 }],
     right: [{ kind: 'window', at: -0.6 }, { kind: 'window', at: 0.3 }, { kind: 'window', at: -0.2, sill: 0.64 }, { kind: 'window', at: 0.7, sill: 0.64 }],
     gableWindow: { front: true, back: true, w: 0.12, h: 0.14, y: 0.12 },
@@ -65,7 +65,7 @@ function farmhouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Grou
     c.C({ x: 0.12, z: front - 0.06, rot: 0.3 }, a => Clutter.boots(a), 0.9);
     c.C({ x: 0.5, z: c.hd + 0.22, y: y0, rot: 0.2 }, a => Clutter.rocker(a), 0.9);
     c.C({ x: -0.45, z: 0.0 }, a => Clutter.dogBed(a, c.rnd() < 0.5), 0.6);
-    c.C({ x: -c.hw - 0.2, z: -0.4, y: 0.004 }, a => Clutter.woodpile(a, 5.0, 1.3), 1);
+    c.C({ x: -c.hw - 0.12, z: -0.4, y: 0.004, rot: Math.PI / 2 }, a => Clutter.woodpile(a, 5.0, 1.3), 1);   // (turned along the wall: unturned it lay across the wall and into the kitchen)
     c.C({ x: c.hw + 0.12, z: -0.9, y: 0.004 }, a => Clutter.washtub(a), 0.6);
   }, new Parts(seed, opts));
   return group;
@@ -76,11 +76,11 @@ function trailer(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
   const W = def.cellsX * CELL, D = def.cellsZ * CELL;
   const { group } = buildGabled({
     W, D, floor: 0.13, wallH: 0.4, wallT: 0.02, rise: 0.1, eave: 0.03, gableOver: 0.03, porch: 0,
-    foundation: 'piers', floorMat: 'deck', outer: 'vinyl', inner: 'pine_panel', roof: 'shingle', trim: 'trim',
+    foundation: 'piers', noSteps: true, floorMat: 'deck', outer: 'vinyl', inner: 'pine_panel', roof: 'shingle', trim: 'trim',
     front: [{ kind: 'window', at: -0.2, w: 0.2, h: 0.18, sill: 0.15 }, { kind: 'window', at: 0.2, w: 0.2, h: 0.18, sill: 0.15 }],
     back: [{ kind: 'window', at: 0, w: 0.15, h: 0.15, sill: 0.17 }],
     right: [{ kind: 'door', at: 0.35 }, { kind: 'window', at: -0.2 }, { kind: 'window', at: -0.9 }, { kind: 'window', at: 0.9 }, { kind: 'window', at: -1.3 }, { kind: 'door', at: -0.6 }],
-    left: [{ kind: 'window', at: -1.1 }, { kind: 'window', at: -0.4 }, { kind: 'window', at: 0.3 }, { kind: 'window', at: 1.0 }],
+    left: [{ kind: 'window', at: -1.25 }, { kind: 'window', at: -0.4 }, { kind: 'window', at: 0.3 }, { kind: 'window', at: 1.0 }],
     corners: 'none', curtains: 'curtain_red',
   }, (c: FurnishCtx) => {
     const { I, left, right, back, front, y0 } = c;
@@ -110,10 +110,10 @@ function trailer(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
     for (const sz of [-1, 1]) p.add('vinyl', box(W, 0.12, 0.008, 0, -0.01, sz * (hd - 0.01)));
     p.layer = 'deck';
     for (const z of [0.35, -0.6]) {
-      p.add('deck', box(0.22, 0.012, 0.3, hw + 0.11, 0.11, z));
-      p.add('deck', box(0.1, 0.012, 0.3, hw + 0.27, 0.06, z));
-      p.add('deck', box(0.1, 0.012, 0.3, hw + 0.37, 0.01, z));
-      p.add('wood_dark', box(0.012, 0.2, 0.012, hw + 0.21, 0.11, z + 0.15));
+      // solid blocks (they were thin planks hanging in the air one above the other)
+      p.add('deck', box(0.22, 0.122, 0.3, hw + 0.11, 0, z));
+      p.add('deck', box(0.1, 0.062, 0.3, hw + 0.27, 0, z));
+      p.add('wood_dark', box(0.012, 0.2, 0.012, hw + 0.21, 0.122, z + 0.15));
     }
   });
   return group;

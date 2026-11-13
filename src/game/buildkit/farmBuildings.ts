@@ -127,6 +127,9 @@ function greenhouseHeated(_def: KitPieceDef, seed = 1): THREE.Group {
   for (const x of rowX) for (const z of [benchZ0 + benchLen * 0.25, benchZ0 + benchLen * 0.75]) {
     p.add('iron', box(0.8 * M, 0.04 * M, 0.2 * M, x, 2.6 * M, z));
     p.add('lamp', box(0.7 * M, 0.02 * M, 0.14 * M, x, 2.57 * M, z));
+    // hung from the roof on two rods (the lamps used to hang in the air): up to the underside of the glass over that row
+    const u = x - (x < 0 ? -bayW / 2 : bayW / 2), roofY = E + (R - E) * (1 - Math.abs(u) / (bayW / 2));
+    for (const dx of [-0.3, 0.3]) p.add('steel', cylY(0.012 * M, roofY - 2.64 * M, x + dx * M, 2.64 * M, z, 4));
   }
   p.add('blue_tank', cylY(0.45 * M, 1.1 * M, hw - 0.7 * M, 0, hd - 1.2 * M, 12));
   p.add('wood_mid', box(2.6 * M, 0.05 * M, 1.0 * M, -hw + 1.6 * M, 0.9 * M, hd - 1.4 * M));     // the packing table
@@ -476,7 +479,7 @@ function sheepBarn(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Grou
     for (const [x, z, a] of [[-0.3, -0.5, 0.7], [0.3, -0.4, 2.4], [-0.35, 0.1, 1.2]] as const) sheepGeo(add, x, z, a, false);
   }, new Parts(seed, opts), p => {
     // the paddock in front: a plank fence three sides, a trough, a round bale; the flock stands in it (decor, shown by head count)
-    const pw = W + 0.3, pz0 = D / 2 + 0.05, pz1 = D / 2 + 0.95;
+    const pw = W - 0.04, pz0 = D / 2 + 0.05, pz1 = D / 2 + 0.95;   // (the fence ran 0.15 outside the lot on each side)
     p.layer = 'openings';
     for (const [ax, az, bx, bz] of [[-pw / 2, pz0, -pw / 2, pz1], [pw / 2, pz0, pw / 2, pz1], [-pw / 2, pz1, pw / 2, pz1]] as const) {
       const L = Math.hypot(bx - ax, bz - az), n = Math.ceil(L / 0.22);
