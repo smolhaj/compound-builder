@@ -5,6 +5,7 @@
  * hurrying to the innermost shelter when the place is raided (livestockPlan). SCALE v2: a person is 0.28, a cow 0.23 at the withers.
  */
 import * as THREE from 'three';
+import { ContactShadows } from '../../engine/world/fx/ContactShadows';
 import type { Pt } from '../../sim/pathRoute';
 import { animalGoal, doorOf, drawnHerd, type AnimalGoal, type Home, type HerdCtx, type StockKind } from './livestockPlan';
 import { slopePace } from '../paths/walkRoute';
@@ -51,7 +52,7 @@ interface Agent {
   noWay: Set<string>; homeId: string | null;
 }
 
-const tmpM = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpQ2 = new THREE.Quaternion(), tmpE = new THREE.Euler(), tmpV = new THREE.Vector3(), tmpS = new THREE.Vector3(), tmpN = new THREE.Vector3(), UP = new THREE.Vector3(0, 1, 0);
+const tmpM = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpE = new THREE.Euler(), tmpV = new THREE.Vector3(), tmpS = new THREE.Vector3(), tmpN = new THREE.Vector3();
 const hash = (s: string, k: number): number => { let h = 2166136261 ^ k; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return ((h >>> 0) % 10000) / 10000; };
 
 /**
@@ -107,28 +108,14 @@ export class LivestockRenderer {
   private readonly _noWay = new Set<StockKind>();
   takeNoWay(): StockKind[] { const o = [...this._noWay]; this._noWay.clear(); return o; }
 
-  /** A soft contact shadow under every animal: one transparent instanced mesh for all of them (no shadow-map casters, no SSAO). */
-  private _shadow: THREE.InstancedMesh | null = null;
-  private _shadowN = 0;
+  /** The soft contact shadow under every animal: the world's shared decal layer (`engine/world/fx/ContactShadows`), or its own when drawn alone (viewer, tests). */
+  private _contact: ContactShadows;
+  private readonly _ownContact: boolean;
 
-  constructor(scene: THREE.Scene) { this._scene = scene; }
-
-  private _shadowMesh(): THREE.InstancedMesh {
-    if (this._shadow) return this._shadow;
-    const N = 32, d = new Uint8Array(N * N * 4);
-    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
-      const r = Math.hypot((i + 0.5) / N - 0.5, (j + 0.5) / N - 0.5) * 2, v = Math.round(255 * Math.pow(Math.max(0, 1 - r), 1.4));
-      d.set([v, v, v, 255], (j * N + i) * 4);
-    }
-    const tex = new THREE.DataTexture(d, N, N, THREE.RGBAFormat); tex.magFilter = tex.minFilter = THREE.LinearFilter; tex.needsUpdate = true;
-    const mat = new THREE.MeshBasicMaterial({ color: 0x14130e, alphaMap: tex, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-    const m = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), mat, CAP);
-    m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    m.count = 0; m.visible = false; m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; m.renderOrder = 1;
-    m.name = 'stock_shadow'; m.userData = { type: 'livestock', noSSAO: true };
-    this._scene.add(m);
-    this._shadow = m;
-    return m;
+  constructor(scene: THREE.Scene, shared?: ContactShadows) {
+    this._scene = scene;
+    this._ownContact = !shared;
+    this._contact = shared ?? new ContactShadows(scene);
   }
 
   /** The draw detail tier (rebuilds the meshes lazily at the next draw when it changes). */
@@ -176,7 +163,7 @@ export class LivestockRenderer {
   preview(items: readonly PreviewAnimal[], lod = 0): void {
     this._time += 0.016;
     for (const b of this._batches.values()) b.n = 0;
-    this._shadowN = 0;
+    if (this._ownContact) this._contact.begin();
     items.forEach((it, i) => this._put(it.kind, !!it.rooster, it.breed ?? 0, it.x, 0, it.z, it.rot, it.phase ?? 0, it.gait ?? 0, it.graze ?? 0, it.seed ?? ((i * 0.37) % 1), it.scale ?? 1, 0.5, lod));
     this._flush();
   }
@@ -273,20 +260,13 @@ export class LivestockRenderer {
     b.anim.set([phase, gait, graze, seed], b.n * 4);
     b.coat.set([bi, seed, tone, 0], b.n * 4);
     b.n++;
-    // contact shadow: an ellipse the length of the body, lying on the ground (tilted to the slope)
-    const sh = this._shadowMesh();
-    if (this._shadowN < CAP) {
-      const hl = model.length * sc * 0.62, hw = hl * (kind === 'hen' || kind === 'rabbit' ? 0.7 : 0.5);
-      tmpN.set(nx, 1, nz).normalize();
-      tmpQ2.setFromUnitVectors(UP, tmpN);
-      tmpQ.setFromEuler(tmpE.set(0, rot, 0)); tmpQ2.multiply(tmpQ);
-      tmpM.compose(tmpV.set(x, y + 0.004, z), tmpQ2, tmpS.set(hw * 2, 1, hl * 2));
-      sh.setMatrixAt(this._shadowN++, tmpM);
-    }
+    // contact shadow: an ellipse the length of the body, lying on the ground (tilted to the slope), leaning away from the sun
+    const hl = model.length * sc * 0.62, hw = hl * (kind === 'hen' || kind === 'rabbit' ? 0.7 : 0.5);
+    this._contact.blob(x, y, z, tmpN.set(nx, 1, nz).normalize(), hw, hl, rot, hl * 0.55, 0.9);
   }
 
   private _flush(): void {
-    if (this._shadow) { this._shadow.count = this._shadowN; this._shadow.visible = this._shadowN > 0; this._shadow.instanceMatrix.needsUpdate = true; }
+    if (this._ownContact) this._contact.end();
     for (const [, b] of this._batches) {
       b.mesh.count = b.n; b.mesh.visible = b.n > 0;
       b.mesh.instanceMatrix.needsUpdate = true;
@@ -298,7 +278,7 @@ export class LivestockRenderer {
 
   private _draw(herd: ReadonlyArray<{ id: string; kind: StockKind }>, ctx: LivestockCtx, cam?: { x: number; z: number; y?: number }): void {
     for (const b of this._batches.values()) b.n = 0;
-    this._shadowN = 0;
+    if (this._ownContact) this._contact.begin();
     const { at } = lodTier(this._quality);
     for (const h of herd) {
       const a = this._agents.get(h.id);
@@ -320,6 +300,6 @@ export class LivestockRenderer {
     for (const g of this._geos.values()) g.dispose();
     for (const m of this._mats.values()) m.material.dispose();
     this._batches.clear();
-    if (this._shadow) { this._scene.remove(this._shadow); this._shadow.geometry.dispose(); (this._shadow.material as THREE.Material).dispose(); this._shadow = null; }
+    if (this._ownContact) this._contact.dispose();
   }
 }

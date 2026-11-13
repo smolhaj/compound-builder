@@ -540,6 +540,7 @@ export function GameCanvas() {
       world.updateWildlife(dt, game, speedK);
       world.updateLivestock(dt, game, hourOf(game.clock.t), speedK);
       world.updateFleet(dt, game, speedK);
+      world.endContact();
       world.updateDeliveries(dt, game, speedK);
       world.updateRoadLife(dt, game, speedK);
       const speed = game.clock.speed;
