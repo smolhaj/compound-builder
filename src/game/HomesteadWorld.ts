@@ -625,6 +625,7 @@ export class HomesteadWorld {
     if (q === this._quality) return;
     this._quality = q;
     this.roadLife.setQuality(q);
+    this.livestock.setQuality(q);
     this.terrain.build({
       source: this._terrainSource,
       kind: this.regionWorld.kind, cx: this.center.x, cz: this.center.z,
@@ -2350,7 +2351,7 @@ export class HomesteadWorld {
     this.livestock.update(dt, game.stock as unknown as Record<string, number>, coops, homes,
       { hour, raided: hostileAtGate(game.gate.pending) || this.doorLock === true || this.qaRaid, storm: seasonState.params.snow > 0.6, house, clock: game.clock.t },
       { ground: this.groundAt, via: (kind, a, b) => animalRoute(a, b, this._animalHard(kind), (x, z) => w.cost?.(x, z) ?? 1, 0.14, 1.3) },
-      speedK, { x: this._ws.camera.position.x, z: this._ws.camera.position.z });
+      speedK, { x: this._ws.camera.position.x, z: this._ws.camera.position.z, y: this._ws.camera.position.y });
     // a shelter the animals cannot get to (across the creek, behind a wall): one line in the log
     const cut = this.livestock.takeNoWay().filter(k => !this._noWayLogged.has(k));
     for (const k of cut) { this._noWayLogged.add(k); log(game, `The ${k === 'hen' ? 'hens' : k + 's'} have no way to a barn they can reach: a wall, the creek or the rock is in the road.`); }

@@ -88,3 +88,38 @@ describe('48 animals at one barn', () => {
     expect(worst).toBeGreaterThan(0.85);
   });
 });
+
+describe('the drawing', () => {
+  it('draws each kind with its own model: few draw calls, hidden when unused, a breed per animal, a soft shadow under each', () => {
+    const scene = new THREE.Scene(), r = new LivestockRenderer(scene);
+    const one: Home[] = [{ id: 'b', kind: 'barn', x: 10, z: 0, rot: 0, w: 3, d: 4, depth: 0 }];
+    const stock = { cow: 3, goat: 2 };
+    for (let i = 0; i < 100; i++) r.update(0.1, stock, 1, [...one, { id: 'c', kind: 'chicken_coop', x: 12, z: 6, rot: 0, w: 1.5, d: 1.5, depth: 1 }], c(), ctx, 1, { x: 10, y: 3, z: 3 });
+    const visible = scene.children.filter(o => o.visible && (o as THREE.InstancedMesh).isInstancedMesh) as THREE.InstancedMesh[];
+    // cow + goat + rooster + hens (+ the shadow): never more than a handful, and nothing is drawn for a kind that is not there
+    expect(visible.length).toBeLessThanOrEqual(7);
+    expect(visible.some(m => m.name.startsWith('stock_pig'))).toBe(false);
+    const shadow = scene.children.find(o => o.name === 'stock_shadow') as THREE.InstancedMesh;
+    const bodies = visible.filter(m => m !== shadow).reduce((s, m) => s + m.count, 0);
+    expect(shadow.count).toBe(bodies);
+    for (const m of visible) { expect(m.castShadow).toBe(false); expect(m.userData.noSSAO).toBe(true); }
+    r.dispose();
+  });
+  it('the preview draws the breeds it is asked for', () => {
+    const scene = new THREE.Scene(), r = new LivestockRenderer(scene);
+    r.preview([{ kind: 'cow', breed: 0, x: 0, z: 0, rot: 0 }, { kind: 'cow', breed: 2, x: 1, z: 0, rot: 0 }, { kind: 'hen', rooster: true, x: 2, z: 0, rot: 0 }]);
+    const meshes = scene.children.filter(o => o.visible && (o as THREE.InstancedMesh).isInstancedMesh) as THREE.InstancedMesh[];
+    const cow = meshes.find(m => m.name.startsWith('stock_cow'))!;
+    expect(cow.count).toBe(2);
+    const coat = cow.geometry.attributes.iCoat as THREE.BufferAttribute;
+    expect([coat.getX(0), coat.getX(1)]).toEqual([0, 2]);
+    expect(meshes.some(m => m.name.startsWith('stock_rooster'))).toBe(true);
+    r.dispose();
+  });
+  it('the animals stop moving their feet when they stand still', () => {
+    const r = new LivestockRenderer(new THREE.Scene());
+    const one: Home[] = [{ id: 'b', kind: 'barn', x: 10, z: 0, rot: 0, w: 3, d: 4, depth: 0 }];
+    for (let i = 0; i < 3000; i++) r.update(0.1, { cow: 1 }, 0, one, c({ clock: 5 }), ctx, 1);
+    expect(r.animals().every(a => !a.moving)).toBe(true);
+  });
+});
