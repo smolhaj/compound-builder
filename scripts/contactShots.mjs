@@ -21,6 +21,7 @@ await new Promise((ok, fail) => { vite.stdout.on('data', d => /localhost:\d+/.te
 const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 try {
   const page = await browser.newPage({ viewport: { width: 1100, height: 700 } }); page.setDefaultTimeout(300000);
+  page.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') console.error('console', m.text().slice(0, 400)); });
   page.on('pageerror', e => console.error('PAGEERROR', e.message));
   const url = mode === 'showcase'
     ? `http://localhost:${port}/?lowrender=0.75&clean&seed=7&region=pnw&lot=hillside&lotcut&relief=9&acres=40&lotseed=8&elev=600&showcase=mountain`
@@ -57,17 +58,26 @@ try {
     await page.evaluate(q => window.__cb.store.getState().setQuality(q), q);
   }
   const frames = async () => { await page.evaluate(q => window.__cb.qa.renderFull(q), q); await page.waitForTimeout(200); };
-  const shoot = async (name, on) => { await page.evaluate(v => { window.__cb.world.contact.enabled = v; }, on); await frames(); await frames(); await page.screenshot({ path: `${out}/${tag}-${name}-${on ? 'after' : 'before'}.png` }); console.error('shot', tag, name, on); };
+  const shoot = async (name, on) => { await page.evaluate(v => { window.__cb.world.contact.enabled = v; }, on); await frames(); await frames(); await page.screenshot({ path: `${out}/${tag}-${name}-${on ? 'after' : 'before'}.png` }); console.error('shot', tag, name, on, JSON.stringify(await page.evaluate(() => { const c = window.__cb.world.contact; return { n: c.mesh.count, vis: c.mesh.visible, par: !!c.mesh.parent }; }))); };
   const f = S.f;
   // person 0.45 off the south-east wall corner (or at the camp)
   const px = f ? f.x1 + 0.42 : S.x + 1.2, pz = f ? f.z0 + (f.z1 - f.z0) * 0.35 : S.z + 0.8;
-  const eye = (x, z, lx, lz, h) => page.evaluate(([x, z, lx, lz, h]) => { const { world } = window.__cb, gr = world.groundAt; window.__cb.qa.pose = { x, y: gr(x, z) + h, z, lx, ly: gr(lx, lz) + 0.16, lz, fov: 55 }; }, [x, z, lx, lz, h]);
+  const eye = (x, z, lx, lz, h) => page.evaluate(([x, z, lx, lz, h]) => { const { world } = window.__cb, gr = world.groundAt; window.__cb.qa.pose = { x, y: gr(x, z) + h, z, lx, ly: gr(lx, lz) + 0.1, lz, fov: 55 }; }, [x, z, lx, lz, h]);
+  if (args.includes('--debug')) {
+    await page.evaluate(t => window.__cb.store.getState().setTimeOfDay(t), 12);
+    await place(px, pz, px, pz - 1); await eye(px + 1.2, pz + 0.8, px, pz, 0.5); await place(px, pz, px, pz - 1);
+    await page.evaluate(() => { const m = window.__cb.world.contact.mesh.material; m.uniforms.uColor.value.set(1, 0, 0); m.uniforms.uOpacity.value = 6; m.uniforms.uNight.value = 1; m.uniforms.uFade.value.set(1e4, 2e4); });
+    await shoot('dbg1-red', true);
+    await page.evaluate(() => { const c = window.__cb.world.contact, m = c.mesh; m.material = new window.__cb.THREE.MeshBasicMaterial({ color: 0xff0000, depthTest: false }); m.material.needsUpdate = true; });
+    await shoot('dbg2-basic', true);
+    process.exit(0);
+  }
   for (const t of times) {
     await page.evaluate(t => window.__cb.store.getState().setTimeOfDay(t), t);
     const states = before.includes(t) ? [false, true] : [true];
     for (const on of states) {
       const hh = String(t).replace('.', 'h');
-      if (views.includes('eye')) { await place(px, pz, px, pz - 1); await eye(px + 1.5, pz + 0.9, px, pz, 0.3); await place(px, pz, px, pz - 1); await shoot(`${hh}-eye`, on); }
+      if (views.includes('eye')) { await place(px, pz, px, pz - 1); await eye(px + 1.2, pz + 0.8, px, pz, 0.5); await place(px, pz, px, pz - 1); await shoot(`${hh}-eye`, on); }
       if (views.includes('wall') && f) { await place(px, pz, px, pz - 1); await eye(f.x1 + 1.8, f.z1 + 1.8, f.x1, f.z1 - 0.2, 0.45); await place(px, pz, px, pz - 1); await shoot(`${hh}-wall`, on); }
       if (views.includes('air')) { await page.evaluate(([x, z]) => { const { world, cam } = window.__cb; window.__cb.qa.pose = null; cam.target.set(x, world.groundAt(x, z) + 0.5, z); cam.radius = 11; cam.pitch = 0.62; cam.yaw = 0.7; }, [S.x, S.z]); await shoot(`${hh}-air`, on); }
     }

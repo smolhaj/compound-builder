@@ -2365,15 +2365,21 @@ export class HomesteadWorld {
       this._bandKey = key;
       c.clearStatic(); c.begin();
       if (c.wantsBands) {
-        const W = 0.14;
+        const W = 0.2;
         for (const b of this._built.values()) {
           if (b.under || !b.finished) continue;
-          const f = b.fpBody, y = b.padY, k = 0.85;
+          const f = b.fpBody;
           if (f.x1 - f.x0 < 0.3 || f.z1 - f.z0 < 0.3) continue;
-          c.strip(f.x0, f.z0, f.x1, f.z0, y, 0, -1, W, k);
-          c.strip(f.x0, f.z1, f.x1, f.z1, y, 0, 1, W, k);
-          c.strip(f.x0, f.z0, f.x0, f.z1, y, -1, 0, W, k);
-          c.strip(f.x1, f.z0, f.x1, f.z1, y, 1, 0, W, k);
+          // each side in short pieces, every one on the ground (or the pad, where that stands higher) and tilted to it, so a band follows a slope instead of floating or sinking
+          const sides: Array<[number, number, number, number, number, number]> = [[f.x0, f.z0, f.x1, f.z0, 0, -1], [f.x0, f.z1, f.x1, f.z1, 0, 1], [f.x0, f.z0, f.x0, f.z1, -1, 0], [f.x1, f.z0, f.x1, f.z1, 1, 0]];
+          for (const [x0, z0, x1, z1, ox, oz] of sides) {
+            const len = Math.hypot(x1 - x0, z1 - z0), m = Math.max(1, Math.ceil(len / 1.6));
+            for (let i = 0; i < m; i++) {
+              const ax = x0 + (x1 - x0) * i / m, az = z0 + (z1 - z0) * i / m, bx = x0 + (x1 - x0) * (i + 1) / m, bz = z0 + (z1 - z0) * (i + 1) / m;
+              const mx = (ax + bx) / 2 + ox * W / 2, mz = (az + bz) / 2 + oz * W / 2, gy = this.groundAt(mx, mz);
+              c.strip(ax, az, bx, bz, Math.max(gy, b.padY), ox, oz, W, 0.9, gy >= b.padY ? groundNormal(this.groundAt, mx, mz, this._cN) : null);
+            }
+          }
         }
       }
       c.endStatic();
@@ -2493,7 +2499,7 @@ export class HomesteadWorld {
     for (const p of this.family.positions()) {
       if (!this.family.shown.has(p.id)) continue;
       const y = p.y ?? this.walkHeight(p.x, p.z);
-      this.contact.blob(p.x, y, p.z, groundNormal(this.walkHeight, p.x, p.z, this._cN, 0.08), 0.1, 0.1, 0, 0.28, 0.8);
+      this.contact.blob(p.x, y, p.z, groundNormal(this.walkHeight, p.x, p.z, this._cN, 0.08), 0.13, 0.13, 0, 0.28, 0.9);
     }
     for (const d of this.dogs.positions()) {
       const y = d.y ?? this.walkHeight(d.x, d.z);

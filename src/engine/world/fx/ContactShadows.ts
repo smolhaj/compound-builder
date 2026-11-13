@@ -84,7 +84,7 @@ export class ContactShadows {
     this._shape.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('aShape', this._shape);
     this._mat = new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: new THREE.Color(0x0d0c08) }, uOpacity: { value: 0.6 }, uFade: { value: new THREE.Vector2(70, 150) }, uNight: { value: 1 } },
+      uniforms: { uColor: { value: new THREE.Color(0x0d0c08) }, uOpacity: { value: 0.8 }, uFade: { value: new THREE.Vector2(70, 150) }, uNight: { value: 1 } },
       vertexShader: VERT, fragmentShader: FRAG, transparent: true, depthWrite: false,
       polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3,
     });
@@ -133,7 +133,7 @@ export class ContactShadows {
   }
 
   /** A band along a wall's foot: from (x0, z0) to (x1, z1) on the ground at height y, `w` wide, dark at the wall, on the side of `(sx, sz)` (outward unit vector). */
-  strip(x0: number, z0: number, x1: number, z1: number, y: number, outX: number, outZ: number, w: number, k: number): void {
+  strip(x0: number, z0: number, x1: number, z1: number, y: number, outX: number, outZ: number, w: number, k: number, n: THREE.Vector3 | null = null): void {
     if (this._n >= CAP) return;
     const len = Math.hypot(x1 - x0, z1 - z0);
     if (len < 0.01) return;
@@ -142,7 +142,7 @@ export class ContactShadows {
     const yaw = Math.atan2(-(z1 - z0), x1 - x0);               // rotation about Y taking +x onto the wall direction
     // inward = -out. Local +z after yaw rotates to (sin(yaw), cos(yaw)); if it points outward, add a half turn (the band's length is symmetric)
     const lz = Math.cos(yaw) * outZ + Math.sin(yaw) * outX;
-    this._put(mx, y, mz, null, lz > 0 ? yaw + Math.PI : yaw, len, w, 1, k);
+    this._put(mx, y, mz, n, lz > 0 ? yaw + Math.PI : yaw, len, w, 1, k);
   }
 
   private _put(x: number, y: number, z: number, n: THREE.Vector3 | null, yaw: number, sx: number, sz: number, kind: number, k: number): void {
