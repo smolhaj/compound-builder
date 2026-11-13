@@ -24,7 +24,7 @@ try {
     let R = null; try { R = await import('/src/engine/world/people/roleWear.ts'); } catch { /* old kit */ }
     const C = await import('/src/engine/world/people/crowdWear.ts');
     const c = cb.world.camp;
-    const ox = c.x + 7, oz = c.z - 12;
+    const [ox, oz] = cb.world.openSpotNear(c.x, c.z + 6, 3.5);
     const ground = cb.world.groundAt;
     const layer = new K.FigureLayer(cb.ws.scene, 64, 'lineup');
     window.__lineup = { layer, K, R };
@@ -38,6 +38,7 @@ try {
     window.__lineup.ground = ground;
     return { ox, oz, n: wears.length };
   });
+  await page.keyboard.press('h');
   const frames = async () => { await page.evaluate(() => window.__cb.qa.renderNow()); };
   const setRow = async (name, poseFn) => {
     await page.evaluate(([poseFn]) => {
@@ -53,7 +54,7 @@ try {
         layer.setPose(i, { x, y: ground(x, z), z, rot: Math.PI, scale: rows.scales[i], phase: 0, amp: 0, ...o });
       }
       layer.commit(rows.n, true);
-      layer.setTime(3.7);
+      if (layer.setTime) layer.setTime(3.7);
       cam.target.set(rows.ox, 0.14, rows.oz); cam.radius = 3.0; cam.pitch = 0.12; cam.yaw = 0;
     }, [poseFn]);
     await frames(); await frames();

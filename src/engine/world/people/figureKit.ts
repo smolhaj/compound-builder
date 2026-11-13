@@ -9,7 +9,7 @@
  *
  * Per-instance attributes (the last, aGear, is the people pass: hair / headwear / gear flags packed in x, build in y, head look yaw in z, ground slope in w):
  *   aShirt / aPants / aSkin / aHair / aPack  (vec3 sRGB→linear colors)
- *   aStyle  (pose, hasPack, longHair, shoeTone)
+ *   (pose is aAnim.w; hasPack / longHair are gear bits and the shoe tone is the fraction of aGear.y)
  *   aWear   (coat 0 none / 1 hip / 2 mid-thigh / 3 gown, shorts, hat code, idle phase)
  *   aAnim   (walkPhase, swingAmp, tool)
  *
@@ -74,6 +74,8 @@ export const HEADWEAR = { NONE: 0, CAP: 1, BOONIE: 2, HELMET: 3, HOOD: 4 } as co
 export const BUILD = { AVERAGE: 0, CHILD: 1, ELDER: 2, BROAD: 3, SLENDER: 4 } as const;
 /** Gear flags (bit set in aGear.x / 256). */
 export const GEAR = { APRON: 1, VEST: 2, PLATE: 4, RADIO: 8, BOOTS: 16, GLOVES: 32, SCARF: 64, BELT: 128, SLING: 256, RUCK: 512 } as const;
+/** Internal gear bits (packed with the flags, set from `Wear.hasPack` / `Wear.longHair`). */
+const GEAR_HASPACK = 1024, GEAR_LONGHAIR = 2048;
 
 /** Hat code for a graduation mortarboard (aWear.z). */
 export const HAT_MORTARBOARD = 20;
@@ -238,11 +240,11 @@ export function buildFigureGeometry(): THREE.BufferGeometry {
 /** The figure's per-instance attribute names and sizes (source order). */
 export const FIGURE_ATTRS: ReadonlyArray<readonly [string, number]> = [
   ['aShirt', 3], ['aPants', 3], ['aSkin', 3], ['aHair', 3], ['aPack', 3],
-  ['aStyle', 4], ['aWear', 4], ['aAnim', 3], ['aGear', 4],
+  ['aWear', 4], ['aAnim', 4], ['aGear', 4],
 ];
 
 /** GLSL: one 0/1 float per gear flag (agGApron, agGVest, …) from the packed flags `agGf`. */
-const GEAR_DECODE = Object.entries(GEAR).map(([k, v]) => `        float agG${k[0]}${k.slice(1).toLowerCase()} = mod(floor(agGf / ${v}.0), 2.0);`).join('\n');
+const GEAR_DECODE = Object.entries({ ...GEAR, HASPACK: GEAR_HASPACK, LONGHAIR: GEAR_LONGHAIR }).map(([k, v]) => `        float agG${k[0]}${k.slice(1).toLowerCase()} = mod(floor(agGf / ${v}.0), 2.0);`).join('\n');
 
 /**
  * Vertex-shader skeleton: limbs rotate about hip / shoulder pivots by the
@@ -272,9 +274,8 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         attribute vec3 aSkin;
         attribute vec3 aHair;
         attribute vec3 aPack;
-        attribute vec4 aStyle;
         attribute vec4 aWear;
-        attribute vec3 aAnim;
+        attribute vec4 aAnim;
         varying vec3 vAgCol;
         varying vec3 vAgAlt;
         varying vec2 vAgCut;
@@ -298,7 +299,7 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         float aLimb = floor(agPL / ${PL_K.toFixed(1)} + 0.001) - 2.0;
         float aPart = agPL - (aLimb + 2.0) * ${PL_K.toFixed(1)};
         float agTool = aAnim.z;
-        float agPose = aStyle.x;
+        float agPose = aAnim.w;
         float agBench = step(0.5, agPose) * step(agPose, 1.5);
         float agLawn = step(1.5, agPose) * step(agPose, 2.5);
         float agBike = step(2.5, agPose) * step(agPose, 3.5);
@@ -326,7 +327,7 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         float agHeadW = mod(floor(agGp / 32.0), 8.0);
         float agGf = floor(agGp / 256.0);
 ${GEAR_DECODE}
-        float agBuild = aGear.y;
+        float agBuild = floor(aGear.y);
         float agChild = step(0.5, agBuild) * step(agBuild, 1.5);
         float agElder = step(1.5, agBuild) * step(agBuild, 2.5);
         float agBroad = step(2.5, agBuild) * step(agBuild, 3.5);
@@ -449,8 +450,8 @@ ${GEAR_DECODE}
         transformed = agYaw(transformed, agYawA);
         // Collapse optional parts when unused (flagged here, collapsed at the end so the whole part goes to one point)
         float agTl = floor(agTool + 0.5);
-        if (abs(aPart - ${P_PACK.toFixed(1)}) < 0.5 && (aStyle.y < 0.5 || agGRuck > 0.5)) agGone = 1.0;
-        if (abs(aPart - ${P_LONGHAIR.toFixed(1)}) < 0.5 && (!((aStyle.z > 0.5 && agHairS < 0.5) || abs(agHairS - 6.0) < 0.5) || agHeadW > 2.5 || agNear < 0.5)) agGone = 1.0;
+        if (abs(aPart - ${P_PACK.toFixed(1)}) < 0.5 && (agGHaspack < 0.5 || agGRuck > 0.5)) agGone = 1.0;
+        if (abs(aPart - ${P_LONGHAIR.toFixed(1)}) < 0.5 && (!((agGLonghair > 0.5 && agHairS < 0.5) || abs(agHairS - 6.0) < 0.5) || agHeadW > 2.5 || agNear < 0.5)) agGone = 1.0;
         if ((abs(aPart - ${P_UMB_CANOPY.toFixed(1)}) < 0.5 || abs(aPart - ${P_UMB_SHAFT.toFixed(1)}) < 0.5) && agUmb < 0.5) agGone = 1.0;
         if (agBoardPart > 0.5 && aWear.z < ${(HAT_MORTARBOARD - 0.5).toFixed(1)}) agGone = 1.0;
         if (abs(aPart - ${P_BOX.toFixed(1)}) < 0.5 && !(agCarry > 0.5 || (agTl == 9.0 && agCarryP + agCarry > 0.5))) agGone = 1.0;
@@ -503,7 +504,7 @@ ${GEAR_DECODE}
         transformed.x += agStill * sin(agT * 0.8) * transformed.y * 0.035;
         if (agGone > 0.5) transformed = vec3(0.0, 0.35, 0.0);
         // Per-part color (hat replaces the hair cap)
-        vec3 shoeC = mix(vec3(0.08), vec3(0.86), step(0.55, aStyle.w));
+        vec3 shoeC = mix(vec3(0.08), vec3(0.86), step(0.55, fract(aGear.y)));
         vec3 hatC = aWear.z > 0.5 ? agHatColor(aWear.z) : aPack;
         vec3 hairC = aWear.z > 0.5 ? agHatColor(aWear.z) : agHeadW > 3.5 ? aShirt : agHeadW > 0.5 ? hatC : aHair;
         // clean-shaven, stubble (halfway to the skin), full beard; accessory tint from the person
@@ -536,7 +537,7 @@ ${GEAR_DECODE}
         // leather work gloves on the hands
         if (aPart < 0.5 && agIsArm > 0.5 && position.y < ${f(SHOULDER_Y - 0.145)} && agGGloves > 0.5) vAgCol = vec3(0.2, 0.13, 0.08);
         // boots are the dark brown of the shoes' tone, laced work boots
-        if (abs(aPart - 4.0) < 0.5 && agGBoots > 0.5) vAgCol = mix(vec3(0.07, 0.05, 0.04), vec3(0.2, 0.14, 0.1), step(0.55, aStyle.w));
+        if (abs(aPart - 4.0) < 0.5 && agGBoots > 0.5) vAgCol = mix(vec3(0.07, 0.05, 0.04), vec3(0.2, 0.14, 0.1), step(0.55, fract(aGear.y)));
         // Trousers: coat / gown hem (shirt color above) / shorts (skin below the knee)
         float agPants = step(2.5, aPart) * step(aPart, 3.5);
         vAgAlt = aWear.x > 0.5 ? aShirt : aSkin;
@@ -618,6 +619,7 @@ export class FigureLayer {
   /** Per instance: hair / beard / headwear bits and the wear's own gear flags (setPose adds the flags to aGear.x). */
   private readonly _gearBase: Float32Array;
   private readonly _gearFlags: Uint16Array;
+  private readonly _gearInt: Uint16Array;
   private _timeSet = false;
   private _t0 = typeof performance !== 'undefined' ? performance.now() : 0;
 
@@ -626,6 +628,7 @@ export class FigureLayer {
     this.capacity = Math.max(1, capacity);
     this._gearBase = new Float32Array(this.capacity);
     this._gearFlags = new Uint16Array(this.capacity);
+    this._gearInt = new Uint16Array(this.capacity);
     this._geo = buildFigureGeometry();
     for (const [n, size] of FIGURE_ATTRS) {
       const a = new THREE.InstancedBufferAttribute(new Float32Array(this.capacity * size), size);
@@ -658,8 +661,6 @@ export class FigureLayer {
     const A = this._attrs;
     this._col(A.aShirt, i, w.shirt); this._col(A.aPants, i, w.pants); this._col(A.aSkin, i, w.skin);
     this._col(A.aHair, i, w.hair); this._col(A.aPack, i, w.pack);
-    const st = A.aStyle.array as Float32Array;
-    st[i * 4 + 1] = w.hasPack ? 1 : 0; st[i * 4 + 2] = w.longHair ? 1 : 0; st[i * 4 + 3] = w.shoe;
     const we = A.aWear.array as Float32Array;
     we[i * 4] = w.coat;
     we[i * 4 + 1] = w.shorts ? 1 : 0;
@@ -668,7 +669,8 @@ export class FigureLayer {
     // the look: hair style, beard, headwear (bits 0-7), gear flags (from bit 8); the build
     this._gearBase[i] = (w.hairStyle ?? 0) + (w.beard ?? 0) * 8 + (w.headwear ?? 0) * 32;
     this._gearFlags[i] = w.gear ?? 0;
-    (A.aGear.array as Float32Array)[i * 4 + 1] = w.build ?? 0;
+    this._gearInt[i] = (w.hasPack ? GEAR_HASPACK : 0) | (w.longHair ? GEAR_LONGHAIR : 0);
+    (A.aGear.array as Float32Array)[i * 4 + 1] = (w.build ?? 0) + Math.min(0.99, Math.max(0, w.shoe)) * 0.999;
   }
 
   /** Drive the idle / work animations from a clock the caller owns (a scrubbed cutscene); otherwise they run on real time. */
@@ -683,12 +685,10 @@ export class FigureLayer {
     if (p.pitch) this._q.multiply(this._pq.setFromAxisAngle(this._right, p.pitch));
     this._m.compose(this._p.set(p.x, p.y, p.z), this._q, this._s.setScalar(p.scale * FIG_SCALE));
     this._m.toArray(this.mesh.instanceMatrix.array as Float32Array, i * 16);
-    const st = this._attrs.aStyle.array as Float32Array;
-    st[i * 4] = p.pose;
     const an = this._attrs.aAnim.array as Float32Array;
-    an[i * 3] = p.phase; an[i * 3 + 1] = p.amp; an[i * 3 + 2] = p.tool ?? 0;
+    an[i * 4] = p.phase; an[i * 4 + 1] = p.amp; an[i * 4 + 2] = p.tool ?? 0; an[i * 4 + 3] = p.pose;
     const gr = this._attrs.aGear.array as Float32Array;
-    gr[i * 4] = this._gearBase[i] + (p.gear ?? this._gearFlags[i]) * 256;
+    gr[i * 4] = this._gearBase[i] + ((p.gear ?? this._gearFlags[i]) | this._gearInt[i]) * 256;
     gr[i * 4 + 2] = Math.max(-1.1, Math.min(1.1, p.look ?? 0));
     gr[i * 4 + 3] = Math.max(-0.8, Math.min(0.8, p.slope ?? 0));
   }
@@ -701,7 +701,7 @@ export class FigureLayer {
     const im = this.mesh.instanceMatrix;
     im.clearUpdateRanges(); im.addUpdateRange(0, k * 16); im.needsUpdate = true;
     if (!this._timeSet) (this._mat.userData.time as { value: number }).value = ((performance.now() - this._t0) / 1000) % 6283;
-    for (const name of ['aStyle', 'aAnim', 'aGear'] as const) {
+    for (const name of ['aAnim', 'aGear'] as const) {
       const a = this._attrs[name];
       a.clearUpdateRanges(); a.addUpdateRange(0, k * a.itemSize); a.needsUpdate = true;
     }
