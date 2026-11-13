@@ -114,6 +114,46 @@ function gradeOver(h: SiteQuery['height'], fp: Rect): number {
   return (hi - lo) / Math.max(0.5, Math.max(fp.x1 - fp.x0, fp.z1 - fp.z0));
 }
 
+/** Ground a fence post cannot stand on: open water, or a slope steeper than 150 %. */
+const FENCE_STEEP = 1.5;
+const badPost = (q: SiteQuery, x: number, z: number): boolean => {
+  if (q.water(x, z)) return true;
+  const d = 0.25;
+  return (Math.abs(q.height(x + d, z) - q.height(x - d, z)) + Math.abs(q.height(x, z + d) - q.height(x, z - d))) / (2 * d) > FENCE_STEEP;
+};
+
+/**
+ * Pull the edges of a fence rect in (never past `core`) while posts along them would stand in water or on a cliff; mutates `rect`.
+ * Returns how many bad posts remain on the outline (0: a dry line).
+ */
+export function fenceLineProblems(rect: Rect, core: Rect, q: SiteQuery): number {
+  const badCount = (r: Rect): number => {
+    let n = 0;
+    for (let x = r.x0; x <= r.x1 + 1e-6; x += 0.25) { if (badPost(q, x, r.z0)) n++; if (badPost(q, x, r.z1)) n++; }
+    for (let z = r.z0; z <= r.z1 + 1e-6; z += 0.25) { if (badPost(q, r.x1, z)) n++; if (badPost(q, r.x0, z)) n++; }
+    return n;
+  };
+  let best = badCount(rect);
+  // greedy: each round pulls in the one edge (as far as it takes, never past the core) that clears the most bad posts, the shortest pull among equals
+  for (let it = 0; it < 8 && best > 0; it++) {
+    let pick: Rect | null = null, pickN = best, pickK = Infinity;
+    const edges: Array<{ room: number; move: (r: Rect, d: number) => Rect }> = [
+      { room: core.z0 - rect.z0, move: (r, d) => ({ ...r, z0: r.z0 + d }) },
+      { room: rect.z1 - core.z1, move: (r, d) => ({ ...r, z1: r.z1 - d }) },
+      { room: rect.x1 - core.x1, move: (r, d) => ({ ...r, x1: r.x1 - d }) },
+      { room: core.x0 - rect.x0, move: (r, d) => ({ ...r, x0: r.x0 + d }) },
+    ];
+    for (const e of edges) for (let k = 1; k * 0.25 <= e.room + 1e-9; k++) {
+      const m = e.move(rect, k * 0.25), n = badCount(m);
+      if (n < pickN || (n === pickN && pick && k < pickK)) { pick = m; pickN = n; pickK = k; }
+    }
+    if (!pick) break;
+    Object.assign(rect, pick);
+    best = pickN;
+  }
+  return best;
+}
+
 /** The smallest home that gives the missing beds, or two of the biggest when the family is large. */
 export function homeKinds(missing: number, logs = true): string[] {
   if (missing <= 0) return [];
@@ -260,7 +300,10 @@ export function planStarter(s: GameState, o: StarterOpts): StarterPlan {
       x0: Math.max(h.x0 + 0.5, Math.min(...around.map(r => r.x0)) - pad), z0: Math.max(h.z0 + 0.5, Math.min(...around.map(r => r.z0)) - pad),
       x1: Math.min(h.x1 - 0.5, Math.max(...around.map(r => r.x1)) + pad), z1: Math.min(h.z1 - 0.5, Math.max(...around.map(r => r.z1)) + pad),
     };
-    yard = { kind: 'woven_wire', rect, plan: null as never, usd: 0, hours: 0, later: false, laterWhy: null };
+    // the line must stand on dry, walkable ground: an edge whose posts would stand in the creek, the lake or on a cliff is pulled in toward the pieces
+    const core: Rect = { x0: Math.min(...around.map(r => r.x0)) - 0.3, z0: Math.min(...around.map(r => r.z0)) - 0.3, x1: Math.max(...around.map(r => r.x1)) + 0.3, z1: Math.max(...around.map(r => r.z1)) + 0.3 };
+    const wet = fenceLineProblems(rect, core, site);
+    yard = { kind: 'woven_wire', rect, plan: null as never, usd: 0, hours: 0, later: wet > 0, laterWhy: wet > 0 ? 'the line would stand in water or on a cliff: wall it by hand' : null };
   }
   return finish(s, pieces, yard, [...skip], null, geo);
 }
