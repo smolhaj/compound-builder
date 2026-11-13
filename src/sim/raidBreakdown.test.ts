@@ -51,3 +51,27 @@ describe('raid breakdown matches the sim', () => {
     expect(bareHi).toBe(0);
   }, 60_000);
 });
+
+describe('the card title names the real wall', () => {
+  it('replaces "The fence held" with the outermost layer', async () => {
+    const { retitle } = await import('./raidCutscene');
+    const g = tierGame(1, 'standard', 'stone_wall'), b = planBattle(g, 6, 300, TIER_CREWS.looters6.o);
+    const bd = raidBreakdown(g, b)!;
+    expect(bd.wall).toMatch(/stone/);
+    expect(retitle('The fence held', bd)).toBe(`The ${bd.wall} held`);
+    expect(retitle('The fence held, but 2 hurt', bd)).toBe(`The ${bd.wall} held, but 2 hurt`);
+    expect(retitle('They overran the place', bd)).toBe('They overran the place');
+    const g0 = tierGame(1, 'standard', 'none'), bd0 = raidBreakdown(g0, planBattle(g0, 6, 300, TIER_CREWS.looters6.o))!;
+    expect(retitle('The fence held', bd0)).toBe('The line held');
+  });
+  it('a layer never needed reads as stood ready (held), not failed, when the crew broke off', () => {
+    let seen = false;
+    for (let i = 0; i < 12 && !seen; i++) {
+      const g = tierGame(1 + (i % 8), 'cozy', 'fortress'), b = planBattle(g, 5, 700 + i, TIER_CREWS.looters6.o);
+      if (b.result !== 'fled' && b.result !== 'repelled') continue;
+      const bd = raidBreakdown(g, b)!;
+      for (const l of bd.lines.filter(x => /stood ready|broke off|raised the alarm/.test(x.text))) { expect(l.held).toBe(true); seen = true; }
+    }
+    expect(seen).toBe(true);
+  });
+});

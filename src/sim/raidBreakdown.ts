@@ -33,6 +33,8 @@ export interface RaidBreakdown {
   familyKilled: number;
   guardsKilled: number;
   raidersDown: number;
+  /** The real name of the wall the crew met ("stone-and-timber wall"), or null when there was none: the card's title uses it instead of a generic "fence". */
+  wall: string | null;
 }
 
 const near = (a: { x: number; z: number }, b: { x: number; z: number }, r: number) => Math.hypot(a.x - b.x, a.z - b.z) <= r;
@@ -148,5 +150,5 @@ export function raidBreakdown(g: GameState, b: Battle, lost: ReadonlyArray<reado
     ? (f.linePassed ? 'You drove them back out of the yard.' : lines.find(l => l.layer === 'wall' && l.held) ? 'The wall held and the defenders did the rest.' : 'The defenders held them at the line.')
     : result === 'breached' ? 'They broke the line and reached the yard; the houses held.'
       : 'They broke the line and overran the houses.';
-  return { result, headline, lines, kills, familyKilled, guardsKilled, raidersDown };
+  return { result, headline, lines, kills, familyKilled, guardsKilled, raidersDown, wall: wk ? wallName(wk) : null };
 }

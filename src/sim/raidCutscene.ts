@@ -128,7 +128,7 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?:
   const finalBattle = (): Battle => {
     if (battle) return deco(battle, finalScene);
     if (e.kind === 'break_in') return breakInScene(game, e, stance, outcome.tone, seed);
-    return deco(gateScene(game, e, stance, outcome.tone, seed), finalScene);
+    return deco(gateScene(game, e, stance, outcome.tone, seed, outcome.bunker), finalScene);
   };
   let scenes: Scene[], battles: Battle[], spent: Array<Record<string, number>>;
   let voiceFrom = 0;
@@ -206,6 +206,12 @@ export function commitRaid(st: Pick<StagedRaid, 'staged' | 'plan'>): GameState {
   return step(st.staged, commitDays(st.plan));
 }
 
+/** "The fence held" names the real outermost layer: "The stone-and-timber wall held" (or "The line held" with no wall). */
+export function retitle(title: string, bd: RaidBreakdown | null): string {
+  if (!bd || !/^The fence held/.test(title)) return title;
+  return title.replace(/^The fence held/, bd.wall ? `The ${bd.wall} held` : 'The line held');
+}
+
 /** What changed for the family and the stores between `before` and `after`, in the card's words. */
 export function raidReport(before: GameState, after: GameState, outcome: Outcome, extraRounds = 0): RaidReport {
   const killed: string[] = [], wounded: string[] = [], taken: string[] = [];
@@ -219,10 +225,11 @@ export function raidReport(before: GameState, after: GameState, outcome: Outcome
   for (const k of STOCK_LOSSES) { const d = Math.floor((before.stock[k] ?? 0) - (after.stock[k] ?? 0)); if (d > 0) lost.push([LOSS_WORDS[k][d === 1 ? 0 : 1], d]); }
   const am = after.gate.aftermath;
   const b = after.gate.battle;
+  const bd = b ? raidBreakdown(after, b, lost) : null;
   const held = (b?.surrendered?.defenders ?? []).map(id => after.people.find(p => p.id === b!.units.find(u => u.id === id)?.personId)?.first).filter((n): n is string => !!n && !killed.includes(n) && !taken.includes(n));
   const rounds = (b ? b.events.filter(e => e.kind === 'shot' && e.from.startsWith('h_')).length : 0) + extraRounds;
   return {
-    title: outcome.title, text: outcome.text, tone: outcome.tone, killed, wounded, taken, lost,
-    ...(b?.raid ? { facts: b.raid } : {}), ...(b ? (() => { const bd = raidBreakdown(after, b, lost); return bd ? { breakdown: bd } : {}; })() : {}), damage: newDamage(before, after), raidersWounded: am?.wounded ?? 0, raidersDead: am?.dead ?? 0, raidersSurrendered: am?.surrendered ?? 0, held, rounds, lines: outcome.lines, aftermath: !!am,
+    title: retitle(outcome.title, bd), text: outcome.text, tone: outcome.tone, killed, wounded, taken, lost,
+    ...(b?.raid ? { facts: b.raid } : {}), ...(bd ? { breakdown: bd } : {}), damage: newDamage(before, after), raidersWounded: am?.wounded ?? 0, raidersDead: am?.dead ?? 0, raidersSurrendered: am?.surrendered ?? 0, held, rounds, lines: outcome.lines, aftermath: !!am,
   };
 }
