@@ -233,6 +233,8 @@ export class LivestockRenderer {
     a.v = 0;
     const away = Math.hypot(goal.x - a.x, goal.z - a.z);
     if (away > 40) { a.x = goal.x; a.z = goal.z; a.via = []; a.viaFor = key; a.inside = goal.inside; return; }       // far (a load, a long skip): simply there
+    // at the door of its shelter (within a body length of the doorway: the wall stops it getting nearer) it goes in
+    if (goal.inside && away < 0.4 + look.len * 0.5) { a.inside = true; a.via = []; a.viaFor = key; return; }
     if (a.wait > 0) { a.wait -= dt; return; }
     if (a.viaFor !== key) {
       if (away > 0.05 && this._budget > 0) {
