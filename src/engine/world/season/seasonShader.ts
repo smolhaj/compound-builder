@@ -9,7 +9,7 @@
  *   uSeaB = (snow, dormant, dry, litter)    ground
  *   uSeaC = (ice, blaze, wet, cold)         water / region intensity
  *   uSeaP = cumulative fall palette shares (scarlet, +orange, +gold, 1)
- *   uSeaD = (broadleaf evergreen share, frost, mud, 0)   region (live oak / magnolia);
+ *   uSeaD = (broadleaf evergreen share, frost, mud, winter rime)   region (live oak / magnolia);
  *           morning frost and mud season (writeSeasonExtras; the game's own calendar)
  *
  * Hooks (no geometry is rebuilt for a season):
@@ -56,6 +56,8 @@ export function writeSeasonUniforms(p: SeasonParams, c: SeasonClimate): void {
   const s = r + o + y + b || 1;
   P.x = r / s; P.y = (r + o) / s; P.z = (r + o + y) / s; P.w = 1;
   D.x = c.broadEvergreen;
+  // winter rime (seasonState): frosted ground in a region with little lying snow, Dec–Feb
+  D.w = Math.min(1, p.rime);
 }
 
 /**
@@ -232,7 +234,7 @@ vec3 seaSnowTint = vec3( 1.0 );
   }
 #endif
 #ifndef SEA_VEG
-if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD.z > 0.003 ) {
+if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD.z + uSeaD.w > 0.003 ) {
   vec3 seN = normalize( ( vec4( normal, 0.0 ) * viewMatrix ).xyz );
   vec3 seP = cameraPosition + ( vec4( - vViewPosition, 0.0 ) * viewMatrix ).xyz;
   float seUp = smoothstep( 0.6, 0.9, seN.y );
@@ -301,15 +303,20 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD
   // more than sod), glossy where water stands; drives hold water in their ruts
   if ( uSeaD.z > 0.003 ) {
     float seMn = seaNoise( seP.xz * 0.9 + 3.1 ) * 0.6 + seaNoise( seP.xz * 3.7 ) * 0.4;
-    float seMud = uSeaD.z * seUp * smoothstep( 0.66 - uSeaD.z * 0.32, 0.8 - uSeaD.z * 0.32, seMn + ( 1.0 - seGreen ) * 0.16 );
+    // sod only darkens a little (wet grass); bare ground goes to real mud. Wide soft edges, and the patchiness fades with distance
+    // (the fine octaves read as camouflage from the air), so a spring lot is green earth rather than brown blotches on green.
+    float seFar = smoothstep( 0.05, 0.3, seFw );
+    seMn = mix( seMn, 0.5, 0.6 * seFar );
+    float seMud = uSeaD.z * seUp * smoothstep( 0.5 - uSeaD.z * 0.25, 0.95 - uSeaD.z * 0.25, seMn + ( 1.0 - seGreen ) * 0.2 );
+    seMud *= mix( 1.0, 0.4, seGreen );
 #if defined( SEA_MUD_UV ) && defined( USE_MAP )
     float seRut = max( smoothstep( 0.075, 0.03, abs( vMapUv.x - 0.27 ) ), smoothstep( 0.075, 0.03, abs( vMapUv.x - 0.73 ) ) );
     seMud = max( seMud, uSeaD.z * ( 0.55 + 0.45 * seRut ) );
 #else
     float seRut = 0.0;
 #endif
-    vec3 seMudC = vec3( 0.075, 0.056, 0.038 ) * ( 0.8 + 0.4 * seaNoise( seP.xz * 11.0 ) );
-    diffuseColor.rgb = mix( diffuseColor.rgb, seMudC, clamp( seMud * 0.92, 0.0, 1.0 ) );
+    vec3 seMudC = mix( vec3( 0.075, 0.056, 0.038 ), diffuseColor.rgb * vec3( 0.62, 0.55, 0.42 ), 0.55 * seGreen ) * ( 0.85 + 0.3 * seaNoise( seP.xz * 11.0 ) );
+    diffuseColor.rgb = mix( diffuseColor.rgb, seMudC, clamp( seMud * 0.85, 0.0, 1.0 ) );
     float sePool = max( seMud * smoothstep( 0.78, 0.92, seMn ), seRut * uSeaD.z );
     diffuseColor.rgb *= 1.0 - 0.35 * sePool;
     roughnessFactor = mix( mix( roughnessFactor, 0.62, seMud ), 0.12, sePool );
@@ -322,6 +329,14 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD
     float seFm = seFr * ( 0.5 + 0.3 * seN1 + 0.2 * seSp );
     diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.6, 0.64, 0.7 ), clamp( seFm, 0.0, 0.85 ) );
     roughnessFactor = max( roughnessFactor, mix( roughnessFactor, 0.9, seFr ) );
+  }
+  // Winter rime (regions with little lying snow): frosted grass and thin patchy snow in a wide, soft blanket that thickens with the cold,
+  // heaviest on the open lawns and in hollows, absent from roads and bare earth. The coarse noise keeps it from aliasing from the air.
+  if ( uSeaD.w > 0.003 ) {
+    float seRn = seaNoise( seP.xz * 0.06 + 21.0 ) * 0.55 + seaNoise( seP.xz * 0.23 + 4.0 ) * 0.45;
+    float seRm = uSeaD.w * seUp * smoothstep( 0.3, 0.6, roughnessFactor ) * ( 0.55 + 0.45 * seGreen ) * smoothstep( 0.55 - uSeaD.w * 0.2, 0.8 - uSeaD.w * 0.2, seRn );
+    diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.62, 0.66, 0.70 ) * ( 0.92 + 0.12 * seN1 ), clamp( seRm * 0.75, 0.0, 0.7 ) );
+    roughnessFactor = max( roughnessFactor, mix( roughnessFactor, 0.85, seRm ) );
   }
 #endif
 }

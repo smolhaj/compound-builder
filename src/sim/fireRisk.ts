@@ -33,3 +33,15 @@ export function fireMarks(s: GameState, fuel: Record<string, number>): FireMark[
   }
   return out;
 }
+
+/**
+ * What the Fire overlay says when it has nothing (or nothing worrying) to draw: no ring appears until a building is finished, and a ring is
+ * green when the place is safe, so an all-green or empty map should be explained rather than look like the overlay is off. Null when there is
+ * a ring to read.
+ */
+export function fireOverlayNote(marks: readonly FireMark[], finishedBuildings: number): string | null {
+  if (finishedBuildings === 0) return 'Nothing to mark yet: every finished building gets a ring here, and a house under construction gets none.';
+  if (marks.length === 0) return 'Only underground rooms stand so far: bunkers and cellars cannot burn, so no ring is drawn.';
+  if (marks.every(m => m.band === 'low')) return 'All rings are green: every building is in cleared ground or has fire-safe walls. Nothing needs a firebreak.';
+  return null;
+}
