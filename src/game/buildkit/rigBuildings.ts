@@ -27,6 +27,19 @@ function pad(p: Parts, W: number, D: number, zc = 0): void {
   p.add('rubber', box(0.1, 0.008, 0.008, -W / 2 - 0.05, 0.02, zc - D / 2 + 0.1));
 }
 
+/**
+ * The painted stripe down each side, between the floor (0.1) and the window sills (0.24): broken at the door so it does not run across it
+ * (it was drawn at the sill height, over every window and the door). z0..z1 along the side, `gaps` the door spans to leave bare.
+ */
+function stripe(p: Parts, W: number, z0: number, z1: number, gaps: Array<[number, number]>): void {
+  let a = z0;
+  for (const [g0, g1] of [...gaps, [z1 + 1, z1 + 2] as [number, number]]) {
+    const b = Math.min(g0, z1);
+    if (b - a > 0.02) for (const sx of [-1, 1]) p.add('paint_red', box(0.002, 0.025, b - a, sx * (W / 2 + 0.006), 0.17, (a + b) / 2));
+    a = g1;
+  }
+}
+
 /** A 28-foot travel trailer on a hitch. */
 function travelTrailer(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   const W = 0.42, D = 1.4, hd = D / 2;
@@ -41,7 +54,7 @@ function travelTrailer(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.
   }, (c: FurnishCtx) => {
     const { I, left, right, back, front } = c;
     const o = c.parts.opts;
-    I({ x: back + 0.2, z: back + 0.2 }, a => Furniture.bed(a, true, 'quilt_blue'));
+    I({ x: 0, z: back + 0.2 }, a => Furniture.bed(a, true, 'quilt_blue'));
     I({ x: left + 0.05, z: 0.15, rot: Math.PI / 2 }, a => Furniture.counter(a, 2.2, 0.35, !!o.plumbed));
     I({ x: right - 0.1, z: -0.2, rot: -Math.PI / 2 }, a => Furniture.table(a, 0.8, 0.5));
     I({ x: 0, z: front - 0.15, rot: Math.PI }, a => Furniture.sofa(a, 'quilt_red'));
@@ -62,9 +75,10 @@ function travelTrailer(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.
     p.add('linen', box(0.07, 0.015, 0.07, 0.1, 0.1 + 0.33 + 0.025, 0.35));
     p.layer = 'walls';
     // a stripe down the side, the entry steps and a fold-out awning over the door
-    for (const sx of [-1, 1]) p.add('paint_red', box(0.002, 0.025, D - 0.1, sx * (W / 2 + 0.006), 0.25, 0));
-    p.add('steel', box(0.07, 0.015, 0.08, W / 2 + 0.04, 0.05, 0.3));
-    p.add('steel', box(0.07, 0.015, 0.08, W / 2 + 0.04, 0.085, 0.3));
+    stripe(p, W, -D / 2 + 0.05, D / 2 - 0.05, [[0.3 - 0.09, 0.3 + 0.09]]);
+    // (two solid blocks out from the door, 0.065 and then up to the floor: they used to be two plates one above the other at the same distance)
+    p.add('steel', box(0.07, 0.065, 0.08, W / 2 + 0.09, 0, 0.3));
+    p.add('steel', box(0.07, 0.1, 0.08, W / 2 + 0.04, 0, 0.3));
     p.add('paint_green', box(0.14, 0.006, 0.22, W / 2 + 0.07, 0.4, 0.3));
   });
   void def;
@@ -111,9 +125,9 @@ function rvCamper(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group
     p.add('metal_roof_grey', box(W + 0.01, 0.01, 0.31, 0, 0.1 + 0.46, fz - 0.08));
     p.add('linen', box(0.18, 0.04, 0.22, 0, 0.1 + 0.34 + 0.02, -0.15));
     p.layer = 'walls';
-    for (const sx of [-1, 1]) p.add('paint_red', box(0.002, 0.025, D - 0.1, sx * (W / 2 + 0.006), 0.25, 0));
-    p.add('steel', box(0.07, 0.015, 0.08, W / 2 + 0.04, 0.05, 0.2 - 0.2));
-    p.add('steel', box(0.07, 0.015, 0.08, W / 2 + 0.04, 0.085, 0.2 - 0.2));
+    stripe(p, W, -D / 2 + 0.05 + parts.oz, D / 2 - 0.05 + parts.oz, [[0.2 + parts.oz - 0.09, 0.2 + parts.oz + 0.09]]);
+    p.add('steel', box(0.07, 0.065, 0.08, W / 2 + 0.09, 0, 0.2 - 0.2));
+    p.add('steel', box(0.07, 0.1, 0.08, W / 2 + 0.04, 0, 0.2 - 0.2));
   });
   void def;
   return group;

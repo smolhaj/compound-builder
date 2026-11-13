@@ -96,8 +96,8 @@ function helipad(def: KitPieceDef, seed = 1): THREE.Group {
   p.add('concrete', box(S, 0.15 * M, S, 0, 0, 0));
   p.layer = 'openings';
   const y = 0.151 * M;
-  p.add('paint_yellow', new THREE.RingGeometry(4.6 * M, 5.1 * M, 40).rotateX(-Math.PI / 2).translate(0, y, 0));
-  for (const [w, d, x, z] of [[0.7 * M, 4.4 * M, -1.5 * M, 0], [0.7 * M, 4.4 * M, 1.5 * M, 0], [3.7 * M, 0.7 * M, 0, 0]] as const) p.add('paint_yellow', box(w, 0.004, d, x, y, z));
+  p.add('paint_yellow', new THREE.RingGeometry(4.6 * M, 5.1 * M, 40).rotateX(-Math.PI / 2).translate(0, y + 0.001, 0));   // (0.001 over the pad: painted flush with it, it flickered)
+  for (const [w, d, x, z] of [[0.7 * M, 4.4 * M, -1.5 * M, 0], [0.7 * M, 4.4 * M, 1.5 * M, 0], [3.7 * M, 0.7 * M, 0, 0]] as const) p.add('paint_yellow', box(w, 0.004, d, x, y + 0.001, z));
   p.layer = 'interior';
   for (let i = 0; i < 16; i++) { const a = i * Math.PI / 8; p.add('lamp', box(0.18 * M, 0.12 * M, 0.18 * M, Math.cos(a) * (hs - 0.25 * M), 0.15 * M, Math.sin(a) * (hs - 0.25 * M))); }
   p.add('wood_dark', cylY(0.05 * M, 5.5 * M, hs + 1.2 * M, 0, -hs - 0.4 * M, 6));
@@ -126,7 +126,7 @@ function towerPod(_def: KitPieceDef, seed = 1): THREE.Group {
   for (let i = 0; i < steps; i++) {
     const a = i * 0.34, y = 0.15 * M + i * rise;
     p.add('steel', box(0.9 * M, 0.04 * M, 0.34 * M, 0, 0, 0).translate(0.7 * M, 0, 0).rotateY(-a).translate(0, y, 0));
-    if (i % 4 === 0) p.add('steel', cylY(0.015 * M, 1.0 * M, Math.cos(a) * 1.12 * M, y, -Math.sin(a) * 1.12 * M, 4));
+    if (i % 4 === 0) p.add('steel', cylY(0.015 * M, 1.0 * M, Math.cos(a) * 1.12 * M, y, Math.sin(a) * 1.12 * M, 4));
   }
   // roof: the platform, rail, pod walls and roof
   p.layer = 'roof';
@@ -154,7 +154,7 @@ function towerPod(_def: KitPieceDef, seed = 1): THREE.Group {
 
 const LIFT = 2.4 * M;
 function stiltedHouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
-  const g = COMPOUND_BUILDERS.guest_house(def, seed, opts);
+  const g = COMPOUND_BUILDERS.guest_house(def, seed, { ...opts, lifted: true });
   // lift every layer of the cottage; its floor was 0.08 up
   for (const c of g.children) c.position.y += LIFT;
   const W = def.cellsX * CELL, D = def.cellsZ * CELL - M, hw = W / 2, hd = D / 2;
@@ -175,13 +175,17 @@ function stiltedHouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.G
     e.add('wood_mid', pipe([hw - 0.3 * M, 0.4 * M, hd - 0.3 * M * s], [0, LIFT - 0.5 * M, hd - 0.3 * M * s], 0.05 * M, 5));
   }
   e.layer = 'deck';
-  // the deck round the front door and a straight stair to the ground
-  const pz = hd + 0.14 * 6 * M / 6;
-  e.add('deck', box(2.6 * M, 0.08 * M, 1.5 * M, 0, LIFT, hd + 0.75 * M));
-  const steps = 13, run = 0.28 * M;
-  for (let i = 0; i < steps; i++) e.add('deck', box(1.0 * M, 0.06 * M, run, 0.2 * M, LIFT - (i + 1) * (LIFT / steps), hd + 1.5 * M + i * run));
-  for (const sx of [-0.3 * M, 0.7 * M]) e.add('wood_mid', pipe([sx, LIFT + 0.9 * M, hd + 1.5 * M], [sx, 0.9 * M, hd + 1.5 * M + steps * run], 0.025 * M, 4));
-  void pz;
+  // the cottage's porch deck (0.28 deep, its floor 0.08 over the lifted sill line) is the landing; a straight stair comes down from its edge
+  // (it used to start at the beams, 0.08 below the porch: a 2.5 ft first step), with two stringers under the treads and a post at each rail end
+  const PORCH = 0.28, TOP = LIFT + 0.08, steps = 13, run = 0.28 * M, rise = TOP / steps, z0 = hd + PORCH, zEnd = z0 + steps * run;
+  const sx0 = 0.2 * M, half = 0.5 * M;
+  for (let i = 0; i < steps - 1; i++) e.add('deck', box(2 * half, 0.06 * M, run, sx0, TOP - (i + 1) * rise - 0.06 * M, z0 + (i + 0.5) * run));
+  for (const sx of [sx0 - half + 0.01, sx0 + half - 0.01]) e.add('wood_mid', pipe([sx, TOP - 0.05 * M, z0], [sx, 0.02, zEnd - run], 0.025 * M, 4), 'deck');
+  for (const sx of [sx0 - half, sx0 + half]) {
+    e.add('wood_mid', pipe([sx, TOP + 0.9 * M, z0], [sx, 0.9 * M, zEnd - run], 0.025 * M, 4));
+    e.add('wood_mid', pipe([sx, TOP, z0], [sx, TOP + 0.9 * M, z0], 0.03 * M, 4));
+    e.add('wood_mid', pipe([sx, 0, zEnd - run], [sx, 0.9 * M, zEnd - run], 0.03 * M, 4));
+  }
   const eg = e.finish();
   for (const c of [...eg.children]) g.add(c);
   g.userData.keep = [...((g.userData.keep as string[] | undefined) ?? []), 'foundation'];

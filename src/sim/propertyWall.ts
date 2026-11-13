@@ -283,6 +283,12 @@ export function planPropertyWall(s: GameState, kind: PerimeterKind, geo: Propert
         }
         if (sg !== 0) prev = sg;
       }
+      // a line that grazes the channel without crossing it (a corner on the bank) would stand posts in the water: it is barred there too
+      const half = (geo.creekHalf ?? 0.7) + 0.05;
+      for (let i = 0; i < N; i++) {
+        const [x, z] = loop.at(i * seg);
+        if (Math.abs(z - creek.creekZ!(x)) < half) { const reach = Math.ceil(gh / seg); for (let k = -reach; k <= reach; k++) creekCut[(((i + k) % N) + N) % N] = true; }
+      }
     }
     // stretches something already holds
     const heldCut = Array.from({ length: N }, (_, i) => { const [x, z] = mid(i); return walls.some(r => distToPolyline(r.pts, x, z) <= REACH); });

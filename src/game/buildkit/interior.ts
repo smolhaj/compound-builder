@@ -285,8 +285,9 @@ export const Furniture = {
       for (const e of [-1, 1]) add('steel', cyl(0.02 * M, 0.05 * M, sx + e * 0.08 * M, h, -d / 2 + 0.06 * M, 6));
     } else {
       add('iron', box(0.03 * M, 0.3 * M, 0.03 * M, sx, h, -d / 2 + 0.06 * M));            // pitcher pump
-      add('iron', box(0.04 * M, 0.04 * M, 0.2 * M, sx, h + 0.3 * M, -d / 2 + 0.12 * M).rotateX(0.25));
-      add('iron', box(0.02 * M, 0.02 * M, 0.3 * M, sx, h + 0.32 * M, -d / 2 - 0.05 * M).rotateX(-0.6));    // handle
+      // (turned about their own middles, then moved: turning a moved box swings it about the piece's origin and out through the wall behind)
+      add('iron', new THREE.BoxGeometry(0.04 * M, 0.04 * M, 0.2 * M).rotateX(0.25).translate(sx, h + 0.32 * M, -d / 2 + 0.12 * M));
+      add('iron', new THREE.BoxGeometry(0.02 * M, 0.02 * M, 0.3 * M).rotateX(-0.6).translate(sx, h + 0.34 * M, -d / 2 + 0.1 * M));    // handle
     }
     add('iron', cyl(0.11 * M, 0.14 * M, -sx * 0.6, h, 0.02 * M));                         // pot
     for (let i = 0; i < 3; i++) add('crockery', cyl(0.05 * M, 0.1 * M, l * 0.32 + i * 0.12 * M - l * 0.05, h, -0.12 * M, 8));

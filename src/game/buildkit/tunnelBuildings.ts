@@ -117,7 +117,7 @@ function highTunnel(def: KitPieceDef, seed = 1): THREE.Group {
   p.layer = 'roof';
   p.add('polycarb', skin(prof, -hd, hd, 1.35 * M, 1.35 * M));
   // the rolled side film: a roll on a crank pole at the rail, both sides
-  for (const sx of [-1, 1]) p.add('polycarb', new THREE.CylinderGeometry(0.1 * M, 0.1 * M, D - 0.6 * M, 8).rotateX(Math.PI / 2).translate(sx * (hw + 0.05), 1.3 * M, 0));
+  for (const sx of [-1, 1]) p.add('polycarb', new THREE.CylinderGeometry(0.1 * M, 0.1 * M, D - 0.6 * M, 8).rotateX(Math.PI / 2).translate(sx * (hw + 0.1 * M), 1.3 * M, 0));
   p.layer = 'walls';
   for (const sz of [-1, 1]) {
     const z = sz * hd, dw = 2.4 * M, dh = 2.5 * M;
