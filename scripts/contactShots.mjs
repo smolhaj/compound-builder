@@ -45,7 +45,7 @@ try {
   }, [px, pz, fx, fz]);
   // the scene-graph census with and without the layer (upper bound, no culling): what it adds to the perf budget
   if (args.includes('--census')) {
-    for (const tier of ['medium', 'low']) {
+    for (const tier of ['medium']) {
       await page.evaluate(q => window.__cb.store.getState().setQuality(q), tier);
       for (let i = 0; i < 6; i++) { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(100); }
       const r = await page.evaluate(() => {
