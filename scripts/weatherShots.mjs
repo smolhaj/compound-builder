@@ -26,13 +26,13 @@ page.on('pageerror', e => console.error('PAGEERROR', e.message));
 const SC = {
   clear: ['clear', 226, 14, null], rain: ['rain', 292, 14, null], storm: ['storm', 160, 17, null], snow: ['snow', 20, 14, null],
   fire: ['clear', 226, 21, null], wildfire: ['clear', 226, 17, null], nuclear: ['clear', 226, 15, null], raid: ['clear', 226, 8, null],
-  dust: ['clear', 200, 15, 'desert'], fog: ['fog', 288, 7, null],
+  dust: ['clear', 200, 15, 'desert'], fireday: ['clear', 226, 14, null], soot: ['clear', 226, 14, null], fog: ['fog', 288, 7, null],
 };
 try {
   for (const name of scenes) {
     const [mode, doy, hour, reg] = SC[name];
     const region = reg ?? regionDef;
-    await page.goto(`http://localhost:${port}/?lowrender&clean&seed=7&region=${region}`);
+    await page.goto(`http://localhost:${port}/?lowrender&clean&seed=7&region=${region}${region === 'desert' ? '&lot=flat&relief=4&acres=40&lotseed=3&elev=300' : ''}`);
     await page.waitForFunction(() => window.__cb?.qa?.renderNow, null, { timeout: 300000 });
     await page.evaluate(async ([q, name]) => {
       const cb = window.__cb, G = cb.game, c = cb.world.camp;
@@ -61,8 +61,8 @@ try {
       const { startFires } = await import('/src/sim/raidFire.ts');
       const { addBurnScar } = await import('/src/sim/raidDamage.ts');
       if (name === 'dust') cb.qa.dust = 0.85;
-      if (name === 'fire') {
-        G.setState(st => { const g = structuredClone(st.game); startFires(g, g.structures.filter(x => /barn|cabin/.test(x.kind)).map(x => ({ structure: x.id, x: x.x, z: x.z }))); for (const f of g.raidFires ?? []) f.intensity = f.structure === g.structures[0].id ? 0.45 : 0.75; return { game: g }; });
+      if (name === 'fire' || name === 'fireday' || name === 'soot') {
+        G.setState(st => { const g = structuredClone(st.game); startFires(g, g.structures.filter(x => /barn|cabin/.test(x.kind)).map(x => ({ structure: x.id, x: x.x, z: x.z }))); for (const f of g.raidFires ?? []) f.intensity = name === 'soot' ? 0.95 : f.structure === g.structures[0].id ? 0.45 : 0.75; return { game: g }; });
       }
       if (name === 'raid') {
         G.setState(st => { const g = structuredClone(st.game); const b = g.structures[g.structures.length - 1]; addBurnScar(g, b.x + 3, b.z - 4, 'shed'); g.raidDamage[g.raidDamage.length - 1].day = Math.floor(g.clock.t); return { game: g }; });
@@ -79,8 +79,11 @@ try {
     const tick = async n => { await page.waitForTimeout(n * 100); };
     await page.evaluate(() => { const { world, cam } = window.__cb, h = window.__home.cabin; cam.target.set(h[0] + 3, world.groundAt(h[0], h[1]), h[1]); cam.radius = 26; cam.pitch = 0.7; cam.yaw = 0.5; });
     await tick(30);
+    if (name === 'soot') console.log('SOOT', JSON.stringify(await page.evaluate(() => { const w = window.__cb.world, a = w.atmos, out = { char: [...a._char.entries()], fires: window.__cb.game.getState().game.raidFires?.map(f => f.structure), ids: [...a._h.buildings()].map(b => b.id), wear: [] }; for (const b of a._h.buildings()) { b.group.traverse(o => { const at = o.geometry?.getAttribute?.('aWear'); if (at && out.wear.length < 14) out.wear.push([b.id, o.material?.name, o.material?.type, JSON.stringify(o.material?.defines), o.visible, Array.from(at.array.slice(0, 4))]); }); } return out; })));
+    if (name === 'soot') { await page.evaluate(() => window.__cb.qa.renderFull('medium')); console.log('PROG', JSON.stringify(await page.evaluate(() => { const r = window.__cb.ws.renderer, gl = r.getContext(), out = []; for (const p of r.info.programs ?? []) { const k = String(p.cacheKey); if (!k.includes('wear')) continue; const src = gl.getShaderSource(p.fragmentShader) ?? ''; out.push([k.slice(0, 60), src.includes('wSoot'), src.includes('vWear'), src.includes('wearNoise'), src.length]); } return out.slice(0, 8); }))); }
     await shot('aerial');
-    await page.evaluate(() => { const { world, cam } = window.__cb, h = window.__home.cabin; const p = world.family.positions()[0] ?? { x: h[0], z: h[1] + 5 }; const [ex, ez] = world.openSpotNear(h[0] - 4, h[1] + 7, 0.8); cam.placeEye(ex, ez, h[0] + 3, h[1], 0.3); });
+    await page.evaluate(n => { window.__soot = n === 'soot'; }, name);
+    await page.evaluate(() => { const { world, cam } = window.__cb, h = window.__home.cabin; const p = world.family.positions()[0] ?? { x: h[0], z: h[1] + 5 }; const [ex, ez] = world.openSpotNear(h[0] - 4, h[1] + 9, 0.8); const [fx, fz] = world.openSpotNear(h[0] - 2.2, h[1] + 5, 0.5); world.qaFigure?.(fx, fz); if (window.__soot) { const [sx, sz] = world.openSpotNear(h[0] - 1.5, h[1] + 4, 0.4); cam.placeEye(sx, sz, h[0], h[1], 0.3); } else cam.placeEye(ex, ez, h[0] + 3, h[1], 0.3); });
     await tick(5);
     await shot('eye');
   }
