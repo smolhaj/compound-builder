@@ -226,12 +226,18 @@ const FRAG = /* glsl */`
     vec3 horizon = mix(uHorizonAnti, uHorizonSun, az * az);
 
     // Zenith gradient — horizon color dominates the lowest ~15° (optical depth).
-    float g = 1.0 - exp(-hp * 3.2);
+    // At dawn and dusk the colour changes faster with height, so the ~15 degrees of sky a street-level eye sees runs from the horizon glow
+    // through rose to violet-blue instead of one flat orange band (a steeper optical-depth curve; the aerial view barely moves).
+    float g = 1.0 - exp(-hp * 3.2 * (1.0 + 1.3 * uSkyB.y));
     vec3 sky = mix(horizon, uZenith, g);
+    // a slight fall-off of the horizon colour's brightness with height, strongest in twilight
+    sky *= 1.0 - 0.22 * uSkyB.y * smoothstep(0.02, 0.25, hp);
     // Haze band hugging the horizon: thick in a humid Gulf summer, thin in crisp fall air.
     sky += horizon * (0.06 + 0.2 * uHaze) * exp(-hp * 24.0);
     // City light pollution / residual twilight glow.
     sky += uGlow * exp(-hp * 7.0);
+    // Night: a faint cool airglow band so the skyline reads against the sky from street level (the dome is otherwise near black there)
+    sky += vec3(0.007, 0.011, 0.024) * uNight * exp(-hp * 9.0);
     // Twilight (dawn and dusk): layered bands instead of one wash. Toward the sun yellow at the horizon, orange, rose, then violet; away from it a
     // pink belt over the Earth's blue shadow. Fades to nothing by day and by night (uSkyB.y is the golden weight).
     if (uSkyB.y > 0.001) {
