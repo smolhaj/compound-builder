@@ -108,19 +108,19 @@ export function raidBreakdown(g: GameState, b: Battle, lost: ReadonlyArray<reado
   // towers (and turrets)
   const towerCount = g.structures.filter(s => isTower(s.kind)).length;
   if (kills.towers + kills.turrets > 0) lines.push({ layer: 'towers', held: true, text: `${pluralize(kills.towers + kills.turrets, 'raider')} dropped from ${kills.turrets && !kills.towers ? 'the turret' : 'the towers'}.` });
-  else if (towerCount > 0) lines.push({ layer: 'towers', held: false, text: `${pluralize(towerCount, 'tower')} stood, but nobody dropped a raider from one.` });
+  else if (towerCount > 0) lines.push({ layer: 'towers', held: won, text: won ? `${pluralize(towerCount, 'tower')} watched the approach; the crew broke off before the towers had to fire.` : `${pluralize(towerCount, 'tower')} stood, but nobody dropped a raider from one.` });
   else lines.push({ layer: 'towers', held: false, text: 'No tower: nobody had the high ground.' });
 
   // guards
   if (guardUnits.length > 0) {
     const shots = ev.filter(e => e.kind === 'shot' && isGuardUnit(e.from)).length;
-    lines.push({ layer: 'guards', held: kills.guards > 0 || shots > 0, text: `${pluralize(guardUnits.length, 'contract guard')} fought${kills.guards ? `, dropping ${pluralize(kills.guards, 'raider')}` : ''}${guardsKilled ? `; ${pluralize(guardsKilled, 'guard')} killed` : ''}.` });
+    lines.push({ layer: 'guards', held: shots > 0 || won, text: shots > 0 ? `${pluralize(guardUnits.length, 'contract guard')} fought${kills.guards ? `, dropping ${pluralize(kills.guards, 'raider')}` : ''}${guardsKilled ? `; ${pluralize(guardsKilled, 'guard')} killed` : ''}.` : `${pluralize(guardUnits.length, 'contract guard')} stood ready; the crew broke off before it came to shooting.` });
   } else if ((g.guards?.staff.length ?? 0) > 0) lines.push({ layer: 'guards', held: false, text: 'Your guards were not in this fight.' });
 
   // dogs
   const bites = ev.filter(e => e.kind === 'snag' && e.what === 'a guard dog').length;
   if (bites > 0) lines.push({ layer: 'dogs', held: true, text: `The guard dogs bit ${pluralize(bites, 'raider')} on the ladder.` });
-  else if (dogCount(g) > 0) lines.push({ layer: 'dogs', held: false, text: 'The dogs barked, but the crew never got into their reach.' });
+  else if (dogCount(g) > 0) lines.push({ layer: 'dogs', held: won, text: won ? 'The dogs raised the alarm; the crew never got into their reach.' : 'The dogs barked, but they could not stop the crew.' });
 
   // cameras
   const cams = (g.stock.cameras ?? 0) + (g.stock.thermal_cam ?? 0);
