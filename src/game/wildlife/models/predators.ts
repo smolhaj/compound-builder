@@ -55,7 +55,7 @@ function canid(o: Canid): Quad {
     .map(([z, t, b, hw]) => [Z(z), Y(t), Y(b), hw * k * wd, 2.2] as [number, number, number, number, number]);
   const neck: NeckRow[] = [{ y: 0.72 + sl, z: 0.36, w: 0.085, h: 0.12, dn: 0.12 }, { y: 0.77 + sl, z: 0.5, w: 0.066, h: 0.095, dn: 0.095 }, { y: 0.79 + sl, z: 0.6, w: 0.052, h: 0.07, dn: 0.07 }].map(n => ({ y: Y(n.y), z: Z(n.z), w: n.w * k * nk * wd, h: n.h * k * nk, dn: n.dn * k * nk }));
   const hz = (z: number): number => (z > 0.1 ? 0.1 + (z - 0.1) * mz : z);
-  const mw = 1.12, LW = o.limbW ?? 1.3;
+  const mw = 1.3, LW = o.limbW ?? 1.3;
   const head: HeadRow[] = ([[-0.05, 0, 0.05 * sw, 0.062, 0.062], [0.03, 0, 0.06 * sw, 0.067, 0.064], [0.1, -0.012, 0.045 * sw, 0.05, 0.048], [0.17, -0.024, 0.032 * sw * mw, 0.036, 0.035], [0.22, -0.03, 0.026 * sw * mw, 0.028, 0.026]] as HeadRow[])
       .map(([z, cy, w, h, dn]) => [hz(z) * k, cy * k * hs, w * k * hs, h * k * hs, dn * k * hs] as HeadRow);
   const headAt: V3 = c3(0, Y(0.78 + sl), Z(0.6)), HP = -0.16;
@@ -89,7 +89,7 @@ function canid(o: Canid): Quad {
       }
       for (const sx of [-1, 1]) {
         const at: V3 = e.kind === 'prick' ? [sx * m(0.034) * sw, m(0.052) * hs, m(-0.035)] : [sx * m(0.047) * sw * hs, m(0.045) * hs, m(-0.03) * hs];
-        if (e.kind === 'prick') append(h, ear(sx, earBone(sx), [Math.abs(at[0]), at[1], at[2]], m(e.len), m(e.wd), 0.5, lod, { back: 0.12 }));
+        if (e.kind === 'prick') append(h, ear(sx, earBone(sx), [Math.abs(at[0]), at[1], at[2]], m(e.len), m(e.wd), 0.28, lod, { back: 0.05 }));
         else if (e.kind === 'drop') append(h, flap(sx, earBone(sx), [at[0], at[1], at[2]], m(e.len), m(e.wd), lod, { sweep: 0.5 }));
         else if (e.kind === 'fold') append(h, flap(sx, earBone(sx), [at[0], at[1], at[2]], m(e.len), m(e.wd), lod, { fold: true, sweep: 0.5 }));
         else {
@@ -150,7 +150,7 @@ function dogPose(b: Array<import('../../livestock/animalMaterial').BoneAnim | un
 
 // ---------------------------------------------------------------- wolf and coyote
 const WOLF = canid({
-  id: 'wolf', k: 1, chest: 0.95, legK: 1.1, muzzle: 1.1, ear: { kind: 'prick', len: 0.11, wd: 0.042 }, tail: { kind: 'bush', len: 0.42, thick: 1.15 }, ruff: 1, tipAcc: true, paws: 1.15,
+  id: 'wolf', k: 1, chest: 0.95, legK: 1.1, muzzle: 0.95, skullW: 1.25, ear: { kind: 'prick', len: 0.085, wd: 0.05 }, tail: { kind: 'bush', len: 0.42, thick: 1.15 }, ruff: 1, tipAcc: true, paws: 1.15,
   withers: 0.8, length: 1.15, stride: 1.5,
   breeds: [
     cb('Gray wolf', { base: c3(0.46, 0.43, 0.38), style: 7, dorsal: 0.62, patch: c3(0.2, 0.18, 0.16), cover: 0.5, belt: [0.0, 0.3], face: c3(0.5, 0.46, 0.4), faceMix: 0.5, leg: c3(0.5, 0.42, 0.32), legMix: 0.35, belly: c3(0.75, 0.72, 0.66), bellyMix: 0.8, bellyY: 0.5, acc1: c3(0.72, 0.68, 0.6), acc1Mix: 0.8, acc3: c3(0.08, 0.07, 0.07), fur: 1.0, furFreq: 45 }),
@@ -162,7 +162,7 @@ const WOLF = canid({
 export const WOLF_MODEL = (): AnimalModel => quadModel(WOLF);
 
 const COY = canid({
-  id: 'coyote', k: 0.76, chest: 0.9, legK: 1.04, muzzle: 1.18, skullW: 0.9, ear: { kind: 'prick', len: 0.14, wd: 0.042 }, tail: { kind: 'bush', len: 0.5, thick: 0.95 }, ruff: 0.8, tipAcc: true, paws: 0.9,
+  id: 'coyote', k: 0.76, chest: 0.9, legK: 1.04, muzzle: 1.0, skullW: 1.1, ear: { kind: 'prick', len: 0.1, wd: 0.05 }, tail: { kind: 'bush', len: 0.5, thick: 0.95 }, ruff: 0.8, tipAcc: true, paws: 0.9,
   withers: 0.62, length: 0.9, stride: 1.2,
   breeds: [
     cb('Coyote', { base: c3(0.58, 0.46, 0.32), style: 7, dorsal: 0.45, patch: c3(0.3, 0.24, 0.18), cover: 0.45, belt: [0.0, 0.3], face: c3(0.62, 0.48, 0.32), faceMix: 0.5, leg: c3(0.62, 0.4, 0.22), legMix: 0.75, belly: c3(0.88, 0.84, 0.76), bellyMix: 0.9, bellyY: 0.5, acc1: c3(0.9, 0.87, 0.8), acc1Mix: 0.85, acc3: c3(0.07, 0.06, 0.06), fur: 1.0, furFreq: 50 }),
@@ -174,8 +174,8 @@ export const COYOTE_MODEL = (): AnimalModel => quadModel(COY);
 
 // ---------------------------------------------------------------- cougar
 const CAT = canid({
-  id: 'cougar', k: 0.9, chest: 0.9, legK: 0.78, stretch: 1.12, muzzle: 0.5, skullW: 1.12, head: 1.0, neckK: 1.2, width: 1.1, limbW: 1.55,
-  ear: { kind: 'prick', len: 0.055, wd: 0.034 }, tail: { kind: 'long', len: 0.75, thick: 1.35 }, tipAcc: true, paws: 1.2, collar: false,
+  id: 'cougar', k: 0.9, chest: 0.9, legK: 0.78, stretch: 1.12, muzzle: 0.6, skullW: 1.2, head: 1.25, neckK: 1.2, width: 1.1, limbW: 1.75,
+  ear: { kind: 'prick', len: 0.045, wd: 0.04 }, tail: { kind: 'long', len: 0.55, thick: 0.95 }, tipAcc: true, paws: 1.2, collar: false,
   withers: 0.72, length: 1.25, stride: 1.4,
   breeds: [
     cb('Cougar', { base: c3(0.62, 0.45, 0.28), face: c3(0.6, 0.44, 0.28), faceMix: 0.4, leg: c3(0.58, 0.42, 0.26), legMix: 0.5, belly: c3(0.88, 0.8, 0.66), bellyMix: 0.9, bellyY: 0.42, acc1: c3(0.9, 0.84, 0.72), acc1Mix: 0.9, acc3: c3(0.07, 0.06, 0.05), fur: 0.5, furFreq: 70 }),
@@ -186,28 +186,28 @@ export const COUGAR_MODEL = (): AnimalModel => quadModel(CAT);
 
 // ---------------------------------------------------------------- black bear
 const BR_FORE = (b: number): LimbRow[] => [
-  [0.74, 0.38, 0.07, 0.1, sk(b)], [0.6, 0.36, 0.08, 0.115, sk(b, b + 1, 0.2)], [0.42, 0.3, 0.078, 0.09, sk(b + 1)], [0.26, 0.34, 0.064, 0.075, sk(b + 1)],
-  [0.12, 0.37, 0.056, 0.07, sk(b + 1, b + 2, 0.5)], [0.05, 0.385, 0.056, 0.072, sk(b + 3)],
+  [0.8, 0.38, 0.08, 0.11, sk(b)], [0.62, 0.36, 0.105, 0.14, sk(b, b + 1, 0.2)], [0.42, 0.3, 0.1, 0.12, sk(b + 1)], [0.26, 0.34, 0.085, 0.1, sk(b + 1)],
+  [0.12, 0.37, 0.075, 0.09, sk(b + 1, b + 2, 0.5)], [0.05, 0.385, 0.075, 0.09, sk(b + 3)],
 ];
 const BR_HIND = (b: number): LimbRow[] => [
-  [0.8, -0.36, 0.08, 0.13, sk(b)], [0.66, -0.34, 0.095, 0.16, sk(b)], [0.5, -0.25, 0.085, 0.12, sk(b, b + 1, 0.4)], [0.38, -0.2, 0.074, 0.095, sk(b + 1)],
-  [0.24, -0.3, 0.06, 0.075, sk(b + 1, b + 2, 0.5)], [0.12, -0.37, 0.054, 0.068, sk(b + 2)], [0.05, -0.36, 0.055, 0.07, sk(b + 3)],
+  [0.8, -0.36, 0.09, 0.14, sk(b)], [0.66, -0.34, 0.115, 0.17, sk(b)], [0.5, -0.25, 0.105, 0.14, sk(b, b + 1, 0.4)], [0.38, -0.2, 0.095, 0.115, sk(b + 1)],
+  [0.24, -0.3, 0.08, 0.095, sk(b + 1, b + 2, 0.5)], [0.12, -0.37, 0.072, 0.085, sk(b + 2)], [0.05, -0.36, 0.072, 0.088, sk(b + 3)],
 ];
 const brBreed = (name: string, o: Partial<Breed> & { base: V3 }): Breed => ({ name, style: 0, fur: 1.4, furFreq: 38, nose: c3(0.04, 0.035, 0.035), acc1Mix: 0.95, acc2Mix: 0, acc3Mix: 0, ...o });
-const BH = c3(0, 0.8, 0.76);
+const BH = c3(0, 0.82, 0.68);
 const BEAR: Quad = {
   id: 'bear',
-  body: [[0.55, 0.74, 0.42, 0.12, 2.2], [0.38, 0.99, 0.34, 0.185, 2.2], [0.08, 0.92, 0.3, 0.22, 2.2], [-0.2, 0.88, 0.3, 0.225, 2.2], [-0.42, 0.88, 0.34, 0.2, 2.2], [-0.56, 0.76, 0.4, 0.13, 2.0]],
-  neck: [{ y: 0.8, z: 0.45, w: 0.17, h: 0.2, dn: 0.2 }, { y: 0.84, z: 0.61, w: 0.145, h: 0.16, dn: 0.16 }, { y: 0.82, z: 0.74, w: 0.11, h: 0.12, dn: 0.12 }],
-  head: [[-0.06, 0, 0.09, 0.095, 0.1], [0.03, 0, 0.1, 0.102, 0.108], [0.1, -0.01, 0.085, 0.085, 0.09], [0.17, -0.035, 0.074, 0.07, 0.068], [0.225, -0.05, 0.07, 0.064, 0.056]],
-  headAt: BH, headPitch: -0.3, eye: [0.066, 0.04, 0.085, 0.0095],
-  fore: BR_FORE, hind: BR_HIND, foreX: 0.12, hindX: 0.12, coatFrom: 3,
+  body: [[0.55, 0.74, 0.42, 0.12, 2.2], [0.38, 1.1, 0.34, 0.2, 2.2], [0.1, 1.0, 0.3, 0.23, 2.2], [-0.2, 0.88, 0.3, 0.225, 2.2], [-0.42, 0.88, 0.34, 0.2, 2.2], [-0.56, 0.76, 0.4, 0.13, 2.0]],
+  neck: [{ y: 0.82, z: 0.42, w: 0.2, h: 0.24, dn: 0.22 }, { y: 0.85, z: 0.56, w: 0.17, h: 0.19, dn: 0.18 }, { y: 0.82, z: 0.66, w: 0.14, h: 0.15, dn: 0.14 }],
+  head: [[-0.07, 0, 0.1, 0.105, 0.11], [0.02, 0, 0.11, 0.112, 0.118], [0.08, -0.01, 0.095, 0.095, 0.1], [0.13, -0.035, 0.08, 0.075, 0.075], [0.17, -0.05, 0.075, 0.068, 0.06]],
+  headAt: BH, headPitch: -0.25, eye: [0.066, 0.04, 0.085, 0.0095],
+  fore: BR_FORE, hind: BR_HIND, foreX: 0.13, hindX: 0.13, coatFrom: 3,
   foot: (sx, b, hind, lod) => [paw(sx * (hind ? 0.15 : 0.14), hind ? -0.37 : 0.37, { r: 0.058, len: hind ? 0.27 : 0.21, toes: 5, skin: sk(b), claw: 0.035, coat: 1, region: REGION.LEG, clawCol: [0.12, 0.1, 0.09] }, lod)],
   headExtras: (h, lod) => {
-    append(h, blob([0, -0.045, 0.165], [0.074, 0.06, 0.072], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: REGION.ACC1, skin: sk(BONE.HEAD), flat: true }));      // the pale muzzle
-    append(h, blob([0, -0.05, 0.228], [0.038, 0.028, 0.019], { seg: lod.seg, rings: 4, col: [0.04, 0.035, 0.035], region: REGION.NOSE, skin: sk(BONE.HEAD), flat: true }));
-    append(h, nostrils([0, -0.05, 0.238], 0.014, 0.007, sk(BONE.HEAD), lod));
-    for (const sx of [-1, 1]) append(h, ear(sx, sx > 0 ? BONE.EAR_L : BONE.EAR_R, [sx * 0.06, 0.082, -0.04], 0.062, 0.048, 0.55, lod, { back: 0.05 }));
+    append(h, blob([0, -0.045, 0.125], [0.08, 0.065, 0.06], { seg: lod.seg, rings: 4, col: [1, 1, 1], coat: 1, region: REGION.ACC1, skin: sk(BONE.HEAD), flat: true }));      // the pale muzzle
+    append(h, blob([0, -0.05, 0.172], [0.04, 0.03, 0.02], { seg: lod.seg, rings: 4, col: [0.04, 0.035, 0.035], region: REGION.NOSE, skin: sk(BONE.HEAD), flat: true }));
+    append(h, nostrils([0, -0.05, 0.188], 0.015, 0.007, sk(BONE.HEAD), lod));
+    for (const sx of [-1, 1]) append(h, ear(sx, sx > 0 ? BONE.EAR_L : BONE.EAR_R, [sx * 0.075, 0.098, -0.04], 0.062, 0.05, 0.5, lod, { back: 0.05 }));
   },
   tail: lod => strand([[0, 0.8, -0.56, 0.035], [0, 0.76, -0.6, 0.03], [0, 0.72, -0.62, 0.012]], sk(BONE.TAIL, BONE.TAIL2, 0.5), lod, { region: REGION.TAIL, up: [1, 0, 0] }),
   extras: (out, lod) => {
@@ -216,7 +216,7 @@ const BEAR: Quad = {
   bones: quadBones(
     { fore: [[0.14, 0.6, 0.36], [0.14, 0.42, 0.3], [0.14, 0.12, 0.37], [0.14, 0.05, 0.385]], hind: [[0.15, 0.66, -0.34], [0.15, 0.38, -0.2], [0.15, 0.12, -0.37], [0.15, 0.05, -0.36]],
       swing: [0.3, 0.3], flexF: [0, 0.2, -0.3, 0.1], flexH: [0, -0.3, 0.4, -0.1], foot: -0.1 },
-    { neck: c3(0, 0.82, 0.5), head: BH, tail: c3(0, 0.8, -0.56), tailBob: 0.05, earAt: headPoint(BH, -0.3, c3(0.06, 0.082, -0.04)), rootY: 0.68, earFlick: 0.25, tailLen: 0.05,
+    { neck: c3(0, 0.84, 0.46), head: BH, tail: c3(0, 0.8, -0.56), tailBob: 0.05, earAt: headPoint(BH, -0.25, c3(0.07, 0.095, -0.04)), rootY: 0.68, earFlick: 0.25, tailLen: 0.05,
       graze: { neck: -1.3, head: 0.15, bob: 0.06 }, alert: { neck: 0.25, head: 0.2, ear: 0.0, tail: -0.3 }, gallop: true }),
   breeds: [
     brBreed('Black bear', { base: c3(0.045, 0.04, 0.038), face: c3(0.05, 0.045, 0.04), faceMix: 0.4, acc1: c3(0.45, 0.33, 0.22), acc2: c3(0.045, 0.04, 0.038) }),

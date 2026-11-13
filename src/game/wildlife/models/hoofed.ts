@@ -115,6 +115,12 @@ interface Cerv {
   adorn: V3;
 }
 function cervid(o: Cerv): Quad {
+  const q = cervid0(o);
+  // the body tips nose-down to graze; the legs stay upright
+  for (const b of [BONE.FL, BONE.FR, BONE.HL, BONE.HR]) if (q.bones[b]) q.bones[b]!.graze = 0.18;
+  return q;
+}
+function cervid0(o: Cerv): Quad {
   const k = o.k, ly = k * (o.legK ?? 1), lift = 0.56 * k * ((o.legK ?? 1) - 1);
   const sc = (rows: LimbRow[]): LimbRow[] => rows.map(r => [r[0] * ly, r[1] * k, r[2] * k, r[3] * k, r[4]]);
   const fore = (b: number) => sc(DEER_FORE(b)), hind = (b: number) => sc(DEER_HIND(b));
@@ -138,7 +144,7 @@ function cervid(o: Cerv): Quad {
       { neck: c3(0, 0.8 * k + lift, 0.42 * k), head: headAt, tail: c3(0, 0.9 * k + lift, -0.56 * k), tailBob: o.bones.tailBob, earAt: o.bones.earAt, rootY: 0.7 * k + lift, earFlick: 0.35, tailLen: 0.1 * k,
         graze: o.bones.graze, alert: { ...o.bones.alert, ear: 0 }, gallop: true }),
     breeds: o.breeds, withers: o.withers, length: o.length, stride: o.stride, graze: { neck: o.bones.graze.neck, head: o.bones.graze.head },
-    root: { bob: 0.012 * k, pitch: 0.015, cy: 0.74 * k + lift, grazePitch: -0.22 }, rootPose: { alertPitch: 0.02 }, adorn: o.adorn,
+    root: { bob: 0.012 * k, pitch: 0.015, cy: 0.74 * k + lift, grazePitch: -0.18 }, rootPose: { alertPitch: 0.02 }, adorn: o.adorn,
   };
 }
 

@@ -66,7 +66,7 @@ try {
       }
       const [sx, sz] = best ?? world.openSpotNear(c.x + 7, c.z + 6, 1.2), gy = (x, z) => world.groundAt(x, z), K = 1 / 6;
       // the animals: the renderer's own debug hook; offsets are in metres
-      world.wildlife.clearDebug();
+      world._seasonDoy = s.doy; world.wildlife.clearDebug();
       for (const [sp, dx, dz, face, male, mood] of s.animals) {
         world.wildlife.spawnDebug(sp, sx + dx * K, sz + dz * K, (face * Math.PI) / 180 + (s.cam?.bearing ?? 0.4) + Math.PI, male);
         const b = [...world.wildlife._beasts.values()].pop();
