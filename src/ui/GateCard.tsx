@@ -159,7 +159,10 @@ export function GateCard() {
           {odds && <div>If you fight: you hold {inTen(odds.win)} · someone of yours killed or taken {inTen(odds.loseSomeone)}</div>}
           {odds && (() => { const d = doorHoldLine(g.game); return d ? <div style={{ opacity: 0.85 }}>{d}</div> : null; })()}
           {e.stances.includes('hide') && <div>If you hide: they find the place lived in {inTen(hideFoundChance(g.game, e, p))}, and strip it</div>}
-          {e.stances.includes('hide') && p.bunker && (() => { const hp = hidePreview(g.game, e, hideFoundChance(g.game, e, p)); return <div data-testid="hide-cost" style={{ opacity: 0.9 }}><div>{hp.costLine}.</div><div>{hp.daysLine}.</div><div>{hp.riskLine}.</div><div>{hp.foundLine}.</div></div>; })()}
+          {e.stances.includes('hide') && p.bunker && (() => { const hp = hidePreview(g.game, e, hideFoundChance(g.game, e, p)); return <div data-testid="hide-cost" style={{ margin: '8px 0 2px', padding: '7px 10px', border: '1px solid rgba(216,201,160,0.3)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 4, opacity: 0.95 }}>
+            <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.65, textTransform: 'uppercase' }}>If you hide in the bunker</div>
+            <div>{hp.costLine}.</div><div style={hp.viable ? undefined : { color: '#e0a090' }}>{hp.daysLine}.</div><div>{hp.riskLine}.</div><div>{hp.foundLine}.</div>
+          </div>; })()}
         </div>}
         {cut && e.strength > 0 && e.kind !== 'break_in' && (() => {
           const offer = talkOffer(g.game, e, p);

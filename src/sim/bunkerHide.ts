@@ -351,8 +351,10 @@ export function hidePreview(s: GameState, e: Pick<Encounter, 'kind' | 'size' | '
   const f = ent ? bunkerFindChance(s, e, Math.min(stay, Math.max(1, Math.floor(sup.days))), ent) : { total: 0, perDay: [] as number[] };
   const find = houseFound * f.total;
   const a = arms(s);
-  const riskLine = ent ? `They find the bunker ${inTen(find)} (${entranceWord(ent.kind)}, ${Math.round(ent.concealment)}% hidden, door ${Math.round(ent.hardness)}% hard; ${inTen(houseFound)} that they find the place, then ${pluralize(Math.min(stay, Math.max(1, Math.floor(sup.days))), 'day')} of searching)` : 'No bunker to hide in';
-  const foundLine = a.armed ? `If found: a shootout at ${ent ? entranceWord(ent.kind) : 'the door'} (${pluralize(a.guns, 'gun')}${a.melee ? `, ${a.melee} with tools in hand` : ''} below, the family fires first)` : 'If found, nobody below is armed: they loot the bunker and take or kill whoever they find';
+  const searchDays = Math.min(stay, Math.max(1, Math.floor(sup.days)));
+  const riskLine = ent ? `They find the bunker ${inTen(find)}: ${entranceWord(ent.kind).replace('the ', '')} ${Math.round(ent.concealment)}% hidden, door ${Math.round(ent.hardness)}% hard. First they must find the place (${inTen(houseFound)}), then search ${pluralize(searchDays, 'day')}` : 'No bunker to hide in';
+  const armsText = [a.guns ? pluralize(a.guns, 'gun') : '', a.melee ? `${pluralize(a.melee, 'person', 'people')} with tools to swing` : ''].filter(Boolean).join(' and ');
+  const foundLine = a.armed ? `If found: a shootout at ${ent ? entranceWord(ent.kind) : 'the door'} (${armsText} below; the family fires first)` : 'If found, nobody below is armed: they loot the bunker and take or kill whoever they find';
   return { viable: sup.viable, costLine, daysLine, riskLine, foundLine, stay, find };
 }
 
