@@ -28,7 +28,7 @@ try {
   await page.waitForFunction(() => window.__cb?.qa?.renderNow, null, { timeout: 300000 });
   await page.evaluate(async ([q]) => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp;
-    G.getState().setSpeed(0); cb.store.getState().setQuality(q);
+    G.getState().setSpeed(0); cb.store.getState().setQuality(q); cb.world.atmos.lanterns.forceGlow = true;
     const sp = cb.tool.findSpot('timber_cabin', c.x, c.z, 0);
     G.getState().plan('timber_cabin', sp[0], sp[1], 0);
     const h = 12, cx = sp[0] + 2, cz = sp[1];

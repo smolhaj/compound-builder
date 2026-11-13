@@ -74,6 +74,9 @@ export const ColorGradingShader: {
 
     /** Whole-frame colour cast (linear multiplier; 1,1,1 = none). The collapse's look (sim/collapseLook.ts). */
     uCast: { value: { r: 1, g: 1, b: 1 } },
+
+    /** Warm lift added to the dark tones (linear RGB; 0,0,0 = none). The oasis: a held, lit compound is never pitch black. */
+    uLift: { value: { r: 0, g: 0, b: 0 } },
   },
 
   vertexShader: /* glsl */`
@@ -96,6 +99,7 @@ export const ColorGradingShader: {
     uniform float uNight;
     uniform float uVignette;
     uniform vec3 uCast;
+    uniform vec3 uLift;
 
     varying vec2 vUv;
 
@@ -172,6 +176,9 @@ export const ColorGradingShader: {
         vec3 blueShift = vec3(lum) * vec3(0.62, 0.84, 1.45);
         color = mix(color, blueShift, scot * 0.55);
       }
+
+      // 5b. warm lift in the darks (the oasis)
+      color += uLift * (1.0 - smoothstep(0.0, 0.25, luma(color)));
 
       // 6. Vignette — smooth radial falloff, aspect-agnostic.
       vec2 vc = vUv - 0.5;

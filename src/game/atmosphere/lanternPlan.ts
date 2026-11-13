@@ -5,10 +5,11 @@
 import { PERIMETER, runFinished, type PerimeterRun, type Pt } from '../../sim/perimeter';
 import { headingAt, lineLen, pointAtArc } from '../perimeter/gateKitLayout';
 import { compoundPolygons } from './compoundRegion';
+import { phaseWeights } from '../../engine/world/sky/dayPhase';
 
 export interface Lantern { x: number; z: number; /** Height above the ground (world units). */ y: number; /** 1 = the gate lamp, 0.55 = a wall lantern. */ size: number; gate: boolean; /** Unit vector pointing out of the compound (for the post's offset). */ ox: number; oz: number }
 
-export const WALL_SPACING = 7;
+export const WALL_SPACING = 5;
 export const MAX_LANTERNS = 96;
 
 type RunLike = Pick<PerimeterRun, 'id' | 'kind' | 'pts' | 'gates' | 'finishedAt' | 'dropped' | 'hostId'>;
@@ -55,8 +56,14 @@ function ringCentre(pts: readonly Pt[]): Pt | null {
   return [x / (pts.length - 1), z / (pts.length - 1)];
 }
 
-/** 0-1 how lit the lanterns are: dusk to dark, nothing under a blackout, flickering a little handled by the renderer. */
-export function lanternLevel(night: number, lightsOut: boolean): number {
+/**
+ * 0-1 how lit the lanterns are: lit as the sun goes (the golden evening hour), full at night, dark by day, out at dawn and never lit under
+ * a blackout.
+ */
+export function lanternLevel(hour: number, lightsOut: boolean): number {
   if (lightsOut) return 0;
-  return Math.max(0, Math.min(1, (night - 0.18) / 0.35));
+  const ph = phaseWeights(hour);
+  const evening = hour >= 12 ? ph.golden : 0;
+  const sm = (a: number, b: number, x: number): number => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  return Math.max(sm(0.15, 0.55, ph.night), 0.9 * sm(0.35, 0.85, evening));
 }

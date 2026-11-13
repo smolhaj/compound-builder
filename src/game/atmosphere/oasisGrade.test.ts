@@ -44,7 +44,7 @@ describe('gradeDelta', () => {
   it('is neutral with no collapse', () => {
     const d = gradeDelta(oasisFactors({ collapse: 0, safety: 1, inside: 1 }), 1, 0);
     expect(d.cast).toEqual([1, 1, 1]);
-    expect(d.satMul).toBe(1); expect(d.warmAdd).toBe(0); expect(d.fogFire).toBe(0); expect(d.horizonFire).toBe(0); expect(d.fogDensityMul).toBe(1);
+    expect(d.satMul).toBe(1); expect(d.warmAdd).toBe(0); expect(d.fogFire).toBe(0); expect(d.horizonFire).toBe(0); expect(d.fogDensityMul).toBe(1); expect(d.lift).toEqual([0, 0, 0]); expect(d.nightKeep).toBe(1);
   });
   it('warms inside (more red than blue) and cools outside (more blue than red), and fires show at night only', () => {
     const w = gradeDelta(oasisFactors({ collapse: 0.9, safety: 1, inside: 1 }), 1, 0);
@@ -108,8 +108,11 @@ describe('lanterns', () => {
     for (const l of plan) expect(l.x * l.ox + l.z * l.oz).toBeGreaterThan(0);
   });
   it('is lit from dusk, dark by day and never under a blackout', () => {
-    expect(lanternLevel(0, false)).toBe(0);
-    expect(lanternLevel(1, false)).toBe(1);
-    expect(lanternLevel(1, true)).toBe(0);
+    expect(lanternLevel(12, false)).toBe(0);
+    expect(lanternLevel(23, false)).toBe(1);
+    expect(lanternLevel(23, true)).toBe(0);
+    expect(lanternLevel(18.7, false)).toBeGreaterThan(0.5);   // dusk: lit as the sun goes
+    expect(lanternLevel(6.5, false)).toBeLessThan(0.1);        // dawn: out
+    expect(lanternLevel(3, false)).toBe(1);
   });
 });

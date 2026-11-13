@@ -28,8 +28,8 @@ export function oasisFactors(i: OasisInput): OasisFactors {
 
 export type RGB = [number, number, number];
 /** Amber of a lit, held place; the cold ash of the outside; the glow of far fires. */
-export const WARM_CAST: RGB = [1.07, 0.975, 0.84];
-export const RUIN_CAST: RGB = [0.93, 0.965, 1.0];
+export const WARM_CAST: RGB = [1.14, 0.97, 0.76];
+export const RUIN_CAST: RGB = [0.86, 0.94, 1.03];
 export const FIRE_HAZE: RGB = [0.30, 0.125, 0.055];
 export const GOLD_HAZE: RGB = [0.95, 0.66, 0.36];
 
@@ -51,6 +51,9 @@ export interface GradeDelta {
   fogGold: number;
   fogDark: number;
   fogDensityMul: number;
+  /** Warm lift on the dark tones (linear RGB), and how much of the night's blue shift to keep. */
+  lift: RGB;
+  nightKeep: number;
   /** Fires on the horizon (added to the skyline fire strength and the sky glow), 0-1. */
   horizonFire: number;
 }
@@ -63,11 +66,12 @@ export function gradeDelta(f: OasisFactors, night: number, golden: number): Grad
   const { warm, ruin, presence } = f;
   const dusk = clamp01(0.35 * golden + night);   // fire reads at dusk and in the dark
   const cast = mul3(lerp3([1, 1, 1], WARM_CAST, 0.85 * warm), lerp3([1, 1, 1], RUIN_CAST, 0.8 * ruin));
-  const dark = 1 - 0.10 * ruin;
+  // the held place is lit from within (a lift), the ruin outside is darker
+  const dark = 1 - 0.18 * ruin + 0.10 * warm * (0.4 + 0.6 * night);
   return {
     relief: 0.55 * warm,
     cast: [cast[0] * dark, cast[1] * dark, cast[2] * dark],
-    satMul: 1 - 0.30 * ruin,
+    satMul: 1 - 0.42 * ruin,
     satAdd: 0.06 * warm,
     contrastAdd: 0.05 * ruin - 0.05 * warm,
     warmAdd: 0.22 * warm,
@@ -78,6 +82,8 @@ export function gradeDelta(f: OasisFactors, night: number, golden: number): Grad
     fogGold: 0.14 * warm,
     fogDark: 0.32 * presence * (0.6 + 0.4 * dusk) * (0.5 + 0.5 * ruin),
     fogDensityMul: 1 + 0.45 * presence * (0.4 + 0.6 * ruin),
+    lift: [0.016 * warm * (0.3 + 0.7 * night), 0.0078 * warm * (0.3 + 0.7 * night), 0.0016 * warm * (0.3 + 0.7 * night)],
+    nightKeep: 1 - 0.55 * warm,
     horizonFire: presence * clamp01(dusk * 1.1),
   };
 }

@@ -244,7 +244,7 @@ export class Atmosphere {
     for (const id of ids) { const p = this._h.family.poseOf(id); if (p) carriers.push({ x: p.x, y: this._h.groundAt(p.x, p.z), z: p.z, rot: p.rot }); }
     this._flash.update(carriers, f.night, f.time);
     // lanterns on the wall ring and over the gates: lit from dusk, dark under a blackout
-    this.lanterns.update([...this._h.runs()].map(x => x.run), f.night, lightsOut, homeSafetyNow().level, f.time, f.fov ?? 55, f.viewportH);
+    this.lanterns.update([...this._h.runs()].map(x => x.run), f.hour, lightsOut, homeSafetyNow().level, f.time, f.fov ?? 55, f.viewportH);
     // ── the generator ──
     this._syncGenerators(built, game, f, wx, wz);
     // ── aging (a few times a second is plenty: it changes over years) ──

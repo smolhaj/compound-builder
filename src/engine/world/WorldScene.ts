@@ -509,7 +509,7 @@ export class WorldScene {
     if (wn > 0.01 && (col.nightGlow.r + col.nightGlow.g + col.nightGlow.b) > 0.0005) sky.glow.add(this._c.tmp.copy(col.nightGlow).multiplyScalar(wn));
     if (oa.horizonFire > 0.001) {
       // the world outside is burning a long way off: an orange band along the far horizon at dusk and night
-      sky.glow.add(this._c.tmp.setRGB(0.24, 0.085, 0.016).multiplyScalar(0.34 * oa.horizonFire * (0.6 + 0.4 * wn)));
+      sky.glow.add(this._c.tmp.setRGB(0.5, 0.16, 0.02).multiplyScalar(0.9 * oa.horizonFire * (0.6 + 0.4 * wn)));
     }
     if (oa.fogDark > 0.001 || oa.fogGold > 0.001) {
       // the haze: darker and warmer toward fire glow outside, a touch of gold inside
@@ -1030,6 +1030,9 @@ export class WorldScene {
     u['uWarmStrength'].value += oa.warmAdd;
     u['uWarmThreshold'].value += oa.warmThresholdAdd;
     u['uShadowTintStrength'].value *= oa.shadowTint;
+    u['uNight'].value *= oa.nightKeep;
+    const lift = u['uLift'].value as { r: number; g: number; b: number };
+    lift.r = oa.lift[0]; lift.g = oa.lift[1]; lift.b = oa.lift[2];
     const cast = u['uCast'].value as { r: number; g: number; b: number };
     cast.r = (col.cast.r + (1 - col.cast.r) * rl) * oa.cast[0];
     cast.g = (col.cast.g + (1 - col.cast.g) * rl) * oa.cast[1];
