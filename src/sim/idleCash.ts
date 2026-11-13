@@ -8,6 +8,8 @@
  */
 import { blueprintOf, isFinished } from './construction';
 import { isHome } from './blueprints';
+import { homeAdvice, kitUsd } from './homeAdvice';
+import { planProblem } from './construction';
 import { crewProblem, crewQuote, hoursLeft } from './crews';
 import { orderCost, prices } from './economy';
 import { GUARD_MONTH, guardCount, guardProblem, MAX_GUARDS } from './guards';
@@ -43,9 +45,33 @@ export interface IdleCash {
   metals: number;
   /** Contract guards to post, and the first quarter's pay for them. */
   guards: { n: number; usd: number } | null;
+  /** With no project open, the next one to stake (a home that sleeps everyone first, then water, food, power): spare cash with nothing to spend it on was silent. */
+  stake: IdleStake | null;
 }
+export interface IdleStake { kind: string; name: string; usd: number }
 
 const rank = (kind: string): number => (isHome(kind) ? 0 : /^(well|cistern|garden|field|greenhouse|root_cellar|solar|battery)/.test(kind) ? 1 : 2);
+
+const WATER_KINDS = ['well_hand', 'well_drilled', 'cistern', 'water_tower'], FOOD_KINDS = ['garden', 'field', 'greenhouse', 'greenhouse_heated', 'polytunnel', 'high_tunnel', 'orchard', 'orchard_grove', 'orchard_terraced', 'aquaponics'], POWER_KINDS = ['solar_array', 'wind_turbine', 'generator_shed', 'micro_hydro'];
+const NAMES: Record<string, string> = { well_hand: 'hand-dug well', well_drilled: 'drilled well', garden: 'garden', solar_array: 'solar array' };
+
+/** The next project worth staking with spare cash: a home for everyone, then water, food and power, whichever is missing and fits the spare cash. */
+function nextProject(s: GameState, spare: number): IdleStake | null {
+  const has = (kinds: string[]) => s.structures.some(st => !st.unplaced && kinds.includes(st.kind));
+  const home = homeAdvice(s);
+  const wants: Array<{ kind: string; name: string }> = [
+    ...(home ? [{ kind: home.kind, name: home.name }] : []),
+    ...(!has(WATER_KINDS) ? [s.site.gwDepth > 9 ? 'well_drilled' : 'well_hand'].map(kind => ({ kind, name: NAMES[kind] })) : []),
+    ...(!has(FOOD_KINDS) ? [{ kind: 'garden', name: NAMES.garden }] : []),
+    ...(!has(POWER_KINDS) ? [{ kind: 'solar_array', name: NAMES.solar_array }] : []),
+  ];
+  for (const w of wants) {
+    if (planProblem(s, w.kind)) continue;
+    const usd = Math.round(kitUsd(s, w.kind));
+    if (usd <= spare * IDLE_CREW_SHARE) return { ...w, usd };
+  }
+  return null;
+}
 
 export function idleCash(s: GameState): IdleCash | null {
   const phase = s.disaster.phase;
@@ -71,6 +97,11 @@ export function idleCash(s: GameState): IdleCash | null {
     }
   }
 
+  // nothing open at all: the next project to stake (the crew offer above needs an open project, so it was silent here)
+  let stake: IdleStake | null = null;
+  const anyOpen = s.structures.some(st => !st.unplaced && !st.pre && !isFinished(st));
+  if (!anyOpen) stake = nextProject(s, spare);
+
   let metals = 0, guards: IdleCash['guards'] = null;
   if (phase === 'warning') {
     if (spare >= IDLE_METALS_MIN) {
@@ -83,6 +114,6 @@ export function idleCash(s: GameState): IdleCash | null {
       guards = { n, usd: n * GUARD_MONTH * 3 };
     }
   }
-  if (!crew && metals <= 0 && !guards) return null;
-  return { spare, crew, metals: Math.max(0, metals), guards };
+  if (!crew && metals <= 0 && !guards && !stake) return null;
+  return { spare, crew, metals: Math.max(0, metals), guards, stake };
 }

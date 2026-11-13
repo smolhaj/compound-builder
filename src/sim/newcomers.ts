@@ -49,7 +49,7 @@ import { scoutCrew, type Encounter, type Neighbor, type NeighborKind, type Outco
 import type { Character } from './trial';
 import { lifeOf, plural, surname } from './neighborLife';
 import { joinersDay, kitLine, pool, rigLeaves, rollKit, settleStay, type StayKind } from './joinerHome';
-import { pluralize } from './words';
+import { pluralize, familyLabel } from './words';
 import { noteAdmission, ruleLoyalty } from './rules';
 import { caloriesText } from './units';
 
@@ -585,7 +585,7 @@ export function refuseNeighbor(s: GameState, n: Neighbor, hard: number): string[
   n.disposition = Math.max(-100, n.disposition - hard);
   let heard = 0;
   for (const o of s.neighbors) if (o.id !== n.id && o.status === 'home' && o.members > 0) { o.disposition = Math.max(-100, o.disposition - 3); heard++; }
-  if (heard) out.push(`Word gets round: ${heard} ${heard === 1 ? 'household hears' : 'households hear'} the gate was shut on the ${surname(n)}s.`);
+  if (heard) out.push(`Word gets round: ${heard} ${heard === 1 ? 'household hears' : 'households hear'} the gate was shut on ${familyLabel(n.name)}.`);
   lifeOf(s, n).history.push({ day: dayIndex(s.clock.t), text: 'Turned away at the family’s gate when they asked for shelter.', known: true, how: 'seen' });
   return out;
 }
@@ -967,8 +967,8 @@ function shelterDay(s: GameState, N: NewcomerState, day: number, r: () => number
 export function originLabel(s: GameState, p: Person): string {
   const o = p.origin;
   if (!o) return '';
-  if (o.kind === 'guest') { const n = s.neighbors.find(x => x.id === o.from); return `guest${n ? ` of the ${surname(n)}s` : ''}`; }
-  if (o.kind === 'neighbor') { const n = s.neighbors.find(x => x.id === o.from); return `neighbor${n ? `, the ${surname(n)}s` : ''}`; }
+  if (o.kind === 'guest') { const n = s.neighbors.find(x => x.id === o.from); return `guest${n ? ` of ${familyLabel(n.name)}` : ''}`; }
+  if (o.kind === 'neighbor') { const n = s.neighbors.find(x => x.id === o.from); return `neighbor${n ? `, ${familyLabel(n.name)}` : ''}`; }
   return 'stranger you took in';
 }
 

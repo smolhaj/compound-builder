@@ -25,6 +25,7 @@ import { upkeepDay } from './upkeep';
 import { wallTopsDay } from './wallTops';
 import { armedResponseDay } from './armedResponse';
 import { watchDay } from './watch';
+import { roofEmergencyDay } from './roofSafety';
 import { rainStormOn, snowedIn, weatherDay } from './weatherThreats';
 import { fogLog } from './fogFx';
 import { slumpDay } from './retaining';
@@ -255,6 +256,7 @@ function subStep(s: GameState): void {
     prisonersDay(s);   // (it logs its own lines)
     storyDay(s);   // the raider with a story comes back (sim/raiderStory.ts; it logs its own lines)
     for (const line of weatherDay(s)) log(s, line);
+    for (const line of roofEmergencyDay(s)) log(s, line);   // a roofless home with nobody under a roof: the family hires the re-roof itself (sim/roofSafety.ts)
     for (const line of fogLog(s)) log(s, line);   // valley fog and cloud: this morning, and the forecast for the next (sim/fog.ts)
     for (const line of slumpDay(s, rainStormOn(s))) log(s, line);   // a tall retaining wall with no drainage behind it can let go (sim/retaining.ts)
     for (const line of winterDay(s, dayIndex(s.clock.t))) log(s, line);   // (Hardcore) the first hard winter

@@ -142,6 +142,10 @@ export interface Structure {
   permitAt?: number;
   /** A fire, storm or looters took its roof off after it stood: the guidance suggests re-roofing it until it is finished again (optional, so no save bump). */
   roofLost?: boolean;
+  /** The game time the roof came off (sim/roofSafety.ts: the family hires a crew on its own a day after, if nobody has; optional, so no save bump). */
+  roofLostAt?: number;
+  /** The snow took only the roof; the walls and the rooms came through, so putting a roof back finishes the home again (sim/weatherThreats.ts, construction.ts; optional, so no save bump). */
+  kept?: boolean;
   /** It stood finished once and was knocked back (a storm, a fire): finishing it again is a rebuild, one line in the chronicle (absent on older saves). */
   lost?: boolean;
   /** An upgrade of this finished structure (sim/towers.ts): the old tier keeps working until this one is done, then goes (half its materials back). */

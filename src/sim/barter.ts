@@ -7,6 +7,7 @@
  * (stocks run down; a can is worth more in month six than in week one).
  * A day's labor is the other yardstick (`LABOR_DAY`).
  */
+import { familyLabel, singularSurname } from './words';
 import { CALIBER, type Caliber } from './armory';
 import { barterValue, METALS, type MetalKind } from './finance';
 import { MATERIALS } from './materials';
@@ -133,14 +134,14 @@ export function trade(s: GameState, give: readonly Lot[], get: readonly Lot[], n
   const gv = valueOf(p, give), tv = valueOf(p, get);
   const fail = (problem: TradeProblem, line: string): TradeResult => ({ ok: false, problem, give: gv, get: tv, line });
   if (!n) return fail('no_neighbor', 'No such neighbor.');
-  if (n.status !== 'home') return fail('not_home', `The ${n.name} place is empty.`);
-  if (n.disposition < TRADE_MIN_DISPOSITION) return fail('unfriendly', `The ${n.name}s won't deal with you.`);
+  if (n.status !== 'home') return fail('not_home', `The ${singularSurname(n.name)} place is empty.`);
+  if (n.disposition < TRADE_MIN_DISPOSITION) return fail('unfriendly', `${familyLabel(n.name).replace(/^the/, 'The')} won't deal with you.`);
   if (!give.some(l => l.qty > 0) || !get.some(l => l.qty > 0)) return fail('empty', 'Nothing to trade.');
   if (give.some(l => l.qty < 0) || get.some(l => l.qty < 0)) return fail('empty', 'Nothing to trade.');
   if (give.some(l => have(s, l.good) < l.qty)) return fail('short', "You don't have that much.");
-  if (tv > SPARE_PER_MEMBER * n.members) return fail('too_much', `The ${n.name}s can't spare that much.`);
+  if (tv > SPARE_PER_MEMBER * n.members) return fail('too_much', `${familyLabel(n.name).replace(/^the/, 'The')} can't spare that much.`);
   const markup = 1 + Math.max(0, 50 - n.disposition) / 200;
-  if (gv < tv * markup - 1e-9) return fail('unfair', `The ${n.name}s want more for it.`);
+  if (gv < tv * markup - 1e-9) return fail('unfair', `${familyLabel(n.name).replace(/^the/, 'The')} want more for it.`);
   for (const l of give) {
     if (l.good === 'labor') barterOf(s).laborOwed += l.qty;
     else move(s, l.good, -l.qty);
@@ -152,7 +153,7 @@ export function trade(s: GameState, give: readonly Lot[], get: readonly Lot[], n
   // a generous deal goes further
   n.disposition = Math.min(100, n.disposition + 2 + Math.min(4, (gv - tv) / 100));
   barterOf(s).trades++;
-  return { ok: true, give: gv, get: tv, line: `Traded with the ${n.name}s.` };
+  return { ok: true, give: gv, get: tv, line: `Traded with ${familyLabel(n.name)}.` };
 }
 
 /** Chance a day that a friendly household helps, and that it asks for help. */
@@ -177,7 +178,7 @@ export function mutualAidDay(s: GameState): string[] {
   if (b.laborOwed > 0) b.laborOwed = Math.max(0, b.laborOwed - 1);
   for (const n of s.neighbors) {
     if (n.status !== 'home' || n.disposition <= 50) continue;
-    const name = `The ${n.name}s`;
+    const name = familyLabel(n.name).replace(/^the/, 'The');
     if (r() < AID_CHANCE) {
       if (s.food.daysLeft < 7) {
         s.stock.canned += n.members;

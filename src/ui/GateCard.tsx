@@ -17,6 +17,7 @@ import { Clamp, Hint } from './hud/common';
 import { StayPicker } from './StayPicker';
 import { defaultStay, kitDetail, kitLine } from '../sim/joinerHome';
 import { pluralize } from '../sim/words';
+import { defaultStance } from '../sim/raidDefault';
 import { isTalk, talkOffer } from '../sim/negotiation';
 import { ORDERS, ORDER_HINT, ORDER_NAME } from '../sim/raidOrders';
 import { SCOUT_HINT, SCOUT_NAME, SCOUT_PLANS } from '../sim/scoutPlans';
@@ -103,7 +104,7 @@ export function GateCard() {
     // honest odds: the battle sim itself, a couple of dozen times (cached per encounter)
     const odds = e.strength > 0 && e.kind !== 'break_in' && e.stances.includes('defend') ? fightOdds(g.game, e) : null;
     const label = (st: Stance) => (e.kind === 'kin' && st === 'take_in' && defaultStay(g.game, e) === 'player_build' && STANCE.build_first) || (e.ransom && RANSOM[st]) || (e.kind === 'trial_end' && TRIAL_END[st]) || (e.kind === 'shelter' && SHELTER[st]) || (e.kind === 'guard_stay' && GUARD_STAY[st]) || (e.kind === 'insider' && INSIDER_CARD[st]) || STANCE[st];
-    const picked = cut ? cut.stance ?? e.stances[0] : null;
+    const picked = cut ? cut.stance ?? defaultStance(e.stances, p) : null;
     return (
       <div style={cut ? raidBox : box}>
         <div data-testid={cut ? 'raid-card-scroll' : undefined} style={cut ? { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', paddingRight: 4 } : undefined}>
@@ -177,7 +178,7 @@ export function GateCard() {
         {cut && (picked === 'defend' || picked === 'warn') && e.opener?.kind === 'scouts' && e.opener.spotted && <ScoutChoices />}
         {cut && picked === 'defend' && <RaidOrders />}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, ...(cut ? { flex: '0 0 auto', maxHeight: '45%', overflowY: 'auto' } : {}) }}>
+        <div data-testid={cut ? 'stance-buttons' : undefined} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, ...(cut ? { flex: '0 0 auto', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 5 } : {}) }}>
           {e.stances.filter(st => !(e.kind === 'kin' && st === 'build_first')).map((st, i) => (
             <button key={st} style={cut ? { ...button(st === picked), outline: st === picked ? '2px solid #d8c9a0' : undefined, background: st === picked ? '#4a4a3c' : '#2e302a', color: '#eee' } : button(i === 0)} title={label(st)[1]} onClick={() => (cut ? g.chooseStance(st) : g.answer(st))}>
               <div style={{ fontWeight: 600 }}>{label(st)[0]}</div>
