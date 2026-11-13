@@ -115,6 +115,36 @@ describe('proportions (SCALE v2: a person is 0.28, a unit is 6 m)', () => {
   });
 });
 
+describe('shape polish (the wildlife and dog pass)', () => {
+  const geo = (id: WildModelId) => wildModelOf(id).build(LODS[0]);
+  it('a squirrel carries a tail that is bushy but not bigger than the animal', () => {
+    const g = geo('squirrel');
+    expect(g.boundingBox!.max.y / wildModelOf('squirrel').withers).toBeLessThan(1.55);      // it was 1.95
+  });
+  it('a cougar tail is short and thick with a dark tip, not a rope', () => {
+    const g = geo('cougar'), m = wildModelOf('cougar'), pos = g.attributes.position, mk = g.attributes.aMark;
+    expect((g.boundingBox!.max.z - g.boundingBox!.min.z) / m.length).toBeLessThan(1.38);      // it was 1.4 and more
+    let tail = 0, tip = 0, thick = 0;
+    for (let i = 0; i < pos.count; i++) if (mk.getY(i) === 3 || mk.getY(i) === 9) { if (mk.getY(i) === 3) tail++; else tip++; thick = Math.max(thick, Math.abs(pos.getX(i))); }
+    expect(tail).toBeGreaterThan(50); expect(tip).toBeGreaterThan(20); expect(thick).toBeGreaterThan(0.04);
+  });
+  it('a wolf and a coyote have a forehead stop and a muzzle that is not a thin spike', () => {
+    for (const id of ['wolf', 'coyote'] as WildModelId[]) {
+      const g = geo(id), pos = g.attributes.position, sk = g.attributes.aSkin, mk = g.attributes.aMark;
+      const slice = (z0: number, z1: number): { top: number; half: number; n: number } => {
+        let top = -Infinity, half = 0, n = 0;
+        for (let i = 0; i < pos.count; i++) if (sk.getX(i) === BONE.HEAD && sk.getZ(i) === 0 && mk.getY(i) === 1 && pos.getZ(i) >= z0 && pos.getZ(i) < z1) { top = Math.max(top, pos.getY(i)); half = Math.max(half, Math.abs(pos.getX(i))); n++; }
+        return { top, half, n };
+      };
+      const m = wildModelOf(id), hz = muzzle(g)[2], z0 = hz - (id === 'wolf' ? 0.34 : 0.27);
+      const skull = slice(z0 + 0.04, z0 + 0.12), snout = slice(hz - 0.1, hz - 0.04);
+      expect(skull.n, id).toBeGreaterThan(5); expect(snout.n, id).toBeGreaterThan(5);
+      expect(skull.top - snout.top, `${id} stop`).toBeGreaterThan(0.025 * (m.withers / 0.8));
+      expect(snout.half / skull.half, `${id} muzzle width`).toBeGreaterThan(0.45);
+    }
+  });
+});
+
 describe('poses reach where they should', () => {
   it('a grazing hoofed animal and a predator put the muzzle near the grass', () => {
     for (const id of ['deer', 'elk', 'moose', 'pronghorn', 'javelina', 'bear', 'wolf', 'coyote', 'cougar', 'rabbit', 'squirrel'] as WildModelId[]) {
