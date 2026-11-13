@@ -39,6 +39,7 @@ try {
     return { ox, oz, n: wears.length };
   });
   await page.keyboard.press('h');
+  await page.evaluate(() => { window.__cb.game.getState().setSpeed(0); window.__cb.store.getState().setTimeOfDay(13); });
   const frames = async () => { await page.evaluate(() => window.__cb.qa.renderNow()); };
   const setRow = async (name, poseFn) => {
     await page.evaluate(([poseFn]) => {
@@ -55,10 +56,13 @@ try {
       }
       layer.commit(rows.n, true);
       if (layer.setTime) layer.setTime(3.7);
-      cam.target.set(rows.ox, 0.14, rows.oz); cam.radius = 3.0; cam.pitch = 0.12; cam.yaw = 0;
+      cam.target.set(rows.ox - 1.4, 0.14, rows.oz); cam.radius = 1.7; cam.pitch = 0.12; cam.yaw = 0;
     }, [poseFn]);
     await frames(); await frames();
-    await page.screenshot({ path: `${out}/lineup-${tag}-${name}.png` });
+    await page.screenshot({ path: `${out}/lineup-${tag}-${name}-a.png` });
+    await page.evaluate(() => { const { rows } = window.__lineup; window.__cb.cam.target.set(rows.ox + 1.4, 0.14, rows.oz); });
+    await frames(); await frames();
+    await page.screenshot({ path: `${out}/lineup-${tag}-${name}-b.png` });
     console.error('shot', name);
   };
   await setRow('roles', '(i,K)=>({pose:K.FIG_POSE.STAND})');
@@ -69,6 +73,6 @@ try {
     await setRow('actions', `(i,K)=>{const P=K.FIG_POSE,T=K.FIG_TOOL;const l=[[P.CHOP,T.AXE],[P.HOE,T.HOE],[P.STIR,T.SPOON],[P.REACH,T.HAMMER],[P.KNEEL,0],[P.CARRY,0],[P.PAIL,T.PAIL],[P.RIFLE,T.RIFLE],[P.BENCH,0],[P.CROSS,0],[P.HANG,0],[P.STAND,0]][i%12];return {pose:l[0],tool:l[1]}}`);
   }
   // close up, two people
-  await page.evaluate(() => { const { rows } = window.__lineup, cb = window.__cb; cb.cam.target.set(rows.ox - 0.9, 0.14, rows.oz); cb.cam.radius = 1.0; });
+  await page.evaluate(() => { const { rows } = window.__lineup, cb = window.__cb; cb.cam.target.set(rows.ox - 0.34 * 3, 0.14, rows.oz); cb.cam.radius = 0.8; });
   await frames(); await frames(); await page.screenshot({ path: `${out}/lineup-${tag}-close.png` });
 } finally { await browser.close(); vite.kill(); }
