@@ -97,7 +97,7 @@ transformed.x += dot(gcDisp, gcX) / max(dot(gcX, gcX), 1e-6);
 transformed.z += dot(gcDisp, gcZ) / max(dot(gcZ, gcZ), 1e-6);
 transformed.xz *= gcVis;
 transformed.y *= gcVis * gcHy;
-vGcUv = (vec2(mod(aTile, uGcGrid), floor(aTile / uGcGrid)) + 0.02 + uv * 0.96) / uGcGrid;
+vGcUv = (vec2(mod(aTile, uGcGrid), floor(aTile / uGcGrid)) + 0.02 + vec2(uv.x, 1.0 - uv.y) * 0.96) / uGcGrid;
 vGcUv.y = 1.0 - vGcUv.y;
 // color: the terrain's own grass colors through the season
 float gcKk = clamp(dot(uGcGrass, vec3(0.2126, 0.7152, 0.0722)) / 0.09, 0.6, 1.5);
@@ -145,7 +145,7 @@ else if (gcIs(7.0)) { gcVis = clamp(0.35 + gcDry * 0.8 - aRand * 0.5, 0.0, 1.0);
 vGcSnow = clamp(uSeaB.x * 1.2, 0.0, 0.95);
 gcVis *= gcThin(gcD, aRand);
 vec3 transformed = vec3(position) * gcFade * gcVis;
-vGcUv = (vec2(mod(aTile, uGcGrid), floor(aTile / uGcGrid)) + 0.02 + uv * 0.96) / uGcGrid;
+vGcUv = (vec2(mod(aTile, uGcGrid), floor(aTile / uGcGrid)) + 0.02 + vec2(uv.x, 1.0 - uv.y) * 0.96) / uGcGrid;
 vGcUv.y = 1.0 - vGcUv.y;
 vGcTint = gcT; vGcFlag = 0.0; vGcFlower = vec3(0.0);
 `;
