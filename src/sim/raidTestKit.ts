@@ -11,6 +11,7 @@ import { dispositionOf } from './crewMercy';
 import { crewKindOf } from './surrender';
 import type { Difficulty } from './difficulty';
 import type { BattleEvent } from './battleTypes';
+import { isGuardUnit } from './defenseTune';
 
 export type Layout = 'bare' | 'armed' | 'chain' | 'container' | 'container_gate' | 'concrete_bollards' | 'ditch_wall' | 'palisade_tower';
 export const LAYOUTS: Layout[] = ['bare', 'armed', 'chain', 'container', 'container_gate', 'concrete_bollards', 'ditch_wall', 'palisade_tower'];
@@ -101,7 +102,7 @@ export function problems(g: GameState, b: PlannedBattle, o: BattleOptions): stri
   for (const f of raid.fires) if (!g.structures.some(s => s.id === f.structure)) bad.push('fire on a structure that does not exist');
   if (!raid.text) bad.push('no result text');
   if (raid.ending && b.result !== 'fled') bad.push('a talked end that is not a flight');
-  if (raid.loss.people.killed !== b.events.filter(e => e.kind === 'death' && e.unit.startsWith('h_')).length) bad.push('killed count differs from death events');
+  if (raid.loss.people.killed !== b.events.filter(e => e.kind === 'death' && e.unit.startsWith('h_') && !isGuardUnit(e.unit)).length) bad.push('killed count differs from death events');
   return bad;
 }
 
