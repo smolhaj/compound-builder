@@ -491,9 +491,14 @@ function dressLogHouse(c: FurnishCtx): void {
 
 /** Evening seats per kind (local). */
 const SEATS: Record<string, Seat[]> = {
+  // the old farmhouse: four places on the benches of the kitchen table, two armchairs facing the range
+  farmhouse: [[-0.09, -0.667, 0, -0.55], [0.09, -0.667, 0, -0.55], [-0.09, -0.433, 0, -0.55], [0.09, -0.433, 0, -0.55], [-0.43, -0.11, -0.62, -0.11], [-0.43, 0.03, -0.62, 0.03]],
   log_house: [[-0.3, -0.45, -0.4, -1.1], [-0.5, -0.45, -0.4, -1.1], [0.35, 0.62, 0.35, 0.78], [0.35, 0.94, 0.35, 0.78]],
   ...HOUSING_SEATS,
 };
+
+/** Seats whose role is not what the facing heuristic says (game/people/ritualGoals seatRole): the farmhouse's table is at the back wall. */
+const SEAT_ROLES: Record<string, Array<'fire' | 'table'>> = { farmhouse: ['table', 'table', 'table', 'table', 'fire', 'fire'] };
 
 const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpts) => THREE.Group> = {
   timber_cabin: buildCabinLayers,
@@ -527,6 +532,7 @@ export function buildLayers(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): T
   const g = BUILDERS[def.id](def, seed, opts);
   g.userData.opts = opts;
   g.userData.seats ??= SEATS[def.id] ?? [];
+  if (SEAT_ROLES[def.id]) g.userData.seatRoles ??= SEAT_ROLES[def.id];
   g.userData.chimneyTop ??= null;
   return g;
 }

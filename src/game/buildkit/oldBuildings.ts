@@ -45,6 +45,9 @@ function farmhouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Grou
     const o = c.parts.opts;
     I({ x: left + 0.05, z: -0.5, rot: Math.PI / 2 }, a => Furniture.counter(a, 3.0, 0.4, !!o.plumbed));
     I({ x: left + 0.06, z: -0.05, rot: Math.PI / 2 }, a => Furniture.cookstove(a));
+    // two armchairs by the range for the evening (game/people/ritualGoals: the fireside seats)
+    I({ x: left + 0.27, z: -0.11, rot: -Math.PI / 2 }, a => Furniture.armchair(a, 'quilt_red'));
+    I({ x: left + 0.27, z: 0.03, rot: -Math.PI / 2 }, a => Furniture.armchair(a, 'quilt_blue'));
     if (o.wired) I({ x: left + 0.065, z: back + 0.12, rot: Math.PI / 2 }, a => Furniture.fridge(a));
     I({ x: 0.0, z: -0.55 }, a => Furniture.diningTable(a));
     dressEvenings(c, { x: 0.0, z: -0.55 });
