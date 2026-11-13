@@ -22,8 +22,16 @@ export interface Wear {
   coat: 0 | 1 | 2 | 3;
   /** Bare legs below the knee. */
   shorts: boolean;
-  /** Knit hat color, or -1 for none. */
+  /** Knit hat color, or -1 for none (with `headwear` set: the colour of the cap / hat / helmet; -1 there takes the gear colour). */
   hat: number;
+  /** Hair style (figureKit HAIR; default by `longHair`), a beard (0 none, 1 stubble, 2 full), headwear over the hair (figureKit HEADWEAR). */
+  hairStyle?: number;
+  beard?: number;
+  headwear?: number;
+  /** Gear flags (figureKit GEAR bits): apron, vest, plate carrier, radio, boots, gloves, scarf, belt, slung rifle, rucksack. */
+  gear?: number;
+  /** Body build (figureKit BUILD): average, child, elder, broad, slender. */
+  build?: number;
 }
 
 const SKIN_TONES = [0xf6d7bf, 0xf1c9a5, 0xe0ac7e, 0xc68a5c, 0xa0694a, 0x7a4e35, 0x5a3a28];
@@ -47,7 +55,19 @@ const PANTS: Record<WearSeason, number[]> = {
   spring: [0x3b4a66, 0x6f86a8, 0xa89a78, 0x5d6066, 0x1e1e20, 0xc9bfa8],
 };
 /** Knit hat colors (the figure shader indexes this palette). */
-export const HATS = [0x2a2c31, 0x9c2a2a, 0x23304a, 0xd9d2c3, 0x4a4a30, 0xb88a2e, 0x6a6e74];
+export const HATS = [0x2a2c31, 0x9c2a2a, 0x23304a, 0xd9d2c3, 0x4a4a30, 0xb88a2e, 0x6a6e74,
+  // (appended by the people pass: helmets, caps, sun hats; the order of the first seven is fixed)
+  0x3d4232, 0x101112, 0xd9742a, 0xb04030, 0x6a5a4a, 0x1c2018, 0xc9b27a, 0x4a3a2a, 0x2c3a4a, 0x7a2a22];
+
+/** Palette index of the colour nearest `hex` (an exact match first). */
+export function hatIndex(hex: number): number {
+  const exact = HATS.indexOf(hex);
+  if (exact >= 0) return exact;
+  const r = (hex >> 16) & 255, g = (hex >> 8) & 255, b = hex & 255;
+  let best = 0, bd = Infinity;
+  HATS.forEach((c, i) => { const d = (r - ((c >> 16) & 255)) ** 2 + (g - ((c >> 8) & 255)) ** 2 + (b - (c & 255)) ** 2; if (d < bd) { bd = d; best = i; } });
+  return best;
+}
 const JOG_SHIRTS = [0xe8f04a, 0xff6a3a, 0x3ad0ff, 0xf2f0ea, 0xe0407a, 0x2b2b2b, 0x6af07a];
 
 export interface WearOptions {
