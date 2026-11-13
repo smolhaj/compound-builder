@@ -18,6 +18,8 @@ import { CAMP } from '../props/campGeometry';
 import { YARD } from '../props/yardGeometry';
 import type { TaskKind } from '../../sim/state';
 import type { Wp } from '../paths/linkRoute';
+import { ritualGoal } from './ritualGoals';
+import type { RitualKind } from '../../sim/rituals';
 
 export interface Site { x: number; z: number; rot: number; w: number; d: number; /** Evening seats (local x, z, face x, z). */ seats?: ReadonlyArray<readonly [number, number, number, number]> }
 
@@ -54,6 +56,8 @@ export interface GoalCtx {
   today?: number;
   /** The yard position of dome tent `n` (props/TentsRenderer). */
   tentAt?: (n: number) => { x: number; z: number } | undefined;
+  /** The evening rituals (sim/rituals.ts, game/people/ritualGoals.ts): the household's calm, which ritual each person is at, who sits where, who is old. */
+  ritual?: { calm: number; kind: (i: number) => RitualKind | null; rank: (i: number) => { k: number; n: number }; elder: (i: number) => boolean };
 }
 
 export interface WorkSpots {
@@ -90,6 +94,8 @@ export interface Goal {
   y?: number;
   /** Pose while walking there (a rifle carried, buckets). */
   walkPose?: number;
+  /** Walking pace against the usual (1): unhurried at the evening table, hurried when the house is alarmed. */
+  pace?: number;
 }
 
 /** Rotate a camp-local point into the world. */
@@ -108,6 +114,8 @@ export function wobble(i: number, clock: number, period: number): number {
 }
 
 export function goalFor(i: number, kid: boolean, task: TaskKind, target: string | null, hour: number, ctx: GoalCtx, clock = 0): Goal {
+  const rg = ritualGoal(i, kid, task, hour, ctx, clock);
+  if (rg) return rg;
   const fire = campPt(ctx, CAMP.fire.x, CAMP.fire.z);
   switch (task) {
     case 'build': {
