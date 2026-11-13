@@ -98,6 +98,7 @@ import { choresDay, choresStep, dailyTick, DUTY, DUTY_TASK, restFactor, tire, du
 import { gatheringStep, gatheringsDay } from './gatherings';
 import { awayRates, caretakerWork, heatShare, presenceStep, weekenderDay, workDay, livingShare } from './weekender';
 import type { GameState, Structure } from './state';
+import { ritualDay, ritualHour } from './rituals';
 
 /** Household running costs a day in peacetime (rural Mountain West, 2020s): the truck, insurance, phone and property tax for the household, plus groceries a head ($160 for a family of four). Stops once the stores and banks are gone. */
 export const LIVING_BASE = 100, GROCERIES_PER_HEAD = 15;
@@ -146,6 +147,8 @@ function subStep(s: GameState): void {
   const party = gatheringStep(s);
   // fires a raid set grow, spread and are fought by the hour (sim/raidFire.ts)
   if (hourly && s.raidFires?.length) for (const l of tickRaidFires(s)) log(s, l);
+  // family rituals (sim/rituals.ts): the calm, and credit for the hour that just ended (the tasks are still last hour's)
+  if (hourly) ritualHour(s, h);
   s.people.forEach((p, i) => {
     const ps = s.personState.find(x => x.id === p.id)!;
     if (ps.needs.died != null) { ps.task = 'gone'; ps.target = null; return; }
@@ -312,6 +315,7 @@ function subStep(s: GameState): void {
     s.food = liveDay(s, y - Math.floor(y));
     for (const line of bodyDay(s)) log(s, line);
     for (const line of medicalDay(s)) log(s, line);
+    for (const line of ritualDay(s)) log(s, line);
     for (const line of peopleDay(s)) log(s, line);
     const end = tallyDay(s);
     if (end && end.kind !== 'wipe') log(s, end.kind === 'recovered' ? 'The outside world is coming back.' : end.kind === 'new_normal' ? 'The outside world has come back as far as it will.' : 'A full year the place has fed itself.');

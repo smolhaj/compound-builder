@@ -80,6 +80,9 @@ export interface WorldState {
   shadeReadout: string[] | null;
   /** The Fire overlay's empty-state line (nothing built, or every ring green), or null while there is a ring to read. */
   fireNote: string | null;
+  /** What someone in the home just said (sim/domesticLines.ts), shown as a caption while the camera is near the house; null: nothing. */
+  homeLine: { who: string; text: string; tone: 'warm' | 'low' | 'scared'; at: number } | null;
+  setHomeLine: (l: WorldState['homeLine']) => void;
   setFireNote: (n: string | null) => void;
   setShadeReadout: (r: string[] | null) => void;
   setBlueprintReadout: (r: BpReadout | null) => void;
@@ -185,6 +188,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   blueprintReadout: null,
   shadeReadout: null,
   fireNote: null,
+  homeLine: null,
+  setHomeLine: (homeLine) => set({ homeLine }),
   setFireNote: (fireNote) => set({ fireNote }),
   setShadeReadout: (shadeReadout) => set({ shadeReadout }),
   setBlueprintReadout: (blueprintReadout) => set({ blueprintReadout }),

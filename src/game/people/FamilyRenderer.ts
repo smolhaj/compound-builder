@@ -119,7 +119,7 @@ export class FamilyRenderer {
       // climbing steep ground is slow, picking down it a little slower than the flat (game/paths/walkRoute slopePace); a tunnel's deck is at its own grade
       const ahead = leg && leg[2] !== undefined && a.y !== null ? (leg[2] - a.y) / Math.max(dl, 0.2) : null;
       const pace = ahead !== null ? slopePace(ahead) : dl > 1e-6 ? slopePace((ground(a.x + dx / dl * 0.2, a.z + dz / dl * 0.2) - ground(a.x, a.z)) / 0.2) : 1;
-      const v = WALK * Math.max(1, speedK) * (p.kid ? 1.1 : 1) * (ctx.footing ? ctx.footing(a.x, a.z) : 1) * pace;
+      const v = WALK * Math.max(1, speedK) * (goal.pace ?? 1) * (p.kid ? 1.1 : 1) * (ctx.footing ? ctx.footing(a.x, a.z) : 1) * pace;
       let moving = false;
       if (a.wait > 0) { a.wait = Math.max(0, a.wait - dt * Math.max(1, speedK)); if (a.wait === 0 && leg) { a.via.shift(); } }
       else if (d > 0.02 || (leg && a.via.length)) {

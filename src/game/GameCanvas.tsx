@@ -53,7 +53,7 @@ import { coverBoxes, obstaclesOf, treeBoxes } from './battle/cameraObstacles';
 import { liveBreach } from './battle/liveBreach';
 import { decorateBreach } from '../sim/breach';
 import { planHouseAssault } from '../sim/houseAssault';
-import { routeScene } from '../sim/cutLive';
+import { routeScene, gatePortals } from '../sim/cutLive';
 import { voiceMoments } from '../sim/momentVoices';
 import { deadSilent } from '../sim/deadSilent';
 import { stepSegments } from '../sim/standingSurfaces';
@@ -417,13 +417,23 @@ export function GameCanvas() {
       return h ? { x: h.x, y: 0, z: h.z } : { x: world.camp.x, y: 0, z: world.camp.z };
     };
     let cutawayBefore: ReturnType<typeof useWorldStore.getState>['buildingView'] | null = null;
+    // the movement router's static ground test: ONE function for as long as the compound stands as it is, so what the router has learned about it (its lattice of solid
+    // cells and its graph of openings, sim/cutNav.ts) serves every scene of the cutscene and is thrown away the moment a structure or a wall run changes (or after a minute)
+    let navSolidCache: { sig: string; at: number; fn: (x: number, z: number) => boolean } | null = null;
+    const navSolid = () => {
+      const g = useGameStore.getState().game;
+      const sig = g.structures.filter(st => isFinished(st)).map(st => `${st.id}:${st.kind}:${st.x},${st.z},${st.rot}`).join('|') + '#' + g.perimeter.map(r => `${r.id}:${r.kind}:${r.finishedAt}:${r.done}:${JSON.stringify(r.pts)}${JSON.stringify(r.gates)}`).join('|');
+      const now = performance.now();
+      if (!navSolidCache || navSolidCache.sig !== sig || now - navSolidCache.at > 60000) navSolidCache = { sig, at: now, fn: (x: number, z: number) => world.walkBlocked(x, z, 0.04) };
+      return navSolidCache.fn;
+    };
     const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70), ...(qa.noCover ? [] : coverBoxes(world.lowCover, homeSpot(), 70))] ,
       // the invasion look (sim/breach.ts, sim/houseAssault.ts): how the wall comes down, and the fight inside the house; cinematic, the sim's result is kept
       prepare: b0 => {
         // 1. the invasion look (cinematic; the sim's result is kept); 2. the movement rule: every leg goes through a real opening (sim/cutNav.ts).
         // Any failure leaves the scene as the sim staged it: a cutscene must never take the game down.
         let b = b0;
-        const solid = (x: number, z: number) => world.walkBlocked(x, z, 0.04);
+        const solid = navSolid();
         try {
           if (b0.events.some(e => e.kind === 'breach')) {
             const g = useGameStore.getState().game, hs = homeSpot();
@@ -441,7 +451,7 @@ export function GameCanvas() {
           for (const other of useGameStore.getState().cutscene?.battles ?? []) if (other !== b0) d2.noteAll(other);
           b = voiceMoments(b, d2, id => { const pid = b0.units.find(u => u.id === id)?.personId; const p = pid ? g2.people.find(q => q.id === pid) : undefined; return (p as { first?: string } | undefined)?.first; });
         } catch (err) { console.warn('cutscene staging failed; playing the plain scene', err); b = b0; }
-        return routeScene(deadSilent(b), solid, undefined, stepSegments(useGameStore.getState().game.perimeter)).battle;
+        return routeScene(deadSilent(b), solid, undefined, stepSegments(useGameStore.getState().game.perimeter), gatePortals(useGameStore.getState().game.perimeter)).battle;
       },
       cutaway: on => { const ws2 = useWorldStore.getState(); if (on) { cutawayBefore ??= ws2.buildingView; ws2.setBuildingView('cutaway'); } else if (cutawayBefore) { ws2.setBuildingView(cutawayBefore); cutawayBefore = null; } } });
     const nameLayer = new NameLabelLayer();
