@@ -64,7 +64,11 @@ export function botTurn(g: GameState, log: BotLog): void {
       let got = 0;
       while (act.logs && got < act.logs && (log.marked ?? 0) < PINES) { const id = 700_000 + (log.marked = (log.marked ?? 0) + 1); if (markTree(g, { id, x: 20, z: 20, kind: 'conifer', scale: 1 }, 4)) got += 3; }
     } else if (act.type === 'order' && !orderProblem(g, act.lines) && placeOrder(g, act.lines) !== null) log.orders++;
-    else if (act.type === 'crew' && !hireCrew(g, act.id)) log.crews++;
+    else if (act.type === 'crew') {
+      // the same two steps as the card's button: order what is missing, then hire
+      if (act.lines?.length && !orderProblem(g, act.lines) && placeOrder(g, act.lines) !== null) log.orders++;
+      if (!hireCrew(g, act.id)) log.crews++;
+    }
     else if (act.type === 'hookup' && hookupProblem(g, act.what) === null && orderHookup(g, act.what) === null) log.orders++;
   }
 }

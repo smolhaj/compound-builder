@@ -127,8 +127,14 @@ export function addWork(s: GameState, st: Structure, personHours: number, own = 
       st.stage++;
       st.done = 0;
       st.supplied = false;
+      // the snow took only the roof (weatherThreats.ts): the rooms came through, so the new roof finishes the home; the later stages' materials that knockBack gave back are taken out of the yard again
+      if (stage.id === 'roof' && st.kept && !isFinished(st)) {
+        for (let i = st.stage; i < bp.stages.length; i++) for (const [k, n] of Object.entries(bp.stages[i].materials) as Array<[keyof Stock, number]>) s.stock[k] = Math.max(0, s.stock[k] - n);
+        st.stage = bp.stages.length;
+      }
+      delete st.kept;
       if (isFinished(st)) {
-        st.finishedAt = s.clock.t; delete st.roofLost;
+        st.finishedAt = s.clock.t; delete st.roofLost; delete st.roofLostAt;
         log(s, `The ${st.kind.replace('_', ' ')} is finished!`);
         if (st.replaces) completeUpgrade(s, st);
         else if (st.lost) chronicleUpkeep(s, `The ${st.kind.replace(/_/g, ' ')} was rebuilt.`);
@@ -152,7 +158,7 @@ export function knockBack(s: GameState, st: Structure, stage: number): void {
   for (let i = stage + 1; i < from; i++) for (const [k, n] of Object.entries(stages[i].materials) as Array<[keyof Stock, number]>) s.stock[k] += n;
   // the current stage's own materials, if they were already taken in
   if (st.stage > stage && st.stage < stages.length && st.supplied) for (const [k, n] of Object.entries(stages[st.stage].materials) as Array<[keyof Stock, number]>) s.stock[k] += n;
-  if (stages[stage]?.id === 'roof' && from > stage) st.roofLost = true;
+  if (stages[stage]?.id === 'roof' && from > stage) { st.roofLost = true; st.roofLostAt = s.clock.t; }
   if (st.finishedAt != null) st.lost = true;   // it stood once: finishing it again is a rebuild (the chronicle)
   st.stage = stage; st.done = 0; st.supplied = false; st.finishedAt = null;
 }
@@ -182,7 +188,7 @@ export function burnStructure(s: GameState, st: Structure): boolean {
   // stone, earth and steel walls come through a fire: the roof and everything inside burn, and it has to be re-roofed and refinished
   if (keepsWalls(st.kind)) {
     const roof = stages.findIndex(x => x.id === 'roof');
-    if (roof >= 0 && st.stage > roof) { st.lost = true; st.stage = roof; st.done = 0; st.supplied = false; st.finishedAt = null; st.roofLost = true; return true; }
+    if (roof >= 0 && st.stage > roof) { st.lost = true; st.stage = roof; st.done = 0; st.supplied = false; st.finishedAt = null; st.roofLost = true; st.roofLostAt = s.clock.t; return true; }
   }
   if (st.finishedAt != null) st.lost = true;
   st.stage = 0; st.done = 0; st.supplied = false; st.finishedAt = null;

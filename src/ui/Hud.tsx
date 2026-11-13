@@ -34,6 +34,7 @@ import { BACKGROUND_NAME, backgroundOf, fullName } from '../sim/family';
 import { MATERIALS, MATERIAL_IDS, qtyText, type MaterialId } from '../sim/materials';
 import { onOrder, orderCost, orderProblem, prices } from '../sim/economy';
 import { holdReason, isFinished } from '../sim/construction';
+import { climbable, weakSpots } from '../sim/wallTops';
 import { REGIONS } from '../sim/regions';
 import { keeping, KEPT } from '../sim/shelf';
 import { CONDITION, pharmacyOpen, rxDaysOf } from '../sim/body';
@@ -136,11 +137,30 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
 const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died', shelter: 'Sheltering', away: 'Away from the place', town: 'At the town house', ...DAILY_TASK_TEXT };
 
+/** What each sightline map means, shown while it is on (the road / ridge / night maps are faint washes, not outlines). */
+const SIGHT_LEGEND: Record<'road' | 'ridge' | 'night', string> = {
+  road: 'Red-orange: in plain view of people on the county road. Blue-green: hidden by trees, walls or the lie of the land. A faint wash everywhere is normal: the map fills in over a few seconds after a change.',
+  ridge: 'Red-orange: in plain view from the high ground to the west. Blue-green: hidden. The map fills in over a few seconds after a change.',
+  night: 'Warm: a lit window that shows from the county road. Pale blue: lamplight that stays hidden. Dark ground: nothing lit shows. If no window is lit yet, there is nothing to draw.',
+};
+
 /** "Click a point" for the viewshed overlay, which draws nothing until a spot on the ground is picked (always on screen, whatever panels are open). */
 function SightHint() {
   const on = useWorldStore(s => s.sightMode === 'viewshed' && !s.sightPicked);
   if (!on) return null;
   return <div data-testid="sight-hint" style={{ position: 'fixed', left: '50%', bottom: 64, transform: 'translateX(-50%)', color: '#f2ecd8', background: 'rgba(20,22,18,0.86)', border: '1px solid rgba(240,230,190,0.4)', borderRadius: 6, padding: '6px 16px', fontSize: 14, pointerEvents: 'none', zIndex: 20, whiteSpace: 'nowrap' }}>Click a point on the ground to see what can be seen from there (Shift-click: from a 33 ft tower)</div>;
+}
+
+/** The weak-spot overlay draws a mark only where a climber can bypass a wall: say so when there is none (always on screen, whatever panels are open). */
+function WeakHint() {
+  const on = useWorldStore(s => s.weakView), trees = useWorldStore(s => s.wallTrees), game = useGameStore(s => s.game);
+  if (!on) return null;
+  const spots = weakSpots(game, trees?.() ?? []);
+  if (spots.length > 0) return null;
+  const walls = game.perimeter.filter(climbable).length;
+  return <div data-testid="weak-hint" style={{ position: 'fixed', left: '50%', bottom: 64, transform: 'translateX(-50%)', color: '#f2ecd8', background: 'rgba(20,22,18,0.86)', border: '1px solid rgba(240,230,190,0.4)', borderRadius: 6, padding: '6px 16px', fontSize: 14, pointerEvents: 'none', zIndex: 20, whiteSpace: 'nowrap' }}>
+    {walls === 0 ? 'No weak spots to mark: there is no finished wall a climber could bypass yet.' : 'No weak spots: nothing stands within a step of a wall, no tree reaches over one and no brush is overgrown.'}
+  </div>;
 }
 
 function dateLabel(doy: number): string {
@@ -234,6 +254,7 @@ export function Hud() {
       <ToastLine />
       <CursorHint />
       <SightHint />
+      <WeakHint />
       <LineToolBar />
       <WelcomeCard />
       {/* Top bar: date, time, money, speed */}
@@ -699,6 +720,8 @@ export function Hud() {
         <button style={btn(w.terrainMode === 'off')} title="Hide the terrain overlay" onClick={() => w.setTerrainMode('off')}>Off</button>
         {(Object.keys(TERRAIN_LEGEND) as Array<Exclude<TerrainMode, 'off'>>).map(m => <button key={m} title={TERRAIN_LEGEND[m].tip} style={btn(w.terrainMode === m)} onClick={() => w.setTerrainMode(m)}>{TERRAIN_LEGEND[m].label}</button>)}
         {w.terrainMode !== 'off' && <div style={{ flexBasis: '100%', fontSize: 11.5, opacity: 0.85 }}>{TERRAIN_LEGEND[w.terrainMode].legend}</div>}
+        {w.terrainMode === 'fire' && w.fireNote && <div data-testid="fire-note" style={{ flexBasis: '100%', fontSize: 11.5, color: '#bcd' }}>{w.fireNote}</div>}
+        {w.sightMode !== 'off' && w.sightMode !== 'viewshed' && <div data-testid="sight-legend" style={{ flexBasis: '100%', fontSize: 11.5, opacity: 0.85 }}>{SIGHT_LEGEND[w.sightMode]}</div>}
         {w.terrainMode === 'shade' && w.shadeReadout && <div data-testid="shade-readout" style={{ flexBasis: '100%', fontSize: 11.5, color: '#bcd', display: 'flex', flexWrap: 'wrap', gap: '2px 14px' }}>{w.shadeReadout.length ? w.shadeReadout.map(l => <span key={l}>{l}</span>) : <span>Nothing to site yet: place a solar array or a garden bed and its shade shows here.</span>}</div>}
         {(w.terrainMode !== 'off' || w.sightMode !== 'off') && (() => { const t = fogLineFor(g.game, w.dayOfYear, w.timeOfDay, w.weatherMode); return t ? <div data-testid="fog-readout" style={{ flexBasis: '100%', fontSize: 11.5, color: '#bcd' }} title="Valley fog and low cloud (sim/fog.ts): it cuts what a watch, a camera or a night-vision tube sees; thermal sees through it. The same fog is drawn in the valley.">{t}</div> : null; })()}
         <button data-testid="blueprint-toggle" style={btn(w.blueprint)} title="Blueprint view: names and roles of the buildings, rings, gates, towers and tunnels, with the defense readouts" onClick={() => w.setBlueprint(!w.blueprint)}>Blueprint</button>

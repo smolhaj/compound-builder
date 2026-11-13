@@ -83,7 +83,7 @@ export class TerrainOverlay {
       col.set(c, v * 4);
     }
     // the analysis cells are about 12 ft; smooth the soft modes so the washes read as ground, not as stepped tiles
-    if (this._mode === 'sun' || this._mode === 'water' || this._mode === 'high' || this._mode === 'shade') smoothColors(col, nx, nz, 2);
+    if (this._mode === 'sun' || this._mode === 'water' || this._mode === 'high' || this._mode === 'shade') smoothColors(col, nx, nz, this._mode === 'sun' ? 5 : 2);
     geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
     geo.computeBoundingSphere();
     const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
@@ -127,9 +127,10 @@ export class TerrainOverlay {
         return sh > 0.04 ? [0.1, 0.15, 0.6, Math.min(0.62, 0.15 + sh * 0.5)] : [1, 0.9, 0.4, 0.07];
       }
       case 'sun': {
-        // one ramp, cool slate-blue (north faces) through to warm amber (south faces); faint where the ground is neutral
-        const s = t.sun[k] - 1, u = Math.max(0, Math.min(1, 0.5 + s * 2));
-        return [lerp(0.30, 0.98, u), lerp(0.46, 0.72, u), lerp(0.78, 0.30, u), Math.min(0.32, Math.abs(s) * 1.6)];
+        // a few clear bands, not a gradient of speckle: the aspect is quantized to five steps (cool slate through a neutral gap to warm
+        // amber), then box-blurred so the band edges are soft but each band is one flat tone. Neutral ground stays clear.
+        const s = t.sun[k] - 1, u = Math.round(Math.max(0, Math.min(1, 0.5 + s * 3)) * 4) / 4, d = Math.abs(u - 0.5) * 2;
+        return d < 0.01 ? [0, 0, 0, 0] : [lerp(0.30, 0.98, u), lerp(0.46, 0.72, u), lerp(0.78, 0.30, u), 0.3 + 0.14 * d];
       }
       default: return [0, 0, 0, 0];
     }

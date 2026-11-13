@@ -43,12 +43,19 @@ export function bodyGeometry(): THREE.BufferGeometry {
   return finish([s, flat(tail, 0.7)]);
 }
 
+/** Length of the neck behind the skull, in skull radii (the renderer puts the skull this far from the withers). */
+export const NECK_LEN = 2.1;
+
 /** Neck + skull + muzzle + ears. Unit: skull radius 1. Nose along +z, the neck back along -z. */
 export function headGeometry(): THREE.BufferGeometry {
   const parts: THREE.BufferGeometry[] = [], face: THREE.BufferGeometry[] = [];
-  // neck: thick at the shoulder (z = -2.6), narrowing to the skull
-  const neck = new THREE.CylinderGeometry(0.56, 0.72, 2.6, 8, 1, false).rotateX(Math.PI / 2).translate(0, -0.05, -1.35);
-  parts.push(flat(neck, 0.97));
+  // neck: short and heavy at the shoulder (z = -2.1), a gentle arch, narrowing to the poll behind the skull
+  const rear = new THREE.CylinderGeometry(0.86, 1.0, 1.15, 8, 1, false).rotateX(Math.PI / 2).rotateX(-0.1).translate(0, 0.02, -1.5);
+  const front = new THREE.CylinderGeometry(0.58, 0.86, 1.1, 8, 1, false).rotateX(Math.PI / 2).rotateX(0.08).translate(0, 0.05, -0.62);
+  parts.push(flat(rear, 0.97), flat(front, 0.97));
+  // a dewlap / throat under the jaw so the head does not sit on a pipe
+  const throat = new THREE.SphereGeometry(0.62, 7, 5).scale(0.8, 0.8, 1.5).translate(0, -0.52, -0.75);
+  parts.push(flat(throat, 0.86));
   const skull = new THREE.SphereGeometry(1, 10, 8).scale(0.82, 0.88, 1.0);
   face.push(tint(skull, (_x, y) => (y < -0.3 ? 0.88 : 1)));
   const muzzle = new THREE.CylinderGeometry(0.46, 0.66, 1.15, 8).rotateX(Math.PI / 2).translate(0, -0.2, 1.05);

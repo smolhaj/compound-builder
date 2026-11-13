@@ -53,14 +53,16 @@ export interface SeasonParams {
   cold: number;
   /** Damp, dull ground (Pacific NW winters). */
   wet: number;
+  /** Winter hoar-frost / thin patchy snow on open ground where little snow lies (visual only; see SeasonClimate.rime). */
+  rime: number;
 }
 
 export const SEASON_KEYS: readonly (keyof SeasonParams)[] = [
-  'fall', 'bare', 'fresh', 'bloom', 'snow', 'dormant', 'dry', 'litter', 'ice', 'cold', 'wet',
+  'fall', 'bare', 'fresh', 'bloom', 'snow', 'dormant', 'dry', 'litter', 'ice', 'cold', 'wet', 'rime',
 ];
 
 export function zeroSeasonParams(): SeasonParams {
-  return { fall: 0, bare: 0, fresh: 0, bloom: 0, snow: 0, dormant: 0, dry: 0, litter: 0, ice: 0, cold: 0, wet: 0 };
+  return { fall: 0, bare: 0, fresh: 0, bloom: 0, snow: 0, dormant: 0, dry: 0, litter: 0, ice: 0, cold: 0, wet: 0, rime: 0 };
 }
 
 /** Climate of one location. Days are days of the year (Jan 1 = 1). */
@@ -105,6 +107,11 @@ export interface SeasonClimate {
   freeze: boolean;
   /** Damp, dull winter ground (PNW). */
   wetWinter: number;
+  /**
+   * Winter hoar-frost / thin patchy snow on the open ground where the region has little lying snow (0 = none). Visual only: it shows
+   * while it is cold and fades as real snow cover builds, so a snowless winter still reads as winter (PNW lowlands: frosted grass, damp).
+   */
+  rime: number;
 }
 
 const BASE: Omit<SeasonClimate, 'id'> = {
@@ -114,7 +121,7 @@ const BASE: Omit<SeasonClimate, 'id'> = {
   snow: 0.88, snowOn: 334, snowFull: 348, snowMelt: 66, snowGone: 84, weatherSnow: 1,
   dormant: 1, dormantOn: 300, greenUp: 105,
   dry: 0, dryStart: 200, dryFull: 228, dryEnd: 320,
-  freeze: true, wetWinter: 0,
+  freeze: true, wetWinter: 0, rime: 0,
 };
 
 export const CLIMATES: Record<string, SeasonClimate> = {
@@ -134,7 +141,7 @@ export const CLIMATES: Record<string, SeasonClimate> = {
     ...BASE, id: 'pacific_northwest', blaze: 0.75, palette: [0.04, 0.18, 0.68, 0.1],
     turnStart: 268, peak: 296, dropEnd: 322, leafOut: 104, bloomDay: 88,
     snow: 0, weatherSnow: 0.55, dormant: 0.15, dormantOn: 320, greenUp: 70,
-    freeze: false, wetWinter: 0.55,
+    freeze: false, wetWinter: 0.55, rime: 0.6,
   },
   deep_south: {
     ...BASE, id: 'deep_south', blaze: 0.38, palette: [0.1, 0.22, 0.18, 0.5],
@@ -275,6 +282,8 @@ export function seasonTargets(c: SeasonClimate, d: number): SeasonParams {
   const fallen = late ? sstep(c.peak - 14, c.dropEnd - 6, d) : 0.3 * (1 - sstep(c.greenUp - 30, c.greenUp + 4, d));
   p.litter = leaves * fallen * (1 - Math.min(1, p.snow * 1.1));
   p.wet = c.wetWinter * window(d, 290, 320, 75, 110);
+  // Rime: the snow window's own months (Dec–Feb), gone by the end of February, and only where snow does not lie (it gives way to real cover)
+  p.rime = c.rime * window(d, c.snowOn, c.snowFull, c.snowMelt - 24, c.snowGone - 28) * (1 - Math.min(1, p.snow * 2));
   return p;
 }
 

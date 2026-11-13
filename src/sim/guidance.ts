@@ -32,6 +32,7 @@ import { crewProblem, crewQuote } from './crews';
 import { crewNudge } from './crewNudge';
 import { wallCrewCard, wallFirstCard } from './wallCrew';
 import { eta } from './pace';
+import { reroofLines, winterRoofRisk, WINTER_ROOF_URGENT_DAYS } from './roofSafety';
 import { idleCash } from './idleCash';
 import { permitWait, permitWaitText } from './permitWait';
 import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind, type Pt } from './perimeter';
@@ -350,16 +351,25 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
   // a home that lost its roof (chimney fire, storm, looters): re-roof it before anything else, the family should not winter in tents
   { const bare = homes.find(h => h.roofLost && !isFinished(h));
     if (bare && stuck?.key !== `s:${bare.id}`) {
-      const need = blueprintOf(bare).stages[bare.stage]?.materials ?? {}, pending = onOrder(s);
-      const lines: OrderLine[] = (Object.entries(need) as Array<[MaterialId, number]>)
-        .map(([material, n]) => ({ material, qty: Math.ceil(n - (bare.supplied ? n : s.stock[material]) - (pending[material] ?? 0) - 1e-6) }))
-        .filter(l => l.qty > 0 && MATERIALS[l.material].price !== null);
-      const name = bare.kind.replace(/_/g, ' ');
+      const lines = reroofLines(s, bare), name = bare.kind.replace(/_/g, ' ');
+      const canHire = !(s.crews ?? []).some(c => c.target === bare.id) && !crewProblem(s, bare);
       out.push({ id: 'reroof', kind: '', title: 'Re-roof your home', urgency: 97,
         why: lines.length ? `the ${name} lost its roof and the family cannot live in it; the roof needs ${lines.map(l => materialCount(l.material, l.qty, MATERIALS[l.material].name, String(l.qty))).join(' and ')} more` : `the ${name} lost its roof; the crew is on it, and it is the first thing to finish`,
-        acts: [...(lines.length ? [{ label: `Order the roof materials (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []),
-          ...(!(s.crews ?? []).some(c => c.target === bare.id) && !crewProblem(s, bare) ? [{ label: `${lines.length ? 'Order and hire a crew' : 'Hire a crew'} (~${usd(crewQuote(bare).usd + (lines.length ? orderCost(lines, prices(s)) : 0))})`, act: { type: 'crew' as const, id: bare.id, ...(lines.length ? { lines } : {}) } }] : []),
+        // the one tap first: order what is missing and hire the crew in one press (a bare "Order" leaves the roof unbuilt)
+        acts: [...(canHire ? [{ label: `${lines.length ? 'Order and hire a crew' : 'Hire a crew'} (~${usd(crewQuote(bare).usd + (lines.length ? orderCost(lines, prices(s)) : 0))})`, act: { type: 'crew' as const, id: bare.id, ...(lines.length ? { lines } : {}) } }] : []),
+          ...(lines.length ? [{ label: `Order the roof materials (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []),
           { label: 'Show me', act: { type: 'select', id: bare.id } }] });
+    } }
+  // a home that still has the old roof it came with: a blizzard can bring it down (sim/weatherThreats.ts). Said months ahead, in the cold regions.
+  { const risk = winterRoofRisk(s);
+    if (risk && !(s.crews ?? []).some(c => c.target === risk.st.id)) {
+      const name = risk.st.kind.replace(/_/g, ' '), urgent = risk.days <= WINTER_ROOF_URGENT_DAYS;
+      const canHire = !crewProblem(s, risk.st);
+      out.push({ id: 'roof_winter', kind: '', title: 'Fix the roof before winter', urgency: risk.days === 0 ? 96 : urgent ? 90 : 64,
+        why: `The ${name} roof will not take a snowload; fix it before winter. ${risk.days === 0 ? 'Blizzard season is on now.' : `Blizzards can start in about ${pluralize(Math.max(1, Math.round(risk.days / 7)), 'week')}.`} If it caves in, the family is out in tents until a crew re-roofs it${risk.lines.length ? `. The roof needs ${risk.lines.map(l => materialCount(l.material, l.qty, MATERIALS[l.material].name, String(l.qty))).join(' and ')}` : ''}.`,
+        acts: [...(canHire ? [{ label: `${risk.lines.length ? 'Order and hire a crew' : 'Hire a crew'} for the roof (~${usd(risk.totalUsd)})`, act: { type: 'crew' as const, id: risk.st.id, ...(risk.lines.length ? { lines: risk.lines } : {}) } }] : []),
+          ...(risk.lines.length ? [{ label: `Order the roofing (${usd(orderCost(risk.lines, prices(s)))})`, act: { type: 'order' as const, lines: risk.lines } }] : []),
+          { label: 'Show me', act: { type: 'select', id: risk.st.id } }] });
     } }
   const growing = hasKind(s, 'garden', 'field', 'greenhouse', 'orchard');
   if (!growing) add('food', 'garden', daysOfFood(s) < 90 ? 'little food stored and nothing growing' : 'nothing growing yet', daysOfFood(s) < 90 ? 70 : 45);
