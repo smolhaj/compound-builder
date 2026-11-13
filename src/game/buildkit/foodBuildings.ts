@@ -447,7 +447,7 @@ function orchard(def: KitPieceDef, seed = 1): THREE.Group {
       p.add('soil', box(W - 0.1 * M, 0.04 * M, depth - 0.3 * M, cx, top, cz - 0.05 * M), 'roof');
     }
     // a stair of flat stones at the left end, up the three benches
-    for (let i = 0; i < 6; i++) p.add('fieldstone', box(1.0 * M, 0.2 * M, 0.5 * M, x0 + 0.5 * M, i * 0.27 * M, z1 - 0.3 * M - i * (z1 - z0) / 3 * 0.42), 'frame');
+    for (let i = 0; i < 6; i++) p.add('fieldstone', box(1.0 * M, 0.2 * M + i * 0.27 * M, 0.5 * M, x0 + 0.5 * M, 0, z1 - 0.3 * M - i * (z1 - z0) / 3 * 0.42), 'frame');   // (solid from the ground: each stone used to hover over the one before)
   }
   for (const t of orchardTrees(def)) {
     const T = TREE[t.kind];

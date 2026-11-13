@@ -105,7 +105,7 @@ function lodgeBasement(p: Parts, o: LodgeShell): void {
   const top = y0 - 0.004;
   // ── the walkout basement: poured and stone-faced, the pad is its floor; the back (downhill) wall is mostly glass ──
   p.layer = 'foundation';
-  const slabRects = minusHoles({ x0: -hw, x1: hw, z0: -hd, z1: hd }, o.hatches);
+  const slabRects = minusHoles({ x0: -hw + 0.01, x1: hw - 0.01, z0: -hd + 0.01, z1: hd - 0.01 }, o.hatches);   // (inset: flush with the stone's outer face it z-fought)
   for (const r of slabRects) p.add('concrete', box(r.x1 - r.x0, 0.04, r.z1 - r.z0, (r.x0 + r.x1) / 2, -0.016, (r.z0 + r.z1) / 2));   // top at the furniture's floor (0.004), above the graded pad: the cutaway shows a slab, not grass
   const wallH = top + 0.03;
   const sink = p.sink;
@@ -134,7 +134,7 @@ function lodgeBasement(p: Parts, o: LodgeShell): void {
 function lodgePlinth(p: Parts, o: LodgeShell): void {
   const { y0, hw, hd } = o;
   p.layer = 'foundation';
-  for (const r of minusHoles({ x0: -hw, x1: hw, z0: -hd, z1: hd }, o.hatches)) p.add('concrete', box(r.x1 - r.x0, 0.04, r.z1 - r.z0, (r.x0 + r.x1) / 2, -0.04, (r.z0 + r.z1) / 2));
+  for (const r of minusHoles({ x0: -hw + 0.01, x1: hw - 0.01, z0: -hd + 0.01, z1: hd - 0.01 }, o.hatches)) p.add('concrete', box(r.x1 - r.x0, 0.04, r.z1 - r.z0, (r.x0 + r.x1) / 2, -0.04, (r.z0 + r.z1) / 2));
   const courses = 5, ch = (y0 + 0.03) / courses;
   for (let i = 0; i < courses; i++) {
     const inset = i % 2 ? 0.004 : 0;
@@ -159,7 +159,8 @@ function lodgeShell(p: Parts, o: LodgeShell): void {
   for (let x = -dx + 0.06; x <= dx - 0.05; x += (2 * dx - 0.12) / 10) { piers.push([x, dz - 0.06], [x, -dz + 0.06]); }
   for (let z = -dz + 0.5; z <= dz - 0.4; z += (2 * dz - 0.9) / 5) piers.push([-dx + 0.06, z], [dx - 0.06, z]);
   for (const [x, z] of piers) {
-    p.add('fieldstone', box(0.09, y0 + 0.22, 0.09, x, -0.22, z), 'foundation');
+    // (up to the beam, 0.04 under the boards: it used to end at the floor line, poking up through the deck boards)
+    p.add('fieldstone', box(0.09, y0 + 0.18, 0.09, x, -0.22, z), 'foundation');
     p.add('chimney_cap', box(0.105, 0.012, 0.105, x, y0 - 0.04, z), 'foundation');
   }
   // ── the wraparound deck: boards on the beams, the chimney stack and the stair coming through ──
@@ -276,7 +277,7 @@ function furnishLodge(c: FurnishCtx, o: { y0: number; f2: number; clear: Collide
   // the master suite, back right: partitions, a double bed, nightstands, a dresser; the bath beside it
   c.partition(0.42, back, 0.42, -0.4, [{ at: (-0.4 - back) - 0.25, w: 0.16, sill: 0, h: 0.4 }], 'pine_panel', 0.49);
   c.partition(0.42, -0.4, right, -0.4, [], 'pine_panel', 0.49);
-  c.partition(0.42, 0.04, right, 0.04, [{ at: 0.33, w: 0.16, sill: 0, h: 0.4 }], 'pine_panel', 0.49);
+  c.partition(0.42, 0.12, right, 0.12, [{ at: 0.33, w: 0.16, sill: 0, h: 0.4 }], 'pine_panel', 0.49);   // (was 0.04: it ended in the right wall's window)
   I({ x: 0.68, z: back + 0.22 }, a => { Furniture.bed(a, true, 'quilt_red'); sickSlot(a); });
   I({ x: 0.52, z: back + 0.06 }, a => Furniture.nightstand(a));
   I({ x: right - 0.06, z: back + 0.06 }, a => Furniture.nightstand(a));
@@ -391,36 +392,36 @@ function furnishTwoStorey(c: FurnishCtx, o: TwoStorey): void {
   c.partition(0.2, back, 0.2, front - 0.04, [door(0.35), door(span - 0.45)], 'plaster', 0.44);
   c.partition(left, 0.1, -0.2, 0.1, [door(0.3)], 'plaster', 0.44);
   c.partition(0.2, 0.0, right, 0.0, [door(0.25)], 'plaster', 0.44);
-  c.partition(0.55, back, 0.55, -0.45, [door(0.2)], 'plaster', 0.44);
-  c.partition(0.55, -0.45, right, -0.45, [], 'plaster', 0.44);
+  c.partition(0.52, back, 0.52, -0.45, [door(0.2)], 'plaster', 0.44);
+  c.partition(0.52, -0.45, right, -0.45, [], 'plaster', 0.44);
   // dining room (back left): the hearth, a table and chairs
   I({ x: -0.3, z: back + 0.06 }, a => Furniture.fireplace(a, o.hearth));
   I({ x: -0.55, z: -0.5 }, a => Furniture.diningTable(a));
   dressEvenings(c, { x: -0.55, z: -0.5, rot: 0 });
   I({ x: left + 0.03, z: -0.3, rot: Math.PI / 2 }, a => Furniture.shelfUnit(a, 1.2, 1.8, 'jars'));
   // parlor (front left): sofa, two armchairs, a rug, books
-  I({ x: -0.62, z: 0.55 }, a => Furniture.rug(a, 2.4, 2.4), false);
-  I({ x: -0.62, z: 0.3, rot: Math.PI }, a => Furniture.sofa(a, 'quilt_blue'));
-  I({ x: -0.9, z: 0.6, rot: Math.PI / 2 }, a => Furniture.armchair(a, 'quilt_red'));
+  I({ x: -0.47, z: 0.55 }, a => Furniture.rug(a, 2.4, 2.4), false);
+  I({ x: -0.47, z: 0.3, rot: Math.PI }, a => Furniture.sofa(a, 'quilt_blue'));
+  I({ x: -0.6, z: 0.62, rot: Math.PI / 2 }, a => Furniture.armchair(a, 'quilt_red'));
   I({ x: -0.34, z: 0.6, rot: -Math.PI / 2 }, a => Furniture.armchair(a, 'quilt_red'));
-  I({ x: left + 0.03, z: 0.85, rot: Math.PI / 2 }, a => Furniture.shelfUnit(a, 1.2, 1.8, 'books'));
+  I({ x: left + 0.03, z: 0.8, rot: Math.PI / 2 }, a => Furniture.shelfUnit(a, 1.2, 1.8, 'books'));
   // hall
   I({ x: 0.06, z: -0.2 }, a => Furniture.stairs(a, 2.8, 3.4, 0.9));
   I({ x: 0.0, z: front - 0.04, rot: Math.PI }, a => Furniture.coatPegs(a, 1.0), false);
   // kitchen (front right): the range, the counter, an island and a table
-  I({ x: right - 0.05, z: 0.5, rot: -Math.PI / 2 }, a => Furniture.counter(a, 3.2, 0.4, !!w.plumbed));
-  I({ x: right - 0.06, z: 0.9, rot: -Math.PI / 2 }, a => Furniture.cookstove(a));
-  if (w.wired) I({ x: right - 0.065, z: 0.2, rot: -Math.PI / 2 }, a => Furniture.fridge(a));
+  I({ x: right - 0.05, z: 0.5, rot: -Math.PI / 2 }, a => Furniture.counter(a, 2.6, 0.4, !!w.plumbed));
+  I({ x: right - 0.06, z: 0.81, rot: -Math.PI / 2 }, a => Furniture.cookstove(a));
+  if (w.wired) I({ x: right - 0.065, z: 0.15, rot: -Math.PI / 2 }, a => Furniture.fridge(a));
   I({ x: 0.55, z: 0.55, rot: Math.PI / 2 }, a => Furniture.island(a, 1.6));
-  I({ x: 0.45, z: 0.95, rot: Math.PI / 2 }, a => Furniture.table(a, 1.2, 0.8));
-  I({ x: 0.5, z: front - 0.04, rot: Math.PI }, a => Furniture.shelfUnit(a, 1.0, 1.6, 'food'));
+  I({ x: 0.45, z: 0.8, rot: Math.PI / 2 }, a => Furniture.table(a, 1.2, 0.8));
+  I({ x: 0.59, z: front - 0.1, rot: Math.PI }, a => Furniture.shelfUnit(a, 1.0, 1.6, 'food'));
   // bedroom (back, between the hall and the bath) and the bath (back right)
   I({ x: 0.38, z: back + 0.22 }, a => { Furniture.bed(a, true, 'quilt_red'); sickSlot(a); });
   I({ x: 0.24, z: back + 0.06 }, a => Furniture.nightstand(a));
   I({ x: 0.5, z: -0.2, rot: -Math.PI / 2 }, a => Furniture.dresser(a, 0.9));
-  I({ x: 0.75, z: back + 0.2 }, a => Furniture.tub(a));
+  I({ x: right - 0.09, z: back + 0.2, rot: Math.PI / 2 }, a => Furniture.tub(a));
   I({ x: right - 0.04, z: -0.6, rot: -Math.PI / 2 }, a => Furniture.washstand(a));
-  I({ x: 0.68, z: -0.55 }, a => (w.plumbed && w.septic ? Furniture.flushToilet(a) : Furniture.toilet(a)));
+  I({ x: 0.6, z: -0.55 }, a => (w.plumbed && w.septic ? Furniture.flushToilet(a) : Furniture.toilet(a)));
   if (w.wired) for (const [x, z] of [[-0.55, -0.5], [-0.62, 0.45], [0.55, 0.6]] as const) I({ x, z, y: o.f2 - 0.05 }, a => Furniture.pendant(a, 0.5), false);
   const tableY = c.y0 + 0.004 + 0.76 * M;
   c.C({ x: 0.45, z: 0.95, y: tableY }, a => Clutter.fruitBowl(a), 0.8);
@@ -455,9 +456,9 @@ function furnishTwoStorey(c: FurnishCtx, o: TwoStorey): void {
   c.partition(0.5, -0.4, right, -0.4, [], 'pine_panel', 0.44);
   I({ x: 0.12, z: back + 0.22 }, a => { Furniture.bed(a, true, 'quilt_red'); sickSlot(a); });
   I({ x: -0.04, z: back + 0.06 }, a => Furniture.nightstand(a));
-  I({ x: 0.7, z: back + 0.2 }, a => Furniture.tub(a));
+  I({ x: right - 0.09, z: back + 0.2, rot: Math.PI / 2 }, a => Furniture.tub(a));
   I({ x: right - 0.04, z: -0.55, rot: -Math.PI / 2 }, a => Furniture.washstand(a));
-  I({ x: 0.62, z: -0.5 }, a => (w.plumbed && w.septic ? Furniture.flushToilet(a) : Furniture.toilet(a)));
+  I({ x: 0.6, z: -0.5 }, a => (w.plumbed && w.septic ? Furniture.flushToilet(a) : Furniture.toilet(a)));
   I({ x: 0.3, z: -0.1 }, a => Furniture.workbench(a, 1.8));
   I({ x: 0.06, z: -0.2 }, a => Furniture.stairs(a, 2.8, 3.4, 0.9));
   // lived in
@@ -520,14 +521,14 @@ function shutters(p: Parts, hw: number, hd: number, ops: Array<{ side: 'front' |
 function stoneHouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   const W = def.cellsX * 0.5, D = def.cellsZ * 0.5, hw = W / 2, hd = D / 2, T = 0.075;
   const y0 = def.floorY, wallH = 0.95, rise = 0.5, f2 = y0 + 0.47;
-  const lower = [-0.62, 0.05, 0.62], upper = [-0.3, 0.35];
+  const lower = [-0.62, 0.3, 0.62], upper = [-0.3, 0.0];   // (the middle lower one was at 0.05 and the upper at 0.35: both hall partitions end in the side walls at 0.1 and 0.0, in that glass)
   const side = rowsOf(lower, upper, 0.24, 0.2, { sill: 0.07, sillU: 0.55, h: 0.34, hU: 0.3 });
   const front: WallOpening[] = [{ kind: 'door', at: 0, w: 0.18, h: 0.4 }, { kind: 'window', at: -0.48, w: 0.3, h: 0.34, sill: 0.07 }, { kind: 'window', at: 0.48, w: 0.3, h: 0.34, sill: 0.07 },
     { kind: 'window', at: -0.22, w: 0.15, h: 0.3, sill: 0.55 }, { kind: 'window', at: 0.22, w: 0.15, h: 0.3, sill: 0.55 }];
   const { group } = buildGabled({
     W, D, floor: y0, wallH, wallT: T, rise, eave: 0.1, gableOver: 0.06, porch: def.porch,
     foundation: 'fieldstone', floorMat: 'floorboards', outer: 'fieldstone', inner: 'plaster', roof: 'metal_roof_grey', trim: 'wood_dark',
-    front, back: [{ kind: 'window', at: -0.4, w: 0.3, h: 0.34, sill: 0.07 }, { kind: 'door', at: 0.45, w: 0.18, h: 0.4 }, { kind: 'window', at: 0.0, w: 0.2, h: 0.3, sill: 0.55 }],
+    front, back: [{ kind: 'window', at: -0.4, w: 0.3, h: 0.34, sill: 0.07 }, { kind: 'door', at: 0.0, w: 0.18, h: 0.4 }, { kind: 'window', at: 0.38, w: 0.2, h: 0.3, sill: 0.55 }],
     left: side, right: side,
     gableWindow: { front: true, back: true, w: 0.34, h: 0.22, y: 0.06 },
     chimney: { kind: 'stone', x: -0.3 }, tieBeams: [-0.5, 0.1, 0.7], ceiling: 'pine_panel', corners: 'none', curtains: 'curtain',
@@ -561,7 +562,7 @@ function timberFrameHouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THR
     W, D, floor: y0, wallH, wallT: T, rise, eave: 0.12, gableOver: 0.07, porch: def.porch,
     foundation: 'fieldstone', floorMat: 'floorboards', outer: 'plaster', inner: 'pine_panel', roof: 'metal_roof_green', trim: 'wood_dark',
     front: [{ kind: 'door', at: 0, w: 0.18, h: 0.4 }, tall(-0.5, 0.3), tall(0.5, 0.3)],
-    back: [tall(-0.5, 0.3), { kind: 'door', at: 0.5, w: 0.18, h: 0.4 }],
+    back: [tall(-0.5, 0.3), { kind: 'door', at: 0.36, w: 0.18, h: 0.4 }],
     left: [tall(-0.62, 0.3), tall(0.05, 0.3), tall(0.62, 0.3)],
     right: [tall(-0.62, 0.3), tall(0.05, 0.3), tall(0.62, 0.3)],
     gableWindow: { front: true, back: true, w: 1.0, h: 0.5, y: 0.04, rake: true },
@@ -610,7 +611,7 @@ function containerHouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE
   const up = { x0: 0.0, x1: W / 2, z0: -hd + 0.36, z1: hd + 0.36 };   // the upper container, over the right one, 2 m forward
   const { group } = buildGabled({
     W, D, floor: y0, wallH, wallT: T, rise, eave: 0.03, gableOver: 0.02, porch: 0,
-    foundation: 'piers', noSteps: true, floorMat: 'floorboards', outer: colA, inner: 'pine_panel', roof: 'metal_roof_grey', trim: 'iron',
+    foundation: 'piers', noSteps: true, sideSteps: true, floorMat: 'floorboards', outer: colA, inner: 'pine_panel', roof: 'metal_roof_grey', trim: 'iron',
     front: [{ kind: 'door', at: -0.2, w: 0.16, h: 0.36 }, { kind: 'window', at: 0.18, w: 0.3, h: 0.34, sill: 0.04 }],
     back: [{ kind: 'window', at: -0.2, w: 0.2, h: 0.28, sill: 0.1 }, { kind: 'window', at: 0.2, w: 0.2, h: 0.28, sill: 0.1 }],
     left: [-0.75, -0.25, 0.25, 0.75].map(at => ({ kind: 'window' as const, at, w: 0.34, h: 0.3, sill: 0.08 })),
@@ -727,7 +728,7 @@ function adobeHouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Gro
     W, D, floor: y0, wallH, wallT: T, rise, eave: 0.05, gableOver: 0.03, porch: def.porch,
     foundation: 'concrete', floorMat: 'pavers', outer: 'adobe', inner: 'plaster', roof: 'gravel', trim: 'wood_dark',
     front: [{ kind: 'door', at: 0.05, w: 0.18, h: 0.38 }, win(-0.48, 0.24), win(0.48, 0.24)],
-    back: [win(-0.5), win(0.2), { kind: 'door', at: 0.5, w: 0.16, h: 0.36 }],
+    back: [win(-0.5), win(0.29), { kind: 'door', at: 0.5, w: 0.16, h: 0.36 }],
     left: [win(-0.65), win(-0.1), win(0.5, 0.24)],
     right: [win(-0.65), win(-0.1), win(0.5, 0.24)],
     ceiling: 'pine_panel', corners: 'none', curtains: 'curtain_red',
@@ -749,7 +750,7 @@ function adobeHouse(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Gro
     for (const x of [-hw + 0.1, -0.5, 0.5, hw - 0.1]) p.add('log_end', cyl(0.024, wallH - 0.03, x, y0, pz, 8), 'openings');
     p.add('wood_dark', box(W + 0.04, 0.05, 0.06, 0, yE - 0.07, pz), 'openings');
     // buttresses: stepped, battered earth ribs at the corners and midway down the long walls
-    for (const sx of [-1, 1]) for (const z of [-hd + 0.02, -0.4, 0.4, hd - 0.02]) {
+    for (const sx of [-1, 1]) for (const z of [-hd + 0.02, -0.37, 0.19, hd - 0.02]) {
       p.add('adobe', box(0.09, 0.36, 0.11, sx * (hw + 0.04), y0, z), 'walls');
       p.add('adobe', box(0.07, 0.12, 0.09, sx * (hw + 0.03), y0 + 0.36, z), 'walls');
     }
