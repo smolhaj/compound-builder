@@ -124,3 +124,14 @@ export function distToPolyline(pts: readonly Pt[], x: number, z: number): number
   }
   return best;
 }
+
+/**
+ * Does the (planned or built) road re-shape the ground at (x, z) by more than `tol` (world units, 24 cm): the bench, a cut bank or a fill slope? A building
+ * graded onto ground the road's banks run over would be buried in the cut or hover over the fill, so placement keeps its pads off it. `natural` is the ground
+ * height there with no road.
+ */
+export function bedMoves(bed: RoadBed, natural: number, x: number, z: number, tol = 0.04): boolean {
+  const b = bed.bbox;
+  if (bed.empty || x < b[0] || x > b[2] || z < b[1] || z > b[3]) return false;
+  return Math.abs(bed.apply(x, z, natural).h - natural) > tol;
+}

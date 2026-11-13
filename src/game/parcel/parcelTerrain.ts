@@ -509,6 +509,14 @@ export class ParcelTerrain {
 
   sample(x: number, z: number): ParcelSample {
     const s = this.natural(x, z);
+    for (const p of this._pads) {
+      const d = Math.max(p.x0 - x, x - p.x1, p.z0 - z, z - p.z1, 0);
+      if (d >= p.skirt) continue;
+      const k = 1 - sstep(0, p.skirt, d);
+      s.h += (p.y - s.h) * k;
+      s.forest *= 1 - k;
+    }
+    // (the road's bench and banks come after the pads: a pad's skirt that reaches the road eases into the road's banks, and never re-grades the road itself, which kept its own level)
     const bed = this._bed;
     if (bed) {
       const b = bed.bbox;
@@ -517,13 +525,6 @@ export class ParcelTerrain {
         s.h = r.h;
         if (r.cleared) s.forest = 0;
       }
-    }
-    for (const p of this._pads) {
-      const d = Math.max(p.x0 - x, x - p.x1, p.z0 - z, z - p.z1, 0);
-      if (d >= p.skirt) continue;
-      const k = 1 - sstep(0, p.skirt, d);
-      s.h += (p.y - s.h) * k;
-      s.forest *= 1 - k;
     }
     for (const w of this._works) {
       const b = w.bbox!;
