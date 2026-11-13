@@ -18,7 +18,7 @@ import * as THREE from 'three';
 export type ContactQuality = 'low' | 'medium' | 'high';
 
 const CAP = 1024;
-const EPS = 0.004;
+const EPS = 0.02;      // clears the path aprons and ribbons (ground + 0.013) that polygon offset alone cannot beat
 const UP = new THREE.Vector3(0, 1, 0);
 
 const VERT = /* glsl */`
@@ -67,7 +67,9 @@ export class ContactShadows {
   private _n = 0;
   private _nStatic = 0;
   /** QA / settings switch: false draws nothing. */
-  enabled = true;
+  private _enabled = true;
+  get enabled(): boolean { return this._enabled; }
+  set enabled(v: boolean) { this._enabled = v; this.mesh.visible = v && this._n > 0; }
   private _quality: ContactQuality = 'high';
   private _night = 0;
   /** Horizontal unit vector pointing away from the sun, and how long a shadow is per unit of height (cot of the sun's elevation, capped). */
@@ -162,7 +164,7 @@ export class ContactShadows {
   /** Upload the frame. */
   end(): void {
     this.mesh.count = this._n;
-    this.mesh.visible = this._n > 0 && this.enabled;
+    this.mesh.visible = this._n > 0 && this._enabled;
     this.mesh.instanceMatrix.needsUpdate = true;
     this._shape.needsUpdate = true;
   }
