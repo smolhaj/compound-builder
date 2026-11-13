@@ -12,6 +12,8 @@ import { FigureLayer, FIG_POSE, FIG_SCALE, FIG_TOOL, GEAR, HEADWEAR, stridePhase
 import type { Wear } from '../../engine/world/people/crowdWear';
 import { wearForRole, roleOfPerson, seedOf, type Role } from '../../engine/world/people/roleWear';
 import type { Battle, BattleEvent, BattleUnit } from '../../sim/battleTypes';
+import { blockedAt, keepPush } from '../../sim/cutNav';
+import { navFor } from '../../sim/cutLive';
 import { coverPusher, type Box } from './cameraObstacles';
 import { MUZZLE, OWN_BOX, TORSO, WALL_POST, faceNormal, lineOfFire } from './lineOfFire';
 import { chooseCover, dropsProne, type Round } from './coverChoice';
@@ -133,14 +135,30 @@ export class BattleRenderer {
   coverSource: () => ReadonlyArray<{ x: number; z: number; r: number }> = () => [];
   /** Is the spot inside a wall, a building or furniture (set by the canvas: the world's walk collision)? A raider is never nudged out of a bush into one. */
   walkSolid: (x: number, z: number) => boolean = () => false;
+  /** The walk collision as it is right now in this scene: the world's own, with the scene's breaches open from their moment and its shut doors shut (sim/cutNav.ts). */
+  private _navFor: { battle: Battle; nav: ReturnType<typeof navFor> } | null = null;
+  private _solidNow(): (x: number, z: number) => boolean {
+    const b = this.battle;
+    if (!b) return this.walkSolid;
+    if (this._navFor?.battle !== b) this._navFor = { battle: b, nav: navFor(b, this.walkSolid) };
+    const nav = this._navFor.nav, t = this.time;
+    return (x, z) => blockedAt(nav, x, z, t);
+  }
   private _coverIdx: { src: unknown; push: (x: number, z: number) => { x: number; z: number } } | null = null;
-  private _clearOfCover(x: number, z: number): { x: number; z: number } {
+  private _clearOfCover(x: number, z: number, now?: { x: number; z: number }, unit?: string): { x: number; z: number } {
     const cover = this.coverSource();
     if (!cover.length) return { x, z };
     if (this._coverIdx?.src !== cover) this._coverIdx = { src: cover, push: coverPusher(cover) };
     const p = this._coverIdx.push(x, z);
-    // (the push out of a bush must not end inside something solid: then he stays where the plan put him)
-    return (p.x !== x || p.z !== z) && this.walkSolid(p.x, p.z) && !this.walkSolid(x, z) ? { x, z } : p;
+    // (a push that ends inside something solid, or hops a wall beside the breach, is refused: sim/cutNav.ts `keepPush`)
+    // (the plan's next waypoint for him, if there is one: the leg on from the pushed spot must run clear to it as the plan's did)
+    let next: { at: { x: number; z: number }; solid: (x: number, z: number) => boolean } | undefined;
+    const b = this.battle;
+    if (b && unit && this._navFor?.battle === b) {
+      const nav = this._navFor.nav;
+      for (const f of b.events) if (f.t > this.time + 1e-6 && (f.kind === 'move' || f.kind === 'cover') && f.unit === unit) { next = { at: { x: f.x, z: f.z }, solid: (sx, sz) => blockedAt(nav, sx, sz, f.t) }; break; }
+    }
+    return keepPush(this._solidNow(), { x, z }, p, now, next);
   }
 
   private readonly _scene: THREE.Scene;
@@ -489,8 +507,8 @@ export class BattleRenderer {
     switch (e.kind) {
       case 'alarm': this._alarmOn = true; if (e.what === 'dog') this.props.onEvent({ ...e }); break;
       case 'lights': this._lightsOn(e.masts, e.aim); break;
-      case 'move': { const u = U_(e.unit); if (u && !u.dead) { const n = this._near(e), c = u.def.side === 'raider' ? this._clearOfCover(n.x, n.z) : n; u.tx = c.x; u.tz = c.z; u.ty = e.y ?? 0; u.crouch = false; u.lean = 0; if (e.walk) u.speed = WALK; } break; }
-      case 'cover': { const u = U_(e.unit); if (u && !u.dead) { const n = this._near(e), c = u.def.side === 'raider' ? this._clearOfCover(n.x, n.z) : n; u.tx = c.x; u.tz = c.z; u.ty = 0; u.crouch = true; if (e.walk) u.speed = WALK; } break; }
+      case 'move': { const u = U_(e.unit); if (u && !u.dead) { const n = this._near(e), c = u.def.side === 'raider' ? this._clearOfCover(n.x, n.z, { x: u.x, z: u.z }, e.unit) : n; u.tx = c.x; u.tz = c.z; u.ty = e.y ?? 0; u.crouch = false; u.lean = 0; if (e.walk) u.speed = WALK; } break; }
+      case 'cover': { const u = U_(e.unit); if (u && !u.dead) { const n = this._near(e), c = u.def.side === 'raider' ? this._clearOfCover(n.x, n.z, { x: u.x, z: u.z }, e.unit) : n; u.tx = c.x; u.tz = c.z; u.ty = 0; u.crouch = true; if (e.walk) u.speed = WALK; } break; }
       case 'beat':
         if (e.rate && e.secs) { this._rate = e.rate; this._slowUntil = Math.max(this._slowUntil, this.time + e.secs); }
         if (e.role === 'vigil') this._alarmOn = false;   // the shooting is over: the alarm light goes out, and the yard is quiet

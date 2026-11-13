@@ -13,7 +13,7 @@ import { decorateBreach } from './breach';
 import { planHouseAssault } from './houseAssault';
 import { deadSilent } from './deadSilent';
 import { LineDirector } from './raidDialogue';
-import { routeScene } from './cutLive';
+import { routeScene, gatePortals } from './cutLive';
 import { stepSegments } from './standingSurfaces';
 import { KIT, footprint } from '../game/buildkit/kit';
 
@@ -77,7 +77,7 @@ export function prepared(b: Battle, g: GameState, seed: number): Battle {
     out = decorateBreach(b, g.perimeter, { x: 0, z: 0 }, seed, b.events.some(e => e.kind === 'rocket' || e.kind === 'throw'), dir);
     out = planHouseAssault(out, { box: HOUSE, blocked: solid, seed, dir, nameOf: id => id });
   }
-  const r = routeScene(deadSilent(out), solid, undefined, stepSegments(g.perimeter));
+  const r = routeScene(deadSilent(out), solid, undefined, stepSegments(g.perimeter), gatePortals(g.perimeter));
   if (!r.ok || r.unrouted) throw new Error(`routing failed: ok ${r.ok}, unrouted ${r.unrouted} ${JSON.stringify(r.lost.slice(0, 3))}`);
   return r.battle;
 }
