@@ -99,7 +99,7 @@ describe('the drawing', () => {
     // cow + goat + rooster + hens (+ the shadow): never more than a handful, and nothing is drawn for a kind that is not there
     expect(visible.length).toBeLessThanOrEqual(7);
     expect(visible.some(m => m.name.startsWith('stock_pig'))).toBe(false);
-    const shadow = scene.children.find(o => o.name === 'stock_shadow') as THREE.InstancedMesh;
+    const shadow = scene.children.find(o => o.name === 'contact_shadows') as THREE.InstancedMesh;
     const bodies = visible.filter(m => m !== shadow).reduce((s, m) => s + m.count, 0);
     expect(shadow.count).toBe(bodies);
     for (const m of visible) { expect(m.castShadow).toBe(false); expect(m.userData.noSSAO).toBe(true); }

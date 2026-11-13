@@ -48,7 +48,7 @@ try {
     if (m.problems) checks.push({ k: 'showcaseProblems', v: m.problems, max: 0, bad: true });
     rows.push({ scene: sceneName, tier, loadMs, ...Object.fromEntries(checks.map(c => [c.k, Math.round(c.v)])) });
     const bad = checks.filter(c => c.bad);
-    console.log(`${sceneName}/${tier}: calls ${m.drawCalls} tris ${(m.triangles / 1000).toFixed(0)}k shadowTris ${(m.shadowTriangles / 1000).toFixed(0)}k casters ${m.shadowCasters} heap ${m.heapMB.toFixed(0)}MB load ${loadMs}ms (script ${Math.round(m.showcaseMs)}ms)`
+    console.log(`${sceneName}/${tier}: calls ${m.drawCalls} tris ${m.triangles} (${(m.triangles / 1000).toFixed(0)}k) shadowTris ${m.shadowTriangles} (${(m.shadowTriangles / 1000).toFixed(0)}k) casters ${m.shadowCasters} heap ${m.heapMB.toFixed(0)}MB load ${loadMs}ms (script ${Math.round(m.showcaseMs)}ms)`
       + (bad.length ? '  OVER BUDGET: ' + bad.map(c => `${c.k} ${Math.round(c.v)} > ${c.max}`).join(', ') : '  ok'));
     if (bad.length && !printOnly) failed = true;
   }
