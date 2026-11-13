@@ -38,7 +38,8 @@ try {
   page.setDefaultTimeout(600000);
   page.on('pageerror', e => console.error('pageerror:', e.message));
   page.on('console', m => { if (m.type() === 'error') console.error('console:', m.text().slice(0, 300)); });
-  const frames = async () => { await page.evaluate(q => window.__cb.qa.renderFull(q), quality); };
+  // (renderNow keeps the quality tier the page was set to; renderFull switches tiers, which drops the animals' meshes until the next update)
+  const frames = async () => { await page.evaluate(() => { const { world, game } = window.__cb; world.updateWildlife(0.001, game.getState().game, 1); return window.__cb.qa.renderNow(); }); };
   let loaded = '';
   for (const s of SHOTS) {
     if (only && !only.split(',').some(o => s.name.includes(o))) continue;

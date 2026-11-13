@@ -106,11 +106,15 @@ export class AnimalBatches {
     return b;
   }
 
-  begin(): void { for (const b of this._batches.values()) b.n = 0; this._shadowN = 0; }
+  private _drawn = 0;
+  begin(): void { for (const b of this._batches.values()) b.n = 0; this._shadowN = 0; this._drawn = 0; }
 
   put(a: PutAnimal): void {
+    // Low: at most 8 animals are drawn at all (the perf budget counts every triangle on the screen)
+    if (this._quality === 'low' && this._drawn >= 8) return;
     const b = this._batch(a.id, a.li), { model } = this._material(a.id);
     if (b.n >= this._cap) return;
+    this._drawn++;
     const nb = model.spec.breeds.length, bi = ((a.breed % nb) + nb) % nb, sc = UNIT * a.size * (model.spec.breeds[bi].size ?? 1);
     tmpQ.setFromEuler(tmpE.set(a.pitch ?? 0, a.rot, 0, 'YXZ'));
     tmpM.compose(tmpV.set(a.x, a.y, a.z), tmpQ, tmpS.set(sc, sc, sc));
