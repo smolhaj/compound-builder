@@ -24,30 +24,40 @@ export interface BoneAnim {
   bob?: number;
   /** Pulse the idle motion (an ear twitch, a tail flick) instead of a smooth sway. */
   pulse?: boolean;
+  /** Bias when lying (a dog down on its belly; `AnimalMaterialSpec.extra`) and when alert (head up, ears forward, tail raised). */
+  lie?: number; alert?: number;
+  /** A gallop phase offset (rad): above gait 1 the leg swings with this offset instead of `off` (a flee is not a fast walk). */
+  offRun?: number;
+  /** Tail wag: amplitude (rad) and frequency (rad/s), scaled by the per-instance wag amount. */
+  wag?: [amp: number, freq: number];
 }
 
 /** One coat. Colours are linear-ish sRGB triples in 0..1. */
 export interface Breed {
   name: string;
   base: V3;
-  /** 0 solid, 1 blotches, 2 bars, 3 belt, 4 spots, 5 saddle, 6 speckle. */
+  /** 0 solid, 1 blotches, 2 bars, 3 belt, 4 spots, 5 saddle, 6 speckle, 7 dorsal saddle. Regions 7, 8 and 9 take the accents below (a muzzle, an eye ring, a throat patch, a duck's breast). */
   style: number;
   patch?: V3; cover?: number; scale?: number;
   face?: V3; faceMix?: number;
   leg?: V3; legMix?: number;
   belly?: V3; bellyMix?: number; bellyY?: number;
+  /** Style 7 (a dorsal saddle): the height (m) the saddle fades in from, centred on `belt`. */
+  dorsal?: number;
   /** Belt centre (z, metres) and half-width; for style 5 the saddle. */
   belt?: [number, number];
   /** Muzzle / nose colour. */
   nose?: V3;
   /** Fur bump strength and frequency (per metre). */
   fur?: number; furFreq?: number;
+  /** Colour and mix of the three accent regions (REGION.ACC1..3). */
+  acc1?: V3; acc1Mix?: number; acc2?: V3; acc2Mix?: number; acc3?: V3; acc3Mix?: number;
   /** Instance scale for this breed (a Jersey is smaller than a Holstein). */
   size?: number;
 }
 
 export const BREEDS_MAX = 4;
-const PER = 8;
+const PER = 11;
 
 export interface AnimalMaterialSpec {
   bones: ReadonlyArray<BoneAnim | undefined>;
@@ -57,9 +67,18 @@ export interface AnimalMaterialSpec {
   grazeFreq: number;
   /** Shader cache key. */
   key: string;
+  /**
+   * Wildlife and pets: the geometry carries the extra per-instance attribute `iExtra` (x: adornment growth 0..1 — antlers, a tom turkey's
+   * beard; y: lying 0..1; z: tail wag 0..1; w: alert 0..1). Livestock leaves this off and compiles without it.
+   */
+  extra?: boolean;
+  /** Where REGION.ADORN vertices scale from (the antler base, model metres) as the growth goes 0 to 1. */
+  adorn?: V3;
+  /** Root: drop (m) when lying and when sitting, pitch (rad) when alert. */
+  rootPose?: { lieDrop?: number; sitDrop?: number; alertPitch?: number };
 }
 
-export const ANIM_ATTRS = { coat: 'iCoat', anim: 'iAnim' } as const;
+export const ANIM_ATTRS = { coat: 'iCoat', anim: 'iAnim', extra: 'iExtra' } as const;
 
 const VERT_PARS = /* glsl */`
 #define NB ${BONE_COUNT}
@@ -67,7 +86,11 @@ uniform vec4 uBP[NB];
 uniform vec4 uA0[NB];
 uniform vec4 uA1[NB];
 uniform vec4 uA2[NB];
+uniform vec4 uA3[NB];
+uniform vec4 uA4[NB];
 uniform vec4 uRoot;
+uniform vec4 uRoot2;
+uniform vec3 uAdorn;
 uniform vec2 uRootC;
 uniform float uTime;
 uniform float uGrazeFreq;
@@ -75,6 +98,10 @@ attribute vec3 aSkin;
 attribute vec2 aMark;
 attribute vec4 iAnim;
 attribute vec4 iCoat;
+#ifdef USE_EXTRA
+attribute vec4 iExtra;
+#endif
+varying float vAdorn;
 varying vec3 vRest;
 varying vec2 vMark;
 varying vec4 vCoat;
@@ -85,10 +112,15 @@ vec3 aRot(vec3 v, float a, int ax) {
   return vec3(v.x * c + v.z * s, v.y, -v.x * s + v.z * c);
 }
 float boneAngle(int b) {
-  vec4 a0 = uA0[b], a1 = uA1[b], a2 = uA2[b];
-  float ph = iAnim.x + a0.z, g = iAnim.y, gr = iAnim.z, seed = iAnim.w;
+  vec4 a0 = uA0[b], a1 = uA1[b], a2 = uA2[b], a3 = uA3[b], a4 = uA4[b];
+  float g = iAnim.y, gr = iAnim.z, seed = iAnim.w;
+  float run = a3.w * smoothstep(0.95, 1.12, g);
+  float ph = iAnim.x + mix(a0.z, a3.z, run);
   float a = a0.x + g * (a0.y * sin(ph) + a0.w * max(0.0, cos(ph)));
   a += gr * a1.x;
+#ifdef USE_EXTRA
+  a += iExtra.y * a3.x + iExtra.w * a3.y + iExtra.z * a4.x * sin(uTime * a4.y + seed * 9.0);
+#endif
   float s = sin(uTime * a1.z + seed * 6.2831 * a1.w + seed * 11.0);
   if (a2.z > 0.5) s = sign(s) * pow(abs(s), 9.0);
   a += a1.y * s * (1.0 - 0.8 * g);
@@ -111,11 +143,16 @@ void skinChain(inout vec3 p, inout vec3 n, int b) {
 const NORMAL_BEGIN = /* glsl */`
 vec3 objectNormal = vec3(normal);
 vec3 skPos = position;
+vAdorn = 1.0;
 {
-  vec3 pA = position, nA = objectNormal;
+  vec3 pos0 = position;
+#ifdef USE_EXTRA
+  if (aMark.y > 16.5 && aMark.y < 17.5) { pos0 = uAdorn + (position - uAdorn) * max(iExtra.x, 0.0001); vAdorn = iExtra.x; }
+#endif
+  vec3 pA = pos0, nA = objectNormal;
   skinChain(pA, nA, int(aSkin.x + 0.5));
   if (aSkin.z > 0.001) {
-    vec3 pB = position, nB = objectNormal;
+    vec3 pB = pos0, nB = objectNormal;
     skinChain(pB, nB, int(aSkin.y + 0.5));
     pA = mix(pA, pB, aSkin.z); nA = normalize(mix(nA, nB, aSkin.z));
   }
@@ -123,9 +160,14 @@ vec3 skPos = position;
   float rph = iAnim.x * 2.0, g = iAnim.y;
   float bob = uRoot.w > 0.5 ? max(0.0, sin(iAnim.x)) : abs(sin(rph * 0.5));
   float rp = uRoot.y * g * cos(iAnim.x * (uRoot.w > 0.5 ? 1.0 : 2.0)) + iAnim.z * uRoot.z;
+  float drop = iAnim.z * uRoot2.z;
+#ifdef USE_EXTRA
+  rp += iExtra.w * uRoot2.y;
+  drop += iExtra.y * uRoot2.x;
+#endif
   vec3 q = pA - vec3(0.0, uRootC.x, uRootC.y);
   q = aRot(q, rp, 0);
-  pA = q + vec3(0.0, uRootC.x + uRoot.x * g * bob, uRootC.y);
+  pA = q + vec3(0.0, uRootC.x + uRoot.x * g * bob - drop, uRootC.y);
   nA = aRot(nA, rp, 0);
   skPos = pA; objectNormal = nA;
 }
@@ -134,6 +176,7 @@ vRest = position; vMark = aMark; vCoat = iCoat;
 
 const FRAG_PARS = /* glsl */`
 uniform vec4 uBreed[${BREEDS_MAX * PER}];
+varying float vAdorn;
 varying vec3 vRest;
 varying vec2 vMark;
 varying vec4 vCoat;
@@ -147,7 +190,7 @@ float afbm(vec3 p) { return an(p) * 0.55 + an(p * 2.03 + 7.1) * 0.3 + an(p * 4.1
 vec3 coatColor(out float fur, out float freq) {
   int br = int(clamp(vCoat.x + 0.5, 0.0, ${BREEDS_MAX}.0 - 1.0));
   int o = br * ${PER};
-  vec4 c0 = uBreed[o], c1 = uBreed[o + 1], c2 = uBreed[o + 2], c3 = uBreed[o + 3], c4 = uBreed[o + 4], c5 = uBreed[o + 5], c6 = uBreed[o + 6], c7 = uBreed[o + 7];
+  vec4 c0 = uBreed[o], c1 = uBreed[o + 1], c2 = uBreed[o + 2], c3 = uBreed[o + 3], c4 = uBreed[o + 4], c5 = uBreed[o + 5], c6 = uBreed[o + 6], c7 = uBreed[o + 7], c8 = uBreed[o + 8], c9 = uBreed[o + 9], c10 = uBreed[o + 10];
   vec3 p = vRest + vec3(vCoat.y * 13.7, vCoat.y * 3.1, vCoat.y * 7.9);
   float style = c5.x;
   vec3 col = c0.rgb;
@@ -173,14 +216,20 @@ vec3 coatColor(out float fur, out float freq) {
     } else if (style < 5.5) {               // saddle / coloured ends: the middle is the colour of "patch"
       float d = abs(vRest.z - c6.y);
       mask = 1.0 - smoothstep(c6.z * 0.45, c6.z * 1.15, d + (afbm(p * 22.0) - 0.5) * 0.09);
-    } else {                                // speckle
+    } else if (style < 6.5) {               // speckle
       mask = step(1.0 - c1.w, an(p * c0.w * 3.0));
+    } else {                                // dorsal saddle: a band along the back that fades down the flanks (a wolf's, a shepherd's)
+      float d = abs(vRest.z - c6.y);
+      mask = (1.0 - smoothstep(c6.z * 0.45, c6.z * 1.15, d + (afbm(p * 18.0) - 0.5) * 0.12)) * smoothstep(c6.x - 0.06, c6.x + 0.1 + (an(p * 14.0) - 0.5) * 0.12, vRest.y);
     }
   }
   col = mix(col, c1.rgb, mask);
   if (region > 0.5 && region < 1.5) col = mix(col, c2.rgb, c2.w);           // face
   if (region > 1.5 && region < 3.5) col = mix(col, c3.rgb, c3.w);           // lower legs, tail
   if (region > 3.5 && region < 4.5) col = mix(col, mix(c2.rgb, c0.rgb, 0.5), c2.w * 0.6);   // ears
+  if (region > 6.5 && region < 7.5) col = mix(col, c8.rgb, c8.w);
+  if (region > 7.5 && region < 8.5) col = mix(col, c9.rgb, c9.w);
+  if (region > 8.5 && region < 9.5) col = mix(col, c10.rgb, c10.w);
   float below = smoothstep(c4.w + 0.06, c4.w - 0.06, vRest.y);
   if (region < 0.5) col = mix(col, c4.rgb, below * c6.w);
   if (region > 12.5 && region < 13.5) col = c7.rgb;
@@ -205,7 +254,7 @@ vec3 bumpN(vec3 N, vec3 vp, float h, float k) {
 
 /** Build the material for one model. `uniforms` is returned so the renderer can drive uTime. */
 export function animalMaterial(spec: AnimalMaterialSpec): { material: THREE.MeshStandardMaterial; uniforms: Record<string, { value: unknown }> } {
-  const bp = new Float32Array(BONE_COUNT * 4), a0 = new Float32Array(BONE_COUNT * 4), a1 = new Float32Array(BONE_COUNT * 4), a2 = new Float32Array(BONE_COUNT * 4);
+  const bp = new Float32Array(BONE_COUNT * 4), a0 = new Float32Array(BONE_COUNT * 4), a1 = new Float32Array(BONE_COUNT * 4), a2 = new Float32Array(BONE_COUNT * 4), a3 = new Float32Array(BONE_COUNT * 4), a4 = new Float32Array(BONE_COUNT * 4);
   for (let i = 0; i < BONE_COUNT; i++) {
     const b = spec.bones[i];
     bp[i * 4 + 3] = -1;
@@ -214,6 +263,8 @@ export function animalMaterial(spec: AnimalMaterialSpec): { material: THREE.Mesh
     a0.set([b.bias ?? 0, b.swing ?? 0, b.off ?? 0, b.flex ?? 0], i * 4);
     a1.set([b.graze ?? 0, b.idle ?? 0, b.idleFreq ?? 1, b.idlePh ?? 0], i * 4);
     a2.set([b.axis ?? 0, b.bob ?? 0, b.pulse ? 1 : 0, 0], i * 4);
+    a3.set([b.lie ?? 0, b.alert ?? 0, b.offRun ?? 0, b.offRun === undefined ? 0 : 1], i * 4);
+    a4.set([b.wag?.[0] ?? 0, b.wag?.[1] ?? 0, 0, 0], i * 4);
   }
   const br = new Float32Array(BREEDS_MAX * PER * 4);
   spec.breeds.slice(0, BREEDS_MAX).forEach((b, i) => {
@@ -224,16 +275,22 @@ export function animalMaterial(spec: AnimalMaterialSpec): { material: THREE.Mesh
     d(3, [...(b.leg ?? b.base), b.legMix ?? 0]);
     d(4, [...(b.belly ?? b.base), b.bellyY ?? 0.5]);
     d(5, [b.style, b.fur ?? 0.5, b.furFreq ?? 60, 0]);
-    d(6, [0, b.belt?.[0] ?? 0, b.belt?.[1] ?? 0.2, b.bellyMix ?? 0]);
+    d(6, [b.dorsal ?? 0, b.belt?.[0] ?? 0, b.belt?.[1] ?? 0.2, b.bellyMix ?? 0]);
     d(7, [...(b.nose ?? [0.3, 0.22, 0.22]), 0]);
+    d(8, [...(b.acc1 ?? b.base), b.acc1Mix ?? 0]);
+    d(9, [...(b.acc2 ?? b.base), b.acc2Mix ?? 0]);
+    d(10, [...(b.acc3 ?? b.base), b.acc3Mix ?? 0]);
   });
   const uniforms = {
-    uBP: { value: bp }, uA0: { value: a0 }, uA1: { value: a1 }, uA2: { value: a2 },
+    uBP: { value: bp }, uA0: { value: a0 }, uA1: { value: a1 }, uA2: { value: a2 }, uA3: { value: a3 }, uA4: { value: a4 },
+    uRoot2: { value: new THREE.Vector4(spec.rootPose?.lieDrop ?? 0, spec.rootPose?.alertPitch ?? 0, spec.rootPose?.sitDrop ?? 0, 0) },
+    uAdorn: { value: new THREE.Vector3(...(spec.adorn ?? [0, 0, 0])) },
     uRoot: { value: new THREE.Vector4(spec.root.bob, spec.root.pitch, spec.root.grazePitch ?? 0, spec.root.hop ? 1 : 0) },
     uRootC: { value: new THREE.Vector2(spec.root.cy, spec.root.cz) },
     uTime: { value: 0 }, uGrazeFreq: { value: spec.grazeFreq }, uBreed: { value: br },
   };
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0, vertexColors: true });
+  if (spec.extra) material.defines = { USE_EXTRA: '' };
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = shader.vertexShader
@@ -251,6 +308,9 @@ export function animalMaterial(spec: AnimalMaterialSpec): { material: THREE.Mesh
             vec3 cc = coatColor(furK, furF);
             float shade = dot(vColor.rgb, vec3(0.3333));
             diffuseColor.rgb *= mix(base, cc * shade, coatK);
+          } else if (vMark.y > 16.5 && vMark.y < 17.5) {
+            // antlers: fuzzy brown velvet while they grow, bone once hard
+            diffuseColor.rgb *= mix(vec3(0.5, 0.38, 0.28), base, smoothstep(0.8, 0.95, vAdorn));
           } else diffuseColor.rgb *= base;
         }`)
       .replace('#include <normal_fragment_maps>', /* glsl */`
@@ -262,7 +322,7 @@ export function animalMaterial(spec: AnimalMaterialSpec): { material: THREE.Mesh
       .replace('#include <roughnessmap_fragment>', /* glsl */`
         #include <roughnessmap_fragment>
         { float rg = vMark.y;
-          if (rg > 9.5) { roughnessFactor = rg < 10.5 ? 0.12 : rg < 11.5 ? 0.55 : rg < 12.5 ? 0.45 : rg < 13.5 ? 0.3 : rg < 14.5 ? 0.6 : 0.4; } }`);
+          if (rg > 9.5) { roughnessFactor = rg < 10.5 ? 0.12 : rg < 11.5 ? 0.55 : rg < 12.5 ? 0.45 : rg < 13.5 ? 0.3 : rg < 14.5 ? 0.6 : rg < 15.5 ? 0.4 : rg < 16.5 ? 0.3 : 0.7; } }`);
   };
   material.customProgramCacheKey = () => 'animal_' + spec.key;
   return { material, uniforms };
