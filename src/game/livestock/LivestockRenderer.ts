@@ -45,6 +45,8 @@ interface Agent {
   inside: boolean; v: number;
   /** The home it is walking in or out of, from the staging spot outside the doorway to the rest spot, and how far along the doorway points it is. */
   shelter: string | null; leg: number; out: boolean;
+  /** Seconds it has stood still short of its doorway (a crowd or a snag in the route): past a few it is stepped up to the doorway. */
+  stall: number;
   /** Height it is drawn at (eased: the barn floor is a step above the yard). */
   y: number | null;
   /** Size variation (1 +- 5 %). */
@@ -201,7 +203,7 @@ export class LivestockRenderer {
       let a = this._agents.get(h.id);
       if (!a) {
         // a new animal starts at its own spot (a load puts everyone where they belong)
-        a = { id: h.id, kind: h.kind, x: goal.x, z: goal.z, rot: hash(h.id, 9) * 6.28, phase: hash(h.id, 8) * 6, tone: hash(h.id, 7), via: [], viaFor: '', wait: 0, inside: goal.inside, v: 0, goingIn: goal.inside, shelter: goal.inside ? goal.home : null, leg: 99, out: false, y: null, size: 0.95 + hash(h.id, 11) * 0.1, gait: 0, graze: 0, noWay: new Set(), homeId: goal.home };
+        a = { id: h.id, kind: h.kind, x: goal.x, z: goal.z, rot: hash(h.id, 9) * 6.28, phase: hash(h.id, 8) * 6, tone: hash(h.id, 7), via: [], viaFor: '', wait: 0, inside: goal.inside, v: 0, goingIn: goal.inside, shelter: goal.inside ? goal.home : null, leg: 99, out: false, stall: 0, y: null, size: 0.95 + hash(h.id, 11) * 0.1, gait: 0, graze: 0, noWay: new Set(), homeId: goal.home };
         this._agents.set(h.id, a);
       }
       this._step(a, goal, dt, k, ctx, byId);
@@ -256,6 +258,8 @@ export class LivestockRenderer {
         return;
       }
       goal = { ...goal, x: en.stage[0], z: en.stage[1] };
+      if (a.v < 0.01 && a.wait <= 0) a.stall += dt; else a.stall = 0;
+      if (a.stall > 4 && Math.hypot(goal.x - a.x, goal.z - a.z) < 1.6) { a.x = goal.x; a.z = goal.z; a.shelter = goal0.home; a.leg = 0; a.stall = 0; return; }
     } else if (a.shelter) {
       // out for the day (or to another home): back through the doorway the way it came, then on by the route
       const h = homes.get(a.shelter);

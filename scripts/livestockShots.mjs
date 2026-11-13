@@ -135,11 +135,12 @@ try {
     await shot(`07-yard-${name}`);
     if (name === 'night' || name === 'dusk-queue') {
       // the open barn: from the yard at eye level straight through the door at the animals resting inside (the barn is the one the herd sleeps in)
-      const T = await page.evaluate(() => {
+      await page.evaluate(() => {
+        // eye level, a little way out from the doorway, looking straight in through it
         const cb = window.__cb, barn = cb.game.getState().game.structures.find(s => s.kind === 'barn'), r = (barn.rot ?? 0) * Math.PI / 2, ux = Math.sin(r), uz = Math.cos(r);
-        return [barn.x - ux * 0.7, barn.z - uz * 0.7, Math.atan2(uz, ux)];
+        const ex = barn.x + ux * 2.4, ez = barn.z + uz * 2.4;
+        window.__cb.qa.pose = null; cb.cam.placeEye(ex, ez, barn.x - ux * 0.6, barn.z - uz * 0.6, 0.3);
       });
-      await look(T[0], T[1], 1.6, 0.3, T[2], 0.18);
       await shot(`07c-barn-open-${name}`);
     }
   }
