@@ -52,7 +52,11 @@ export class AnimalBatches {
     this._geos.clear();
   }
   /** The LOD tier now: the lods and the distances they switch at. */
-  tier(): ReturnType<typeof lodTier> { return lodTier(this._quality); }
+  tier(): ReturnType<typeof lodTier> {
+    const t = lodTier(this._quality);
+    // Low: wildlife and pets are all drawn at the plainest level (the perf budget counts every triangle)
+    return this._quality === 'low' ? { lods: [t.lods[2], t.lods[2], t.lods[2]], at: t.at } : t;
+  }
   model(id: string): AnimalModel { return this._lookup(id); }
 
   private _shadowMesh(): THREE.InstancedMesh {
@@ -83,7 +87,7 @@ export class AnimalBatches {
     const key = `${id}|${li}`;
     let b = this._batches.get(key);
     if (b) return b;
-    const { model, material } = this._material(id), lod: Lod = lodTier(this._quality).lods[li];
+    const { model, material } = this._material(id), lod: Lod = this.tier().lods[li];
     const gk = `${id}|${lod.seg}|${lod.sub}|${lod.detail}`;
     let g = this._geos.get(gk);
     if (!g) { g = model.build(lod); this._geos.set(gk, g); }
