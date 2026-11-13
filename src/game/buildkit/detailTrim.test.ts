@@ -72,6 +72,15 @@ describe('building detail trim', () => {
     expect(snow.visible).toBe(true);
   });
 
+  it('barn and workshop get gutters and rake boards (roof and openings meshes grow), the cottage a railing', () => {
+    for (const kind of ['barn', 'workshop', 'cottage']) {
+      setDetailTier('low'); const lo = census(kind);
+      setDetailTier('high'); const hi = census(kind);
+      expect(hi.verts, kind).toBeGreaterThan(lo.verts + 100);
+      expect(hi.snow, kind).not.toBeNull();
+    }
+  });
+
   it('the trim stays near the footprint (a gutter is not a wing)', () => {
     for (const kind of ['log_house', 'timber_cabin', 'cottage']) {
       const def = KIT[kind];
