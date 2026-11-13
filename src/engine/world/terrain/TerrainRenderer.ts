@@ -419,8 +419,8 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
         snow = max(snow, uSnowCover * (1.0 - smoothstep(0.25, 0.55, slope)) * (1.0 - 0.8 * fo) * (1.0 - 0.45 * smoothstep(0.22, 0.55, vForest)));
         col = mix(col, uSnow * (0.9 + 0.1 * nb), snow);
         // Damp shore and wet mud just above the water line
-        float shore = 1.0 - smoothstep(0.0, 0.7, alt - uWaterY);
-        col = mix(col, vec3(0.20, 0.19, 0.14), shore * 0.7);
+        float shore = 1.0 - smoothstep(0.0, 0.25, alt - uWaterY);
+        col = mix(col, vec3(0.20, 0.19, 0.14), shore * 0.6);
         // Creek bank: a darker, wetter band just above the waterline (damp → mud → dark wet sand at the edge), nothing under water
         if (uWetRect.z > 0.0) {
           vec2 wuv = (vRPos.xz - uWetRect.xy) * uWetRect.zw;
