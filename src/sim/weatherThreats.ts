@@ -46,6 +46,7 @@ import { floodCandidates } from './terrainFx';
 import { regionFor } from './climate';
 import { roadClosedFor } from './slope';
 import { hasSafeRoom } from './houseHardening';
+import { isHome } from './blueprints';
 
 export type WeatherKind = StormKind;
 
@@ -102,6 +103,13 @@ const REGION_SEASON: Partial<Record<RegionId, Partial<Record<WeatherKind, [numbe
  */
 export const STORM_SCALE = { cozy: DIFFICULTY.cozy.storms, standard: DIFFICULTY.standard.storms, hardcore: DIFFICULTY.hardcore.storms } as const;
 const inSeason = (doy: number, [a, b]: [number, number]) => a <= b ? doy >= a && doy <= b : doy >= a || doy <= b;
+
+/** Days until this storm's season opens here (0: in season now; null: it does not come to this region). Uses the same season table as the daily roll. */
+export function daysToSeason(s: GameState, kind: WeatherKind, doy = calendarOf(s.clock).doy): number | null {
+  if (!regionFor(s.site).storms[kind]) return null;
+  const season = REGION_SEASON[s.site.region]?.[kind] ?? SEASON[kind];
+  return inSeason(doy, season) ? 0 : (season[0] - doy + 365) % 365;
+}
 
 export const weatherOf = (s: GameState): WeatherState => (s.weather ??= { active: null, last: -999 });
 
@@ -171,10 +179,12 @@ function cracksGlass(s: GameState, r: () => number, chance: number, by: string, 
   }
 }
 
-function damage(s: GameState, st: Structure, share: number, what: string, out: string[]): void {
+function damage(s: GameState, st: Structure, share: number, what: string, out: string[], roofOnly = false): void {
   const stages = blueprintOf(st).stages;
   const roof = stages.findIndex(x => x.id === 'roof');
   knockBack(s, st, roof >= 0 ? roof : stages.length - 1);
+  // a snow-load collapse takes the roof, not the rooms under it: a new roof makes the house a home again (construction.ts)
+  if (roofOnly && roof >= 0 && isHome(st.kind)) st.kept = true;
   out.push(`${what} The ${label(st.kind)} has to be ${roof >= 0 ? 're-roofed' : 'redone'}.`);
   const paid = insuranceClaim(s, st, share);
   if (paid) out.push(paid);
@@ -192,7 +202,7 @@ function hit(s: GameState, e: WeatherEvent, r: () => number, out: string[]): voi
   tunnelStorm(s, e.kind, r, out);
   if (e.kind === 'blizzard') {
     out.push('Blizzard: the roads are drifted shut and we are snowed in.');
-    for (const st of fin) if (!weatherOf(s).snowCollapsed && !s.structures.some(x => x.roofLost) && (st.fixes ?? []).some(f => f.part === 'roof' && f.done < f.hours) && r() < 0.5) { damage(s, st, 0.3, 'The snow load was too much for the old roof.', out); weatherOf(s).snowCollapsed = true; break; }
+    for (const st of fin) if (!weatherOf(s).snowCollapsed && !s.structures.some(x => x.roofLost) && (st.fixes ?? []).some(f => f.part === 'roof' && f.done < f.hours) && r() < 0.5) { damage(s, st, 0.3, 'The snow load was too much for the old roof.', out, true); weatherOf(s).snowCollapsed = true; break; }
   } else if (e.kind === 'tornado' || e.kind === 'derecho') {
     const targets = fin.filter(st => !st.kind.startsWith('bunker_') && st.kind !== 'root_cellar');
     if (targets.length) damage(s, pick(r, targets), 0.4, e.kind === 'tornado' ? 'A tornado came through!' : 'A derecho tore through: 90 mph straight-line winds.', out);

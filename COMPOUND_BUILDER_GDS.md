@@ -421,7 +421,7 @@ You pick the lifestyle on the new-game screen and can change it later, but not c
 - **The budget comes from the lifestyle** (§10.7). Compound builders are roughly the top 10–15 % of households, about $1M or more in net worth.
   - Weekend getaway: about $450k.
   - Full-time with jobs: about $800k.
-  - Financially independent: about $1.4M, plus about $45k a year in passive income.
+  - Financially independent: about $0.7M to $1.4M (each family rolls inside that range from its jobs, savings, house sale and debts, `sim/startFunds.ts`; it was $1.0M to $2.0M until the cash-use pass), plus about $45k a year in passive income.
 - **Everything is priced at real 2025 costs** (land, materials, contractors, gear).
   - Owner-built work saves the labor, which is about half the cost of hiring it out.
   - Hiring a crew is faster and dearer.
