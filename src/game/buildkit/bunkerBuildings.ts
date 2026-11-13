@@ -504,7 +504,7 @@ function floorhatch(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Gro
     p.add('deck', box(d.x + FLIGHT_W / 2 - (b.x - FLIGHT_W / 2), 0.012, zA - inner.z0, (b.x - FLIGHT_W / 2 + d.x + FLIGHT_W / 2) / 2, d.yFrom - 0.012, (inner.z0 + zA) / 2), I);
     // caged lamps on the walls at each turn and at the foot, an extinguisher, a sign
     const lamp = (x: number, y: number, z: number, alongX: boolean) => { p.add('steel', box(alongX ? 0.05 : 0.02, 0.05, alongX ? 0.02 : 0.05, x, y, z), I); p.add('bulkhead', box(alongX ? 0.036 : 0.012, 0.034, alongX ? 0.012 : 0.036, x, y + 0.008, z), I); };
-    lamp(0, b.yFrom + 0.3, inner.z1 - 0.012, true); lamp(0, d.yFrom + 0.3, inner.z0 + 0.012, true); lamp(d.x, 0.32, inner.z1 - 0.012, true); lamp(a.x, depth - 0.12, inner.z0 + 0.012, true);
+    lamp(0, Math.min(b.yFrom + 0.3, depth - 0.1), inner.z1 - 0.012, true);   // (kept under the cap: a shallow well would put it up in the house floor) lamp(0, d.yFrom + 0.3, inner.z0 + 0.012, true); lamp(d.x, 0.32, inner.z1 - 0.012, true); lamp(a.x, depth - 0.12, inner.z0 + 0.012, true);
     p.add('paint_red', new THREE.CylinderGeometry(0.014, 0.014, 0.1, 8).translate(inner.x1 - 0.02, 0.1, inner.z1 - 0.03), I);
     c.reserve({ x0: inner.x0, x1: inner.x1, z0: inner.z0, z1: inner.z1 });
   });
