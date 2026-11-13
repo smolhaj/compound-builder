@@ -14,6 +14,9 @@
  * ever reaches the family through it. Pure and seeded.
  */
 import { withKnownWalls } from './perimeter';
+import { BUNKER_ENTRANCES } from './bunkerEntrances';
+import { bunkerFindChance, drainStores, entranceOf, hideSupplies, resolveFound, stayDays, type BunkerResult } from './bunkerHide';
+import { leaveAftermath } from './aftermath';
 import { planOpener, scoutSpotted } from './raidOpeners';
 import { raiderName } from './raiderStory';
 import { captureOdds, driveOffDeters, type ScoutPlan } from './scoutPlans';
@@ -69,11 +72,13 @@ import { practice } from './skills';
 import { turbineNoise } from './renewables';
 import { villageWatch } from './outposts';
 import { guardPosture, resolveGuardStay } from './guards';
+import { isGuardUnit } from './defenseTune';
 import { hardness, opportunistK } from './reputation';
 import { resolveInsider } from './insider';
 import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp } from './trial';
 import { vetArrival } from './gateVetting';
 import { admitNewcomers, resolveShelter, strangerArrival, type Extras, type ShelterWhy } from './newcomers';
+import { gallonsText } from './units';
 import { pluralize, familyLabel, pluralSurname } from './words';
 import { prepPosture } from './roadWarn';
 import { markKind, takeMark } from './roadPassers';
@@ -195,7 +200,7 @@ export function postureOf(s: GameState): Posture {
   const kEye = fogSightK(s, 'eye');
   const pre = prepPosture(s);
   const detection = Math.min(100, pre.detection + 25 + (watch * 5 + tw.detection + watchDetection(s)) * kEye + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + guards.detection + forewarned(s) + villageWatch(s) + ruleWatch(s));
-  return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier + pre.barrier), detection, fighters: fighters + pre.fighters, deter: gear.deter, signs: gear.signs, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => st.kind === 'bunker_hatch' || st.kind === 'bunker_stairs') };
+  return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier + pre.barrier), detection, fighters: fighters + pre.fighters, deter: gear.deter, signs: gear.signs, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => BUNKER_ENTRANCES.includes(st.kind)) };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -310,7 +315,7 @@ const TEMPER_SIGN: Record<RaiderTemper, string[]> = {
   desperate: ['Thin, dirty, scared. More hungry than mean.', ''],
 };
 
-export interface Outcome { title: string; text: string; tone: 'good' | 'mixed' | 'bad'; lines: string[] }
+export interface Outcome { title: string; text: string; tone: 'good' | 'mixed' | 'bad'; lines: string[]; /** Hiding in the bunker: what happened below (sim/bunkerHide.ts); the cutscene reads it. */ bunker?: BunkerResult }
 
 export interface GateState {
   /** Waiting for the player's stance (the game pauses). */
@@ -788,7 +793,7 @@ export function fightOdds(s: GameState, e: Encounter, tries = Math.max(10, Math.
   for (let i = 0; i < tries; i++) {
     const b = planBattle(s, raidersAfterHelp(e, help), 7_919 + i * 104_729 + e.day, battleOpts(e, e.dig || e.insiderHelp ? { insideBreach: true } : {}));
     if (b.result === 'repelled' || b.result === 'fled') win++;
-    const n = b.events.filter(x => (x.kind === 'death' || x.kind === 'taken') && x.unit.startsWith('h_')).length;
+    const n = b.events.filter(x => (x.kind === 'death' || x.kind === 'taken') && x.unit.startsWith('h_') && !isGuardUnit(x.unit)).length;
     if (n) loseSomeone++;
     lost += n;
   }
@@ -812,6 +817,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   { const talker = s.people.filter((x, i) => !x.kid && s.personState[i]?.needs.died == null).sort((a, b) => b.skills.negotiator - a.skills.negotiator)[0];
     if (talker) { practice(s, talker.id, 'negotiator', 1.5); practice(s, talker.id, 'leadership', 0.5); } }
   const lines: string[] = [];
+  let bunkerOut: BunkerResult | undefined;
   let title = '', text = '', tone: Outcome['tone'] = 'mixed';
   if (e.kind === 'ransom') {
     const o = resolveRansom(s, e, stance);
@@ -956,12 +962,37 @@ export function resolve(s: GameState, stance: Stance): Outcome {
     }
     if (stance === 'hide') {
       // everyone underground (or in the timber); they take what's lying about. Nobody gets in by the tunnel: it only opens from inside.
-      const found = r() < hideFoundChance(s, e, p);
-      if (e.scouted) lines.push(found ? `${e.scouted} had walked your fence line and told them where you would hide. They knew where to look.` : `${e.scouted} told them where you would hide. They looked, and did not find it.`);
+      let found = r() < hideFoundChance(s, e, p);
+      // the bunker costs stores for every day below, and a crew that finds the place may find the way down (sim/bunkerHide.ts)
+      let bunkerRes: BunkerResult | undefined, bunkerDone = false;
+      if (p.bunker) {
+        const sup = hideSupplies(s);
+        if (!sup.viable) { stance = 'defend'; lines.push('There was nothing stored to eat or drink down there. They could not hide.'); found = true; bunkerDone = true; }
+        else {
+          const stay = found ? stayDays(e) : 1, can = Math.min(stay, Math.floor(sup.days)), forced = stay > sup.days;
+          const used = drainStores(s, can);
+          lines.push(`Below for ${pluralize(can, 'day')}: ${Math.round(used.kcal / 6000)} cases of food and ${gallonsText(used.liters)} of water used.`);
+          if (found) {
+            let foundDay = 0;
+            const ent = entranceOf(s), fc = bunkerFindChance(s, e, can, ent);
+            for (let d = 0; d < can && !foundDay; d++) if (r() < fc.perDay[d]) foundDay = d + 1;
+            if (forced && !foundDay) foundDay = can + 1;
+            if (foundDay) {
+              const o = resolveFound(s, e, foundDay, can, forced && foundDay > can, r);
+              title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines); bunkerRes = o.result; bunkerDone = true;
+              if (o.left.wounded || o.left.dead) leaveAftermath(s, o.left.wounded, o.left.dead);
+              if (o.held) { g.respect = Math.min(1, (g.respect ?? 0) + 0.25 + 0.1 * (o.left.wounded + o.left.dead)); g.next = Math.max(g.next, e.day + Math.round(15 + 35 * g.respect)); g.raidsHeld++; }
+              else if (o.tone === 'bad') g.raidsLost++;
+            }
+          }
+        }
+      }
+      if (bunkerRes) bunkerOut = bunkerRes;
+      if (e.scouted && !bunkerDone) lines.push(found ? `${e.scouted} had walked your fence line and told them where you would hide. They knew where to look.` : `${e.scouted} told them where you would hide. They looked, and did not find it.`);
       const hidden = p.bunker || p.safeRoom;
       // a savage crew doesn't stop at the stores: they hunt for whoever lives here; so does a crew come back for them
       // (a crew of hungry men back for more stores takes them; a hard one back for whoever lives here looks harder)
-      if (found && !hidden && ((e.temper === 'savage' && r() < 0.6) || (e.back && e.temper === 'hard' && r() < 0.35))) {
+      if (bunkerDone) { /* settled below ground (sim/bunkerHide.ts) */ } else if (found && !hidden && ((e.temper === 'savage' && r() < 0.6) || (e.back && e.temper === 'hard' && r() < 0.35))) {
         stance = 'defend';
         lines.push(e.back ? 'This time they came looking. They found the trail into the timber.' : 'They didn\'t stop at the house. They came into the trees after you, with dogs.');
       } else if (!found) { title = 'They never knew'; text = p.bunker ? 'Lights out, everyone down the hatch. Boots on the porch, voices, then the truck pulls away.' : 'Everyone into the timber, flat in the deadfall. Boots on the porch, voices, then the truck pulls away.'; tone = 'good'; }
@@ -1051,7 +1082,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   }
   g.history.push({ day: e.day, kind: e.kind, stance, tone });
   g.pending = null;
-  const out: Outcome = { title, text, tone, lines: lines.filter(Boolean) };
+  const out: Outcome = { title, text, tone, lines: lines.filter(Boolean), ...(bunkerOut ? { bunker: bunkerOut } : {}) };
   g.card = out;
   log(s, `${e.title}: ${title}.`);
   return out;
