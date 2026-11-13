@@ -49,22 +49,24 @@ function buildCattle(f: Frame, lod: Lod): ReturnType<typeof toGeometry> {
   ];
   const body: Ring[] = rows.map(([z, top, bot, hw, fr, pw]) => bring(z, Y(top), Y(bot), hw * wd, fr, pw));
   out.push(tube(body, { seg, sub, capStart: true, capEnd: true }));
-  const bump = (c: V3, r: V3, col: V3 = [1, 1, 1], region: number = REGION.BODY) => lod.detail < 1 && out.push(blob([c[0], Y(c[1]), c[2]], r, { seg: Math.max(6, seg - 6), rings: 3, col, coat: 1, region, skin: sk(R), flat: true }));
+  const bump = (c: V3, r: V3, col: V3 = [1, 1, 1], region: number = REGION.BODY, rings = 3) => lod.detail < 1 && out.push(blob([c[0], Y(c[1]), c[2]], r, { seg: Math.max(6, seg - 6), rings, col, coat: 1, region, skin: sk(R), flat: true }));
   // brisket, and the shoulder muscle either side of the withers
   bump([0, 0.74, 0.74], [0.2 * wd, 0.2, 0.22]);
   if (dairy) for (const sx of [-1, 1]) {
-    bump([sx * 0.24, 1.375, -0.40], [0.06, 0.04, 0.08]);      // hook bones
-    bump([sx * 0.13, 1.30, -0.97], [0.035, 0.035, 0.05]);     // pin bones
+    bump([sx * 0.22, 1.37, -0.40], [0.08, 0.025, 0.12]);      // hook bones (a soft rise, not a knob)
   } else for (const sx of [-1, 1]) {
     bump([sx * 0.25 * wd, 1.12, 0.58], [0.07, 0.2, 0.22]);      // shoulder muscle
   }
-  if (!dairy) bump([0, 1.41, 0.68], [0.15, 0.1, 0.26]);          // the crest over the withers
+  if (!dairy) {
+    bump([0, 1.49, 0.66], [0.14, 0.075, 0.34], [1, 1, 1], REGION.BODY, 5);   // the hump over the withers
+    bump([0, 1.38, 0.97], [0.09, 0.055, 0.28], [1, 1, 1], REGION.BODY, 5);                        // the crest along the top of the neck
+  }
   // --- neck: base buried in the shoulders; dairy slim and clean, beef short, thick and crested; a dewlap hangs under the throat
   const nk = f.neckThick;
   const N = (y: number, z: number, w: number, h: number, dn: number, a: number, b = a, wt = 0): Ring => ({ p: [0, Y(y), z], w: w * nk, h, dn, pw: 2.2, skin: sk(a, b, wt), coat: 1, col: [1, 1, 1] });
   const neck: Ring[] = [
-    N(1.12, 0.60, 0.22, 0.31, 0.34, R), N(1.19, 0.86, 0.185, 0.26, 0.27, R, BONE.NECK, 0.5), N(1.26, 1.08, 0.15, 0.2, 0.2, BONE.NECK),
-    N(1.31, 1.26, 0.125 + (dairy ? 0 : 0.01), 0.15, 0.15, BONE.NECK, BONE.HEAD, 0.5),
+    N(1.12, 0.60, 0.22, 0.31 + (dairy ? 0 : 0.08), 0.34, R), N(1.19, 0.86, 0.185, 0.26 + (dairy ? 0 : 0.09), 0.27, R, BONE.NECK, 0.5), N(1.26, 1.08, 0.15, 0.2 + (dairy ? 0 : 0.06), 0.2, BONE.NECK),
+    N(1.31, 1.26, 0.125 + (dairy ? 0 : 0.01), 0.15 + (dairy ? 0 : 0.025), 0.15, BONE.NECK, BONE.HEAD, 0.5),
   ];
   out.push(tube(neck, { seg, sub }));
   // dewlap: a loose fold of skin from the throat to the brisket (a blade, bigger on the steer)
@@ -73,28 +75,30 @@ function buildCattle(f: Frame, lod: Lod): ReturnType<typeof toGeometry> {
   // --- head: a broad forehead, a deep jaw, a wide flat muzzle, built along its own axis from the poll, then pitched down
   const hs = f.brow, H = (z: number, cy: number, w: number, h: number, dn: number, pw = 2.5): Ring => ({ p: [0, cy, z], w: w * hs, h, dn, pw, skin: sk(BONE.HEAD), coat: 1, region: REGION.HEAD, col: [1, 1, 1] });
   const headRows: Ring[] = [
-    H(-0.07, 0.0, 0.09, 0.085, 0.09), H(0.02, 0.0, 0.122, 0.095, 0.11), H(0.10, -0.014, 0.118, 0.088, 0.14), H(0.20, -0.03, 0.108, 0.08, 0.125),
-    H(0.285, -0.046, 0.104, 0.072, 0.105), H(0.35, -0.056, 0.11, 0.07, 0.095, 2.9), H(0.395, -0.06, 0.115, 0.07, 0.092, 3.1),
+    H(-0.07, 0.0, 0.092, 0.085, 0.09), H(0.02, 0.0, 0.128, 0.098, 0.12), H(0.10, -0.012, 0.13, 0.09, 0.155), H(0.19, -0.03, 0.123, 0.084, 0.15),
+    H(0.265, -0.05, 0.124, 0.08, 0.135, 2.7), H(0.325, -0.066, 0.13, 0.08, 0.118, 3.3), H(0.358, -0.072, 0.134, 0.078, 0.11, 3.8),
   ];
   const head = tube(lod.detail > 1 ? headRows.filter((_, i) => i % 2 === 0 || i === 6) : headRows, { seg, sub: Math.min(sub, 2), capStart: true, capEnd: true, up: [0, 1, 0] });
   const hbl = (c: V3, r: V3, o: { col?: V3; region?: number; tilt?: number; seg?: number } = {}) =>
     lod.detail < 2 && append(head, blob(c, r, { seg: o.seg ?? Math.max(6, seg - 6), rings: 3, col: o.col ?? [1, 1, 1], coat: 1, region: o.region ?? REGION.HEAD, skin: sk(BONE.HEAD), flat: true, tilt: o.tilt ?? 0 }));
-  hbl([0, -0.064, 0.41], [0.114 * hs, 0.068, 0.036], { region: REGION.NOSE });                      // the muzzle pad (pale / pink / dark by breed)
-  hbl([0, -0.118, 0.365], [0.072 * hs, 0.026, 0.05]);                                                // the lower lip and chin
+  hbl([0, -0.07, 0.372], [0.134 * hs, 0.082, 0.04], { region: REGION.NOSE });                      // the muzzle pad: wide, flat-fronted (pale / pink / dark by breed)
+  hbl([0, -0.135, 0.345], [0.09 * hs, 0.03, 0.05]);                                                // the lower lip and chin
   for (const sx of [-1, 1]) {
-    hbl([sx * 0.104 * hs, 0.07, 0.065], [0.022, 0.012, 0.045]);                                      // the brow ridge over each eye
+    hbl([sx * 0.112 * hs, 0.052, 0.07], [0.02, 0.01, 0.042], { tilt: 0.0 });                         // a soft brow over each eye (level, not a frown)
   }
-  hbl([0, 0.088, -0.03], [0.085, 0.04, 0.06]);                                                       // the poll
-  append(head, nostrils([0, -0.06, 0.442], 0.05 * hs, 0.022, sk(BONE.HEAD), lod, 0.1));          // big wet nostrils
+  hbl([0, 0.086, -0.03], [0.09, 0.045, 0.065]);                                                      // the poll
+  append(head, nostrils([0, -0.062, 0.4], 0.062 * hs, 0.03, sk(BONE.HEAD), lod, 0.05));          // big wet nostrils
   for (const sx of [-1, 1]) {
-    append(head, eye(sx, [0.124 * hs, 0.036, 0.08], 0.0175, sk(BONE.HEAD), lod));
-    // ear: a leaf held out to the side, tip a little down and back, pink inside with a tuft of hair at the root
+    append(head, eye(sx, [0.128 * hs, 0.03, 0.075], 0.0185, sk(BONE.HEAD), lod));
+    // ear: a broad leaf held out to the side (face to the front, tip a little down), hairy outside and dark pink inside with a tuft at the root
     const bone = sx > 0 ? BONE.EAR_L : BONE.EAR_R;
-    const E = (x: number, y: number, z: number, w: number, h: number, a = 1): Ring => ({ p: [sx * x, y, z], w, h, skin: sk(BONE.HEAD, bone, a > 0.99 ? 1 : a), coat: 1, region: REGION.EAR, col: [1, 1, 1] });
-    if (lod.detail < 2) append(head, tube([E(0.1, 0.082, -0.03, 0.03, 0.014, 0.4), E(0.15, 0.086, -0.035, 0.05, 0.011), E(0.215, 0.08, -0.05, 0.066, 0.008), E(0.275, 0.066, -0.07, 0.056, 0.007), E(0.318, 0.048, -0.088, 0.03, 0.005), E(0.335, 0.036, -0.095, 0.006, 0.003)],
-      { seg: Math.max(6, seg - 5), sub: 1, up: [0, 1, 0], flat: true }));
-    if (lod.detail < 1) {
-      hbl([sx * 0.222, 0.083, -0.035], [0.05, 0.004, 0.032], { region: REGION.FLESH, col: [0.9, 0.62, 0.6] });
+    const E = (x: number, y: number, z: number, w: number, h: number, a = 1): Ring => ({ p: [sx * x, y, z], w: h, h: w, skin: sk(BONE.HEAD, bone, a > 0.99 ? 1 : a), coat: 1, region: REGION.EAR, col: [1, 1, 1] });
+    const EI = (x: number, y: number, z: number, w: number, h: number, a = 1): Ring => ({ p: [sx * x, y, z], w: h, h: w, skin: sk(BONE.HEAD, bone, a > 0.99 ? 1 : a), coat: 0, region: REGION.FLESH, col: [0.42, 0.24, 0.21] });
+    if (lod.detail < 2) {
+      append(head, tube([E(0.09, 0.082, -0.032, 0.012, 0.03, 0.4), E(0.15, 0.078, -0.04, 0.01, 0.052), E(0.215, 0.066, -0.05, 0.009, 0.06), E(0.275, 0.04, -0.062, 0.008, 0.05), E(0.318, 0.012, -0.07, 0.006, 0.028), E(0.334, -0.004, -0.074, 0.003, 0.008)],
+        { seg: Math.max(6, seg - 5), sub: 1, up: [0, 0, 1], flat: true }));
+      if (lod.detail < 1) append(head, tube([EI(0.12, 0.08, -0.024, 0.003, 0.024, 0.4), EI(0.17, 0.076, -0.03, 0.003, 0.042), EI(0.22, 0.064, -0.04, 0.003, 0.05), EI(0.272, 0.04, -0.052, 0.003, 0.04), EI(0.305, 0.016, -0.06, 0.002, 0.02)],
+        { seg: 6, sub: 1, up: [0, 0, 1], flat: true }));
     }
     if (!dairy) {   // horn buds (a beef calf's): short cream stubs curving forward and up
       append(head, tube([
@@ -107,7 +111,7 @@ function buildCattle(f: Frame, lod: Lod): ReturnType<typeof toGeometry> {
   out.push(place(head, -0.74, [0, Y(POLL.y), POLL.z]));
   // --- tail: from the tailhead down behind the thighs to a switch at the hocks
   const T = (y: number, z: number, w: number, b: number, b2 = b, wt = 0): Ring => ({ p: [0, Y(y), z], w, h: w, skin: sk(b, b2, wt), coat: 1, region: REGION.TAIL, col: [0.95, 0.95, 0.95], pw: 2 });
-  out.push(tube([T(1.31, -0.96, 0.04, BONE.TAIL), T(1.25, -1.06, 0.034, BONE.TAIL), T(1.05, -1.09, 0.026, BONE.TAIL), T(0.80, -1.09, 0.022, BONE.TAIL, BONE.TAIL2, 0.5), T(0.60, -1.08, 0.022, BONE.TAIL2), T(0.46, -1.08, 0.05, BONE.TAIL2), T(0.34, -1.08, 0.048, BONE.TAIL2), T(0.26, -1.08, 0.02, BONE.TAIL2)],
+  out.push(tube([T(1.30, -0.90, 0.06, BONE.TAIL), T(1.29, -0.97, 0.045, BONE.TAIL), T(1.24, -1.04, 0.034, BONE.TAIL), T(1.05, -1.09, 0.026, BONE.TAIL), T(0.80, -1.09, 0.022, BONE.TAIL, BONE.TAIL2, 0.5), T(0.60, -1.08, 0.022, BONE.TAIL2), T(0.46, -1.08, 0.05, BONE.TAIL2), T(0.34, -1.08, 0.048, BONE.TAIL2), T(0.26, -1.08, 0.02, BONE.TAIL2)],
     { seg: Math.max(6, seg - 6), sub: Math.min(sub, 2), up: [0, 0, 1], capEnd: true }));
   // --- udder (four quarters, a rear lobe) and teats
   if (dairy) {

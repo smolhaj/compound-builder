@@ -52,6 +52,7 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   95: s => ({ ...s, version: 96 }),
   94: s => ({ ...s, version: 95 }),
   93: s => ({ ...s, version: 94 }),
+  96: s => ({ ...s, version: 97 }),
   91: s => ({ ...s, version: 92 }),
   89: s => ({ ...s, version: 90 }),
   // 78 → 79: Cozy starvation (sim/starvation.ts): `Needs.starved` counts consecutive starving days; old saves start at 0, and a runaway `hunger` is clamped
