@@ -10,6 +10,7 @@
  *  raidReport  what the aftermath card says: who was hurt, killed or taken, what
  *              was lost, how many raiders are left on the drive.
  */
+import { raidBreakdown, type RaidBreakdown } from './raidBreakdown';
 import { withKnownWalls } from './perimeter';
 import type { Battle, RaidFacts } from './battleTypes';
 import type { RaidOrder } from './raidOrders';
@@ -63,6 +64,8 @@ export interface RaidReport {
   raidersDead: number;
   /** The explicit data of the fight (sim/battleTypes.ts `RaidFacts`): how the wall fell, the stage reached, fates, loot, fires, hostages, the leader. Absent when there was no fight or on a report from before save v87. */
   facts?: RaidFacts;
+  /** Why it went the way it did: what stopped the crew and what failed (sim/raidBreakdown.ts). Absent when there was no fight. */
+  breakdown?: RaidBreakdown;
   /** Raiders who gave up and are held at the gate (sim/surrender.ts). Absent in a report from before save v86. */
   raidersSurrendered?: number;
   /** Family members the crew disarmed and held at gunpoint when it broke the line, then left standing in the yard (sim/breachFates.ts). */
@@ -220,6 +223,6 @@ export function raidReport(before: GameState, after: GameState, outcome: Outcome
   const rounds = (b ? b.events.filter(e => e.kind === 'shot' && e.from.startsWith('h_')).length : 0) + extraRounds;
   return {
     title: outcome.title, text: outcome.text, tone: outcome.tone, killed, wounded, taken, lost,
-    ...(b?.raid ? { facts: b.raid } : {}), damage: newDamage(before, after), raidersWounded: am?.wounded ?? 0, raidersDead: am?.dead ?? 0, raidersSurrendered: am?.surrendered ?? 0, held, rounds, lines: outcome.lines, aftermath: !!am,
+    ...(b?.raid ? { facts: b.raid } : {}), ...(b ? (() => { const bd = raidBreakdown(after, b, lost); return bd ? { breakdown: bd } : {}; })() : {}), damage: newDamage(before, after), raidersWounded: am?.wounded ?? 0, raidersDead: am?.dead ?? 0, raidersSurrendered: am?.surrendered ?? 0, held, rounds, lines: outcome.lines, aftermath: !!am,
   };
 }

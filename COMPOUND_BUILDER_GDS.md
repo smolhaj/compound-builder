@@ -207,6 +207,8 @@ Each disaster is a ruleset: what breaks, what is scarce, and what threat cadence
   - The player chooses a stance: hide, parley, warn off, defend, or trade.
   - The result is damage to specific structures, injuries and resources, plus reputation.
   - The outcome is shown as a short illustrated vignette.
+  - **Defense pays (numbers measured by `scripts/defenseTiers.test.ts`, locked by `sim/defenseTiers.test.ts`).** At the same wealth and the same armed family, a Standard raid (6 to 10 raiders) leaves the house standing about 31% of the time with no wall, 52% behind a fence, 71% behind a stone wall, 88% with two towers added, and about 99% with three contract guards, two trained guard dogs and powered cameras on top; deaths per raid fall from 1.5 to 0.4. An overwhelming crew (18) still beats the full fortress about half the time on Standard and two times in three on Hardcore. Hardcore is harsher than Standard and Standard than Cozy at every tier. Guards fight (a trained rifle at a post; the one on shift is up with the alarm, the others take about 20 s), trained guard dogs bite climbers on the wall, powered cameras raise the defenders' aim and cut the night penalty. A bare lot stays survivable by hiding or running.
+  - **The aftermath report says why** (Raid breakdown: wall held or breached and where, kills from towers, guards, dogs and the family's posts, who got out of sight, what was lost).
 
 ## 5. Scale: from homestead to town (the player decides)
 The compound is whatever size you let it become. **Who you take in is the main growth decision.**
