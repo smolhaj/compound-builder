@@ -3,11 +3,10 @@
  * and what to do about a shortage (sim/housing.ts). Also the gate card's
  * "where would they sleep" lines.
  */
+import { kitUsd } from '../sim/homeAdvice';
 import type { CSSProperties } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { BLUEPRINTS, totalBill } from '../sim/blueprints';
-import { MATERIALS, type MaterialId } from '../sim/materials';
-import { orderCost, orderProblem } from '../sim/economy';
+import { orderProblem } from '../sim/economy';
 import { arrivalOutlook, BAG_PRICE, cachedPlan, housingFixes, SPOT_ORDER, TENT_PRICE, type SpotKind } from '../sim/housing';
 import type { Person } from '../sim/family';
 import { Hint } from './hud/common';
@@ -22,8 +21,6 @@ const WHERE: Record<SpotKind, string> = { bed: 'In beds', bunk: 'In bunks', couc
 const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
 const tone = (q: number) => (q >= 0.65 ? TONE.good : q >= 0.4 ? TONE.warn : TONE.bad);
 
-/** The cost of a kit piece's own purchases (what the Build list shows). */
-const homeCost = (kind: string) => orderCost(Object.entries(totalBill(BLUEPRINTS[kind])).filter(([m]) => MATERIALS[m as MaterialId].price !== null).map(([material, qty]) => ({ material: material as MaterialId, qty: qty as number })));
 
 export function HousingPanel() {
   const g = useGameStore();
@@ -31,7 +28,7 @@ export function HousingPanel() {
   const plan = cachedPlan(game);
   if (plan.sleepers.length === 0) return null;
   const cap = plan.cap;
-  const fixes = housingFixes(game, homeCost);
+  const fixes = housingFixes(game, k => kitUsd(game, k));
   const names = (k: SpotKind) => plan.sleepers.filter(x => x.spot.kind === k).map(x => ({ x, p: game.people.find(p => p.id === x.id) }));
   const f = Math.round(plan.night.lowF);
   const buy = (item: 'tent' | 'sleeping_bag', qty: number) => {
@@ -57,7 +54,7 @@ export function HousingPanel() {
           <div style={{ ...small, color: plan.outside > 0 ? TONE.bad : TONE.warn }}>
             <span title={`Poor sleep wears on morale${plan.sleepers.some(x => x.harm > 0.05) ? ' and health' : ''}`}>{plan.noBed} {plan.noBed === 1 ? 'person has' : 'people have'} no bed{plan.outside > 0 ? `, ${plan.outside} out in the weather` : ''}.</span>
           </div>
-          {fixes.length > 0 && <div style={{ ...small, color: DIM, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={`Fix: ${fixes.map(x => x.text).join(', or ')}.`}>Fix: {fixes.map(x => x.text).join(', or ')}.</div>}
+          {fixes.length > 0 && <div style={{ ...small, color: DIM, display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }} title={`Fix: ${fixes.map(x => x.text).join(', or ')}.`}>Fix: {fixes.map(x => x.text).join(', or ')}.</div>}
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 3 }}>
             {fixes.filter(x => x.action === 'buy').map(x => buy(x.item as 'tent' | 'sleeping_bag', x.qty))}
           </div>

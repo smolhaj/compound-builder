@@ -136,3 +136,38 @@ describe('the fence goal', () => {
     expect(b.goals.find(x => x.id === 'fence')!.status).toBe('done');
   });
 });
+
+describe('a lot that starts with a house', () => {
+  /** The way the world lays in a house that came with the land: a pre-built home, plus the pipe and cable run to it (they sit in `perimeter`). */
+  const houseStart = (): GameState => {
+    const g = fresh();
+    const h = finish(g, 'farmhouse', true);
+    g.perimeter.push({ id: 'p1', kind: 'water_pipe', pts: [[0, 0], [h.x + 2, h.z]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 } as never);
+    g.perimeter.push({ id: 'p2', kind: 'power_cable', pts: [[0, 0], [h.x + 2, h.z]], gates: [], done: 1, hours: 1, supplied: true, finishedAt: 0 } as never);
+    return g;
+  };
+  it('still offers the starter compound: the pipe and cable laid in with the house are not the family\'s own work', () => {
+    const f = firstHour(houseStart());
+    expect(f.goals.map(x => x.id)).not.toContain('roof');   // the farmhouse sleeps everyone
+    expect(f.current!.act!.act).toEqual({ type: 'starter' });
+  });
+  it('a first fence the player draws does count as their own work', () => {
+    const g = houseStart();
+    g.perimeter.push({ id: 'p3', kind: 'split_rail', pts: [[0, 0], [10, 0]], gates: [], done: 0, hours: 10, supplied: false, finishedAt: null } as never);
+    expect(firstHour(g).goals.find(x => x.id === 'water')?.act?.act ?? null).not.toEqual({ type: 'starter' });
+  });
+});
+
+describe('while the roof is open the other basics are not blocked behind it', () => {
+  it('lists water, food and power with their own buttons, and never the starter plan twice', () => {
+    const g = fresh(900_000);
+    const cab = finish(g, 'timber_cabin');
+    while (g.people.length < 5) { const p = structuredClone(g.people[0]); p.id = 'x' + g.people.length; g.people.push(p); g.personState.push(structuredClone(g.personState[0])); }
+    expect(cab.kind).toBe('timber_cabin');
+    const f = firstHour(g);
+    expect(f.current!.id).toBe('roof');
+    expect(f.current!.title).toBe('A bed for everyone');
+    expect(f.alsoOpen.map(x => x.id)).toEqual(['water', 'food', 'power']);
+    for (const o of f.alsoOpen) expect(o.act!.act.type).not.toBe('starter');
+  });
+});

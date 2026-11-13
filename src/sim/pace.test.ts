@@ -48,3 +48,14 @@ describe('the family pace', () => {
     expect(eta(null)).toMatch(/no one/);
   });
 });
+
+describe('the slow-going hint with a crew on the work', () => {
+  it('stops telling the player to hire a crew once one is hired', () => {
+    const g = fresh();
+    const st = planStructure(g, 'timber_cabin', 0, 0, 0)!;
+    expect(slowHint(g, 20)).toMatch(/or hire a crew/);
+    g.crews = [{ id: 'c1', target: st.id, hiredAt: 0, hours: 0, paid: 0 }];
+    const h = slowHint(g, 20);
+    expect(h === null || !/hire a crew/.test(h)).toBe(true);
+  });
+});

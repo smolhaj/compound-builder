@@ -115,3 +115,19 @@ export function materialCount(id: MaterialId, n: number, name: string, text = St
   if (!w) return `${text} ${name.toLowerCase()}`;
   return `${text} ${text === '1' ? w[0] : w[1]}`;
 }
+
+/**
+ * Family names. "Ortiz" -> "Ortizes", "Bauer" -> "Bauers", "Marsh" -> "Marshes", "Cross" -> "Crosses" (names ending in s, x, z, ch or sh take -es).
+ * Use these for every "the Ortizes" in text; never `${last}s`.
+ */
+export const pluralSurname = (last: string): string => (/(s|x|z|ch|sh)$/i.test(last) ? `${last}es` : `${last}s`);
+
+/** The singular of a family name that may be stored as a plural: "the Ortizes", "the Ortizs" (older saves), "the Hendersons", "the Running Horses" -> "Ortiz", "Ortiz", "Henderson", "Running Horse". */
+export function singularSurname(stored: string): string {
+  const base = stored.replace(/^the /i, '');
+  if (/(ss|x|z|ch|sh)es$/i.test(base)) return base.slice(0, -2);
+  return base.replace(/s$/, '');
+}
+
+/** "the Ortizes" for any stored neighbor name, old or new. */
+export const familyLabel = (stored: string): string => `the ${pluralSurname(singularSurname(stored))}`;

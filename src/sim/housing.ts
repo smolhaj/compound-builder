@@ -26,6 +26,7 @@
  * sleep quality (0–1) moves the morale target, wears health when it is
  * really bad (freezing, soaked) and builds up `Needs.tired`.
  */
+import { homeAdvice, homeAdviceText } from './homeAdvice';
 import { calendarOf, dayIndex, type GameState } from './state';
 import { HOME_BEDS } from './blueprints';
 import { isFinished } from './construction';
@@ -420,21 +421,15 @@ export interface Fix {
   text: string;
 }
 
-const HOME_NAME: Record<string, string> = { guest_house: 'a guest house', cottage: 'a cottage', moms_house: 'Mom\u2019s house', timber_cabin: 'a timber cabin', log_house: 'a log house', lodge: 'a lodge', lodge_plinth: 'a lodge', lodge_solar: 'a lodge', stone_house: 'a stone house', timber_frame: 'a timber-frame house', container_house: 'a container house', adobe_house: 'an adobe house' };
-/** Candidate homes to build, cheapest per bed first. (Kit pieces in the Build list.) */
-const BUILDABLE_HOMES = ['guest_house', 'cottage', 'moms_house', 'timber_cabin', 'log_house'] as const;
 
 /** Ways to fix a shortage, best first; empty when everyone has a bed. `homeCost` gives the price of a kit piece (the UI's own figure). */
 export function housingFixes(s: GameState, homeCost: (kind: string) => number): Fix[] {
   const plan = cachedPlan(s);
   const out: Fix[] = [];
   if (plan.noBed <= 0) return out;
-  const fixes = (kind: string) => HOME_BEDS[kind] ?? 0;
-  // a home that gets everybody a bed, or the one that gets the most
-  const cands = BUILDABLE_HOMES.map(k => ({ k, beds: fixes(k), cost: homeCost(k) }));
-  const enough = cands.filter(c => c.beds >= plan.noBed).sort((a, b) => a.cost - b.cost)[0];
-  const best = enough ?? [...cands].sort((a, b) => b.beds - a.beds)[0];
-  out.push({ action: 'build', item: best.k, qty: 1, cost: best.cost, helps: Math.min(plan.noBed, best.beds), text: `build ${HOME_NAME[best.k]} (~$${Math.round(best.cost).toLocaleString('en-US')}, ${pluralize(best.beds, 'bed')})` });
+  // the same home the Build list and the first-hour card recommend (sim/homeAdvice.ts); none when the beds on the place, counting homes going up, cover everyone
+  const adv = homeAdvice(s, homeCost);
+  if (adv) out.push({ action: 'build', item: adv.kind, qty: 1, cost: adv.usd, helps: Math.min(plan.noBed, adv.beds), text: `build ${homeAdviceText(adv)}` });
   if (plan.outside > 0) {
     const have = plan.cap.tents * TENT_SEATS + WALL_TENT_SEATS;
     const seated = plan.sleepers.filter(x => x.spot.kind === 'tent').length;

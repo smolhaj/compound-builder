@@ -21,6 +21,7 @@ import { litersText } from '../../sim/format';
 import { setBelt } from '../../sim/weekender';
 import { CREW_DAY_USD, crewIdea, nextLongStay, nextStageOrder, weekendBudget, weekendsFor } from '../../sim/weekendPlan';
 import { dayIndex } from '../../sim/state';
+import { stuckRows, stuckShort } from '../../sim/stalls';
 import { Clamp, Note, Row, Section } from './common';
 import { TONE, DIM, LINE, btn, usd } from './style';
 import { pluralize } from '../../sim/words';
@@ -36,7 +37,8 @@ export function ProjectsTab() {
   const crewIds = (game.crews ?? []).map(c => c.target), crewWeeks = Math.max(0, ...crewIds.map(id => crewWeeksFor(game, id) ?? 0)), crewLeft = crewIds.length ? crewWeeks : 0;
   const selWeeks = sel && !isFinished(sel) ? weeksUntil(game, sel.id, pace) : null;
   const hint = left > 0 ? slowHint(game, weeks, pace) : null;
-  const rows = projectRows(game), todo = needsHookup(game);
+  const rows = projectRows(game), todo = needsHookup(game), stuck = stuckRows(game);
+  const openCrews = (game.crews ?? []).map(c => ({ ...c, kind: game.structures.find(x => x.id === c.target)?.kind ?? '' }));
   const wkPlan = game.weekend?.mode === 'split' ? weekendBudget(game) : null;
   const wkNext = wkPlan ? nextStageOrder(game, 1) : null, wkStay = wkPlan ? nextLongStay(game.clock.startDoy, game.clock.startYear, dayIndex(game.clock.t)) : null, wkCrew = wkPlan ? crewIdea(game) : null;
   return <>
@@ -72,6 +74,20 @@ export function ProjectsTab() {
         </div>)}
         {rows.length > 8 && <Note>…and {rows.length - 8} more.</Note>}
       </Section>}
+      {(stuck.length > 0 || openCrews.length > 0) && <Section title="Stuck and crew jobs">
+        {stuck.slice(0, 6).map(x => <div key={x.key} data-testid="stuck-row" style={{ padding: '3px 0', borderBottom: `1px solid ${LINE}`, overflowWrap: 'anywhere' }}>
+          <div><b>{x.label}</b> <span style={{ color: TONE.warn }}>has waited {pluralize(x.days, 'day')} for {x.what}</span></div>
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
+            {x.lines && <button style={{ ...btn(true), whiteSpace: 'normal', textAlign: 'left' }} onClick={() => g.order(x.lines!)}>{stuckShort({ ...x, lines: x.lines, escalated: false, others: 0 })}</button>}
+            {x.at && <button style={btn()} onClick={() => g.select(x.at!)}>Open</button>}
+          </div>
+        </div>)}
+        {stuck.length > 6 && <Note>…and {stuck.length - 6} more.</Note>}
+        {openCrews.map(c => <div key={c.id} data-testid="crew-row" style={{ padding: '3px 0', borderBottom: `1px solid ${LINE}`, display: 'flex', justifyContent: 'space-between', gap: 6 }}>
+          <span>Crew on the {KIT[c.kind]?.name ?? c.kind} <span style={{ color: DIM, fontSize: 11 }}>${Math.round(c.paid).toLocaleString('en-US')} so far</span></span>
+          <button style={btn()} onClick={() => g.select(c.target)}>Open</button>
+        </div>)}
+      </Section>}
       {todo.length > 0 && <Section title="Finished, but not working yet">
         {todo.slice(0, 6).map((t, i) => <div key={t.id + t.kind + i} style={{ padding: '3px 0', borderBottom: `1px solid ${LINE}` }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>
@@ -83,7 +99,7 @@ export function ProjectsTab() {
         </div>)}
         {todo.length > 6 && <Note>…and {todo.length - 6} more.</Note>}
       </Section>}
-      {!sel && !rows.length && !game.forestry.jobs.length && !todo.length && <Note>Nothing under way. Stake something out from the Build tab.</Note>}
+      {!sel && !rows.length && !game.forestry.jobs.length && !todo.length && !stuck.length && !openCrews.length && <Note>Nothing under way. Stake something out from the Build tab.</Note>}
       {sel && (
         <Section title={KIT[sel.kind].name} flashKey={`struct:${sel.id}`}>
           <div ref={el => { if (el && g.selected === sel.id && selSeen.current !== sel.id) { selSeen.current = sel.id; el.scrollIntoView?.({ block: 'start' }); } }} />

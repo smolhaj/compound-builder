@@ -39,7 +39,7 @@ import { isHome } from './blueprints';
 
 import type { SkillId } from './family';
 import { regionFor } from './climate';
-import { pluralize } from './words';
+import { pluralize, familyLabel } from './words';
 
 // ─────────────────────────────────────────────────────────────────────────
 // The dog
@@ -514,7 +514,7 @@ export function findHomes(s: GameState, id: string): string | null {
   grieve(s, d, 0.5, 1);
   const L = life(s); L.lost.unshift({ name: d.name, day: d.died, cause: 'went to a neighbor' }); L.lost.length = Math.min(L.lost.length, 10);
   const h = hosts.length ? hosts[(d.born % hosts.length + hosts.length) % hosts.length] : null;
-  if (h) { h.disposition = Math.min(100, h.disposition + 4); log(s, `${d.name} went to live with the ${h.name}s. They were delighted; the children said goodbye.`); }
+  if (h) { h.disposition = Math.min(100, h.disposition + 4); log(s, `${d.name} went to live with ${familyLabel(h.name)}. They were delighted; the children said goodbye.`); }
   else log(s, `${d.name} went to a new home. The children said goodbye.`);
   return null;
 }

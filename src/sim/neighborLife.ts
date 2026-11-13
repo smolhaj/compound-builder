@@ -34,6 +34,7 @@
  *                    shooting (pact.defenders), expect the family when they're
  *                    hit, and trade a work day every two weeks.
  */
+import { singularSurname, pluralSurname } from './words';
 import { mulberry32, pick } from './rng';
 import { log } from './economy';
 import { nobodyHome } from './orphans';
@@ -101,9 +102,9 @@ const HEAD_AGE: Record<NeighborKind, [number, number]> = { old_farmer: [72, 84],
 const hashId = (id: string) => { let h = 2166136261; for (const c of id) h = Math.imul(h ^ c.charCodeAt(0), 16777619) >>> 0; return h; };
 const cap = (x: string) => (x ? x[0].toUpperCase() + x.slice(1) : x);
 /** "the Hendersons" → "Henderson". */
-export const surname = (n: Neighbor) => n.name.replace(/^the /, '').replace(/s$/, '');
+export const surname = (n: Neighbor) => singularSurname(n.name);
 /** "Ortiz" → "the Ortizes", "Bauer" → "the Bauers". */
-export const plural = (last: string) => /(s|x|z|ch|sh)$/.test(last) ? `${last}es` : `${last}s`;
+export const plural = pluralSurname;
 
 export function lifeOf(s: GameState, n: Neighbor): NeighborLife {
   const L = localsOf(s);
@@ -277,7 +278,7 @@ function settleRefugees(s: GameState, r: () => number): string | null {
   const l = lifeOf(s, n);
   l.origin = 'refugees'; l.blurb = blurb; l.head = 28 + Math.floor(r() * 18);
   L.refugees++;
-  const text = `Refugees have settled ${kmText(n.km)} ${n.dir}: the ${last}s. ${blurb}`;
+  const text = `Refugees have settled ${kmText(n.km)} ${n.dir}: the ${pluralSurname(last)}. ${blurb}`;
   l.history.push({ day: dayIndex(s.clock.t), text: 'Settled here after the collapse.', known: true, how: 'seen' });
   return text;
 }

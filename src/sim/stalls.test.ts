@@ -8,7 +8,7 @@ import { plansNeedLines } from './guidance';
 import { suggestions } from './guidance';
 import { compoundBoard } from './compoundBoard';
 import { operational } from './operational';
-import { missLines, noteStalls, stallsDay, stuckProject, stuckShort, waiters, STALL_DAYS, ESCALATE_DAYS } from './stalls';
+import { missLines, noteStalls, stuckRows, stallsDay, stuckProject, stuckShort, waiters, STALL_DAYS, ESCALATE_DAYS } from './stalls';
 import { migrate } from './save/migrations';
 import type { Fix } from './improvements';
 
@@ -274,5 +274,31 @@ describe('food, beds and medicine escalate like a stuck project', () => {
     const out = runway(g).find(r => r.id === 'medicine')!;
     expect(out.value).toMatch(/out of pills/);
     expect(out.tone).toBe('bad');
+  });
+});
+
+describe('the Projects tab lists what is stuck', () => {
+  it('a repair on a house that came with the land that waits for materials is listed, with the order that unblocks it', () => {
+    const g = fresh();
+    const st = planStructure(g, 'farmhouse', 0, 0, 0)!; st.pre = true; st.finishedAt = 0; st.stage = BLUEPRINTS.farmhouse.stages.length;
+    st.fixes = [{ part: 'roof', cond: 'poor', done: 0, hours: 40, supplied: false }];
+    g.money = 300_000;
+    noteStalls(g);
+    expect(stuckRows(g)).toEqual([]);   // not yet
+    g.clock.t += 32;
+    const rows = stuckRows(g);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ at: st.id, days: 32 });
+    expect(rows[0].label).toMatch(/roof repair/);
+    expect(rows[0].lines).toEqual(stuckProject(g)!.lines);   // the same order the Next-steps card offers
+    expect(rows[0].cost).toBeGreaterThan(0);
+  });
+  it('keeps a wait the cash cannot fix (no order offered)', () => {
+    const g = fresh();
+    const st = planStructure(g, 'farmhouse', 0, 0, 0)!; st.pre = true; st.finishedAt = 0; st.stage = BLUEPRINTS.farmhouse.stages.length;
+    st.fixes = [{ part: 'roof', cond: 'poor', done: 0, hours: 40, supplied: false }];
+    g.money = 5; noteStalls(g); g.clock.t += 10;
+    expect(stuckProject(g)).toBeNull();
+    expect(stuckRows(g)[0].lines).toBeNull();
   });
 });
