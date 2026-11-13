@@ -80,9 +80,9 @@ export function Hint({ children, more, tone }: { children: ReactNode; more: Reac
 }
 
 /** Text held to two lines; the whole text is the tooltip and a click opens it. */
-export function Clamp({ children, text }: { children: ReactNode; /** The full text, for the tooltip. */ text?: string }) {
-  const [open, setOpen] = useState(false);
-  return <div title={open ? undefined : text} onClick={() => setOpen(!open)} style={{ color: DIM, fontSize: FS.small, lineHeight: 1.35, cursor: 'pointer', ...(open ? {} : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }) }}>{children}</div>;
+export function Clamp({ children, text, full }: { children: ReactNode; /** The full text, for the tooltip. */ text?: string; /** Never cut it off (a stuck-work card must be read whole). */ full?: boolean }) {
+  const [open0, setOpen] = useState(false), open = open0 || !!full;
+  return <div title={open ? undefined : text} onClick={() => setOpen(!open0)} style={{ color: DIM, fontSize: FS.small, lineHeight: 1.35, cursor: full ? 'default' : 'pointer', ...(open ? {} : { display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }) }}>{children}</div>;
 }
 
 /** A checklist line: a green tick or an open dot, a short label, one line of status, and one button when something is left to do. */

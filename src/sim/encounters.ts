@@ -74,7 +74,7 @@ import { resolveInsider } from './insider';
 import { resolveTrialEnd, startTrial, trialDay, type Character, type TrialCamp } from './trial';
 import { vetArrival } from './gateVetting';
 import { admitNewcomers, resolveShelter, strangerArrival, type Extras, type ShelterWhy } from './newcomers';
-import { pluralize } from './words';
+import { pluralize, familyLabel, pluralSurname } from './words';
 import { prepPosture } from './roadWarn';
 import { markKind, takeMark } from './roadPassers';
 
@@ -123,7 +123,7 @@ export function generateNeighbors(seed: number): Neighbor[] {
   return Array.from({ length: n }, (_, i) => {
     const [kind, skill, base] = kinds[i % kinds.length];
     return {
-      id: `n${i + 1}`, name: `the ${names[i]}s`, kind, skill,
+      id: `n${i + 1}`, name: `the ${pluralSurname(names[i])}`, kind, skill,
       disposition: base + Math.round((r() - 0.5) * 30),
       members: kind === 'young_family' ? 4 : kind === 'widow' || kind === 'loner' ? 1 : 2 + Math.floor(r() * 3),
       dir: dirs[Math.floor(r() * 4)], km: Math.round((0.8 + r() * 4) * 10) / 10,
@@ -1010,7 +1010,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       if (b.result === 'repelled' || b.result === 'fled') {
         // honest about the cost: the fence held, but not everyone on the place walked away whole
         const hurtNew = s.personState.filter(ps => ps.needs.died == null && ps.needs.hurt.length > 0 && !hurtBefore.has(ps.id)).length;
-        title = hurtNew > 0 ? `The fence held, but ${hurtNew} hurt` : 'The fence held'; text = `${help ? `${allies.map(a => a.name).join(' and ')} came over the ridge when they heard the shooting. ` : ''}${b.result === 'fled' ? 'They broke off and ran.' : 'None of them got past the fence.'}${hurtNew > 0 ? ` ${pluralize(hurtNew, 'person', 'people')} on the place ${hurtNew === 1 ? 'was' : 'were'} hurt in the fight.` : ''}`; tone = hurtNew > 0 ? 'mixed' : 'good';
+        title = hurtNew > 0 ? `The fence held, but ${hurtNew} hurt` : 'The fence held'; text = `${help ? `${allies.map(a => familyLabel(a.name)).join(' and ')} came over the ridge when they heard the shooting. ` : ''}${b.result === 'fled' ? 'They broke off and ran.' : 'None of them got past the fence.'}${hurtNew > 0 ? ` ${pluralize(hurtNew, 'person', 'people')} on the place ${hurtNew === 1 ? 'was' : 'were'} hurt in the fight.` : ''}`; tone = hurtNew > 0 ? 'mixed' : 'good';
         if (b.raid?.linePassed) lines.push(...applyRaidDamage(s, b, false, r));   // they were in the yard once: the gap stays in the wall
         if (b.raid?.ending) { title = b.raid.ending.kind === 'tribute' ? 'They took terms' : 'They passed through'; text = b.raid.text; tone = 'mixed'; }
         else if (b.raid?.beatenBack) { title = 'Driven back out'; text = b.raid.text; tone = 'mixed'; }

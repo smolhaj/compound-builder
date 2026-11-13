@@ -17,7 +17,11 @@ const fresh = (money: number): GameState => {
 describe('idle cash', () => {
   it('says nothing when the cash is tight or there is nothing to spend it on', () => {
     expect(idleCash(fresh(20_000))).toBeNull();
-    expect(idleCash(fresh(900_000))).toBeNull();   // rich, but no project to put a crew on and no warning yet
+    // rich with no project open: no crew to hire (nothing to put one on) and no warning yet, but the card now offers to stake the next project
+    // (playtest: $525k sat unspent for 470 days because the card was silent when nothing was open); the old expectation of null was the bug
+    const rich = idleCash(fresh(900_000))!;
+    expect(rich.crew).toBeNull();
+    expect(rich.stake).not.toBeNull();
   });
   it('offers a second crew with the materials ordered in the same tap, for a project that is not the home', () => {
     const g = fresh(900_000);
@@ -79,5 +83,25 @@ describe('start funds, independent families', () => {
       expect(f.budget).toBeGreaterThanOrEqual(FUNDS_RANGE.independent[0]);
       expect(f.budget).toBeLessThanOrEqual(FUNDS_RANGE.independent[1]);
     }
+  });
+});
+
+describe('idle cash with no project open', () => {
+  it('offers to stake the next project: a home that sleeps everyone first, then water, food, power', () => {
+    const g = fresh(900_000);
+    const first = idleCash(g)!.stake!;
+    expect(['cottage', 'timber_cabin', 'log_house']).toContain(first.kind);
+    const card = suggestions(g, 8).find(x => x.id === 'idle_cash')!;
+    expect(card.acts!.some(a => a.act.type === 'stake' && a.act.kind === first.kind)).toBe(true);
+    // the home done: water is next
+    const st = planStructure(g, first.kind, 0, 0, 0)!; st.stage = 99; st.finishedAt = 0;
+    while (g.people.length > 3) g.people.pop();
+    while (g.personState.length > 3) g.personState.pop();
+    expect(['well_hand', 'well_drilled']).toContain(idleCash(g)!.stake!.kind);
+  });
+  it('stays quiet about staking while a project is open (the crew offer covers that)', () => {
+    const g = fresh(900_000);
+    planStructure(g, 'timber_cabin', 0, 0, 0);
+    expect(idleCash(g)?.stake ?? null).toBeNull();
   });
 });

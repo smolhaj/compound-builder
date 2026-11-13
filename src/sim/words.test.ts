@@ -55,3 +55,31 @@ describe('the epidemic count', () => {
     expect(epidemicCountText(0, 1)).toBe('nobody sick right now (1 case since it started)');
   });
 });
+
+describe('family names', () => {
+  it('names ending in s, x, z, ch or sh take -es; the rest take -s', async () => {
+    const { pluralSurname, singularSurname, familyLabel } = await import('./words');
+    expect(pluralSurname('Ortiz')).toBe('Ortizes');
+    expect(pluralSurname('Cross')).toBe('Crosses');
+    expect(pluralSurname('Marsh')).toBe('Marshes');
+    expect(pluralSurname('Birch')).toBe('Birches');
+    expect(pluralSurname('Knox')).toBe('Knoxes');
+    expect(pluralSurname('Bauer')).toBe('Bauers');
+    expect(pluralSurname('Running Horse')).toBe('Running Horses');
+    // stored plurals, including the "Ortizs" that older games saved
+    expect(singularSurname('the Ortizes')).toBe('Ortiz');
+    expect(singularSurname('the Ortizs')).toBe('Ortiz');
+    expect(singularSurname('the Hendersons')).toBe('Henderson');
+    expect(singularSurname('the Running Horses')).toBe('Running Horse');
+    expect(familyLabel('the Ortizs')).toBe('the Ortizes');
+    expect(familyLabel('the Ortizes')).toBe('the Ortizes');
+    expect(familyLabel('the Bauers')).toBe('the Bauers');
+  });
+  it('every generated neighbor household reads right (the Ortiz family was "the Ortizs")', async () => {
+    const { generateNeighbors } = await import('./encounters');
+    const names = new Set<string>();
+    for (let seed = 1; seed <= 80; seed++) for (const n of generateNeighbors(seed)) names.add(n.name);
+    expect([...names]).toContain('the Ortizes');
+    for (const n of names) expect(n).not.toMatch(/(z|x|ch|sh)s$/);
+  });
+});

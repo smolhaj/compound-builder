@@ -78,6 +78,10 @@ export function GoalsCard({ fh, run, ticks, children }: { fh: FirstHour; run: (a
     </div>
     {g.act && <button data-testid="goal-primary" style={{ ...btn(true), width: '100%', marginTop: 5, whiteSpace: 'normal', textAlign: 'left', lineHeight: 1.25 }} disabled={!!g.act.off} title={g.act.off ?? g.act.label} onClick={() => press(g)}>{g.act.label}</button>}
     {!g.act && g.status === 'underway' && <Note>Nothing to press right now. Let the clock run (play, or the fast-forward button) and the family gets on with it.</Note>}
+    {fh.alsoOpen.length > 0 && <div data-testid="goals-also" style={{ margin: '6px 0 2px' }}>
+      <div style={{ ...H, marginBottom: 2 }}>Also open: start any of these now</div>
+      {fh.alsoOpen.map(o => <button key={o.id} data-testid={`goal-also-${o.id}`} style={{ ...btn(false), width: '100%', marginTop: 3, whiteSpace: 'normal', textAlign: 'left', lineHeight: 1.25 }} title={`${o.title}: ${o.line}`} onClick={() => press(o)}>{SHORT[o.id]}: {o.act!.label}</button>)}
+    </div>}
     {g.money && <Note tone="warn">{g.money}</Note>}
     {g.pace && <Note>{g.pace}</Note>}
     <button style={{ ...link, marginTop: 3, display: 'block' }} aria-expanded={open} onClick={() => setWhy(open ? null : g.id)}>{open ? 'Hide why this matters' : 'Why this matters'}</button>

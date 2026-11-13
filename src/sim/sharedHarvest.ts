@@ -9,6 +9,7 @@
  * good terms (disposition climbs a little). Stateless: it reads the pact,
  * the neighbors and the calendar. Pure.
  */
+import { familyLabel } from './words';
 import type { Neighbor } from './encounters';
 import { CLEAR_HOURS, dailyOf } from './daily';
 import { inPact } from './pact';
@@ -47,5 +48,5 @@ export function sharedHarvestDay(s: GameState): string[] {
   for (const n of help) n.disposition = Math.min(100, n.disposition + 0.2);
   const H = seasons(regionFor(s.site)).harvest, day = calendarOf(s.clock).doy - H[0];
   if (day % 14 !== 0) return [];
-  return [`${help.map(n => `The ${n.name}s`).join(' and ')} came to help bring the harvest in: ${helpHands(s)} pairs of hands. They take ${Math.round(harvestShare(s) * 100)}% of the crop home.`];
+  return [`${help.map(n => familyLabel(n.name).replace(/^the/, 'The')).join(' and ')} came to help bring the harvest in: ${helpHands(s)} pairs of hands. They take ${Math.round(harvestShare(s) * 100)}% of the crop home.`];
 }

@@ -62,7 +62,8 @@ import { fitProblem, orderFit, plant, repairPump, replaceFried } from '../sim/ut
 /** Reconnection fee to get back on the grid after leaving it. */
 const GRID_RECONNECT = 250;
 import { triggerDisaster, type DisasterKind } from '../sim/disaster';
-import { resolve, type Stance } from '../sim/encounters';
+import { postureOf, resolve, type Stance } from '../sim/encounters';
+import { defaultStance } from '../sim/raidDefault';
 import { buyLand, type LandKind } from '../sim/land';
 import { log } from '../sim/economy';
 import { opsecOf } from '../sim/opsec';
@@ -393,7 +394,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   watchRaid: () => {
     const c = get().cutscene, g = get().game;
     if (c?.phase !== 'prompt' || !g.gate.pending) return;
-    const stance = c.stance ?? g.gate.pending.stances[0];
+    const stance = c.stance ?? defaultStance(g.gate.pending.stances, postureOf(g));
     const st = stageRaid(g, stance, undefined, c.orders, c.scoutPlan);
     set({ tool: null, toolProblem: null, shopOpen: false, selected: null, cutscene: { ...c, phase: 'playing', stance, ...fromRaid(st), offer: null, changed: false } });
   },
