@@ -35,14 +35,14 @@ export function applyDust(l: CollapseLook, d: { dust: number; heat: number }): C
   const keepAsh = l.ash > k * 0.8;
   return {
     ...l,
-    ash: keepAsh ? l.ash : k * 0.8,
-    ashColor: keepAsh ? l.ashColor : [0.66, 0.52, 0.34],
-    haze: Math.max(l.haze, k * 0.95, d.heat * 0.55),
-    fog: Math.max(l.fog, k * 0.55),
+    ash: keepAsh ? l.ash : k,
+    ashColor: keepAsh ? l.ashColor : [0.74, 0.52, 0.3],
+    haze: Math.max(l.haze, k * 1.0, d.heat * 0.55),
+    fog: Math.max(l.fog, k * 0.8),
     cloud: Math.max(l.cloud, k * 0.5),
-    dim: l.dim * (1 - 0.38 * k),
-    skyTint: l.skyAmt > k * 0.7 ? l.skyTint : [0.74, 0.55, 0.34],
-    skyAmt: Math.max(l.skyAmt, k * 0.7),
+    dim: l.dim * (1 - 0.5 * k),
+    skyTint: l.skyAmt > k * 0.9 ? l.skyTint : [0.8, 0.5, 0.26],
+    skyAmt: Math.max(l.skyAmt, k * 0.9),
     sat: l.sat * (1 - 0.1 * k),
     cast: mix3(l.cast, [1.06, 0.97, 0.84], Math.max(k * 0.8, d.heat * 0.35)),
   };

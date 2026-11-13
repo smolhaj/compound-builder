@@ -12,7 +12,7 @@
 import * as THREE from 'three';
 
 export const MAX_FIRES = 8;
-const N_FLAME = 26, N_EMBER = 12, N_GLOW = 1, N_SMOKE = 14;
+const N_FLAME = 26, N_EMBER = 12, N_GLOW = 1, N_SMOKE = 24;
 const PER_FIRE = N_FLAME + N_EMBER + N_GLOW;
 
 export interface FireSource {
@@ -68,12 +68,12 @@ const FIRE_VERT = /* glsl */`
       float ang = aSeed * 6.2831 * 13.0;
       float rr = sqrt( fract( aSeed * 17.7 ) ) * s.w * ( 1.0 - 0.55 * life );
       p.x += cos( ang ) * rr; p.z += sin( ang ) * rr;
-      float hgt = q.x * ( 0.3 + 0.9 * I );
+      float hgt = q.x * ( 0.4 + 1.0 * I );
       p.y += life * hgt;
       p.x += sin( uTime * 7.0 + aSeed * 40.0 ) * 0.025 * life * s.w * 4.0 + uWind.x * life * life * hgt * 3.0;
       p.z += cos( uTime * 6.0 + aSeed * 31.0 ) * 0.025 * life * s.w * 4.0 + uWind.y * life * life * hgt * 3.0;
-      size = s.w * ( 1.15 - 0.75 * life ) * ( 0.7 + 0.7 * I ) * 1.5;
-      a = smoothstep( 0.0, 0.08, life ) * ( 1.0 - smoothstep( 0.5, 1.0, life ) ) * smoothstep( 0.03, 0.3, I ) * 0.85;
+      size = s.w * ( 1.15 - 0.75 * life ) * ( 0.7 + 0.7 * I ) * 1.7;
+      a = smoothstep( 0.0, 0.08, life ) * ( 1.0 - smoothstep( 0.5, 1.0, life ) ) * smoothstep( 0.03, 0.3, I ) * 0.6;
       col = mix( vec3( 1.0, 0.88, 0.45 ), vec3( 1.0, 0.3, 0.05 ), pow( life, 0.7 ) ) * 1.15;
     } else if ( aKind < 1.5 ) {
       // ember: a bright speck that flies up and downwind, flickering
@@ -125,18 +125,18 @@ const SMOKE_VERT = /* glsl */`
     float I = q.y, S = q.z;
     float life = fract( aSeed + uTime * ( 0.075 + 0.03 * I ) );
     float cap = max( I, S * 0.5 );
-    float rise = life * ( q.x * 2.4 + 1.4 + 2.2 * I ) * ( 0.85 + 0.3 * h1( aSeed * 5.0 ) );
+    float rise = life * ( q.x * 3.2 + 1.8 + 3.0 * I ) * ( 0.85 + 0.3 * h1( aSeed * 5.0 ) );
     vec3 p = s.xyz;
     float ang = aSeed * 6.2831 * 11.0;
     p.x += cos( ang ) * s.w * 0.6 * ( 1.0 - life * 0.5 ); p.z += sin( ang ) * s.w * 0.6 * ( 1.0 - life * 0.5 );
     p.y += rise;
     p.xz += uWind * life * life * ( 22.0 + 20.0 * I ) + vec2( sin( life * 8.0 + aSeed * 30.0 ), cos( life * 6.0 + aSeed * 20.0 ) ) * 0.1 * life;
-    float size = ( s.w * 1.1 + life * ( s.w * 2.6 + 0.35 + 0.5 * I ) );
+    float size = ( s.w * 1.6 + life * ( s.w * 3.6 + 0.6 + 0.8 * I ) );
     vec4 mv = modelViewMatrix * vec4( p, 1.0 );
     gl_Position = projectionMatrix * mv;
     gl_PointSize = min( uScale * size / -mv.z, 230.0 );
     float live = aIdx < uKeep ? 1.0 : 0.0;
-    vA = cap * live * smoothstep( 0.0, 0.07, life ) * ( 1.0 - smoothstep( 0.35, 1.0, life ) ) * mix( 0.5, 0.78, I ) * step( 0.02, cap );
+    vA = cap * live * smoothstep( 0.0, 0.07, life ) * ( 1.0 - smoothstep( 0.35, 1.0, life ) ) * mix( 0.6, 1.0, I ) * step( 0.02, cap ) * 1.3;
     // soot-dark where it burns, a light grey for a smolder; lit by the day, warm underneath by the flames at night
     vec3 base = mix( vec3( 0.44, 0.43, 0.42 ), vec3( 0.12, 0.11, 0.105 ), smoothstep( 0.1, 0.7, I ) );
     float lit = 0.22 + 0.78 * uDay;
