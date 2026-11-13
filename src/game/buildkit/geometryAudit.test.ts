@@ -5,6 +5,7 @@
  * through it, steps that reach the door, chimneys that clear the roof, sane construction stages and a draw-call budget.
  * Fortification, towers, gates, bunkers, tunnels and utilities are audited elsewhere.
  */
+import { SNOW_MESH, WINTER } from './buildingDetail';
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 
@@ -277,8 +278,11 @@ describe('building geometry audit', () => {
         }
         const g = buildLayers(def, 1, def.id.startsWith('terrace') ? { rise: 0.3 } : {});
         showStage(g, 5, 0);
-        const hidden = (g.children as THREE.Mesh[]).filter(m => m.isMesh && !m.visible && !['stakes', 'scaffold', 'frame', 'rafters'].includes(m.userData.layer)).map(m => m.name);
+        const hidden = (g.children as THREE.Mesh[]).filter(m => m.isMesh && !m.visible && !['stakes', 'scaffold', 'frame', 'rafters'].includes(m.userData.layer) && m.name !== SNOW_MESH).map(m => m.name);
         none(hidden, 'layers still hidden when finished');
+        // the winter roof is the one finished layer that waits for snow
+        const snow = (g.children as THREE.Mesh[]).find(m => m.name === SNOW_MESH);
+        if (snow) { expect(snow.visible).toBe(false); WINTER.on = true; try { showStage(g, 5, 0); expect(snow.visible).toBe(true); } finally { WINTER.on = false; } }
       });
       it('has no z-fighting: no two shell surfaces share a plane and overlap (finished, walls view and cutaway)', () => {
         const b = built(def);

@@ -63,6 +63,7 @@ import { ringsAround } from '../sim/rings';
 import { buildYard, yardBlockedLocal, yardSolidLocal, type Yard } from './props/yardGeometry';
 import { dailyCtx, wallGate, yardFx } from './people/dailyScene';
 import type { GoalCtx, Site } from './people/peopleGoals';
+import { detailGeometryOn, setDetailTier } from './buildkit/buildingDetail';
 import { CELL, type KitPieceDef } from './buildkit/kit';
 import { yardSpur } from './buildkit/yardSite';
 import { sitePad } from './buildkit/sitePad';
@@ -602,7 +603,11 @@ export class HomesteadWorld {
   /** (Re)build the terrain mesh at a quality tier. */
   setQuality(q: Quality): void {
     if (q === this._quality) return;
+    const trimWas = detailGeometryOn();
+    setDetailTier(q);
     this._quality = q;
+    // the trim geometry (gutters, railings, window heads) is built on Medium and High: rebuild every building when the tier crosses that line
+    if (trimWas !== detailGeometryOn()) for (const b of this._built.values()) this._rebuild(b, b.opts);
     this.roadLife.setQuality(q);
     this.livestock.setQuality(q);
     this.terrain.build({

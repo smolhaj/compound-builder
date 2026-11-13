@@ -14,6 +14,8 @@
 import type { HardenId } from '../../sim/hardening';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { addBaseAndPorch, addRoofTrim, chimneyDetail, doorDetail, pipeDetail, windowDetail } from './detailTrim';
+import { roomCell, SNOW_MESH, WINTER } from './buildingDetail';
 import { kitMaterial, type KitMaterialId } from './materials';
 import { piece, wallRun, type Collider, type Opening, type Place, type Sink } from './interior';
 import { rng } from './clutter';
@@ -177,7 +179,7 @@ export class Parts {
       if (!g) continue;
       g.computeBoundingSphere();
       const mesh = new THREE.Mesh(g, kitMaterial(m));
-      mesh.castShadow = m !== 'glass' && m !== 'polycarb' && m !== 'glow' && m !== 'string' && m !== 'wire_mesh' && m !== 'oil_stain';
+      mesh.castShadow = m !== 'glass' && m !== 'polycarb' && m !== 'snow' && m !== 'glow' && m !== 'string' && m !== 'wire_mesh' && m !== 'oil_stain';
       mesh.receiveShadow = true;
       mesh.name = `bldg_${layer}_${m}`;
       mesh.userData = { layer, vertexCount: g.getAttribute('position').count };
@@ -238,6 +240,12 @@ export function windowAt(parts: Parts, cx: number, cz: number, y: number, nx: nu
   parts.add('glass', bx(w, h, 0.006, 0, y, c + out - 0.006));
   // lamplight seen from outside: a one-sided glow just outside the glass (from inside you look out into the night)
   const glow = new THREE.PlaneGeometry(w, h).rotateY(alongX ? (nz > 0 ? 0 : Math.PI) : (nx > 0 ? Math.PI / 2 : -Math.PI / 2));
+  // which of four lit rooms (curtain, a figure, a lamp, plain) shows behind this window: its UVs address one cell of the glow atlas
+  {
+    const cell = roomCell(cx, y, cz), uv = glow.getAttribute('uv'), u0 = (cell & 1) * 0.5, v0 = (cell >> 1) * 0.5;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) * 0.5, v0 + uv.getY(i) * 0.5);
+    glow.userData.keepUV = true;
+  }
   const o = c + out - 0.002;
   parts.add('glow', glow.translate(cx + nx * o, y + h / 2, cz + nz * o));
   parts.add(trim, bx(w + 2 * t, t, 0.016, 0, y + h, c + out));
@@ -252,6 +260,7 @@ export function windowAt(parts: Parts, cx: number, cz: number, y: number, nx: nu
     for (let k = 1; k < Math.round(w / 0.1); k++) parts.add(trim, bx(0.008, h, 0.012, -w / 2 + k * w / Math.round(w / 0.1), y, c + out));
   }
   parts.add(trim, bx(w + 0.05, 0.012, 0.035, 0, y - t - 0.012, c + out + 0.01));
+  windowDetail((_m, g) => parts.add(trim, g), bx, w, h, y, c, out, t);
 }
 
 /** Clearance kept between any opening and a roof rake, corner or another opening (world units ≈ 30 cm). */
@@ -284,7 +293,15 @@ function gablePane(parts: Parts, poly: ReadonlyArray<[number, number]>, z: numbe
   const glass = new THREE.ShapeGeometry(sh).translate(0, yE, z + out - nz * 0.002);
   if (nz < 0) glass.rotateY(Math.PI).translate(0, 0, 2 * z);
   parts.add('glass', glass);
-  parts.add('glow', glass.clone().translate(0, 0, nz * 0.003));
+  {
+    // the room behind the glass: the plain cell of the glow atlas stretched over the pane (a lamp-lit ceiling, falling off toward the sill)
+    const gl = glass.clone().translate(0, 0, nz * 0.003), pp = gl.getAttribute('position'), uv = gl.getAttribute('uv');
+    gl.computeBoundingBox();
+    const bb = gl.boundingBox!;
+    for (let i = 0; i < pp.count; i++) uv.setXY(i, 0.5 * (pp.getX(i) - bb.min.x) / Math.max(1e-4, bb.max.x - bb.min.x), 0.5 * (pp.getY(i) - bb.min.y) / Math.max(1e-4, bb.max.y - bb.min.y));
+    gl.userData.keepUV = true;
+    parts.add('glow', gl);
+  }
   // frame along every edge
   for (let i = 0; i < poly.length; i++) {
     const [ax, ay] = poly[i], [bx, by] = poly[(i + 1) % poly.length];
@@ -380,7 +397,7 @@ export function showStage(group: THREE.Group, stage: number, f: number, supplied
     if (!m.isMesh) continue;            // lights etc. are managed by the world
     const layer = m.userData.layer as BuildLayer;
     const k = stage >= 5 ? (keep.includes(layer) ? 1 : fr[layer]) : fr[stageAs[layer] ?? layer];
-    m.visible = k > 0.001;
+    m.visible = k > 0.001 && (m.name !== SNOW_MESH || WINTER.on);
     const n = m.userData.vertexCount as number;
     // whole triangles only, so partial layers end on a finished piece edge
     m.geometry.setDrawRange(0, k >= 0.999 ? Infinity : Math.floor((n * k) / 3) * 3);
@@ -599,6 +616,8 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
     }
   }
   for (const z of s.tieBeams ?? []) parts.add('wood_dark', box(W - 2 * T, 0.03, 0.025, 0, yE - 0.03, z));
+  const sf = { hw, hd, y0, yE, z0, z1, pz1, pitch, roofT, slopeLen };
+  addRoofTrim(parts, s, sf);
 
   // ── Walls: outer cladding, inner lining, openings through both ──
   const asOpening = (o: WallOpening): Opening => {
@@ -678,6 +697,7 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
     parts.add(s.trim, onWall(box(p.w + 0.04, 0.02, 0.018, 0, y0 + p.h + 0.001, ow)));
     for (const e of [-1, 1]) parts.add(s.trim, onWall(box(0.02, p.h, 0.018, e * (p.w / 2 + 0.011), y0, ow)));
     if (o.kind === 'door') {
+      doorDetail(parts, s.trim, onWall, p.w, p.h, y0);
       // plank door standing open into the room, hinged on its left jamb
       const g = box(p.w, p.h, 0.012, p.w / 2, 0, -0.006).rotateY(1.35).translate(-p.w / 2 + 0.006, y0, -T);
       parts.add('door', onWall(g));
@@ -693,6 +713,7 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
     for (const sx of [-1, 1]) parts.add(s.trim, box(0.032, yE - 0.01 - y0, 0.032, sx * (hw - 0.03), y0, pz1 - 0.03));
     parts.add(s.trim, box(W + 0.004, 0.037, 0.032, 0, yE - 0.031, pz1 - 0.03));
   }
+  addBaseAndPorch(parts, s, sf);
 
   // ── Chimney (fieldstone, built in courses) or stovepipe through the roof ──
   parts.layer = 'chimney';
@@ -703,12 +724,14 @@ export function buildGabled(s: GabledSpec, furnish?: (c: FurnishCtx) => void, pa
     const cc = 8;
     for (let i = 0; i < cc; i++) parts.add('fieldstone', box(chW, (chTop + 0.03) / cc, chW, cx, -0.03 + i * (chTop + 0.03) / cc, -hd - chW / 2 + 0.01));
     parts.add('chimney_cap', box(chW + 0.02, 0.02, chW + 0.02, cx, chTop - 0.03, -hd - chW / 2 + 0.01));
+    chimneyDetail(parts, cx, -hd - chW / 2 + 0.01, chW, chTop);
     chimneyTop = new THREE.Vector3(cx, chTop, -hd - 0.06);
   } else if (s.chimney?.kind === 'pipe') {
     const { x, z } = s.chimney;
     const roofY = yE + s.rise * (1 - Math.abs(x) / hw);
     parts.add('iron', new THREE.CylinderGeometry(0.014, 0.014, 0.14, 10).translate(x, roofY + 0.06, z));
     parts.add('iron', new THREE.ConeGeometry(0.03, 0.025, 10).translate(x, roofY + 0.14, z));
+    pipeDetail(parts, x, z, roofY, x === 0 ? 0 : (x > 0 ? -pitch : pitch));
     chimneyTop = new THREE.Vector3(x, roofY + 0.15, z);
   }
 
