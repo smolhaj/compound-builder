@@ -46,11 +46,11 @@ try {
   console.log('quality', await page.evaluate(() => window.__cb.store.getState().quality));
   const frames = async (k) => { const f0 = await page.evaluate(() => window.__cb.qa.frames); await page.waitForFunction(x => window.__cb.qa.frames >= x, f0 + k, { polling: 200 }); };
   
-  const N = Number(opt('--n', 20)), AUDIT = args.includes('--audit'), SHOTS = opt('--shots', null);
+  const N = Number(opt('--n', 20)), AUDIT = args.includes('--audit'), SHOTS = opt('--shots', null), PROBE = opt('--probe', null);
   const PROF = args.includes('--prof');
   let cdpP = null;
   if (PROF) { cdpP = await page.context().newCDPSession(page); await cdpP.send('Profiler.enable'); await cdpP.send('Profiler.setSamplingInterval', { interval: 2000 }); await cdpP.send('Profiler.start'); }
-  const out = await page.evaluate(async ([hour0, N, wantDay, AUDIT, SHOTS]) => {
+  const out = await page.evaluate(async ([hour0, N, wantDay, AUDIT, SHOTS, PROBE]) => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp;
     const sp = cb.tool.findSpot('timber_cabin', c.x, c.z, 0);
     G.getState().plan('timber_cabin', sp[0], sp[1], 0);
@@ -76,6 +76,12 @@ try {
     const mk = d => ({ id: 'e9', kind: 'gang', day: d, title: 'An armed crew', dossier: [], size: 12, armed: true, strength: 120, wants: { canned: 8, fuel: 4 }, stances: ['hide', 'parley', 'defend', 'trade'], temper: 'savage' });
     const solid = (x, z) => cb.world.walkBlocked(x, z, 0.04);
     const home = g.structures.find(x => isFinished(x) && isHome(x.kind) && KIT[x.kind]);
+    if (PROBE) {
+      const [px, pz] = PROBE.split(',').map(Number), col = [];
+      for (let z = pz - 0.5; z <= pz + 0.5; z += 0.02) col.push([+z.toFixed(2), cb.world.walkBlocked(px, z, 0.012) ? 'B' : '.', cb.world.walkBlocked(px, z, 0.04) ? 'B' : '.']);
+      const runs = g.perimeter.map(r => ({ kind: r.kind, pts: r.pts.map(q => q.map(v => +v.toFixed(2))), gates: r.gates }));
+      return { probe: [px, pz], col: col.map(c => c.join('')).join(' '), runs };
+    }
     const days = [];
     for (let d = wantDay; d < wantDay + 60 && days.length < N; d++) {
       const t = structuredClone(g); t.gate.pending = mk(d);
@@ -129,7 +135,7 @@ try {
           if (u.dead || u.gone) { prevPos.delete(u.id); continue; }
           const p0 = prevPos.get(u.id); prevPos.set(u.id, { x: u.x, z: u.z }); if (!p0) continue;
           const dd = Math.hypot(u.x - p0.x, u.z - p0.z), nn = Math.max(1, Math.ceil(dd / 0.04)), tt = cb.battle.time; let was = blockedAt(nav, p0.x, p0.z, tt);
-          for (let q = 1; q <= nn; q++) { const x = p0.x + (u.x - p0.x) * q / nn, z = p0.z + (u.z - p0.z) * q / nn, now = blockedAt(nav, x, z, tt); if (now && !was) { clips.push({ id: u.id, side: u.side, t: +tt.toFixed(2), x: +x.toFixed(2), z: +z.toFixed(2) }); break; } was = now; }
+          for (let q = 1; q <= nn; q++) { const x = p0.x + (u.x - p0.x) * q / nn, z = p0.z + (u.z - p0.z) * q / nn, now = blockedAt(nav, x, z, tt); if (now && !was) { clips.push({ id: u.id, side: u.side, t: +tt.toFixed(2), x: +x.toFixed(2), z: +z.toFixed(2), y: +(u.y ?? 0).toFixed(2), tgt: [+(u.tx ?? 0).toFixed(2), +(u.tz ?? 0).toFixed(2)], from: [+p0.x.toFixed(2), +p0.z.toFixed(2)], to: [+u.x.toFixed(2), +u.z.toFixed(2)], carves: nav.carves.map(c => [c.x0, c.z0, c.x1, c.z1, c.from].map(v => +v.toFixed(2))) }); break; } was = now; }
         } if (SHOTS && ev0 && !shotDone && cb.battle.time >= ev0.t + 1.5) { shotDone = true; (window.__shots ??= []).push(...takeShots().map(sh => ({ ...sh, name: `d${d}_${sh.name}` }))); } if (!drawn && cb.battle.time > r.battle.duration * 0.6) { cb.qa.skipDraw = false; const f0 = performance.now(); cb.ws.renderFrame(); const ms = performance.now() - f0; const i = cb.ws.renderer.info.render; drawn = { ms: +ms.toFixed(1), calls: i.calls, triangles: i.triangles }; cb.qa.skipDraw = true; } if (cb.battle.time > r.battle.duration + 1) break; }
       slowest = Math.max(slowest, maxStep);
       cb.battle.stop();
@@ -137,7 +143,7 @@ try {
       rows.push({ k, day: d, clips: clips.length, clipUnits: [...new Set(clips.map(c => c.id))].length, clipSample: clips.slice(0, 10), gap: r.battle.events.filter(e => e.kind === 'gap').map(e => [e.x, e.z, e.w, e.t]), prepMs: Math.round(prep), split, nav: { ...Object.fromEntries(['cores', 'direct', 'grids', 'expanded', 'skipped'].map(a => [a, navStats[a] - ns0[a]])), pad: Object.fromEntries([3, 8, 24].map(q => [q, [navStats.pad[q].tries - ns0.pad[q].tries, navStats.pad[q].ok - ns0.pad[q].ok, navStats.pad[q].expanded - ns0.pad[q].expanded]])) }, unrouted: r.unrouted, lost: (r.lost || []).slice(0, 4), ok: r.ok, steps, maxStepMs: +maxStep.toFixed(1), frame: drawn, heap: Math.round(performance.memory.usedJSHeapSize / 1e6), ...info(), props: cb.battle.props.live });
     }
     return { base, rows, slowestStepMs: +slowest.toFixed(1) };
-  }, [hour0, N, wantDay, args.includes('--audit'), !!opt('--shots', null)]);
+  }, [hour0, N, wantDay, args.includes('--audit'), !!opt('--shots', null), opt('--probe', null)]);
   if (SHOTS) { mkdirSync(SHOTS, { recursive: true }); const sh = await page.evaluate(() => window.__shots ?? []); for (const x of sh) writeFileSync(`${SHOTS}/${x.name}.jpg`, Buffer.from(x.url.split(',')[1], 'base64')); console.log('SHOTS', JSON.stringify(sh.map(x => [x.name, x.cam]))); }
   if (PROF) {
     const { profile } = await cdpP.send('Profiler.stop');
