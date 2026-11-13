@@ -129,6 +129,8 @@ import { bedMoves, type RoadBed } from '../sim/roadBed';
 import { buildRibbon } from '../engine/world/roads/RoadRibbon';
 import { gravelMaterial, roadMaterial } from '../engine/world/roads/roadTextures';
 import { RockField, type RockSpec } from '../engine/world/terrain/RockField';
+import { GroundCover } from '../engine/world/ground/GroundCover';
+import type { CoverSample, CoverSampler } from '../engine/world/ground/groundCoverPlan';
 import { regionFor } from '../sim/climate';
 import { buildLineFences, buildPowerline, planLineFences } from './region/lineFences';
 import type { RegionWorld } from './region/regionWorld';
@@ -218,6 +220,8 @@ interface DigSite { pit: Pit; spoil: number; machine: boolean; stage: number; f:
 const SEE_THROUGH_FLOOR: ReadonlySet<string> = new Set(['lodge', 'lodge_solar']);
 
 /** How much of the lake shows ice for each sim state (a skim is thin and patchy). */
+/** Barns, coops and barnyards: the paddock in front of the door is trodden bare. */
+const PADDOCK = /^(barn|barnyard|sheep_barn|chicken_coop)$/;
 const ICE_COVER = { open: 0, skim: 0.32, ice: 1 } as const;
 
 export class HomesteadWorld {
@@ -228,6 +232,8 @@ export class HomesteadWorld {
   readonly sage: ShrubField;
   readonly willow: ShrubField;
   readonly rocks: RockField;
+  /** Near-camera grass, flowers, ferns, litter and stones (engine/world/ground). `?nocover` turns it off (QA before/after). */
+  readonly cover: GroundCover;
   readonly farTrees: FarTreeRenderer;
   /** The region's look and lie (game/region/regionWorld.ts). */
   readonly regionWorld: RegionWorld;
@@ -341,6 +347,8 @@ export class HomesteadWorld {
     this.forest = new ForestRenderer(ws.scene);
     this.sage = new ShrubField(ws.scene, this.regionWorld.scrub === 'desert' ? 'desert_scrub' : 'sagebrush', this.regionWorld.sagePalette ?? SAGE, 1);
     this.rocks = new RockField(ws.scene);
+    this.cover = new GroundCover(ws.scene);
+    if (typeof location !== 'undefined' && /[?&]nocover\b/.test(location.search)) this.cover.setAmount(0);
     this.willow = new ShrubField(ws.scene, 'willow', WILLOW, 1);
     this.farTrees = new FarTreeRenderer(ws.scene);
     this.stream = new StreamRenderer(ws.scene);
@@ -623,6 +631,9 @@ export class HomesteadWorld {
       kind: this.regionWorld.kind, cx: this.center.x, cz: this.center.z,
       core: { x: PARCEL_SIZE / 2 + 70, z: PARCEL_SIZE / 2 + 22 }, quality: q, waterY: regionWaterY(this.regionWorld.kind),
     });
+    const gc = this.terrain.groundColors();
+    if (gc) this.cover.configure({ kind: this.regionWorld.kind, sampler: this._coverSampler, grass: gc.grass, dryGrass: gc.dryGrass, terrainDry: gc.dry });
+    this.cover.setQuality(q);
     this._plant(q);
     this._water(q);
     this._buildRoads();
@@ -670,7 +681,42 @@ export class HomesteadWorld {
       waterY: wy, quality: q,
       blocked: (x, z) => inside(x, z) || onFarmstead(this.farms, x, z, 2.5) || this.onAccess(x, z, 1.2),
     });
+    this.cover.invalidate();
   }
+
+  /**
+   * What the ground cover may grow on: nothing through a building (and a skirt round it), the camp, the drive and county road, a fence or
+   * wall line, a retaining wall, water, a path (it thins to a worn edge), a barn's paddock (trodden bare), or a crop field.
+   */
+  private readonly _coverSampler: CoverSampler = {
+    height: (x, z) => this.terrain.surfaceAt(x, z),
+    at: (x, z): CoverSample => {
+      const c = this.terrain.coverAt(x, z);
+      let density = 1, worn = 0;
+      for (const b of this._built.values()) {
+        if (b.under) continue;
+        const r = b.fpPorch, dx = Math.max(r.x0 - x, 0, x - r.x1), dz = Math.max(r.z0 - z, 0, z - r.z1), d = Math.hypot(dx, dz);
+        if (d < 0.7) { density = Math.min(density, d < 0.22 ? 0 : (d - 0.22) / 0.48 * 0.6); worn = Math.max(worn, 0.35 * (1 - d / 0.7)); }
+        if (PADDOCK.test(b.placed.kind) && d < 1.1) { density = Math.min(density, 0.1); worn = Math.max(worn, 0.8 * (1 - d / 1.1)); }
+      }
+      const cd = Math.hypot(x - this.camp.x, z - this.camp.z);
+      if (cd < 1.7) { density = Math.min(density, cd < 1.2 ? 0 : (cd - 1.2) / 0.5 * 0.6); worn = Math.max(worn, 0.5 * (1 - cd / 1.7)); }
+      if (this.onAccess(x, z, 0.35)) density = 0;
+      else if (this.onAccess(x, z, 0.8)) density = Math.min(density, 0.45);
+      if (density > 0) {
+        if (this.onPerimeterLine(x, z, 0.2)) density = 0;
+        else if (this.onPerimeterLine(x, z, 0.5)) density = Math.min(density, 0.5);
+      }
+      if (density > 0) {
+        const pd = this.paths.distTo(x, z);
+        if (pd < 0.45) { density = Math.min(density, pd < 0.14 ? 0 : (pd - 0.14) / 0.31 * 0.7); worn = Math.max(worn, 0.55 * (1 - pd / 0.45)); }
+        if (this.walls.blocks(x, z) || this.stream.depthAt(x, z) > 0.01) density = 0;
+        const ly = this.parcel.lakeY;
+        if (ly !== null && ly !== undefined && this.terrain.surfaceAt(x, z) < ly + 0.1) density = 0;
+      }
+      return { forest: c.forest, field: c.field, density, worn };
+    },
+  };
 
   /** The neighbors' farmsteads, their line fences and the power line: rebuilt whole when a farm burns. */
   private _buildFarms(tree: (t: FarmTree) => void = () => {}, insideHome: (x: number, z: number) => boolean = this._insideHome): void {
@@ -1831,6 +1877,7 @@ export class HomesteadWorld {
     this.sage.visible = !on;
     this.willow.visible = !on;
     this.rocks.visible = !on;
+    this.cover.visible = !on;
     // the tracks and the yard clutter lie on the ground, not in the cut-away section
     this.paths.enabled = !on;
     this.lived.enabled = !on;
@@ -2866,6 +2913,8 @@ export class HomesteadWorld {
     this.terrain.update();
     this._clock += dt;
     ForestRenderer.setWindTime(this._clock);
+    this.cover.setWind(this.air.wind);
+    this.cover.update(dt, this._ws.camera);
     updateWaterGlobals(this._ws.scene, this._clock);
     // Wood smoke: the stove is lit when it's cold, and for cooking morning and evening
     const a = this.air, h = a.hour;
@@ -2901,6 +2950,7 @@ export class HomesteadWorld {
     this._roads.traverse(o => (o as THREE.Mesh).geometry?.dispose());
     this.forest.dispose();
     this.rocks.dispose();
+    this.cover.dispose();
     this.farTrees.dispose();
     this._props?.dispose();
     this.stream.dispose();
