@@ -7,7 +7,7 @@
  * per-instance attributes, swings arms and legs about the shoulder / hip
  * pivots and poses the figure.
  *
- * Per-instance attributes:
+ * Per-instance attributes (the last, aGear, is the people pass: hair / headwear / gear flags packed in x, build in y, head look yaw in z, ground slope in w):
  *   aShirt / aPants / aSkin / aHair / aPack  (vec3 sRGB→linear colors)
  *   aStyle  (pose, hasPack, longHair, shoeTone)
  *   aWear   (coat 0 none / 1 hip / 2 mid-thigh / 3 gown, shorts, hat code, idle phase)
@@ -33,7 +33,7 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { HATS, MORTARBOARD, type Wear } from './crowdWear';
+import { HATS, MORTARBOARD, hatIndex, type Wear } from './crowdWear';
 
 /** Figure geometry is authored 2× (0.56 tall); instances draw it at half size (≈0.28 ≈ 1.7 m). */
 export const FIG_SCALE = 0.5;
@@ -52,16 +52,36 @@ export const SADDLE_Y   = 0.3;
 const DECK_Y     = 0.045;
 
 /** Figure poses (aStyle.x). */
-export const FIG_POSE = { STAND: 0, BENCH: 1, LAWN: 2, BIKE: 3, SCOOTER: 4, CARRY: 5, REACH: 6, KNEEL: 7, CROSS: 8, CHOP: 9, HOE: 10, STIR: 11, HANG: 12, RIFLE: 13, PAIL: 14 } as const;
+export const FIG_POSE = { STAND: 0, BENCH: 1, LAWN: 2, BIKE: 3, SCOOTER: 4, CARRY: 5, REACH: 6, KNEEL: 7, CROSS: 8, CHOP: 9, HOE: 10, STIR: 11, HANG: 12, RIFLE: 13, PAIL: 14,
+  /** Digging (a shovel thrust, the body rocking with it). */ DIG: 15,
+  /** Asleep (the caller lays the figure down with `pitch`): arms folded, a slow breath. */ SLEEP: 16,
+  /** A rifle shouldered and aimed (both arms forward, hands on the weapon), feet apart. */ AIM: 17,
+  /** Down behind cover: crouched and hunched, hands over the head. */ COVER: 18,
+  /** Going down: `phase` is the fall's progress 0…1 (arms flung up, knees going). */ FALL: 19,
+  /** Carrying a person (or a heavy sack) in both arms, leaning back against the load. */ CARRYP: 20,
+} as const;
 
 /** Tool in hand (aAnim.z). */
-export const FIG_TOOL = { NONE: 0, AXE: 1, HOE: 2, RIFLE: 3, BUCKETS: 4, HAMMER: 5, SPOON: 6, PAIL: 7 } as const;
+export const FIG_TOOL = { NONE: 0, AXE: 1, HOE: 2, RIFLE: 3, BUCKETS: 4, HAMMER: 5, SPOON: 6, PAIL: 7,
+  /** A spade (the hoe's handle with a narrow blade). */ SHOVEL: 8,
+  /** An armload of firewood (the carry box, drawn as split logs). */ LOGS: 9 } as const;
+
+/** Hair styles (aGear.x bits 0-2). 0 = by the `longHair` flag. */
+export const HAIR = { DEFAULT: 0, BUZZ: 1, BUN: 2, PONYTAIL: 3, BALD: 4, CURLY: 5, LONG: 6 } as const;
+/** Headwear worn over the hair (aGear.x bits 5-7). The knit hat is `Wear.hat` alone (aWear.z). */
+export const HEADWEAR = { NONE: 0, CAP: 1, BOONIE: 2, HELMET: 3, HOOD: 4 } as const;
+/** Body builds (aGear.y). */
+export const BUILD = { AVERAGE: 0, CHILD: 1, ELDER: 2, BROAD: 3, SLENDER: 4 } as const;
+/** Gear flags (bit set in aGear.x / 256). */
+export const GEAR = { APRON: 1, VEST: 2, PLATE: 4, RADIO: 8, BOOTS: 16, GLOVES: 32, SCARF: 64, BELT: 128, SLING: 256, RUCK: 512 } as const;
 
 /** Hat code for a graduation mortarboard (aWear.z). */
 export const HAT_MORTARBOARD = 20;
 
 // Part ids
 const P_PACK = 5, P_LONGHAIR = 6;
+/** Look parts added by the people pass (collapsed unless worn): cap visor / boonie brim, bun / ponytail, beard, apron, vest + pouch, radio, scarf, rucksack. */
+const P_BRIM = 16, P_BUN = 17, P_BEARD = 18, P_APRON = 19, P_VEST = 20, P_RADIO = 21, P_SCARF = 22, P_RUCK = 23;
 // Umbrella (collapsed per-instance unless it is raining — see uRain)
 const P_UMB_CANOPY = 7, P_UMB_SHAFT = 8;
 /** Mortarboard board (collapsed unless the hat code is HAT_MORTARBOARD). */
@@ -71,13 +91,30 @@ const P_BOX = 10;
 /** Tools (collapsed unless aAnim.z says so). */
 const P_AXE = 11, P_HOE = 12, P_RIFLE = 13, P_BUCKET = 14, P_HAMMER = 15;
 /** Part / limb packing: aPL = part + (limb + 2) × PL_K + metal × PL_METAL. */
-const PL_K = 16, PL_METAL = 128;
+const PL_K = 64, PL_METAL = 512;
 /** Raised arm angle (rad) for walkers holding an umbrella. */
 const UMB_ARM = -0.75;
 const L_NONE = 0;
 
 /** Shared uniforms: every figure layer puts umbrellas up together and idles on one clock. */
-export const FIGURE_UNIFORMS = { uRain: { value: 0 }, uTime: { value: 0 } };
+export const FIGURE_UNIFORMS = { uRain: { value: 0 }, uLod: { value: 24 } };
+
+/**
+ * Detail distance (world units from the camera) beyond which the small look parts (hair knots, beard, visor, radio, scarf; the leg lift) are
+ * collapsed in the vertex shader: [low, medium, high]. Set from the quality tier (`setFigureDetail`).
+ */
+const LOD_FAR = { low: 9, medium: 16, high: 28 } as const;
+export function setFigureDetail(tier: 'low' | 'medium' | 'high'): void { FIGURE_UNIFORMS.uLod.value = LOD_FAR[tier]; }
+
+/**
+ * Walk-cycle phase advance for a figure that moved `dist` world units: one half cycle (π) per step, the step length being the chord the
+ * swinging legs span (2 · leg · sin amp), so the planted foot does not slide. `scale` is the instance scale (kids).
+ */
+export function stridePhase(dist: number, scale: number, amp: number): number {
+  const leg = HIP_Y * FIG_SCALE * scale;
+  const step = Math.max(0.02, 2 * leg * Math.sin(Math.min(1.2, Math.max(0.2, amp))));
+  return dist / step * Math.PI;
+}
 
 /** Build the merged figure geometry with the aPL (part + limb) vertex attribute. */
 export function buildFigureGeometry(): THREE.BufferGeometry {
@@ -132,6 +169,18 @@ export function buildFigureGeometry(): THREE.BufferGeometry {
   add(box(0.066, 0.075, 0.018, 0, SHOULDER_Y + 0.03, -0.034), P_LONGHAIR);
   // Backpack (collapsed per-instance when unused)
   add(box(0.086, 0.12, 0.044, 0, SHOULDER_Y - 0.075, -0.054), P_PACK);
+  // Look parts (people pass; each a single box or two, collapsed unless worn). Head: a cap visor / wide brim, a bun / ponytail knot, a beard.
+  add(box(0.05, 0.006, 0.034, 0, SHOULDER_Y + 0.088, 0.04), P_BRIM);
+  add(box(0.03, 0.03, 0.03, 0, SHOULDER_Y + 0.1, -0.036), P_BUN);
+  add(box(0.052, 0.028, 0.03, 0, SHOULDER_Y + 0.046, 0.022), P_BEARD);
+  // Body: an apron over the front, a chest rig (box + pouch strip; a plate carrier scales it), a radio on the strap, a scarf, a rucksack
+  add(box(0.1, 0.19, 0.01, 0, 0.3, 0.04), P_APRON);
+  const vest = box(0.118, 0.115, 0.074, 0, SHOULDER_Y - 0.075, 0);
+  const pouch = box(0.09, 0.03, 0.02, 0, SHOULDER_Y - 0.12, 0.045);
+  add(mergeGeometries([vest.toNonIndexed(), pouch.toNonIndexed()])!, P_VEST);
+  add(box(0.026, 0.05, 0.016, -0.04, SHOULDER_Y - 0.045, 0.052), P_RADIO);
+  add(box(0.075, 0.032, 0.06, 0, SHOULDER_Y + 0.018, 0), P_SCARF);
+  add(box(0.1, 0.17, 0.07, 0, SHOULDER_Y - 0.09, -0.06), P_RUCK);
   // Umbrella held in the raised +x hand: slanted shaft + 8-panel canopy
   // over the head. Hand position = shoulder-pivoted hand at UMB_ARM.
   const hy = SHOULDER_Y - 0.168 * Math.cos(UMB_ARM);
@@ -189,8 +238,11 @@ export function buildFigureGeometry(): THREE.BufferGeometry {
 /** The figure's per-instance attribute names and sizes (source order). */
 export const FIGURE_ATTRS: ReadonlyArray<readonly [string, number]> = [
   ['aShirt', 3], ['aPants', 3], ['aSkin', 3], ['aHair', 3], ['aPack', 3],
-  ['aStyle', 4], ['aWear', 4], ['aAnim', 3],
+  ['aStyle', 4], ['aWear', 4], ['aAnim', 3], ['aGear', 4],
 ];
+
+/** GLSL: one 0/1 float per gear flag (agGApron, agGVest, …) from the packed flags `agGf`. */
+const GEAR_DECODE = Object.entries(GEAR).map(([k, v]) => `        float agG${k[0]}${k.slice(1).toLowerCase()} = mod(floor(agGf / ${v}.0), 2.0);`).join('\n');
 
 /**
  * Vertex-shader skeleton: limbs rotate about hip / shoulder pivots by the
@@ -203,13 +255,17 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
   const f = (v: number) => v.toFixed(3);
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uRain = FIGURE_UNIFORMS.uRain;
-    shader.uniforms.uTime = FIGURE_UNIFORMS.uTime;
+    shader.uniforms.uLod = FIGURE_UNIFORMS.uLod;
+    shader.uniforms.uTime = (mat.userData.time ??= { value: 0 });
     // (a rim of light along the silhouette, per material: colour x strength, zero unless a layer asks for it, so crowds are untouched)
     shader.uniforms.uRim = (mat.userData.rim ??= { value: new THREE.Vector3(0, 0, 0) });
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
         uniform float uRain;
         uniform float uTime;
+        uniform float uLod;
+        attribute vec4 aGear;
+        varying float vAgBelt;
         attribute float aPL;
         attribute vec3 aShirt;
         attribute vec3 aPants;
@@ -256,7 +312,28 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         float agStir = step(10.5, agPose) * step(agPose, 11.5);
         float agHang = step(11.5, agPose) * step(agPose, 12.5);
         float agRifle = step(12.5, agPose) * step(agPose, 13.5);
-        float agPail = step(13.5, agPose);
+        float agPail = step(13.5, agPose) * step(agPose, 14.5);
+        float agDig = step(14.5, agPose) * step(agPose, 15.5);
+        float agSleep = step(15.5, agPose) * step(agPose, 16.5);
+        float agAim = step(16.5, agPose) * step(agPose, 17.5);
+        float agCover = step(17.5, agPose) * step(agPose, 18.5);
+        float agFall = step(18.5, agPose) * step(agPose, 19.5);
+        float agCarryP = step(19.5, agPose) * step(agPose, 20.5);
+        // gear / look (aGear): hair, beard, headwear, flags; build; head look; ground slope
+        float agGp = aGear.x;
+        float agHairS = mod(agGp, 8.0);
+        float agBeardK = mod(floor(agGp / 8.0), 4.0);
+        float agHeadW = mod(floor(agGp / 32.0), 8.0);
+        float agGf = floor(agGp / 256.0);
+${GEAR_DECODE}
+        float agBuild = aGear.y;
+        float agChild = step(0.5, agBuild) * step(agBuild, 1.5);
+        float agElder = step(1.5, agBuild) * step(agBuild, 2.5);
+        float agBroad = step(2.5, agBuild) * step(agBuild, 3.5);
+        float agSlender = step(3.5, agBuild);
+        float agDist = length((modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz);
+        float agNear = 1.0 - step(uLod, agDist);
+        float agGone = 0.0;
         float agSit = agBench + agLawn + agCross;
         float agSide = sign(aLimb);
         float agIsArm = step(1.5, abs(aLimb));
@@ -266,10 +343,12 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         // Joggers (large swing): forearms bent forward
         agAng -= agIsArm * smoothstep(0.6, 0.85, aAnim.y) * 0.55;
         // Idle (standing still): occasional hand gesture with the +x arm
-        float agStill = (1.0 - step(0.01, aAnim.y)) * (1.0 - agSit) * (1.0 - agBike - agScoot - agKneel);
+        float agStill = (1.0 - step(0.01, aAnim.y)) * (1.0 - agSit) * (1.0 - agBike - agScoot - agKneel - agSleep - agFall - agCover - agAim - agDig);
         float agT = uTime + aWear.w * 7.0;
         float agGest = pow(max(0.0, sin(agT * 0.55 + aWear.w * 3.1)), 8.0);
-        agAng -= agStill * step(1.5, aLimb) * agGest * 0.75 * (1.0 - agReach);
+        // (what the idle hand does, by person: a wave of the hand, a hand to the head, arms folded, hands behind the back)
+        float agGk = floor(fract(aWear.w * 13.7) * 4.0);
+        agAng -= agStill * agGest * (1.0 - agReach) * (agGk < 0.5 ? step(1.5, aLimb) * 0.75 : agGk < 1.5 ? step(1.5, aLimb) * 2.3 : agGk < 2.5 ? agIsArm * 0.95 : -agIsArm * 0.3);
         // Bench / chair: legs forward and down so the feet reach the ground
         // in front of a 45 cm seat (no knee joint: a straight leg at ~48°), forearms on the lap
         agAng = mix(agAng, agIsLeg * -0.85 + agIsArm * -0.55, agBench);
@@ -303,6 +382,18 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         agAng = mix(agAng, agIsLeg * agAng + agIsArm * -0.72, agRifle);
         // A pail: carried low; standing still the +x hand scatters feed
         agAng = mix(agAng, agIsLeg * agAng + agIsArm * (aLimb > 0.0 ? -0.12 - agStill * 0.75 * (0.5 + 0.5 * sin(agT * 2.4)) : -0.08), agPail);
+        // Digging: both arms forward on the spade, thrusting with the body
+        agAng = mix(agAng, agIsLeg * agSide * 0.2 + agIsArm * (-0.95 + 0.45 * sin(agT * 2.4)), agDig);
+        // Asleep: arms folded on the chest, one knee bent
+        agAng = mix(agAng, agIsLeg * (agSide > 0.0 ? 0.1 : -0.3) + agIsArm * -0.95, agSleep);
+        // Aiming: both arms out along the rifle, feet apart, a tiny sway of the muzzle
+        agAng = mix(agAng, agIsLeg * agSide * 0.22 + agIsArm * (-1.42 + 0.015 * sin(agT * 1.9)), agAim);
+        // Under cover: hands over the head, knees down
+        agAng = mix(agAng, agIsLeg * 0.12 + agIsArm * -2.35, agCover);
+        // Falling (aAnim.x is the progress): arms flung up and out, a knee going
+        agAng = mix(agAng, agIsLeg * (agSide > 0.0 ? -0.55 : 0.25) * aAnim.x + agIsArm * mix(-0.35, -2.5, aAnim.x), agFall);
+        // Carrying a person: both forearms under the load (legs keep walking)
+        agAng = mix(agAng, agIsLeg * agAng + agIsArm * -1.2, agCarryP);
         // Rain: most walkers put up an umbrella (+x arm raised, held still)
         float agUmbH = fract(dot(aShirt, vec3(7.13, 3.17, 1.71)) + dot(aPants, vec3(2.31, 5.93, 1.13)) + aWear.w * 3.7);
         float agUmb = (1.0 - agSit) * (1.0 - agBike - agScoot - agCarry - agReach - agKneel) * (1.0 - step(8.5, agPose)) * (1.0 - step(0.5, agTool)) * step(0.02, uRain) * step(agUmbH, min(uRain * 1.6, 0.8));
@@ -310,46 +401,115 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         float agPivot = agIsArm > 0.5 ? ${f(SHOULDER_Y)} : ${f(HIP_Y)};
         // Head turns while standing / sitting (head = skin / hair above the neck)
         float agBoardPart = step(abs(aPart - ${P_BOARD.toFixed(1)}), 0.5);
-        float agHead = step(${f(SHOULDER_Y + 0.02)}, position.y) * max(1.0 - step(6.5, aPart), agBoardPart) * step(abs(aLimb), 0.5);
-        float agYawA = agHead * (agStill + agSit) * (sin(agT * 0.37) * 0.55 + sin(agT * 0.91 + 1.3) * 0.2);
+        float agHeadX = step(15.5, aPart) * step(aPart, 18.5);
+        float agHead = step(${f(SHOULDER_Y + 0.02)}, position.y) * max(1.0 - step(6.5, aPart), max(agBoardPart, agHeadX)) * step(abs(aLimb), 0.5);
+        float agLook = step(0.001, abs(aGear.z));
+        float agYawA = agHead * ((agStill + agSit) * (1.0 - agLook) * (sin(agT * 0.37) * 0.55 + sin(agT * 0.91 + 1.3) * 0.2) + aGear.z);
+        // (leaning: runners pitch forward, the old stoop, the dig, the crouch under cover; weighted up the body from the hips)
+        float agRunK = smoothstep(0.58, 0.9, aAnim.y) * (1.0 - agSit - agBike - agScoot);
+        float agLeanA = agRunK * 0.2 + agElder * 0.17 + agAim * 0.08 + agCover * 0.6 + agDig * (0.28 + 0.12 * sin(agT * 2.4 + 1.0)) - agCarryP * 0.2 + agHoe * 0.22 + agKneel * 0.1 + agFall * aAnim.x * -0.3;
+        float agLeanW = smoothstep(0.2, 0.3, position.y);
+        objectNormal = agRot(objectNormal, agLeanA * agLeanW);
         objectNormal = agYaw(agRot(objectNormal, agAng), agYawA);`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         vAgY = position.y;
         vAgHash = fract(aWear.w * 5.31 + dot(aShirt, vec3(3.1, 1.7, 2.3)));
+        vAgBelt = agGBelt * step(abs(aPart - 2.0), 0.5) * step(abs(aLimb), 0.5);
+        // Rest-pose shape of the look parts (before any posing)
+        {
+          vec3 hc = vec3(0.0, ${f(SHOULDER_Y + 0.066)}, 0.0);
+          float hairOn = step(abs(aPart - 1.0), 0.5);
+          // hair shell: a buzz cut hugs the skull, curls stand off it; headwear (helmet, hood) sits proud
+          float hairK = 1.0 - 0.04 * step(0.5, agHairS) * step(agHairS, 1.5) + 0.22 * step(4.5, agHairS) * step(agHairS, 5.5)
+                      + 0.16 * step(2.5, agHeadW) * step(agHeadW, 3.5) + 0.13 * step(3.5, agHeadW) * step(agHeadW, 4.5);
+          transformed = mix(transformed, hc + (transformed - hc) * hairK, hairOn);
+          // a boonie's brim is wide and low; a ponytail hangs where the bun sits; a plate carrier is deeper; boots are tall
+          if (abs(aPart - ${P_BRIM.toFixed(1)}) < 0.5 && abs(agHeadW - 2.0) < 0.5) { transformed.x *= 2.0; transformed.z = (transformed.z - 0.04) * 3.2; transformed.y -= 0.012; }
+          if (abs(aPart - ${P_BUN.toFixed(1)}) < 0.5 && abs(agHairS - 3.0) < 0.5) { transformed.y = ${f(SHOULDER_Y + 0.1)} + (transformed.y - ${f(SHOULDER_Y + 0.1)}) * 2.6 - 0.04; transformed.x *= 0.6; transformed.z -= 0.012; }
+          if (abs(aPart - ${P_VEST.toFixed(1)}) < 0.5 && agGPlate > 0.5) { transformed.z *= 1.28; transformed.x *= 1.04; }
+          if (abs(aPart - 4.0) < 0.5 && agGBoots > 0.5) { transformed.y *= 3.5; transformed.x *= 1.12; transformed.z = (transformed.z - 0.01) * 1.1 + 0.01; }
+          // a child's head is big for the body, an elder's shoulders narrower
+          float inHead = step(${f(SHOULDER_Y + 0.02)}, position.y) * step(abs(aLimb), 0.5) * (step(aPart, 1.5) + step(abs(aPart - 9.0), 0.5) + step(15.5, aPart) * step(aPart, 18.5));
+          transformed = mix(transformed, vec3(0.0, ${f(SHOULDER_Y + 0.03)}, 0.0) + (transformed - vec3(0.0, ${f(SHOULDER_Y + 0.03)}, 0.0)) * 1.3, agChild * inHead);
+        }
         // cross-legged: shins tucked under (half-length legs), knees out to the sides
         if (agCross > 0.5 && agIsLeg > 0.5) {
           transformed.y = ${f(HIP_Y)} - (${f(HIP_Y)} - transformed.y) * 0.5;
           transformed.x *= 1.9;
         }
         transformed = agRot(transformed - vec3(0.0, agPivot, 0.0), agAng) + vec3(0.0, agPivot, 0.0);
+        // aiming: the hands come in to the rifle
+        if (agAim > 0.5 && agIsArm > 0.5) { float sx = agSide * 0.071; vec3 q = agYaw(vec3(transformed.x - sx, transformed.y, transformed.z), -agSide * (agSide > 0.0 ? 0.34 : 0.47)); transformed.x = sx + q.x; transformed.z = q.z; }
+        // lean about the hips, weighted up the body
+        transformed = agRot(transformed - vec3(0.0, ${f(HIP_Y)}, 0.0), agLeanA * agLeanW) + vec3(0.0, ${f(HIP_Y)}, 0.0);
+        // build: broad / slender below the head
+        float agBodyW = 1.0 + agBroad * 0.14 - agSlender * 0.1 - agElder * 0.05;
+        transformed.x *= mix(agBodyW, 1.0, step(${f(SHOULDER_Y + 0.02)}, position.y) * step(abs(aLimb), 0.5));
+        transformed.z *= 1.0 + agBroad * 0.08;
         transformed = agYaw(transformed, agYawA);
-        // Collapse optional parts when unused
-        if (abs(aPart - ${P_PACK.toFixed(1)}) < 0.5 && aStyle.y < 0.5) transformed = vec3(0.0, 0.35, 0.0);
-        if (abs(aPart - ${P_LONGHAIR.toFixed(1)}) < 0.5 && aStyle.z < 0.5) transformed = vec3(0.0, 0.45, 0.0);
-        if ((abs(aPart - ${P_UMB_CANOPY.toFixed(1)}) < 0.5 || abs(aPart - ${P_UMB_SHAFT.toFixed(1)}) < 0.5) && agUmb < 0.5) transformed = vec3(0.0, 0.45, 0.0);
-        if (agBoardPart > 0.5 && aWear.z < ${(HAT_MORTARBOARD - 0.5).toFixed(1)}) transformed = vec3(0.0, 0.45, 0.0);
-        if (abs(aPart - ${P_BOX.toFixed(1)}) < 0.5 && agCarry < 0.5) transformed = vec3(0.0, 0.35, 0.0);
-        if (abs(aPart - ${P_AXE.toFixed(1)}) < 0.5 && abs(agTool - 1.0) > 0.5) transformed = vec3(0.0, 0.35, 0.0);
-        if (abs(aPart - ${P_HOE.toFixed(1)}) < 0.5 && abs(agTool - 2.0) > 0.5) transformed = vec3(0.0, 0.35, 0.0);
-        if (abs(aPart - ${P_RIFLE.toFixed(1)}) < 0.5 && abs(agTool - 3.0) > 0.5) transformed = vec3(0.0, 0.35, 0.0);
-        if (abs(aPart - ${P_BUCKET.toFixed(1)}) < 0.5 && !(abs(agTool - 4.0) < 0.5 || (abs(agTool - 7.0) < 0.5 && aLimb > 0.0))) transformed = vec3(0.0, 0.35, 0.0);
-        if (abs(aPart - ${P_HAMMER.toFixed(1)}) < 0.5 && !(abs(agTool - 5.0) < 0.5 || abs(agTool - 6.0) < 0.5)) transformed = vec3(0.0, 0.35, 0.0);
+        // Collapse optional parts when unused (flagged here, collapsed at the end so the whole part goes to one point)
+        float agTl = floor(agTool + 0.5);
+        if (abs(aPart - ${P_PACK.toFixed(1)}) < 0.5 && (aStyle.y < 0.5 || agGRuck > 0.5)) agGone = 1.0;
+        if (abs(aPart - ${P_LONGHAIR.toFixed(1)}) < 0.5 && (!((aStyle.z > 0.5 && agHairS < 0.5) || abs(agHairS - 6.0) < 0.5) || agHeadW > 2.5 || agNear < 0.5)) agGone = 1.0;
+        if ((abs(aPart - ${P_UMB_CANOPY.toFixed(1)}) < 0.5 || abs(aPart - ${P_UMB_SHAFT.toFixed(1)}) < 0.5) && agUmb < 0.5) agGone = 1.0;
+        if (agBoardPart > 0.5 && aWear.z < ${(HAT_MORTARBOARD - 0.5).toFixed(1)}) agGone = 1.0;
+        if (abs(aPart - ${P_BOX.toFixed(1)}) < 0.5 && !(agCarry > 0.5 || (agTl == 9.0 && agCarryP + agCarry > 0.5))) agGone = 1.0;
+        if (abs(aPart - ${P_AXE.toFixed(1)}) < 0.5 && agTl != 1.0) agGone = 1.0;
+        if (abs(aPart - ${P_HOE.toFixed(1)}) < 0.5 && agTl != 2.0 && agTl != 8.0) agGone = 1.0;
+        if (abs(aPart - ${P_BUCKET.toFixed(1)}) < 0.5 && !(agTl == 4.0 || (agTl == 7.0 && aLimb > 0.0))) agGone = 1.0;
+        if (abs(aPart - ${P_HAMMER.toFixed(1)}) < 0.5 && !(agTl == 5.0 || agTl == 6.0)) agGone = 1.0;
+        // a spade is the hoe's handle with a narrow, long blade
+        if (abs(aPart - ${P_HOE.toFixed(1)}) < 0.5 && agTl == 8.0 && agMetal > 0.5) { vec3 bc = vec3(0.071, ${f(SHOULDER_Y - 0.168 - 0.45)}, 0.0); transformed = bc + (transformed - bc) * vec3(0.55, 1.0, 5.0); }
+        // the rifle: shouldered to aim, across the chest at port arms, or slung diagonally on the back
+        if (abs(aPart - ${P_RIFLE.toFixed(1)}) < 0.5) {
+          vec3 rc = vec3(0.0, ${f(SHOULDER_Y - 0.1)}, 0.1);
+          if (agTl == 3.0 && agAim > 0.5) { vec3 q = transformed - rc; float cz = cos(-0.95), sz = sin(-0.95); q = vec3(q.x * cz - q.y * sz, q.x * sz + q.y * cz, q.z); q = agRot(q, 1.5708); transformed = q + vec3(0.012, ${f(SHOULDER_Y - 0.035)}, 0.25); }
+          else if (agTl != 3.0) { if (agGSling > 0.5) transformed.z -= 0.185; else agGone = 1.0; }
+        }
+        if (abs(aPart - 1.0) < 0.5 && abs(agHairS - 4.0) < 0.5 && aWear.z < 0.5 && agHeadW < 0.5) agGone = 1.0;
+        // small look parts: only when worn, and only near the camera
+        if (abs(aPart - ${P_BRIM.toFixed(1)}) < 0.5 && !(abs(agHeadW - 1.0) < 0.5 || abs(agHeadW - 2.0) < 0.5)) agGone = 1.0;
+        if (abs(aPart - ${P_BRIM.toFixed(1)}) < 0.5 && agNear < 0.5) agGone = 1.0;
+        if (abs(aPart - ${P_BUN.toFixed(1)}) < 0.5 && (!(abs(agHairS - 2.0) < 0.5 || abs(agHairS - 3.0) < 0.5) || agHeadW > 2.5 || aWear.z > 0.5 || agNear < 0.5)) agGone = 1.0;
+        if (abs(aPart - ${P_BEARD.toFixed(1)}) < 0.5 && (agBeardK < 0.5 || agNear < 0.5)) agGone = 1.0;
+        if (abs(aPart - ${P_APRON.toFixed(1)}) < 0.5 && agGApron < 0.5) agGone = 1.0;
+        if (abs(aPart - ${P_VEST.toFixed(1)}) < 0.5 && agGVest + agGPlate < 0.5) agGone = 1.0;
+        if (abs(aPart - ${P_RADIO.toFixed(1)}) < 0.5 && (agGRadio < 0.5 || agNear < 0.5)) agGone = 1.0;
+        if (abs(aPart - ${P_SCARF.toFixed(1)}) < 0.5 && (agGScarf < 0.5 || agNear < 0.5)) agGone = 1.0;
+        if (abs(aPart - ${P_RUCK.toFixed(1)}) < 0.5 && agGRuck < 0.5) agGone = 1.0;
+        // a carried load rides the arms; an unused wear flag on a sleeper or a faller is not drawn differently
         // Walking bob; seat drops; rider lifts
-        transformed.y += abs(cos(aAnim.x)) * aAnim.y * 0.012 * (1.0 - agBike);
+        // Foot planting: the pelvis drops as the legs spread so both feet stay on the ground, and the swinging foot lifts to clear it; runners bounce
+        float agMove = step(0.01, aAnim.y) * (1.0 - agSit - agBike - agScoot - agKneel - agCover - agSleep - agFall - agCross);
+        float agSw = abs(agSwing);
+        transformed.y -= agMove * (1.0 - agRunK) * ${f(HIP_Y)} * (1.0 - cos(min(agSw, 1.0)));
+        transformed.y += agMove * agRunK * abs(cos(aAnim.x)) * 0.045;
+        float agFoot = (1.0 - smoothstep(0.0, ${f(HIP_Y * 0.9)}, position.y)) * agIsLeg * agMove * agNear;
+        transformed.y += agFoot * max(0.0, -agSide * cos(aAnim.x)) * (0.03 + 0.04 * agRunK) * aAnim.y * 2.0;
+        // Feet on the slope: the legs follow the ground plane under the figure (rise per unit along the facing)
+        transformed.y += aGear.w * transformed.z * (1.0 - smoothstep(0.0, ${f(HIP_Y)}, position.y)) * agIsLeg;
+        // A slow breath (more when asleep)
+        transformed.z *= 1.0 + (0.03 + 0.04 * agSleep) * sin(agT * 1.9) * (1.0 - agMove) * step(abs(aPart - 2.0), 0.5) * step(abs(aLimb), 0.5);
         transformed.y -= agBench * ${f(HIP_Y - SEAT_Y)};
         transformed.z -= agBench * 0.02;
         transformed.y -= agLawn * ${f(HIP_Y - LAWN_Y)};
         transformed.z -= agLawn * 0.03;
-        transformed.y -= agKneel * ${f(HIP_Y - KNEEL_Y)};
+        transformed.y -= (agKneel + agCover) * ${f(HIP_Y - KNEEL_Y)};
         transformed.y -= agCross * ${f(HIP_Y - LAWN_Y - 0.01)};
         transformed.z -= agCross * 0.015;
         transformed.y += agBike * ${f(SADDLE_Y - HIP_Y)} + agScoot * ${f(DECK_Y)};
         transformed.z -= agBike * 0.07;
         // Weight shift while standing around
         transformed.x += agStill * sin(agT * 0.8) * transformed.y * 0.035;
+        if (agGone > 0.5) transformed = vec3(0.0, 0.35, 0.0);
         // Per-part color (hat replaces the hair cap)
         vec3 shoeC = mix(vec3(0.08), vec3(0.86), step(0.55, aStyle.w));
-        vec3 hairC = aWear.z > 0.5 ? agHatColor(aWear.z) : aHair;
+        vec3 hatC = aWear.z > 0.5 ? agHatColor(aWear.z) : aPack;
+        vec3 hairC = aWear.z > 0.5 ? agHatColor(aWear.z) : agHeadW > 3.5 ? aShirt : agHeadW > 0.5 ? hatC : aHair;
+        // clean-shaven, stubble (halfway to the skin), full beard; accessory tint from the person
+        vec3 beardC = agBeardK < 1.5 ? mix(aSkin, aHair, 0.45) : aHair;
+        float agAcc = fract(vAgHash * 7.7);
+        vec3 accC = agAcc < 0.2 ? vec3(0.62, 0.12, 0.1) : agAcc < 0.4 ? vec3(0.1, 0.2, 0.4) : agAcc < 0.6 ? vec3(0.78, 0.74, 0.62) : agAcc < 0.8 ? vec3(0.2, 0.32, 0.2) : vec3(0.55, 0.38, 0.12);
         vAgCol = aPart < 0.5 ? aSkin
                : aPart < 1.5 ? hairC
                : aPart < 2.5 ? aShirt
@@ -369,6 +529,14 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
                : abs(aPart - ${P_BUCKET.toFixed(1)}) < 0.5 ? vec3(0.52, 0.54, 0.55)
                : agMetal > 0.5 ? vec3(0.3, 0.31, 0.33)
                : vec3(0.45, 0.3, 0.15);
+        if (aPart > 15.5) {
+          vAgCol = aPart < 16.5 ? hatC : aPart < 17.5 ? aHair : aPart < 18.5 ? beardC : aPart < 19.5 ? aPack : aPart < 20.5 ? aPack * 0.9 : aPart < 21.5 ? vec3(0.04) : aPart < 22.5 ? accC : aPack * 0.8;
+        }
+        if (abs(aPart - ${P_BOX.toFixed(1)}) < 0.5 && agTl == 9.0) vAgCol = vec3(0.3, 0.19, 0.1);
+        // leather work gloves on the hands
+        if (aPart < 0.5 && agIsArm > 0.5 && position.y < ${f(SHOULDER_Y - 0.145)} && agGGloves > 0.5) vAgCol = vec3(0.2, 0.13, 0.08);
+        // boots are the dark brown of the shoes' tone, laced work boots
+        if (abs(aPart - 4.0) < 0.5 && agGBoots > 0.5) vAgCol = mix(vec3(0.07, 0.05, 0.04), vec3(0.2, 0.14, 0.1), step(0.55, aStyle.w));
         // Trousers: coat / gown hem (shirt color above) / shorts (skin below the knee)
         float agPants = step(2.5, aPart) * step(aPart, 3.5);
         vAgAlt = aWear.x > 0.5 ? aShirt : aSkin;
@@ -382,6 +550,7 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         varying vec2 vAgCut;
         varying float vAgY;
         varying float vAgHash;
+        varying float vAgBelt;
         uniform vec3 uRim;`)
       .replace('#include <opaque_fragment>', `
         {
@@ -390,9 +559,11 @@ export function injectFigureShader(mat: THREE.MeshStandardMaterial): void {
         }
         #include <opaque_fragment>`)
       .replace('#include <color_fragment>', `#include <color_fragment>
-        diffuseColor.rgb *= (vAgY > vAgCut.x || (vAgY < vAgCut.y && vAgY > 0.024)) ? vAgAlt : vAgCol;`);
+        diffuseColor.rgb *= (vAgY > vAgCut.x || (vAgY < vAgCut.y && vAgY > 0.024)) ? vAgAlt : vAgCol;
+        // a belt: a dark leather band at the waist
+        if (vAgBelt > 0.5 && vAgY < 0.31) diffuseColor.rgb = vec3(0.06, 0.045, 0.035);`);
   };
-  mat.customProgramCacheKey = () => 'agent-figure-v7';
+  mat.customProgramCacheKey = () => 'agent-figure-v8';
 }
 
 export function makeFigureMaterial(): THREE.MeshStandardMaterial {
@@ -413,6 +584,12 @@ export interface FigurePose {
   amp: number;
   /** Tool in hand (FIG_TOOL; default none). */
   tool?: number;
+  /** Head turn from the body's heading, radians (+ to the figure's left): toward a point of interest. 0 = idle glances. */
+  look?: number;
+  /** Ground rise per unit along the facing (feet follow the slope plane); clamp ±0.8. */
+  slope?: number;
+  /** Gear flags (GEAR bits) for this frame, replacing the wear's own (an apron for the cook, a radio for the watch). */
+  gear?: number;
   /** Pitch about the figure's own x axis, radians, applied before the turn: -PI / 2 lays it on its back (head toward -z). Default 0. */
   pitch?: number;
 }
@@ -438,10 +615,17 @@ export class FigureLayer {
   private readonly _c = new THREE.Color();
   private _scene: THREE.Scene | null;
   readonly capacity: number;
+  /** Per instance: hair / beard / headwear bits and the wear's own gear flags (setPose adds the flags to aGear.x). */
+  private readonly _gearBase: Float32Array;
+  private readonly _gearFlags: Uint16Array;
+  private _timeSet = false;
+  private _t0 = typeof performance !== 'undefined' ? performance.now() : 0;
 
   constructor(scene: THREE.Scene, capacity: number, name: string) {
     this._scene = scene;
     this.capacity = Math.max(1, capacity);
+    this._gearBase = new Float32Array(this.capacity);
+    this._gearFlags = new Uint16Array(this.capacity);
     this._geo = buildFigureGeometry();
     for (const [n, size] of FIGURE_ATTRS) {
       const a = new THREE.InstancedBufferAttribute(new Float32Array(this.capacity * size), size);
@@ -450,6 +634,7 @@ export class FigureLayer {
       this._attrs[n] = a;
     }
     this._mat = makeFigureMaterial();
+    this._mat.userData.time = { value: 0 };
     this.mesh = new THREE.InstancedMesh(this._geo, this._mat, this.capacity);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.count = 0;
@@ -478,8 +663,18 @@ export class FigureLayer {
     const we = A.aWear.array as Float32Array;
     we[i * 4] = w.coat;
     we[i * 4 + 1] = w.shorts ? 1 : 0;
-    we[i * 4 + 2] = w.hat === HAT_MORTARBOARD_HEX ? HAT_MORTARBOARD : w.hat >= 0 ? HATS.indexOf(w.hat) + 1 : 0;
+    we[i * 4 + 2] = w.hat === HAT_MORTARBOARD_HEX ? HAT_MORTARBOARD : w.hat >= 0 ? hatIndex(w.hat) + 1 : 0;
     we[i * 4 + 3] = (i * 0.6180339) % 1;
+    // the look: hair style, beard, headwear (bits 0-7), gear flags (from bit 8); the build
+    this._gearBase[i] = (w.hairStyle ?? 0) + (w.beard ?? 0) * 8 + (w.headwear ?? 0) * 32;
+    this._gearFlags[i] = w.gear ?? 0;
+    (A.aGear.array as Float32Array)[i * 4 + 1] = w.build ?? 0;
+  }
+
+  /** Drive the idle / work animations from a clock the caller owns (a scrubbed cutscene); otherwise they run on real time. */
+  setTime(t: number): void {
+    this._timeSet = true;
+    (this._mat.userData.time as { value: number }).value = t % 6283;
   }
 
   /** Place instance i. */
@@ -492,6 +687,10 @@ export class FigureLayer {
     st[i * 4] = p.pose;
     const an = this._attrs.aAnim.array as Float32Array;
     an[i * 3] = p.phase; an[i * 3 + 1] = p.amp; an[i * 3 + 2] = p.tool ?? 0;
+    const gr = this._attrs.aGear.array as Float32Array;
+    gr[i * 4] = this._gearBase[i] + (p.gear ?? this._gearFlags[i]) * 256;
+    gr[i * 4 + 2] = Math.max(-1.1, Math.min(1.1, p.look ?? 0));
+    gr[i * 4 + 3] = Math.max(-0.8, Math.min(0.8, p.slope ?? 0));
   }
 
   /** Draw the first n instances; flag what changed for upload. */
@@ -501,7 +700,8 @@ export class FigureLayer {
     this.mesh.visible = k > 0;
     const im = this.mesh.instanceMatrix;
     im.clearUpdateRanges(); im.addUpdateRange(0, k * 16); im.needsUpdate = true;
-    for (const name of ['aStyle', 'aAnim'] as const) {
+    if (!this._timeSet) (this._mat.userData.time as { value: number }).value = ((performance.now() - this._t0) / 1000) % 6283;
+    for (const name of ['aStyle', 'aAnim', 'aGear'] as const) {
       const a = this._attrs[name];
       a.clearUpdateRanges(); a.addUpdateRange(0, k * a.itemSize); a.needsUpdate = true;
     }

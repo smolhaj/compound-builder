@@ -45,6 +45,7 @@ import { useWorldStore } from '../store/worldStore';
 import { fenceLean } from './atmosphere/aging';
 import { LEANS, leanRun } from './atmosphere/fenceAging';
 import { FamilyRenderer } from './people/FamilyRenderer';
+import { setFigureDetail } from '../engine/world/people/figureKit';
 import { BunkerFolk, type WorldSpot } from './people/BunkerFolk';
 import { bunkerOccupants, hatchOpen } from '../sim/bunkerLife';
 import { DogRenderer } from './people/DogRenderer';
@@ -624,6 +625,7 @@ export class HomesteadWorld {
   setQuality(q: Quality): void {
     if (q === this._quality) return;
     this._quality = q;
+    setFigureDetail(q);
     this.roadLife.setQuality(q);
     this.livestock.setQuality(q);
     this.terrain.build({
@@ -2416,7 +2418,7 @@ export class HomesteadWorld {
     const fx = yardFx(game, hour);
     this._yard.update(this._clock, fx.lights, fx.smoke);
     const season = (seasonState.visual === 'winter' && !seasonState.climate.freeze ? 'fall' : seasonState.visual) as WearSeason;
-    this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.walkHeight, season, speedK, sickbayPlan(game, this._bedSlots()));
+    this.family.update(dt, game.people, game.personState, hour, game.clock.t, ctx, this.walkHeight, season, speedK, sickbayPlan(game, this._bedSlots()), seasonState.params.cold);
     const dctx: DogCtx = {
       home: ctx.home, camp: this.camp, gate: this.access.gate, yard: this.access.yard, atGate: !!game.gate.pending,
       person: id => (this.family.shown.has(id) ? this.family.poseOf(id) : null),
