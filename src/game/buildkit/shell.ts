@@ -39,11 +39,28 @@ export const WIN = { w: 0.17, h: 0.2, sill: 0.17 } as const;
 // Parts: geometry collected by layer × material, merged at the end
 // ─────────────────────────────────────────────────────────────────────────
 
+/** Remove zero-area triangles (the pole fans of capsules and spheres): they draw nothing and only cost vertices. Non-indexed geometry only. */
+export function dropDegenerate(geo: THREE.BufferGeometry): void {
+  const pos = geo.getAttribute('position');
+  const keep: number[] = [];
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let t = 0; t + 2 < pos.count; t += 3) {
+    a.fromBufferAttribute(pos, t); b.fromBufferAttribute(pos, t + 1); c.fromBufferAttribute(pos, t + 2);
+    if (b.sub(a).cross(c.sub(a)).lengthSq() > 1e-20) keep.push(t);
+  }
+  if (keep.length * 3 === pos.count) return;
+  const out = new Float32Array(keep.length * 9);
+  keep.forEach((t, i) => { for (let k = 0; k < 3; k++) { out[i * 9 + k * 3] = pos.getX(t + k); out[i * 9 + k * 3 + 1] = pos.getY(t + k); out[i * 9 + k * 3 + 2] = pos.getZ(t + k); } });
+  geo.setAttribute('position', new THREE.BufferAttribute(out, 3));
+  geo.deleteAttribute('normal'); geo.deleteAttribute('uv');
+}
+
 /** World-scaled UVs from position by dominant normal axis (walls: u along the face, v up). */
 export function worldUV(g: THREE.BufferGeometry): THREE.BufferGeometry {
   const geo = g.index ? g.toNonIndexed() : g;
   // pictures, photos, posters: their own 0–1 UVs (one image per face)
   if (g.userData.keepUV) { if (!geo.getAttribute('normal')) geo.computeVertexNormals(); return geo; }
+  dropDegenerate(geo);
   geo.computeVertexNormals();
   const p = geo.getAttribute('position'), n = geo.getAttribute('normal');
   const uv = new Float32Array(p.count * 2);

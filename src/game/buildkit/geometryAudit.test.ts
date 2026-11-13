@@ -20,7 +20,6 @@ const OTHER_AUDIT = new Set([...UTILITY_KIT.map(d => d.id), ...UTILITY_ORDER, ..
 for (const id of ['tower_pod', 'gate_garage', 'motor_court', 'vehicle_yard']) OTHER_AUDIT.add(id);
 export const AUDITED: KitPieceDef[] = Object.values(KIT).filter(d => !OTHER_AUDIT.has(d.id));
 
-const STRUCT = new Set(['stakes', 'foundation', 'deck', 'frame', 'rafters', 'roof', 'walls', 'openings', 'chimney', 'scaffold', 'cutwalls']);
 const INSIDE = new Set(['interior', 'loft', 'decor']);
 
 interface Built { furniture: typeof AUDIT.furniture; partitions: typeof AUDIT.partitions; def: KitPieceDef; group: THREE.Group; meshes: AuditMesh[]; comps: Component[]; shells: Array<{ spec: GabledSpec; ox: number; oz: number }> }
@@ -56,8 +55,8 @@ describe('building geometry audit', () => {
           const s = triangleStats(m);
           expect(s.nonFinite, `${m.name} has NaN / Infinity vertices`).toBe(0);
           // the lathe poles of cones and spheres leave a few zero-area triangles; a structural layer must have none
-          if (STRUCT.has(m.layer)) expect(s.degenerate, `${m.name} has zero-area triangles`).toBe(0);
-          else expect(s.degenerate / Math.max(1, s.total), `${m.name} is mostly degenerate`).toBeLessThan(0.15);
+          // (the pole fans of capsules and spheres are dropped when a piece is merged: none may reach a building)
+          expect(s.degenerate, `${m.name} has zero-area triangles`).toBe(0);
         }
       });
       it('has no inside-out closed solids', () => {
@@ -135,6 +134,15 @@ describe('building geometry audit', () => {
           }
         }
         none(bad);
+      });
+      it('has no two solid furniture pieces standing in each other', () => {
+        const fs = built(def).furniture.filter(f => f.kind === 'I'), bad: string[] = [];
+        for (let i = 0; i < fs.length; i++) for (let j = i + 1; j < fs.length; j++) {
+          const a = fs[i].c, b = fs[j].c;
+          const w = Math.min(a.x1, b.x1) - Math.max(a.x0, b.x0), h = Math.min(a.z1, b.z1) - Math.max(a.z0, b.z0);
+          if (w > 0.03 && h > 0.03 && w * h > 0.004 && !(OVERLAP_OK[def.id] ?? 0)) bad.push(`[${a.x0.toFixed(2)},${a.z0.toFixed(2)}|${a.x1.toFixed(2)},${a.z1.toFixed(2)}] and [${b.x0.toFixed(2)},${b.z0.toFixed(2)}|${b.x1.toFixed(2)},${b.z1.toFixed(2)}] overlap ${w.toFixed(2)} x ${h.toFixed(2)}`);
+        }
+        none(bad, 'overlapping furniture');
       });
       it('ends no room partition in a window or a door of the outside wall', () => {
         const bad: string[] = [];
@@ -301,6 +309,8 @@ const ROOF_PIERCED_OK = new Set(['adobe_house']);
 const Z_OK: Record<string, string[]> = {
   stone_house: ['foundation_fieldstone~deck_deck'],   // the stone step and the first wooden step share a face under the porch lip (hidden)
 };
+/** Known gap: these four housing-style layouts were drawn for a wider room and still put a counter, tub or bed partly into its neighbor (cosmetic, reported in the PR); a re-plan removes the entry. */
+const OVERLAP_OK: Record<string, number> = { stone_house: 1, timber_frame: 1, container_house: 1, adobe_house: 1 };
 const MAX_MESHES = 100;
 const MAX_TRIS: Record<string, number> = { field: 110_000, orchard_grove: 95_000, orchard_terraced: 100_000, lodge: 40_000, lodge_solar: 40_000 };
 /** The door is for a person (0.28 tall) except where it is a hen house hatch. */
