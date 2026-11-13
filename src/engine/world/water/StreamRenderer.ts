@@ -44,6 +44,8 @@ export class StreamRenderer {
   private _W = 0;
   private _H = 0;
   private _texel = 1;
+  private _dtex: THREE.DataTexture | null = null;
+  private readonly _rect = new THREE.Vector4(0, 0, 0, 0);
 
   constructor(scene: THREE.Scene) {
     this._scene = scene;
@@ -86,6 +88,7 @@ export class StreamRenderer {
     ftex.magFilter = ftex.minFilter = THREE.LinearFilter;
     ftex.needsUpdate = true;
     const rect = new THREE.Vector4(ox, oz, 1 / (W * texel), 1 / (H * texel));
+    this._dtex = dtex; this._rect.copy(rect);
     const mat = new THREE.MeshStandardMaterial({ color: 0xffffff });
     patchWaterMaterial(mat, {
       key: 'stream',
@@ -100,6 +103,7 @@ export class StreamRenderer {
         wEdge = 1.0 - smoothstep(0.0, 0.05, sd);`,
       flow: { tex: { value: ftex }, rect: { value: rect }, scale: { value: fscale } },
       rippleScale: 0.45,
+      lite: o.quality === 'low',
       detailFade: [40, 260],
     });
     // Ribbon: stations along x, a strip across the course at each station's water level
@@ -151,6 +155,9 @@ export class StreamRenderer {
     });
   }
 
+  /** The signed-depth raster and its world rect (x0, z0, 1/w, 1/h) for the terrain's damp bank band; null when there is no creek. */
+  get wetBank(): { tex: THREE.Texture; rect: THREE.Vector4 } | null { return this._dtex ? { tex: this._dtex, rect: this._rect } : null; }
+
   /** Signed water depth at (x, z) (bilinear in the raster; −1 outside). */
   depthAt(x: number, z: number): number {
     const D = this._depth;
@@ -181,6 +188,8 @@ export class StreamRenderer {
     this._edges.clear();
     this._flow = null;
     this._depth = null;
+    this._dtex = null;
+    this._rect.set(0, 0, 0, 0);
   }
 
   dispose(): void {
