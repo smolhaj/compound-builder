@@ -135,6 +135,15 @@ const FRAG = /* glsl */`
     // splash grime at the foot of the walls
     float wGr = wGrime * ( 1.0 - smoothstep( 0.0, 0.15, wLy ) ) * ( 1.0 - smoothstep( 0.4, 0.8, abs( wUp ) ) ) * ( 0.55 + 0.45 * wearNoise( vec2( wAlong * 9.0, wLy * 25.0 ) ) );
     wC = mix( wC, vec3( 0.07, 0.055, 0.04 ), wGr * 0.5 );
+    // soot (grime past 1): a building that burned goes charcoal, blackest above the openings and up under the eaves
+    float wCh = clamp( wGrime - 1.0, 0.0, 1.0 );
+    if ( wCh > 0.0 ) {
+      float wSn = wearNoise( vec2( wAlong * 14.0, wLy * 9.0 ) ) * 0.6 + wearNoise( vec2( wAlong * 41.0, wP.y * 31.0 ) ) * 0.4;
+      float wSoot = clamp( wCh * ( 0.5 + 0.5 * smoothstep( 0.0, 0.6, wLy ) ) + ( wSn - 0.5 ) * 0.5 * wCh, 0.0, 1.0 );
+      wC = mix( wC, vec3( 0.025, 0.022, 0.02 ) * ( 0.6 + 0.8 * wSn ), wSoot * 0.92 );
+      roughnessFactor = mix( roughnessFactor, 0.95, wSoot );
+      metalnessFactor *= 1.0 - wSoot;
+    }
     diffuseColor.rgb = wC;
   }
 }

@@ -2837,6 +2837,7 @@ export class HomesteadWorld {
     this.terrain.update();
     this._clock += dt;
     ForestRenderer.setWindTime(this._clock);
+    ForestRenderer.setGust(this.air.wind);
     this.cover.setWind(this.air.wind);
     this.cover.update(dt, this._ws.camera);
     updateWaterGlobals(this._ws.scene, this._clock);

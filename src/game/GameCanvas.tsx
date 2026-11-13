@@ -16,6 +16,7 @@ import { useEffect, useRef } from 'react';
 import type { GameState } from '../sim/state';
 import { MushroomCloud } from './fx/MushroomCloud';
 import { collapseLook, withWeather } from '../sim/collapseLook';
+import { applyDust, dustStorm } from '../engine/world/weather/dustStorm';
 import * as THREE from 'three';
 import { WorldScene } from '../engine/world/WorldScene';
 import { moonPhase, skyDarkness } from '../engine/world/sky/skyState';
@@ -450,7 +451,7 @@ export function GameCanvas() {
     let camBefore: { x: number; y: number; z: number; radius: number; pitch: number; yaw: number } | null = null, camBack = false;
     let promptAt = -1, skipScene = useCutsceneView.getState().skipScene, skipAll = useCutsceneView.getState().skipAll;
     let battleView: { x: number; z: number; radius: number; pitch: number } | null = null;
-    const qa: { noCover?: boolean; /** QA: run the frame (sim, camera, effects) without drawing it, to skip ahead cheaply. */ skipDraw?: boolean; frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
+    const qa: { /** QA: force the dust-storm strength 0-1. */ dust?: number; noCover?: boolean; /** QA: run the frame (sim, camera, effects) without drawing it, to skip ahead cheaply. */ skipDraw?: boolean; frames: number; frameMs: number; lowrender?: boolean; weather?: boolean; renderNow?: () => Promise<void>; renderFull?: (q?: QaQuality) => Promise<void>; pose: null | { x: number; y: number; z: number; lx: number; ly: number; lz: number; fov?: number } } = { frames: 0, frameMs: 0, pose: null };
     // window.__cb.qa.renderNow(): draw one frame (a promise); renderFull('high'|'medium'): one slow full-quality, full-resolution shot
     if (lowRender.on) Object.assign(qa, { lowrender: true, renderNow: () => renderReq.request(), renderFull: (q: QaQuality = 'high') => renderReq.request(q) });
     const budget = new FrameBudget(), loopStart = performance.now();
@@ -573,7 +574,11 @@ export function GameCanvas() {
         valley.update(dt, fogTarget(fn, { campY: fogCampY, floorY: fogCampY - fogPlace.campAboveFloorM / 6 }));
       }
       const vc = valley.cur;
-      const gs = useGameStore.getState().game, wo = weather.outputs, look = withWeather(collapseLook(gs), { rain: wo.rain, snow: wo.snow, season: vis });
+      const gs = useGameStore.getState().game, wo = weather.outputs;
+      // dry country in a windy rainless spell lifts dust; a hot dry midday shimmers in a haze (weather/dustStorm.ts: from the weather already running)
+      const dustIn = dustStorm({ region: seasonState.climate.id, season: vis, wind: wo.wind, rain: wo.rain, storm: wo.storm, snow: wo.snow, cloud: wo.cloud, hour: t });
+      if (qa.dust !== undefined) dustIn.dust = qa.dust;
+      const look = applyDust(withWeather(collapseLook(gs), { rain: wo.rain, snow: wo.snow, season: vis }), weatherMode === 'off' ? { dust: 0, heat: 0 } : dustIn);
       const wx = weather.update({
         dt, speed: speed === 0 ? 1 : 60 / SECONDS_PER_DAY[speed], season: wxSeason, hour: t,
         mode: weatherMode, eventWetness: ws.eventWetness, night: ws.nightFactor,

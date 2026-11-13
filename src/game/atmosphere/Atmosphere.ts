@@ -29,6 +29,8 @@ import { StockTank } from '../props/stockTank';
 import { Flashlights, type Carrier } from '../fx/Flashlights';
 import type { FamilyRenderer } from '../people/FamilyRenderer';
 import { SmokePlume } from '../../engine/world/fx/SmokePlume';
+import { FireFx } from '../../engine/world/fx/FireFx';
+import { fireSources, type FireBox } from './fireSources';
 import { seasonState } from '../../engine/world/season/seasonState';
 import { writeSeasonExtras } from '../../engine/world/season/seasonShader';
 import { containerWear, overgrowth, packWear, structureAge, wearFor, wetnessOf, type Wear } from './aging';
@@ -95,6 +97,10 @@ export class Atmosphere {
   private readonly _flash: Flashlights;
   private readonly _drifts: SnowDrifts;
   private readonly _wild: Overgrowth;
+  private readonly _fireFx = new FireFx();
+  private readonly _fireBoxes = new Map<string, FireBox>();
+  /** Char on a building that has burned this session (0-1, only ever up): soot on its walls and roof. */
+  private readonly _char = new Map<string, number>();
   private _tank: StockTank | null = null;
   private _tankKey = '';
   private _q: Quality = 'high';
@@ -125,6 +131,7 @@ export class Atmosphere {
     this._flash = new Flashlights(host.scene);
     this._drifts = new SnowDrifts(host.scene);
     this._wild = new Overgrowth(host.scene);
+    this._fireFx.addTo(host.scene);
   }
 
   setQuality(q: Quality): void {
@@ -132,6 +139,7 @@ export class Atmosphere {
     this.firePit.setQuality(q);
     this._flash.setQuality(q);
     this._wild.setQuality(q);
+    this._fireFx.setQuality(q);
   }
 
   /** Room brightness for a building's lamp tonight (undefined: not decided here). */
@@ -200,6 +208,24 @@ export class Atmosphere {
     const lit = this.qa.fire ?? firePitLit({ hour: f.hour, sittingOut: sitting, rain: f.rain, cold: sp.cold, hasHome, blackout: lightsOut, collapsed: collapsed || lightsOut, night: f.night });
     const wx = 0.08 + f.wind * 0.45, wz = 0.03 + f.wind * 0.12;
     this.firePit.update(f.time, lit, wx, wz, f.daylight, f.viewportH);
+    // ── fire: flames, embers and smoke on what burns, smoke over a fresh ruin; soot stays on what burned ──
+    const burning = (game.raidFires?.length ?? 0) > 0 || (game.raidDamage?.length ?? 0) > 0;
+    if (burning) {
+      const grp = new Map(built.map(b => [b.id, b.group]));
+      const src = fireSources(game, id => {
+        const g = grp.get(id);
+        if (!g) return undefined;
+        let bx = this._fireBoxes.get(g.uuid);
+        if (!bx) {
+          const b3 = new THREE.Box3().setFromObject(g);
+          bx = { cx: (b3.min.x + b3.max.x) / 2, cz: (b3.min.z + b3.max.z) / 2, w: b3.max.x - b3.min.x, d: b3.max.z - b3.min.z, y0: b3.min.y, h: b3.max.y - b3.min.y };
+          this._fireBoxes.set(g.uuid, bx);
+        }
+        return bx;
+      }, this._h.groundAt);
+      for (const fr of game.raidFires ?? []) { const c = Math.min(1, fr.intensity * 1.3); if (c > (this._char.get(fr.structure) ?? 0)) { this._char.set(fr.structure, c); this._wearKey.delete(fr.structure); } }
+      this._fireFx.update(f.time, src, 0.08 + f.wind * 0.45, 0.03 + f.wind * 0.12, f.daylight, f.viewportH);
+    } else this._fireFx.update(f.time, [], 0, 0, f.daylight, f.viewportH);
     // ── flashlights ──
     const threat = {
       radioWarned: !!game.radio && dayIndex(game.clock.t) <= game.radio.warnedUntil,
@@ -290,10 +316,12 @@ export class Atmosphere {
     const byId = new Map(game.structures.map(s => [s.id, s]));
     for (const b of built) {
       const a = this._ages(byId.get(b.id), game);
-      const key = `${b.group.uuid}|${b.finished}|${Math.round(a.walls * 10)}|${Math.round(a.roof * 10)}|${a.repaired === null ? '-' : Math.round(a.repaired * 10)}`;
+      const char = this._char.get(b.id) ?? 0;
+      const key = `${b.group.uuid}|${b.finished}|${Math.round(char * 20)}|${Math.round(a.walls * 10)}|${Math.round(a.roof * 10)}|${a.repaired === null ? '-' : Math.round(a.repaired * 10)}`;
       if (this._wearKey.get(b.id) === key) continue;
       this._wearKey.set(b.id, key);
       const walls = wearFor(a.walls, wet, a.repaired), roof = wearFor(a.roof, wet);
+      if (char > 0) { walls.grime = 1 + char; roof.grime = 1 + char; }
       const cont = containerWear(a.walls, wet);
       for (const o of b.group.children) {
         const m = o as THREE.Mesh;
@@ -400,6 +428,7 @@ export class Atmosphere {
     this._flash.dispose();
     this._drifts.dispose();
     this._wild.dispose();
+    this._fireFx.dispose();
     if (this._tank) { this._h.scene.remove(this._tank.group); this._tank.dispose(); }
     for (const g of this._gens.values()) { g.smoke.points.parent?.remove(g.smoke.points); g.smoke.dispose(); g.lamp.parent?.remove(g.lamp); }
     writeSeasonExtras(0, 0);

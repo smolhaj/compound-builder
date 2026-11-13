@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import {
   applyVegetationDepth, buildConiferTree, buildDeciduousTree, buildTallCrownTree, createVegetationMaterial,
-  VEG_WIND, type TreeLod, type VegDetail,
+  VEG_WIND, VEG_GUST, type TreeLod, type VegDetail,
 } from './treeGeometry';
 import { InstancedLodSet } from './instancedLod';
 import type { Quality } from '../WorldScene';
@@ -132,6 +132,8 @@ export class ForestRenderer {
 
   /** Wind clock (seconds) shared by every vegetation material. */
   static setWindTime(t: number): void { VEG_WIND.value = t; }
+  /** Weather wind 0-1 → gust strength (calm air sways as before). */
+  static setGust(wind: number): void { VEG_GUST.value = Math.max(0, Math.min(1, (wind - 0.3) / 0.6)); }
 
   clear(): void {
     for (const s of this._sets) s.dispose();

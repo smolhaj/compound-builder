@@ -1250,9 +1250,12 @@ export function buildHedgeSprig(seed: number): THREE.BufferGeometry {
 
 /** Global wind clock shared by every vegetation material (seconds). */
 export const VEG_WIND: { value: number } = { value: 0 };
+/** Global gust strength 0-1 (the weather's wind): a gust front sweeps through the crowns and bends them further. */
+export const VEG_GUST: { value: number } = { value: 0 };
 
 const VEG_VERT_PARS = /* glsl */`
 uniform float uWindTime;
+uniform float uGust;
 uniform float uLeafFill;
 uniform vec3 uBarkColor;
 attribute float aLeaf;
@@ -1407,8 +1410,13 @@ const VEG_BEGIN_VERTEX = `#include <begin_vertex>
         wHash = fract(instanceMatrix[3].x * 0.12731 + instanceMatrix[3].z * 0.25113);
       #endif
       // Wind sway: amplitude proportional to local height, phase per tree
-      float windAmp  = 0.030 * max(0.0, position.y);
       float windTime = uWindTime;
+      float gustK = 1.0;
+      #ifdef USE_INSTANCING
+        // a gust front crosses the stand (about 14 s between fronts) and bends each crown further, leaning it with the wind
+        gustK = 1.0 + uGust * (0.4 + 2.6 * smoothstep(-0.2, 0.9, sin(dot(instanceMatrix[3].xz, vec2(0.09, 0.05)) - windTime * 0.45)));
+      #endif
+      float windAmp  = 0.030 * max(0.0, position.y) * gustK;
       transformed.x += sin(windTime * 1.35 + wHash * 6.28318) * windAmp;
       transformed.z += cos(windTime * 1.10 + wHash * 6.28318 + 1.047) * windAmp * 0.55;
       // Leaf flutter: each lobe shivers on its own phase
@@ -1483,6 +1491,7 @@ export function createVegetationMaterial(o: VegetationMaterialOptions): THREE.Me
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, SEASON_UNIFORMS);
     shader.uniforms['uWindTime'] = wind;
+    shader.uniforms['uGust'] = VEG_GUST;
     shader.uniforms['uLeafFill'] = o.leafFill;
     shader.uniforms['uBarkColor'] = o.barkColor;
     // Every uniform must be declared — an undeclared uWindTime previously
@@ -1602,6 +1611,7 @@ export function createVegetationDepthMaterial(leafFill: { value: number }, wind:
   m.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, SEASON_UNIFORMS);
     shader.uniforms['uWindTime'] = wind;
+    shader.uniforms['uGust'] = VEG_GUST;
     shader.uniforms['uLeafFill'] = leafFill;
     shader.uniforms['uBarkColor'] = { value: new THREE.Color(1, 1, 1) };
     shader.vertexShader = VEG_VERT_PARS + SEA_VEG_VERT_PARS + shader.vertexShader;
