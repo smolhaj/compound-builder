@@ -41,6 +41,8 @@ import { kitIdOf, setMeshWear, WEAR_CLASS } from './weathering';
 import { SnowDrifts, type DriftWall } from './snowDrifts';
 import { setBuildingWeather, SNOW_MESH, WINTER } from '../buildkit/buildingDetail';
 import { Overgrowth, type WildArea } from './Overgrowth';
+import { WallLanterns } from './WallLanterns';
+import { homeSafetyNow } from './OasisState';
 import { regionFor } from '../../sim/climate';
 
 /** What the atmosphere needs of a built structure. */
@@ -80,6 +82,8 @@ export interface AtmosFrame {
   snow: number;
   viewportH: number;
   battle: boolean;
+  /** Vertical field of view of the view camera, degrees (sizes the lantern glow). */
+  fov?: number;
 }
 
 const LAMP_MAT: Record<LampKind, KitMaterialId> = { off: 'glow_off', oil: 'glow_oil', electric: 'glow_electric', curtained: 'glow_curtain' };
@@ -97,6 +101,7 @@ export class Atmosphere {
   private readonly _flash: Flashlights;
   private readonly _drifts: SnowDrifts;
   private readonly _wild: Overgrowth;
+  readonly lanterns: WallLanterns;
   private readonly _fireFx = new FireFx();
   private readonly _fireBoxes = new Map<string, FireBox>();
   /** Char on a building that has burned this session (0-1, only ever up): soot on its walls and roof. */
@@ -131,6 +136,7 @@ export class Atmosphere {
     this._flash = new Flashlights(host.scene);
     this._drifts = new SnowDrifts(host.scene);
     this._wild = new Overgrowth(host.scene);
+    this.lanterns = new WallLanterns(host.scene, host.groundAt);
     this._fireFx.addTo(host.scene);
   }
 
@@ -139,6 +145,7 @@ export class Atmosphere {
     this.firePit.setQuality(q);
     this._flash.setQuality(q);
     this._wild.setQuality(q);
+    this.lanterns.setQuality(q);
     this._fireFx.setQuality(q);
   }
 
@@ -236,6 +243,8 @@ export class Atmosphere {
     const carriers: Carrier[] = [];
     for (const id of ids) { const p = this._h.family.poseOf(id); if (p) carriers.push({ x: p.x, y: this._h.groundAt(p.x, p.z), z: p.z, rot: p.rot }); }
     this._flash.update(carriers, f.night, f.time);
+    // lanterns on the wall ring and over the gates: lit from dusk, dark under a blackout
+    this.lanterns.update([...this._h.runs()].map(x => x.run), f.night, lightsOut, homeSafetyNow().level, f.time, f.fov ?? 55, f.viewportH);
     // ── the generator ──
     this._syncGenerators(built, game, f, wx, wz);
     // ── aging (a few times a second is plenty: it changes over years) ──
@@ -428,6 +437,7 @@ export class Atmosphere {
     this._flash.dispose();
     this._drifts.dispose();
     this._wild.dispose();
+    this.lanterns.dispose();
     this._fireFx.dispose();
     if (this._tank) { this._h.scene.remove(this._tank.group); this._tank.dispose(); }
     for (const g of this._gens.values()) { g.smoke.points.parent?.remove(g.smoke.points); g.smoke.dispose(); g.lamp.parent?.remove(g.lamp); }
