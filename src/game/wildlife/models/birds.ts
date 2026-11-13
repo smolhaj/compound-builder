@@ -191,7 +191,7 @@ function buildGoose(lod: Lod): Mesh[] {
   const out: Mesh[] = [], { seg, sub } = lod;
   out.push(tube(GOOSE_BODY.map((r, i) => ringOf(r, sk(BONE.ROOT), i >= 4 ? REGION.ACC3 : REGION.BODY)), { seg, sub, capStart: true, capEnd: true }));
   out.push(wings(0.32, -0.04, 0.16, 0.26, 0.11, lod, -0.02));
-  out.push(neckTube(GNECK, lod, { region: REGION.ACC3 }));
+  out.push(neckTube(GNECK, lod, { coat: 0, col: i => (i === 0 ? [0.2, 0.17, 0.12] : [0.03, 0.03, 0.03]) }));
   const head = newMesh();
   append(head, blob([0, 0, 0.014], [0.03, 0.032, 0.05], { seg: Math.max(6, seg - 3), rings: 5, col: [1, 1, 1], coat: 1, region: REGION.ACC3, skin: sk(BONE.HEAD) }));
   if (lod.detail < 2) append(head, blob([0, -0.014, 0.012], [0.032, 0.012, 0.03], { seg: 6, rings: 3, col: [1, 1, 1], coat: 1, region: REGION.ACC1, skin: sk(BONE.HEAD), flat: true }));           // the white chin strap

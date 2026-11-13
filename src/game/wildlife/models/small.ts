@@ -87,8 +87,8 @@ const SQUIRREL: Quad = {
     { fore: [c3(0.032, 0.14, 0.09), c3(0.032, 0.1, 0.1), c3(0.032, 0.06, 0.12), c3(0.032, 0.025, 0.13)], hind: [c3(0.05, 0.15, -0.08), c3(0.05, 0.11, -0.05), c3(0.05, 0.04, -0.13), c3(0.05, 0.02, -0.09)], swing: [0.6, 0.7], flexF: [0, 0, -0.6, 0.3], flexH: [0, -0.5, 0.8, -0.3], foot: -0.2 },
     { neck: c3(0, 0.14, 0.11), head: SH, tail: c3(0, 0.15, -0.17), tailBob: 0.15, earAt: headPoint(SH, SP, c3(0.022, 0.032, -0.012)), rootY: 0.14, earFlick: 0.25, tailLen: 0.1, graze: { neck: -1.0, head: 0.0, bob: 0.3 }, alert: { neck: 0.3, head: 0.25, ear: 0, tail: 0.1 }, hop: true }),
   breeds: [
-    sb('Gray squirrel', { base: c3(0.32, 0.31, 0.29), style: 8, patch: c3(0.12, 0.11, 0.1), cover: 0.45, scale: 18, belly: c3(0.86, 0.84, 0.8), bellyMix: 0.9, bellyY: 0.1, leg: c3(0.4, 0.36, 0.3), legMix: 0.4, acc1: c3(0.82, 0.8, 0.76), acc1Mix: 0.8, fur: 0.9 }),
-    sb('Fox squirrel', { base: c3(0.4, 0.26, 0.12), style: 8, patch: c3(0.15, 0.12, 0.09), cover: 0.45, scale: 18, belly: c3(0.7, 0.45, 0.2), bellyMix: 0.85, bellyY: 0.1, leg: c3(0.5, 0.32, 0.15), legMix: 0.5, acc1: c3(0.75, 0.5, 0.25), acc1Mix: 0.8, fur: 0.9, size: 1.1 }),
+    sb('Gray squirrel', { base: c3(0.32, 0.31, 0.29), style: 8, patch: c3(0.12, 0.11, 0.1), cover: 0.45, scale: 18, belly: c3(0.86, 0.84, 0.8), bellyMix: 0.9, bellyY: 0.1, leg: c3(0.4, 0.36, 0.3), legMix: 0.4, acc1: c3(0.82, 0.8, 0.76), acc1Mix: 0.8, fur: 0.25 }),
+    sb('Fox squirrel', { base: c3(0.4, 0.26, 0.12), style: 8, patch: c3(0.15, 0.12, 0.09), cover: 0.45, scale: 18, belly: c3(0.7, 0.45, 0.2), bellyMix: 0.85, bellyY: 0.1, leg: c3(0.5, 0.32, 0.15), legMix: 0.5, acc1: c3(0.75, 0.5, 0.25), acc1Mix: 0.8, fur: 0.25, size: 1.1 }),
   ],
   withers: 0.2, length: 0.3, stride: 0.25, graze: { neck: -1.0, head: 0.0 }, root: { bob: 0.04, pitch: 0.25, cy: 0.14, hop: true }, rootPose: { alertPitch: 0.05 }, extra: true,
 };

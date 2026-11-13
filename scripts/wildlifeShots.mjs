@@ -84,7 +84,7 @@ try {
       const cx = an.reduce((q, a) => q + a.x, 0) / an.length, cz = an.reduce((q, a) => q + a.z, 0) / an.length;
       // a person for scale, beside the group (lateral m to the camera's right, depth m toward the camera)
       if (window.__fig) window.__fig.removeFromParent();
-      { const fx = Math.sin(s.cam.bearing), fz = Math.cos(s.cam.bearing), px = cx + (fx * s.person[1] + fz * s.person[0]) * K, pz = cz + (fz * s.person[1] - fx * s.person[0]) * K;
+      { const fx = Math.sin(s.cam?.bearing ?? 0.4), fz = Math.cos(s.cam?.bearing ?? 0.4), px = cx + (fx * s.person[1] + fz * s.person[0]) * K, pz = cz + (fz * s.person[1] - fx * s.person[0]) * K;
         const n0 = world._root.children.length; world.qaFigure(px, pz); window.__fig = world._root.children[n0]; }
       if (s.aerial) { window.__cb.qa.pose = null; cam.target.set(cx, world.groundAt(cx, cz) + 0.1, cz); cam.radius = s.aerial.radius; cam.pitch = s.aerial.pitch; cam.yaw = 0.4; return; }
       const d = s.cam.dist * K, [ex, ez] = world.openSpotNear(cx + Math.sin(s.cam.bearing) * d, cz + Math.cos(s.cam.bearing) * d, 0.5), gy = world.groundAt(ex, ez);

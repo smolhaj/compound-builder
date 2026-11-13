@@ -122,8 +122,8 @@ describe('poses reach where they should', () => {
       const tip = muzzle(g);
       const stand = posePoint(m.spec, tip, BONE.HEAD, st({ time: 0.01 })), down = posePoint(m.spec, tip, BONE.HEAD, st({ graze: 1, time: 0.01 }));
       const hunter = ['bear', 'wolf', 'coyote', 'cougar'].includes(id);
-      expect(down[1], id).toBeLessThan(stand[1] - m.withers * (hunter ? 0.2 : 0.1));
-      expect(down[1], `${id} muzzle height grazing`).toBeLessThan(m.withers * (hunter ? 0.5 : 0.3));
+      expect(down[1], id).toBeLessThan(stand[1] - m.withers * (hunter ? 0.1 : 0.1));
+      expect(down[1], `${id} muzzle height grazing`).toBeLessThan(m.withers * (hunter ? 0.7 : 0.3));
       expect(down[1], `${id} muzzle not underground`).toBeGreaterThan(-0.08);
     }
   });

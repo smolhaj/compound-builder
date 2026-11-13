@@ -117,7 +117,7 @@ interface Cerv {
 function cervid(o: Cerv): Quad {
   const q = cervid0(o);
   // the body tips nose-down to graze; the legs stay upright
-  for (const b of [BONE.FL, BONE.FR, BONE.HL, BONE.HR]) if (q.bones[b]) q.bones[b]!.graze = 0.18;
+  for (const b of [BONE.FL, BONE.FR, BONE.HL, BONE.HR]) if (q.bones[b]) q.bones[b]!.graze = b === BONE.HL || b === BONE.HR ? 0.3 : 0.18;
   return q;
 }
 function cervid0(o: Cerv): Quad {
@@ -193,7 +193,7 @@ const ELK = cervid({
     append(head, scaleMesh(t, k));
     // a bull's rack: beams sweep up and back over the shoulders, tines point forward and up
     append(head, unpitch(antlers([0, 0.11, -0.05], [[0.06, 0, 0, 0.026], [0.1, 0.12, -0.05, 0.022], [0.16, 0.26, -0.2, 0.02], [0.2, 0.38, -0.45, 0.018], [0.2, 0.46, -0.75, 0.016], [0.16, 0.5, -1.05, 0.013], [0.12, 0.5, -1.3, 0.005]],
-      [[0.13, 0.36, -0.3, 0.9], [0.22, 0.42, -0.1, 0.9], [0.36, 0.34, 0.1, 0.7], [0.52, 0.4, 0.2, 0.45], [0.72, 0.3, 0.3, 0.2]], lod), -0.35, [0, 0.11, -0.05]));
+      [[0.13, 0.36, -0.3, 0.9], [0.22, 0.42, -0.1, 0.9], [0.36, 0.34, 0.1, 0.7], [0.52, 0.4, 0.2, 0.45], [0.72, 0.3, 0.3, 0.2]], lod), -0.55, [0, 0.11, -0.05]));
   },
   tail: shortTail(REGION.ACC2, 0.12, 0.05),
   extras: (out, lod, k) => {
@@ -212,7 +212,7 @@ export const ELK_MODEL = (): AnimalModel => quadModel(ELK);
 // ---------------------------------------------------------------- moose
 const MK = 1.8, MLIFT = 0.56 * MK * 0.18, MH = c3(0, 1.0 * MK + MLIFT, 0.74 * MK);
 const MOOSE_HEAD: HeadRow[] = [[-0.07, 0, 0.062, 0.078, 0.082], [0.03, 0, 0.072, 0.084, 0.092], [0.13, -0.02, 0.062, 0.072, 0.074], [0.23, -0.055, 0.054, 0.064, 0.058], [0.31, -0.09, 0.052, 0.062, 0.05], [0.36, -0.115, 0.046, 0.052, 0.04]];
-const MOOSE_BODY: Array<[number, number, number, number, number]> = [[0.53, 0.8, 0.56, 0.09, 2.1], [0.41, 1.0, 0.5, 0.14, 2.2], [0.15, 0.94, 0.5, 0.15, 2.3], [-0.12, 0.88, 0.54, 0.135, 2.3], [-0.38, 0.86, 0.6, 0.12, 2.2], [-0.56, 0.8, 0.64, 0.085, 2.0]];
+const MOOSE_BODY: Array<[number, number, number, number, number]> = [[0.53, 0.8, 0.56, 0.09, 2.1], [0.41, 1.0, 0.5, 0.15, 2.2], [0.15, 0.94, 0.5, 0.16, 2.3], [-0.12, 0.88, 0.54, 0.16, 2.3], [-0.38, 0.86, 0.6, 0.16, 2.2], [-0.56, 0.8, 0.64, 0.085, 2.0]];
 const mooseBreed = (name: string, o: Partial<Breed> & { base: V3 }): Breed => ({ name, style: 0, fur: 0.7, furFreq: 40, nose: c3(0.12, 0.09, 0.08), acc1Mix: 0.7, acc2Mix: 0.9, acc3Mix: 0.9, ...o });
 const MOOSE = cervid({
   id: 'moose', k: MK, legK: 1.18, neckK: 1.2, stride: 2.2, withers: 1.9, length: 2.2, body: MOOSE_BODY,
@@ -288,7 +288,7 @@ const JV_HIND = (b: number): LimbRow[] => [
   [0.5, -0.33, 0.07, 0.1, sk(b)], [0.42, -0.31, 0.06, 0.09, sk(b)], [0.34, -0.27, 0.04, 0.06, sk(b, b + 1, 0.5)], [0.25, -0.33, 0.026, 0.035, sk(b + 1)],
   [0.18, -0.38, 0.02, 0.027, sk(b + 1, b + 2, 0.5)], [0.1, -0.36, 0.015, 0.019, sk(b + 2)], [0.05, -0.34, 0.015, 0.02, sk(b + 2, b + 3, 0.5)], [0.025, -0.335, 0.016, 0.022, sk(b + 3)],
 ];
-const jvBreed = (name: string, o: Partial<Breed> & { base: V3 }): Breed => ({ name, style: 8, patch: c3(0.42, 0.38, 0.32), cover: 0.45, scale: 14, fur: 1.4, furFreq: 40, nose: c3(0.1, 0.08, 0.08), acc1Mix: 0.9, ...o });
+const jvBreed = (name: string, o: Partial<Breed> & { base: V3 }): Breed => ({ name, style: 8, patch: c3(0.42, 0.38, 0.32), cover: 0.2, scale: 14, fur: 1.0, furFreq: 40, nose: c3(0.1, 0.08, 0.08), acc1Mix: 0.9, ...o });
 const JAV: Quad = {
   id: 'javelina',
   body: [[0.4, 0.46, 0.3, 0.09, 2.1], [0.28, 0.54, 0.26, 0.14, 2.2], [0.06, 0.53, 0.25, 0.16, 2.3], [-0.16, 0.51, 0.26, 0.155, 2.3], [-0.33, 0.46, 0.29, 0.12, 2.1], [-0.4, 0.4, 0.31, 0.07, 2.0]],
