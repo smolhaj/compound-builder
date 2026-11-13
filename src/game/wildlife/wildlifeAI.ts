@@ -37,6 +37,8 @@ export interface Beast {
   /** On a tunnel-bridge's deck (game/wildlife/wildlifeCrossing): the points still to walk, and the deck height it stands at now. */
   deck?: Array<[number, number, number]>;
   y?: number;
+  /** Gait amplitude for the legs: 0 standing, 1 a walk, 1.25 a run (eased; set by stepBeast, absent in tests). */
+  gait?: number;
   /** On its way to a bridge's mouth to cross it. */
   cross?: { mouth: [number, number]; bridge: string; from: 0 | 1 };
 }
@@ -52,6 +54,15 @@ export interface StepCtx {
    * null = no way: stay put). Absent: straight lines (the tests).
    */
   route?: (b: Beast, tx: number, tz: number) => Array<[number, number]> | null;
+}
+
+/** Metres a walking animal covers per gait cycle (a left-right step cycle), by species: the legs advance by distance, not by time, so the feet do not slide. The models' `stride` matches (tested). */
+export const STRIDE_M: Record<SpeciesId, number> = {
+  deer: 1.2, elk: 1.9, moose: 2.2, antelope: 1.4, javelina: 0.6, turkey: 0.55, rabbit: 0.45, squirrel: 0.25, grouse: 0.22, waterfowl: 0.35, bear: 1.0, cougar: 1.4, wolf: 1.5, coyote: 1.2,
+};
+/** The gait phase advance for a move of `step` world units (1 unit = 6 m); a run takes longer strides. */
+export function phaseAdvance(sp: SpeciesId, step: number, running: boolean): number {
+  return (step * 6 / (STRIDE_M[sp] * (running ? 2.4 : 1))) * Math.PI * 2;
 }
 
 /** Speeds in world units per second at 1×: a person walks 0.5, so a deer walks slowly and bolts fast. */
@@ -102,7 +113,8 @@ export function stepBeast(b: Beast, dt: number, ctx: StepCtx): void {
     b.mood = 'walk'; b.via = undefined; b.viaFor = undefined; b.cross = undefined;
     const v = sp.walk * k;
     if (advanceDeck(b, v * dt)) { b.hx = b.tx = b.x; b.hz = b.tz = b.z; b.mood = 'graze'; b.t = 3 + ctx.rnd() * 5; b.v = 0; } else b.v = v;
-    b.phase += dt * b.v * 9 / Math.max(0.05, sd.h * 6);
+    b.phase += phaseAdvance(b.sp, dt * b.v, false);
+    b.gait = (b.gait ?? 0) + (Math.min(1.25, b.v / (sp.walk * k)) - (b.gait ?? 0)) * Math.min(1, dt * 6);
     b.head += (0.55 - b.head) * Math.min(1, dt * 4);
     return;
   }
@@ -151,7 +163,8 @@ export function stepBeast(b: Beast, dt: number, ctx: StepCtx): void {
     }
   }
   b.v = v;
-  b.phase += dt * v * 9 / Math.max(0.05, sd.h * 6);
+  b.phase += phaseAdvance(b.sp, dt * v, b.mood === 'flee');
+  b.gait = (b.gait ?? 0) + ((v > 0 ? (b.mood === 'flee' ? 1.25 : Math.min(1, v / (sp.walk * k))) : 0) - (b.gait ?? 0)) * Math.min(1, dt * 6);
   const up = b.mood === 'alert' || b.mood === 'flee' ? 1 : b.mood === 'walk' ? 0.55 : 0;
   b.head += (up - b.head) * Math.min(1, dt * 4);
 }
