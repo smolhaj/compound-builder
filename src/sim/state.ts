@@ -47,7 +47,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 96;
+export const SAVE_VERSION = 97;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -341,6 +341,8 @@ export interface GameState {
   learning?: Learning;
   /** Mental health: strain, trauma, low mood, breakdowns, the fight a household remembers (sim/mind.ts). Save v63; `mindOf` makes it lazily. */
   mind?: MindState;
+  /** Family rituals: the household's calm, today's dinners and firesides, the faded scores, the stories told (sim/rituals.ts). Save v97; `ritualsOf` makes it lazily. */
+  rituals?: import('./rituals').RitualState;
   /** Friends, rivals and mentors, from time shared and dangers lived through (sim/bonds.ts). Optional, made lazily: an old save has none and plays as before (no save bump). */
   bonds?: import('./bonds').Bonds;
   /** Medical depth: lasting effects, pregnancies, the epidemic, the antibiotics policy (sim/medical.ts). Save v64; `medicalOf` makes it lazily. */
