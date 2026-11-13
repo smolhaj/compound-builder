@@ -26,7 +26,7 @@ page.on('pageerror', e => console.error('PAGEERROR', e.message));
 const SC = {
   clear: ['clear', 226, 14, null], rain: ['rain', 292, 14, null], storm: ['storm', 160, 17, null], snow: ['snow', 20, 14, null],
   fire: ['clear', 226, 21, null], wildfire: ['clear', 226, 17, null], nuclear: ['clear', 226, 15, null], raid: ['clear', 226, 8, null],
-  dust: ['clear', 200, 15, 'desert_southwest'], fog: ['fog', 288, 7, null],
+  dust: ['clear', 200, 15, 'desert'], fog: ['fog', 288, 7, null],
 };
 try {
   for (const name of scenes) {
@@ -60,6 +60,7 @@ try {
       stepW(mode, doy < 80 ? 'winter' : doy < 270 ? 'summer' : 'fall');
       const { startFires } = await import('/src/sim/raidFire.ts');
       const { addBurnScar } = await import('/src/sim/raidDamage.ts');
+      if (name === 'dust') cb.qa.dust = 0.85;
       if (name === 'fire') {
         G.setState(st => { const g = structuredClone(st.game); startFires(g, g.structures.filter(x => /barn|cabin/.test(x.kind)).map(x => ({ structure: x.id, x: x.x, z: x.z }))); for (const f of g.raidFires ?? []) f.intensity = f.structure === g.structures[0].id ? 0.45 : 0.75; return { game: g }; });
       }
