@@ -89,7 +89,7 @@ function canid(o: Canid): Quad {
       }
       for (const sx of [-1, 1]) {
         const at: V3 = e.kind === 'prick' ? [sx * m(0.034) * sw, m(0.052) * hs, m(-0.035)] : [sx * m(0.047) * sw * hs, m(0.045) * hs, m(-0.03) * hs];
-        if (e.kind === 'prick') append(h, ear(sx, earBone(sx), [Math.abs(at[0]), at[1], at[2]], m(e.len), m(e.wd), 0.18, lod, { back: 0.05 }));
+        if (e.kind === 'prick') append(h, ear(sx, earBone(sx), [Math.abs(at[0]), at[1], at[2]], m(e.len), m(e.wd), 0.18, lod, { back: 0.05, tri: true }));
         else if (e.kind === 'drop') append(h, flap(sx, earBone(sx), [at[0], at[1], at[2]], m(e.len), m(e.wd), lod, { sweep: 0.5 }));
         else if (e.kind === 'fold') append(h, flap(sx, earBone(sx), [at[0], at[1], at[2]], m(e.len), m(e.wd), lod, { fold: true, sweep: 0.5 }));
         else {
@@ -150,7 +150,7 @@ function dogPose(b: Array<import('../../livestock/animalMaterial').BoneAnim | un
 
 // ---------------------------------------------------------------- wolf and coyote
 const WOLF = canid({
-  id: 'wolf', k: 1, chest: 0.95, legK: 1.1, muzzle: 0.95, skullW: 1.25, ear: { kind: 'prick', len: 0.13, wd: 0.062 }, tail: { kind: 'bush', len: 0.42, thick: 1.15 }, ruff: 1, tipAcc: true, paws: 1.15,
+  id: 'wolf', k: 1, chest: 0.95, legK: 1.1, muzzle: 0.8, skullW: 1.25, ear: { kind: 'prick', len: 0.13, wd: 0.062 }, tail: { kind: 'bush', len: 0.42, thick: 1.15 }, ruff: 1, tipAcc: true, paws: 1.15,
   withers: 0.8, length: 1.15, stride: 1.5,
   breeds: [
     cb('Gray wolf', { base: c3(0.46, 0.43, 0.38), style: 7, dorsal: 0.62, patch: c3(0.2, 0.18, 0.16), cover: 0.5, belt: [0.05, 0.5], face: c3(0.5, 0.46, 0.4), faceMix: 0.5, leg: c3(0.5, 0.42, 0.32), legMix: 0.35, belly: c3(0.75, 0.72, 0.66), bellyMix: 0.8, bellyY: 0.5, acc1: c3(0.72, 0.68, 0.6), acc1Mix: 0.8, acc3: c3(0.08, 0.07, 0.07), fur: 1.0, furFreq: 45 }),
@@ -162,7 +162,7 @@ const WOLF = canid({
 export const WOLF_MODEL = (): AnimalModel => quadModel(WOLF);
 
 const COY = canid({
-  id: 'coyote', k: 0.76, chest: 0.9, legK: 1.04, muzzle: 1.0, skullW: 1.1, ear: { kind: 'prick', len: 0.15, wd: 0.062 }, tail: { kind: 'bush', len: 0.5, thick: 0.95 }, ruff: 0.8, tipAcc: true, paws: 0.9,
+  id: 'coyote', k: 0.76, chest: 0.9, legK: 1.04, muzzle: 0.85, skullW: 1.1, ear: { kind: 'prick', len: 0.15, wd: 0.062 }, tail: { kind: 'bush', len: 0.5, thick: 0.95 }, ruff: 0.8, tipAcc: true, paws: 0.9,
   withers: 0.62, length: 0.9, stride: 1.2,
   breeds: [
     cb('Coyote', { base: c3(0.58, 0.46, 0.32), style: 7, dorsal: 0.45, patch: c3(0.3, 0.24, 0.18), cover: 0.45, belt: [0.05, 0.5], face: c3(0.62, 0.48, 0.32), faceMix: 0.5, leg: c3(0.62, 0.4, 0.22), legMix: 0.75, belly: c3(0.88, 0.84, 0.76), bellyMix: 0.9, bellyY: 0.5, acc1: c3(0.9, 0.87, 0.8), acc1Mix: 0.85, acc3: c3(0.07, 0.06, 0.06), fur: 1.0, furFreq: 50 }),

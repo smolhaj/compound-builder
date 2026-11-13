@@ -26,11 +26,12 @@ function hoof(sx: number, b: number, x: number, z: number, s: number, lod: Lod, 
 }
 
 /** An ear: a long flat leaf set at the crown, `len` long and `wd` wide, tilted out. Head frame. */
-export function ear(sx: number, b: number, at: V3, len: number, wd: number, out: number, lod: Lod, o: { col?: V3; back?: number } = {}): Mesh {
+export function ear(sx: number, b: number, at: V3, len: number, wd: number, out: number, lod: Lod, o: { col?: V3; back?: number; tri?: boolean } = {}): Mesh {
+  const W = o.tri ? [1, 0.88, 0.62, 0.36, 0.05] : [0.34, 0.8, 1, 0.74, 0.18];
   const col = o.col ?? [1, 1, 1];
   const rs: Ring[] = [0, 0.18, 0.5, 0.82, 1].map((t, i) => ({
     p: [at[0] + sx * (0.012 + t * len * out), at[1] + t * len * 0.92, at[2] - t * len * (o.back ?? 0.28)] as V3,
-    w: wd * [0.34, 0.8, 1, 0.74, 0.18][i], h: 0.004, skin: i === 0 ? sk(BONE.HEAD, b, 0.35) : sk(b), coat: 1, region: REGION.EAR,
+    w: wd * W[i], h: 0.004, skin: i === 0 ? sk(BONE.HEAD, b, 0.35) : sk(b), coat: 1, region: REGION.EAR,
     col: i === 3 ? [col[0] * 0.92, col[1] * 0.92, col[2] * 0.92] as V3 : col,
   }));
   return tube(rs, { seg: Math.max(6, Math.round(lod.seg * 0.5)), sub: lod.sub > 1 ? 2 : 1, up: [0, 0, 1], flat: true, capEnd: true });
@@ -117,7 +118,7 @@ interface Cerv {
 function cervid(o: Cerv): Quad {
   const q = cervid0(o);
   // the body tips nose-down to graze; the legs stay upright
-  for (const b of [BONE.FL, BONE.FR, BONE.HL, BONE.HR]) if (q.bones[b]) q.bones[b]!.graze = b === BONE.HL || b === BONE.HR ? 0.3 : 0.18;
+  for (const b of [BONE.FL, BONE.FR, BONE.HL, BONE.HR]) if (q.bones[b]) q.bones[b]!.graze = 0.18;
   return q;
 }
 function cervid0(o: Cerv): Quad {
