@@ -39,7 +39,7 @@ export function padOf(def: KitPieceDef, x: number, z: number, rot: number, h: Na
 function wallInside(plan: PadPlan, r: Rect): boolean {
   if (!plan.runs.length) return false;
   const nx = Math.max(2, Math.min(24, Math.ceil((r.x1 - r.x0) / 0.1))), nz = Math.max(2, Math.min(24, Math.ceil((r.z1 - r.z0) / 0.1)));
-  for (let i = 0; i <= nx; i++) for (let j = 0; j <= nz; j++) if (wallAt(plan, r.x0 + (r.x1 - r.x0) * i / nx, r.z0 + (r.z1 - r.z0) * j / nz, 0) >= RW.MIN_H) return true;
+  for (let i = 0; i <= nx; i++) for (let j = 0; j <= nz; j++) if (wallAt(plan, r.x0 + (r.x1 - r.x0) * i / nx, r.z0 + (r.z1 - r.z0) * j / nz, 0.08) >= RW.MIN_H) return true;
   return false;
 }
 
