@@ -10,7 +10,8 @@ import { quadModel } from '../../livestock/animalQuad';
 import type { AnimalModel } from '../../livestock/animalParts';
 import { canid, hexLin, type Canid } from './predators';
 import { COATS, type Breed as DogBreed } from '../../../sim/pets';
-import type { V3 } from '../../livestock/animalKit';
+import { LODS, type V3 } from '../../livestock/animalKit';
+import { posePoint, type AnimState } from '../../livestock/animalPose';
 
 const WHITE: V3 = [0.9, 0.88, 0.84], BLACK: V3 = [0.035, 0.032, 0.032];
 const lin = hexLin;
@@ -61,4 +62,20 @@ const SPEC: Record<DogBreed, Canid> = {
 };
 export const DOG_BREEDS = Object.keys(SPEC) as DogBreed[];
 export const dogModelId = (b: DogBreed): string => `dog_${b}`;
-export const DOG_MODEL = (b: DogBreed): AnimalModel => quadModel(canid(SPEC[b]));
+/**
+ * Seat the dog on the ground in its sit and lie poses: the root drop that puts the lowest point of the posed body at y = 0. (A fixed drop sank
+ * a shepherd's hind legs through the ground, where they showed as a flat cut, and left a hound floating; the legs, the slope and the chest differ by breed.)
+ */
+function settle(m: AnimalModel): AnimalModel {
+  const g = m.build(LODS[0]), pos = g.attributes.position, sk = g.attributes.aSkin, rp = (m.spec.rootPose ??= {});
+  const lowest = (st: Partial<AnimState>): number => {
+    let lo = Infinity;
+    for (let i = 0; i < pos.count; i++) lo = Math.min(lo, posePoint(m.spec, [pos.getX(i), pos.getY(i), pos.getZ(i)], sk.getX(i), { phase: 0, gait: 0, graze: 0, seed: 0.3, time: 0.01, ...st })[1]);
+    return lo;
+  };
+  rp.sitDrop = 0; rp.lieDrop = 0;
+  rp.sitDrop = lowest({ graze: 1 }); rp.lieDrop = lowest({ lie: 1 });
+  g.dispose();
+  return m;
+}
+export const DOG_MODEL = (b: DogBreed): AnimalModel => settle(quadModel(canid(SPEC[b])));
