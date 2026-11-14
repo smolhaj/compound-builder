@@ -89,7 +89,7 @@ async function wizard({ region, difficulty, lotPick = 'first', mode = 'Surprise'
   await page.evaluate(() => window.__cb.game.getState().setSpeed(0));
   await page.waitForTimeout(500);
 }
-async function shotWizard(tag) { const f = `${out}/w-${tag}.png`; await page.screenshot({ path: f }); }
+async function shotWizard(tag) { const f = `${out}/w-${tag}.png`; await page.screenshot({ path: f, timeout: 120000 }).catch(() => {}); }
 
 const frameCamp = () => page.evaluate(() => { const c = window.__cb.world.camp, cam = window.__cb.cam; cam.target.set(c.x, 0, c.z); cam.radius = 26; cam.pitch = 1.0; cam.yaw = 0.3; });
 
@@ -155,7 +155,7 @@ async function handleGate(s, policy) {
     }
     if (c.cutscene === 'aftermath') { if (stage < 3) { if (policy.shotGate && policy.shotGate(raids)) await shot(tag + '-report'); await scanText(tag + ' report'); stage = 3; } await click(/Pick up the pieces|See to the drive/); await page.waitForTimeout(300); continue; }
     if (c.aftermath) { await click(/Treat|Bury|Leave/) || await click(/./, { filter: { hasText: /treat|bury|leave/i } }); await page.waitForTimeout(300); continue; }
-    if (c.card) { await scanText(tag + ' card'); await click(/Carry on/); await page.waitForTimeout(200); continue; }
+    if (c.card) { await scanText(tag + ' card'); await click(/Carry on|^Continue$/); await page.waitForTimeout(200); continue; }
     await page.waitForTimeout(300);
   }
   const a = await st(); note(`gate ${raids} resolved: day ${a.day} alive ${a.alive}/${a.total} money ${a.money} speed ${a.speed}`);
