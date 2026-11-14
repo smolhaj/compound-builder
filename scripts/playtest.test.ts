@@ -259,7 +259,13 @@ function fieldSpot(s: GameState, M: (x: number, z: number) => [number, number]):
  */
 export function siteFor(seed: number, region?: RegionId): Site {
   const life = (process.env.LIFESTYLE as Lifestyle | undefined) ?? 'fulltime';
-  const budget = startFunds(generateFamily(seed), life, seed, 0, process.env.TOWN === 'rent' ? 'rent' : 'own').budget;
+  // (FUNDS=<usd> sets the nest egg and LANDSHARE=<0-1> caps the land at that share of it and buys the priciest listing under the cap: the wealth harness, scripts/wealth.test.ts)
+  const budget = process.env.FUNDS ? Number(process.env.FUNDS) : startFunds(generateFamily(seed), life, seed, 0, process.env.TOWN === 'rent' ? 'rent' : 'own').budget;
+  if (process.env.LANDSHARE) {
+    const cap = Number(process.env.LANDSHARE) * budget, under = listings(seed, region, undefined, 6, budget).filter(l => affordable(l, budget) && l.price <= cap);
+    if (under.length) return under.sort((a, b) => b.acres - a.acres || b.price - a.price)[0];
+    return listings(seed, region, undefined, 6, budget).sort((a, b) => a.price - b.price)[0];
+  }
   // LOTKIND=gorge plays the first affordable listing of that lot archetype (sim/lots.ts) in the search for this seed; LOTKIND=none plays an
   // affordable listing's acreage and money on the region's ordinary ground (the control: the same family, no relief)
   const lotKind = process.env.LOTKIND;
@@ -292,7 +298,8 @@ const passiveLog = { placed: 0, orders: 0, crews: 0 };
 export function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' | 'medium', site: Site = CLASSIC, years = 0, afterHit = 0): RunResult & { s: GameState } {
   // (LIFESTYLE=weekend plays the weekender: the family in town on weekdays, the move-in card, the road home; TOWN=rent sells the town house at setup and rents; BELT=1 tightens the belt from day one)
   const life = process.env.LIFESTYLE as Lifestyle | undefined;
-  let s = newGame(seed, 105, 2027, { site: site === CLASSIC && !life ? undefined : site, lifestyle: life, townPlan: process.env.TOWN === 'rent' ? 'rent' : 'own', mode: 'scenario', peace, kind, dayJobs: true, grid: true, difficulty: process.env.DIFF as Difficulty | undefined });
+  const funds = process.env.FUNDS ? { ...startFunds(generateFamily(seed), life ?? 'fulltime', seed, 0, process.env.TOWN === 'rent' ? 'rent' : 'own'), budget: Number(process.env.FUNDS) } : undefined;
+  let s = newGame(seed, 105, 2027, { site: site === CLASSIC && !life ? undefined : site, lifestyle: life, funds, townPlan: process.env.TOWN === 'rent' ? 'rent' : 'own', mode: 'scenario', peace, kind, dayJobs: true, grid: true, difficulty: process.env.DIFF as Difficulty | undefined });
   // the plans are drawn on the 40; squeeze them into the place actually bought
   const h = s.site.home, M0 = (x: number, z: number): [number, number] => [h.x0 + x / 67 * (h.x1 - h.x0), h.z0 + z / 67 * (h.z1 - h.z0)];
   // on a lot with relief a player picks level ground: the nearest spot under a 7 % grade that is not on top of one already picked
