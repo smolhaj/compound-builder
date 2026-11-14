@@ -33,6 +33,7 @@ import { layPropertyWall } from './propertyWall';
 import { RW, wallAt, type Rect } from './retainPlan';
 import { integrationProblems, slopeOf, solidSegments, type Problem } from './showcase';
 import { PERIMETER, type PerimeterRun } from './perimeter';
+import { ungatedCrossings } from './roadGate';
 import { lengthText } from './units';
 import { planParcelTrees } from '../game/parcel/parcelTrees';
 import { animalGoal, housesFor, PADDOCK_TRIES, type Home, type StockKind } from '../game/livestock/livestockPlan';
@@ -310,6 +311,8 @@ export function sceneProblems(sc: Scene, opts: { trees?: boolean; rawPaddock?: b
     if (overlap(a.pad!, b.pad!, 0.0001) && Math.abs(a.y - b.y) >= RW.MIN_H) add('graded pads overlap at different levels', `${name(padded[i])} (${a.y.toFixed(2)}) and ${name(padded[j])} (${b.y.toFixed(2)})`);
   }
   for (const r of g.perimeter) crossCreek(sc, r, add);
+  // every place a drive meets a fence or wall gets a vehicle gate (or a gap): the drive never ends at a fence post
+  for (const u of ungatedCrossings(g, sc.access.drive)) add('drive crosses a fence or wall with no gate', `${u.run.kind} ${u.run.id} at ${u.crossing.x.toFixed(1)}, ${u.crossing.z.toFixed(1)} (${u.crossing.at.toFixed(2)} u along a ${u.run.pts.length}-point run, ${u.run.gates.length} gate(s))`);
   // trees
   if (opts.trees) treeProblems(sc, surface, add);
   void gnd; void PARCEL_SIZE; void REGION_IDS;
