@@ -13,7 +13,7 @@
 import { describe, expect, it } from 'vitest';
 import { appendFileSync, existsSync, readFileSync } from 'node:fs';
 import { play, siteFor, HOOKS, type Strategy } from './playtest.test';
-import { REGION_IDS, type RegionId } from '../src/sim/regions';
+import { type RegionId } from '../src/sim/regions';
 import { operational } from '../src/sim/operational';
 import { daysOfFood } from '../src/sim/needs';
 import { hireCrew, crewProblem } from '../src/sim/crews';
