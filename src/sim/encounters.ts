@@ -33,7 +33,7 @@ import { logGate } from './nag';
 import { daysOfFood } from './needs';
 import { forewarned } from './radio';
 import { gearPosture } from './gear';
-import { fxEncounterWeights } from './disasterFx';
+import { fxEncounterWeights, fxMakeExtra, fxResolveExtra, isExtraRaid } from './disasterFx';
 import { fogSightK } from './fogFx';
 import { fenceHold, watchDetection } from './daily';
 import { armed, firepower } from './armory';
@@ -476,7 +476,7 @@ function makeThreat0(kind: EncounterKind, r: () => number, id: string, day: numb
       const size = 6 + Math.floor(r() * 8);
       return { id, kind, day, title: 'Militia at the gate', dossier: [`${size} armed men from the Plains Alliance, a recruiter with a list.`, 'They want food, fuel, and a fighting-age man or woman for the line.'], size, armed: true, strength: size * 11, wants: { canned: 5, fuel: 3 }, stances: ['parley', 'trade', 'hide', 'defend'] };
     }
-    default: return strangerArrival(s, r, id, day);
+    default: return fxMakeExtra(s, kind, r, id, day) ?? strangerArrival(s, r, id, day);
   }
 }
 
@@ -544,7 +544,7 @@ export function gateDay(s: GameState): Encounter | null {
   let waveKind: EncounterKind | null = null;
   if (wv && phaseOf(day, due) === 'arriving') {
     const rw = mulberry32(s.seed * 4231 + day * 29 + 3);
-    for (let i = 0; i < 16 && !waveKind; i++) { const k = whoComes(s, p, rw); if (HOSTILE.has(k)) waveKind = k; }
+    for (let i = 0; i < 16 && !waveKind; i++) { const k = whoComes(s, p, rw); if (HOSTILE.has(k) || isExtraRaid(k)) waveKind = k; }
   }
   if (!waveKind) {
     if (g.next < 0) g.next = day + Math.round(cadence(s, p) * (0.4 + 0.6 * r()));
@@ -559,7 +559,7 @@ export function gateDay(s: GameState): Encounter | null {
   // under the wave clock a mark (sim/roadPassers.ts) does not add a raid or grow a wave: it brings two or three men to look the place over, once
   const markProbe = !!wv && !waveKind && !cb && !!mk0 && kind === mk0.kind && (kind === 'looters' || kind === 'gang');
   if (wv && !waveKind && !(cb && kind === cb.kind) && !markProbe) {
-    if (HOSTILE.has(kind)) return null;
+    if (HOSTILE.has(kind) || isExtraRaid(kind)) return null;
     if (left >= 1 && left <= WAVE.WARN) return null;
   }
   const e = makeThreat(kind, r, `e${s.nextId++}`, day, s);
@@ -815,7 +815,8 @@ export function resolve(s: GameState, stance: Stance): Outcome {
   const lines: string[] = [];
   let bunkerOut: BunkerResult | undefined;
   let title = '', text = '', tone: Outcome['tone'] = 'mixed';
-  if (e.kind === 'ransom') {
+  const extra = fxResolveExtra(s, e, stance);   // (an extra kind a disaster adds, sim/disasters/<kind>.ts resolveExtra; null = the generic threat path)
+  if (extra) { title = extra.title; text = extra.text; tone = extra.tone; lines.push(...extra.lines); } else if (e.kind === 'ransom') {
     const o = resolveRansom(s, e, stance);
     title = o.title; text = o.text; tone = o.tone; lines.push(...o.lines);
   } else if (e.kind === 'break_in') {
