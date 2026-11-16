@@ -28,6 +28,7 @@ describe('how a fight ends on screen', () => {
     let beaten = 0, hands = 0, down = 0;
     for (const temper of ['desperate', 'hard', 'savage'] as const) for (let seed = 1; seed <= 24; seed++) {
       const st = stageRaid(base(seed, temper), 'defend'), last = st.battles.length - 1, b = st.battles[last];
+      if (st.played !== 'defend' || st.outcome.title === 'They thought better of it') continue;   // turned back at first contact (sim/deterrence.ts): no fight to read
       const end = endingOf(b);
       if (end !== 'repelled' && end !== 'fled') continue;
       beaten++;

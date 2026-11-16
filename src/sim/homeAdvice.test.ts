@@ -76,3 +76,13 @@ describe('one home recommendation', () => {
     expect(BLUEPRINTS[adv.kind]).toBeTruthy();
   });
 });
+
+describe('money buys speed: the fastest home when crews are affordable', () => {
+  it('a rich family of four is advised the modular home (about a week), a poor one the cheapest that closes the gap', () => {
+    const rich = fresh(4, 800_000), poor = fresh(4, 20_000);
+    expect(homeAdvice(rich)!.kind).toBe('modular_home');
+    expect(homeAdvice(rich)!.crewWeeks).toBeLessThanOrEqual(2);
+    expect(homeAdvice(poor)!.kind).not.toBe('modular_home');
+    expect(homeAdvice(poor)!.stillShort).toBe(0);
+  });
+});

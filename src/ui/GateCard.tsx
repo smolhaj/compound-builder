@@ -4,6 +4,7 @@ import { ambushOdds, ambushParty, chosenParty } from '../sim/tunnelers';
 import { doorHoldLine } from '../sim/terrainFx';
 import { hidePreview } from '../sim/bunkerHide';
 import { fightOdds, hideFoundChance, postureOf, type Stance } from '../sim/encounters';
+import { deterLine, deterrence } from '../sim/deterrence';
 import { askQuestion, carryLines, carryOf, MAX_QUESTIONS, QUESTIONS } from '../sim/newcomers';
 import { AFTERMATH_TEXT, SURRENDER_TEXT, aftermathHeads } from '../sim/aftermath';
 import { canPay, DOUBLE_CROSS } from '../sim/rescue';
@@ -160,8 +161,9 @@ export function GateCard() {
           <div>{e.size} {e.armed ? 'armed' : 'unarmed'} · walls {Math.round(p.barrier)}% · {Math.round(p.detection)}% chance we see them coming{p.bunker ? ' · bunker to hide in' : p.safeRoom ? ' · safe room' : ''}</div>
           {odds && <div>If you fight: you hold {inTen(odds.win)} · someone of yours killed or taken {inTen(odds.loseSomeone)}</div>}
           {odds && (() => { const d = doorHoldLine(g.game); return d ? <div style={{ opacity: 0.85 }}>{d}</div> : null; })()}
+          {odds && (() => { const dl = deterLine(deterrence(g.game, p), odds.turnBack ?? 0); return dl ? <div data-testid="deter-line" style={{ opacity: 0.85 }}>{dl}</div> : null; })()}
           {e.stances.includes('hide') && <div>If you hide: they find the place lived in {inTen(hideFoundChance(g.game, e, p))}, and strip it</div>}
-          {e.stances.includes('hide') && p.bunker && (() => { const hp = hidePreview(g.game, e, hideFoundChance(g.game, e, p)); return <div data-testid="hide-cost" style={{ margin: '8px 0 2px', padding: '7px 10px', border: '1px solid rgba(216,201,160,0.3)', borderRadius: 8, display: 'flex', flexDirection: 'column', gap: 4, opacity: 0.95 }}>
+          {e.stances.includes('hide') && p.bunker && (() => { const hp = hidePreview(g.game, e, hideFoundChance(g.game, e, p)); return <div data-testid="hide-cost" style={{ margin: '8px 0 2px', padding: '7px 10px', border: '1px solid rgba(216,201,160,0.3)', borderRadius: 8, display: 'flex', flexDirection: 'column', flexShrink: 0, gap: 4, opacity: 0.95, overflow: 'visible', lineHeight: 1.35 }}>
             <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.65, textTransform: 'uppercase' }}>If you hide in the bunker</div>
             <div>{hp.costLine}.</div><div style={hp.viable ? undefined : { color: '#e0a090' }}>{hp.daysLine}.</div><div>{hp.riskLine}.</div><div>{hp.foundLine}.</div>
           </div>; })()}

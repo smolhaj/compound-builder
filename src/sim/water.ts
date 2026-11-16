@@ -31,6 +31,7 @@
  *               half of each able adult's chore time (half an hour for a
  *               teenager).
  */
+import { pumpSeizeK } from './richSinks';
 import type { GameState } from './state';
 import { mulberry32 } from './rng';
 import { gallonsText } from './units';
@@ -109,7 +110,7 @@ export function waterDay(s: GameState): string[] {
   const well = s.structures.some(x => (x.kind === 'well_drilled' || x.kind === 'well_hand') && x.stage >= 5);
   if (well && !u.hauling && s.site.gwQuality === 'arsenic' && s.stock.ro_system < 1) for (const ps of living) ps.needs.health -= 0.01;
   // hard water scales the pump (a softener stops it)
-  if (well && s.site.gwQuality === 'hard' && s.stock.softener < 1 && r() < 1 / 1400) {
+  if (well && s.site.gwQuality === 'hard' && s.stock.softener < 1 && r() < 1 / (1400 * pumpSeizeK(s))) {
     const pump = s.structures.find(x => x.kind === 'well_drilled' && x.stage >= 5);
     if (pump && !u.broken.includes(pump.id)) { u.broken.push(pump.id); out.push('Scale from the hard water seized the well pump.'); }
   }

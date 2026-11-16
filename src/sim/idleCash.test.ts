@@ -90,7 +90,7 @@ describe('idle cash with no project open', () => {
   it('offers to stake the next project: a home that sleeps everyone first, then water, food, power', () => {
     const g = fresh(900_000);
     const first = idleCash(g)!.stake!;
-    expect(['cottage', 'timber_cabin', 'log_house']).toContain(first.kind);
+    expect(['modular_home', 'cottage', 'timber_cabin', 'log_house']).toContain(first.kind);
     const card = suggestions(g, 8).find(x => x.id === 'idle_cash')!;
     expect(card.acts!.some(a => a.act.type === 'stake' && a.act.kind === first.kind)).toBe(true);
     // the home done: water is next

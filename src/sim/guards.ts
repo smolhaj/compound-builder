@@ -75,7 +75,7 @@ export interface Guards {
 }
 export const newGuards = (): Guards => ({ staff: [], days: 0, paid: 0, collapseDays: 0, lastQuit: null });
 
-export const MAX_GUARDS = 3;
+export const MAX_GUARDS = 6;
 export const GUARD_MONTH = 5200;
 /** $ per guard per day. */
 export const GUARD_DAY = Math.round(GUARD_MONTH * 12 / 365);
