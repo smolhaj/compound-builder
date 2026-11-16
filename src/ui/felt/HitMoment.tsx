@@ -57,7 +57,7 @@ export function HitMoment() {
           ? <div style={{ fontSize: 'clamp(24px, 4vw, 44px)', fontWeight: 700, lineHeight: 1.15 }} data-testid="hit-title">{f.title}</div>
           : <div style={{ fontSize: 'clamp(16px, 2.2vw, 24px)', fontStyle: 'italic', minHeight: 30 }} data-testid="hit-caption">{f.caption}</div>}
       </div>
-      <div style={{ position: 'absolute', right: 14, bottom: `calc(${bar}% + 8px)`, fontSize: 11, fontFamily: 'system-ui, sans-serif', color: '#f1ebdb', opacity: 0.6, pointerEvents: 'none' }}>Click or press any key to skip</div>
+      <div style={{ position: 'absolute', right: 14, top: 8, fontSize: 11, fontFamily: 'system-ui, sans-serif', color: '#f1ebdb', opacity: 0.6, pointerEvents: 'none' }}>Click or press any key to skip</div>
     </div>
   );
 }
