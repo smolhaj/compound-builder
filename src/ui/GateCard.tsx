@@ -9,6 +9,7 @@ import { AFTERMATH_TEXT, SURRENDER_TEXT, aftermathHeads } from '../sim/aftermath
 import { canPay, DOUBLE_CROSS } from '../sim/rescue';
 import type { Caliber } from '../sim/armory';
 import { STANCE } from './stanceText';
+import { extraKicker, fxStanceLabels } from '../sim/disasterFx';
 import { ArrivalHousing } from './HousingPanel';
 import { vetting } from '../sim/ringFallback';
 import { canChoose, catchChance, vetDetail, vetLine, VET_POLICIES, type VetPolicy } from '../sim/gateVetting';
@@ -104,12 +105,13 @@ export function GateCard() {
     const p = postureOf(g.game);
     // honest odds: the battle sim itself, a couple of dozen times (cached per encounter)
     const odds = e.strength > 0 && e.kind !== 'break_in' && e.stances.includes('defend') ? fightOdds(g.game, e) : null;
-    const label = (st: Stance) => (e.kind === 'kin' && st === 'take_in' && defaultStay(g.game, e) === 'player_build' && STANCE.build_first) || (e.ransom && RANSOM[st]) || (e.kind === 'trial_end' && TRIAL_END[st]) || (e.kind === 'shelter' && SHELTER[st]) || (e.kind === 'guard_stay' && GUARD_STAY[st]) || (e.kind === 'insider' && INSIDER_CARD[st]) || STANCE[st];
+    const extraLabels = fxStanceLabels(g.game, e);   // (an extra kind's buttons with odds and costs, sim/disasters/<kind>.ts)
+    const label = (st: Stance) => (extraLabels?.[st]) || (e.kind === 'kin' && st === 'take_in' && defaultStay(g.game, e) === 'player_build' && STANCE.build_first) || (e.ransom && RANSOM[st]) || (e.kind === 'trial_end' && TRIAL_END[st]) || (e.kind === 'shelter' && SHELTER[st]) || (e.kind === 'guard_stay' && GUARD_STAY[st]) || (e.kind === 'insider' && INSIDER_CARD[st]) || STANCE[st];
     const picked = cut ? cut.stance ?? defaultStance(e.stances, p) : null;
     return (
       <div style={cut ? raidBox : box}>
         <div data-testid={cut ? 'raid-card-scroll' : undefined} style={cut ? { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', paddingRight: 4 } : undefined}>
-        <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>{e.kind === 'break_in' ? 'In the night' : e.kind === 'ransom' ? 'Word about your child' : e.kind === 'trial_end' ? 'The camp outside the wall' : e.kind === 'guard_stay' ? 'The guard asks to stay' : e.kind === 'insider' ? 'Someone on the inside' : e.kind === 'kin' ? 'Family' : e.kind === 'shelter' ? 'Neighbors at the door' : e.kind === 'move_in' ? (e.title.startsWith('Time') ? 'The warning signs' : 'A decision') : e.kind === 'stranded' ? 'Caught in town' : e.neighbor ? 'A neighbor at the gate' : 'At the gate'}</div>
+        <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>{extraKicker(e.kind) ?? (e.kind === 'break_in' ? 'In the night' : e.kind === 'ransom' ? 'Word about your child' : e.kind === 'trial_end' ? 'The camp outside the wall' : e.kind === 'guard_stay' ? 'The guard asks to stay' : e.kind === 'insider' ? 'Someone on the inside' : e.kind === 'kin' ? 'Family' : e.kind === 'shelter' ? 'Neighbors at the door' : e.kind === 'move_in' ? (e.title.startsWith('Time') ? 'The warning signs' : 'A decision') : e.kind === 'stranded' ? 'Caught in town' : e.neighbor ? 'A neighbor at the gate' : 'At the gate')}</div>
         <div style={{ fontSize: 19, fontWeight: 700, margin: '2px 0 8px' }}>{e.title}</div>
         <Dossier e={e} />
         {e.kind === 'arrival' && (() => { const v = vetting(g.game).line; return v ? <div style={{ marginBottom: 4, opacity: 0.8, fontStyle: 'italic' }}>{v}</div> : null; })()}
