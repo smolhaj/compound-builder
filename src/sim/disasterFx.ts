@@ -13,7 +13,7 @@
  * column in `legacy` (behaviour that predates the seam and still lives in another file; the note says where).
  */
 import type { DisasterKind, Track } from './disaster';
-import type { EncounterKind, Posture } from './encounters';
+import type { Encounter, EncounterKind, Outcome, Posture, Stance } from './encounters';
 import type { GameState, Structure } from './state';
 import type { CollapseLook } from './collapseLook';
 import { mulberry32 } from './rng';
@@ -49,6 +49,27 @@ export interface FxCtx { day: number; r: () => number; once: (key: string) => bo
 /** The weights `whoComes` rolls over; a hook edits them with `scale` / pushes new ones (kinds beyond EncounterKind need WP3/WP4's own union). */
 export interface EncounterMix { w: Array<[EncounterKind, number]>; p: Posture; scale: (kind: EncounterKind, f: number) => void }
 
+/**
+ * Encounter kinds a disaster adds without touching the `EncounterKind` union (WP3 rule; later packages append their own). An extra kind
+ * rides in `Encounter.kind` cast by `asKind`; the kind's `makeExtra` builds the card, `resolveExtra` answers a stance (null: let the
+ * generic threat path fight it, after setting `e.kind` to a base crew kind), `stanceLabels` words the buttons with odds and costs.
+ */
+export type ExtraEncounterKind = 'tollkeeper' | 'posse' | 'watch_pact' | 'salvage' | 'deserters' | 'checkpoint_stop' | 'quota' | 'draft_notice'
+  | 'fugitive' | 'partisan' | 'informant' | 'lost_soldier' | 'reprisal';
+/** The header line over the card (GateCard) and whether the kind plays as a raid cutscene (hostile, fought at the wall). */
+export const EXTRA_META: Record<ExtraEncounterKind, { kicker: string; raid?: true }> = {
+  tollkeeper: { kicker: 'A toll on the county road' }, posse: { kicker: 'The posse comes to collect' }, watch_pact: { kicker: 'The watch committee' }, salvage: { kicker: 'An empty house on the road' },
+  deserters: { kicker: 'Armed men off the line', raid: true }, checkpoint_stop: { kicker: 'A checkpoint on the county road' }, quota: { kicker: 'A requisition order' }, draft_notice: { kicker: 'A notice with your name on it' },
+  fugitive: { kicker: 'Someone running from the war' }, partisan: { kicker: 'Night visitors' }, informant: { kicker: 'A neighbor with questions' }, lost_soldier: { kicker: 'A soldier at the gate, alone' }, reprisal: { kicker: 'The punitive column', raid: true },
+};
+export const isExtraKind = (k: string): k is ExtraEncounterKind => Object.prototype.hasOwnProperty.call(EXTRA_META, k);
+/** The header over a card for an extra kind (null for any other kind). */
+export const extraKicker = (k: string): string | null => (isExtraKind(k) ? EXTRA_META[k].kicker : null);
+/** An extra kind that is a raid (plays as a cutscene, fought at the wall). */
+export const isExtraRaid = (k: string): boolean => isExtraKind(k) && !!EXTRA_META[k].raid;
+/** Put an extra kind in an `Encounter` or an encounter mix. */
+export const asKind = (k: ExtraEncounterKind): EncounterKind => k as unknown as EncounterKind;
+
 /** What a hit does to one finished building (see structureDamage.ts for the shared roll). */
 export interface StructureHit { structure: Structure; day: number; r: () => number }
 
@@ -69,6 +90,12 @@ export interface KindFx {
   supplyMods?(s: GameState): { grow?: number; cold?: number };
   /** encounters: edit the mix of who comes to the gate (scale existing weights, push new ones). */
   encounterWeights?(s: GameState, mix: EncounterMix): void;
+  /** encounters: build the card for one of this kind's extra encounter kinds (null: not mine). */
+  makeExtra?(s: GameState, kind: ExtraEncounterKind, r: () => number, id: string, day: number): Encounter | null;
+  /** encounters: answer a stance on one of its extra kinds. Null: fall through to the generic threat path (after setting `e.kind` to a base crew kind). */
+  resolveExtra?(s: GameState, e: Encounter, stance: Stance): Outcome | null;
+  /** encounters: the buttons for an extra kind, worded with odds and costs (GateCard). */
+  stanceLabels?(s: GameState, e: Encounter): Partial<Record<Stance, [string, string]>> | null;
   /** npcs: a multiplier on how hard life is for neighbors (neighborLife.hardship; 1 = none). */
   npcMods?(s: GameState): number;
   /** buildings: roll damage on the finished buildings (use structureDamage.ts). Called on the hit day and each day after; gate with ctx.once. */
@@ -122,6 +149,9 @@ export const fxNpcMod = (s: GameState): number => after(s)?.npcMods?.(s) ?? 1;
 export const fxMedical = (s: GameState): { contact: number; spread: number } => after(s)?.medical?.(s) ?? { contact: 0, spread: 0 };
 export const fxSupplyMods = (s: GameState): { grow: number; cold: number } => { const m = after(s)?.supplyMods?.(s); return { grow: m?.grow ?? 1, cold: m?.cold ?? 0 }; };
 export const fxRadio = (s: GameState, ctx: FxCtx) => after(s)?.radioBulletins?.(s, ctx) ?? null;
+export const fxMakeExtra = (s: GameState, kind: string, r: () => number, id: string, day: number): Encounter | null => (isExtraKind(kind) ? active(s)?.makeExtra?.(s, kind, r, id, day) ?? null : null);
+export const fxResolveExtra = (s: GameState, e: Encounter, stance: Stance): Outcome | null => (isExtraKind(e.kind) ? active(s)?.resolveExtra?.(s, e, stance) ?? null : null);
+export const fxStanceLabels = (s: GameState, e: Encounter): Partial<Record<Stance, [string, string]>> | null => (isExtraKind(e.kind) ? active(s)?.stanceLabels?.(s, e) ?? null : null);
 export const fxOasis = (s: GameState): number => active(s)?.oasisWeight?.(s) ?? 0;
 
 /** Apply the kind's service multipliers to the live tracks (call after updateDisaster). */

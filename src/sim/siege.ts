@@ -27,6 +27,7 @@ import { log } from './economy';
 import type { Battle, BattleEvent, BattleUnit } from './battleTypes';
 import { planBattle, type RaiderTemper } from './battle';
 import { ORGANIZED, type Encounter, type EncounterKind, type Stance } from './encounters';
+import { isExtraRaid } from './disasterFx';
 import { isFinished } from './construction';
 import { isHome } from './blueprints';
 import { mulberry32 } from './rng';
@@ -48,7 +49,7 @@ export function hasCutscene(e: Pick<Encounter, 'kind' | 'strength' | 'stances'> 
 
 /** An encounter that plays as a raid: an armed (or dead) crew at the gate that can be fought. */
 export function isRaid(e: Pick<Encounter, 'kind' | 'strength' | 'stances'> | null | undefined): boolean {
-  return !!e && RAID_KINDS.has(e.kind) && e.strength > 0 && e.stances.includes('defend');
+  return !!e && (RAID_KINDS.has(e.kind) || isExtraRaid(e.kind)) && e.strength > 0 && e.stances.includes('defend');
 }
 
 /** Windows of the day [from, to) in hours, with weights, by kind. */

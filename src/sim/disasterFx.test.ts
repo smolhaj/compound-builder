@@ -30,8 +30,8 @@ describe('the per-kind hook seam', () => {
     const p = { visibility: 50, fortress: 40 } as never;
     const mix = (k: DisasterKind) => { const g = hit(k); const w: Array<[EncounterKind, number]> = [['arrival', 30], ['refugees', 12], ['looters', 10], ['requisition', 10], ['trader', 10]]; fxEncounterWeights(g, w, p); return Object.fromEntries(w); };
     expect(mix('zombies')).toMatchObject({ horde: 60, trader: 2, refugees: 6, requisition: 0 });
-    expect(mix('invasion')).toMatchObject({ patrol: 40, requisition: 0 });
-    expect(mix('civil_war').militia).toBeCloseTo(35 * (0.4 + 0.4 + 50 / 150));
+    expect(mix('invasion')).toMatchObject({ patrol: 20 * (0.5 + 50 / 100), requisition: 0 });   // (WP3: the occupation's patrol weight)
+    expect(mix('civil_war').militia).toBeCloseTo(25 * (0.4 + 0.4 + 50 / 150), 0);   // 25 at the hit, falling to 10 by month 6
     expect(mix('drought')).toMatchObject({ refugees: 12 * 1.6, looters: 13 });
     expect(mix('grid_down')).toMatchObject({ arrival: 30, trader: 10 });
   });
