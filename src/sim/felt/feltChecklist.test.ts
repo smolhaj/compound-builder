@@ -12,7 +12,7 @@ import type { FeltKind } from './types';
 export const FELT_ENFORCE: FeltKind[] = [];
 
 /** What each kind passes today (the teeth item mirrors disasterTeeth's columnsOf >= 4). Raise, never lower. */
-const BASELINE: Partial<Record<FeltKind, FeltItem[]>> = { lawless: ['teeth'], drought: ['teeth'], pandemic: ['teeth'], nuclear: ['teeth'], ash_winter: ['teeth'], zombies: ['teeth'], invasion: ['teeth'], civil_war: ['teeth'], bioweapon: ['teeth'], crop_blight: ['teeth'], livestock_plague: ['teeth'] };
+const BASELINE: Partial<Record<FeltKind, FeltItem[]>> = { grid_down: ['teeth', 'radio', 'cards', 'goals'], financial: ['teeth', 'radio', 'cards', 'goals'], lawless: ['teeth', 'radio'], drought: ['teeth', 'radio'], pandemic: ['teeth', 'radio'], nuclear: ['teeth', 'radio'], solar_flare: ['teeth', 'radio', 'cards', 'goals'], wildfire: ['radio'], ash_winter: ['teeth', 'radio'], cyberattack: ['teeth', 'radio', 'cards', 'goals'], zombies: ['teeth', 'radio'], invasion: ['teeth', 'radio'], civil_war: ['teeth', 'radio'], bioweapon: ['teeth', 'radio'], asteroid: ['radio'], unknown: ['radio'], emp: ['teeth', 'radio', 'cards', 'goals'], mega_quake: ['radio'], crop_blight: ['teeth', 'radio'], dam_flood: ['radio'], supervolcano: ['radio'], livestock_plague: ['teeth', 'radio'], satellite_loss: ['radio'], oil_shock: ['radio'], reactor_meltdown: ['radio'], global_famine: ['radio'], water_war: ['radio'], cult_takeover: ['radio'], mass_exodus: ['radio'] };
 
 describe('felt checklist', () => {
   it('never loses an item the baseline records, and the baseline is exact today', () => {
