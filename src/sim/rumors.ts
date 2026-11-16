@@ -13,6 +13,7 @@ import { log } from './economy';
 import { mulberry32 } from './rng';
 import { dayIndex, type GameState } from './state';
 import type { Heard, RadioState } from './radio';
+import { evalClaim } from './felt/claims';
 
 const radioOf = (s: GameState): RadioState => (s.radio ??= { warnedUntil: -1, bonus: 0, truths: 0, rumors: 0 });
 
@@ -70,6 +71,8 @@ export function scoutDay(s: GameState): string[] {
     out.push(`${p.first} couldn't tell: nobody to ask and nothing to see. The rumor is still a rumor.`);
     return out;
   }
+  // FL3: a line that made a checkable claim is settled by the world as it is when the scout is back, not by a label
+  if (h.claim) h.truth = evalClaim(s, h.claim);
   if (h.truth) {
     h.status = 'confirmed';
     out.push(`${p.first} confirms it: ${h.text.replace(/^[^:]*:\s*/, '')}`);
