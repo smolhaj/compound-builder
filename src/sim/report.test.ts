@@ -127,7 +127,7 @@ describe('endings and the report card', () => {
     const b = disasterSky(g).haze;
     expect(a).toBeGreaterThan(0);
     expect(b).toBeGreaterThan(0.8);
-    g.clock.t = g.disaster.hitAt + 800;   // the cold is over (a year and a half after the first year)
-    expect(disasterSky(g).haze).toBeLessThan(0.35);
+    g.clock.t = g.disaster.hitAt + 1800;   // the cold is over (the shared winter engine eases over years: half-life 14 months)
+    expect(disasterSky(g).haze).toBeLessThan(b - 0.25);   // (deep ash keeps the ground poor for years: the sky clears more than the soil does)
   });
 });

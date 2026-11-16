@@ -70,6 +70,7 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
     variants: [
       { id: 'ice_storm', name: 'an ice storm', weight: 3, curves: { grid: C(0, 0, 0, [7, 30]), fuel: C(0, 0, 0.1, [8, 32]), stores: C(1, 3, 0.1, [10, 35]), deliveries: C(0, 1, 0, [10, 35]), medical: C(4, 4, 0.3, [10, 35]), law: C(14, 16, 0.4, [12, 34]), phone: C(1, 1, 0.1, [8, 30]), banks: C(0, 1, 0.2, [8, 31]) } },
       { id: 'substation', name: 'a coordinated substation attack', weight: 2, curves: { grid: C(0, 0, 0, [30, 120]), fuel: C(0, 0, 0.05, [32, 125]), stores: C(1, 3, 0.05, [35, 130]), deliveries: C(0, 1, 0, [35, 130]), medical: C(4, 6, 0.2, [35, 130]), law: C(14, 30, 0.15, [40, 140], 21), phone: C(1, 1, 0.1, [31, 122]), banks: C(0, 1, 0, [33, 125]) } },
+      { id: 'transformer_shortage', name: 'cooked transformers that cannot be replaced for years', weight: 1, curves: { grid: C(0, 0, 0, [180, 730], 120), fuel: C(0, 0, 0.05, [200, 740], 90), stores: C(1, 4, 0.05, [210, 750], 90), deliveries: C(0, 1, 0, [210, 750], 90), medical: C(4, 10, 0.1, [210, 750]), law: C(10, 20, 0.2, [240, 760]), phone: C(0, 3, 0, [200, 740], 60), banks: C(2, 6, 0.1, [200, 740], 60) } },
       { id: 'cyber', name: 'a cyberattack on the grid', weight: 2, curves: { grid: C(0, 0, 0.1, [14, 90], 30), fuel: C(0, 0, 0.1, [16, 92], 20), stores: C(1, 3, 0.1, [18, 95]), deliveries: C(0, 2, 0, [18, 95]), medical: C(4, 6, 0.3, [18, 95]), law: C(14, 20, 0.3, [20, 100], 21), phone: C(0, 1, 0.2, [15, 91]), banks: C(0, 0, 0, [20, 100], 14) } },
       { id: 'cascade', name: 'a cascading failure of the old grid', weight: 1, curves: { grid: C(0, 0, 0, [60, 365], 45), fuel: C(0, 0, 0.05, [62, 368]), stores: C(1, 3, 0.05, [65, 370]), deliveries: C(0, 1, 0, [65, 370]), medical: C(4, 10, 0.15, [65, 370]), law: C(14, 40, 0.1, [70, 380], 30), phone: C(1, 2, 0.05, [61, 366]), banks: C(0, 1, 0, [64, 370]) } },
     ],
@@ -142,7 +143,9 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
   solar_flare: {
     kind: 'solar_flare', name: 'Solar flare (Carrington event)', pulpy: false, warn: [1, 3],
     variants: [
-      { id: 'carrington', name: 'a Carrington-class solar storm', weight: 1, curves: { grid: C(0, 0, 0, [240, 730], 90), phone: C(0, 1, 0.1, [60, 240], 60), fuel: C(0, 1, 0.1, [250, 740], 60), stores: C(2, 4, 0.1, [250, 740], 60), deliveries: C(0, 2, 0.05, [250, 740], 60), medical: C(5, 10, 0.2, [250, 740], 60), banks: C(0, 1, 0.05, [250, 740], 60), law: C(20, 40, 0.15, [260, 760], 60) } },
+      { id: 'g4', name: 'a strong (G4) geomagnetic storm', weight: 3, curves: { grid: C(0, 0, 0.1, [10, 60], 20), phone: C(0, 2, 0.2, [3, 30], 10), fuel: C(0, 2, 0.3, [12, 62], 20), stores: C(3, 5, 0.3, [14, 65], 20), deliveries: C(2, 4, 0.3, [14, 65], 20), medical: C(6, 8, 0.5, [14, 65], 20), banks: C(1, 3, 0.2, [5, 40], 10), law: C(35, 30, 0.6, [20, 70], 20) } },
+      { id: 'near_miss', name: 'an aurora storm that missed the grid', weight: 1, curves: { phone: C(0, 1, 0.7, [1, 3], 1) } },
+      { id: 'carrington', name: 'a Carrington-class solar storm', weight: 3, curves: { grid: C(0, 0, 0, [240, 730], 90), phone: C(0, 1, 0.1, [60, 240], 60), fuel: C(0, 1, 0.1, [250, 740], 60), stores: C(2, 4, 0.1, [250, 740], 60), deliveries: C(0, 2, 0.05, [250, 740], 60), medical: C(5, 10, 0.2, [250, 740], 60), banks: C(0, 1, 0.05, [250, 740], 60), law: C(20, 40, 0.15, [260, 760], 60) } },
     ],
     hints: [['Space weather service: an X-class flare.', 'Aurora forecast as far south as Texas.'], ['A coronal mass ejection is on its way: 18–36 hours.', 'The grid operator asks people to unplug what they can.'], ['The northern lights are bright red, straight overhead.', 'Radio full of static.']],
     hit: ['The aurora fills the sky; transformers across the continent are burning. The grid is gone.'],
@@ -169,7 +172,10 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
   cyberattack: {
     kind: 'cyberattack', name: 'Cyberattack on infrastructure', pulpy: false, warn: [5, 20],
     variants: [
-      { id: 'rolling', name: 'a coordinated cyberattack', weight: 1, curves: { grid: C(0, 0, 0.3, [10, 60], 40), banks: C(0, 0, 0, [14, 90], 30), phone: C(0, 1, 0.3, [7, 45], 20), fuel: C(0, 1, 0.3, [10, 60], 30), deliveries: C(1, 5, 0.3, [15, 70], 30), stores: C(2, 6, 0.3, [15, 70], 30), medical: C(2, 7, 0.5, [15, 70], 30), law: C(14, 30, 0.5, [30, 100], 30) } },
+      { id: 'payments_and_pipeline', name: 'a payments and pipeline attack', weight: 3, curves: { grid: C(0, 0, 0.8, [7, 30], 10), fuel: C(0, 3, 0.3, [7, 45], 20), stores: C(2, 6, 0.5, [10, 50], 20), deliveries: C(1, 5, 0.5, [10, 50], 20), medical: C(3, 6, 0.7, [10, 50], 20), law: C(20, 30, 0.7, [20, 60], 20), phone: C(0, 2, 0.5, [5, 30], 10), banks: C(0, 0, 0, [10, 60], 20) } },
+      { id: 'grid_and_water', name: 'an attack on the grid and the water plants', weight: 2, curves: { grid: C(0, 0, 0.1, [14, 120], 30), fuel: C(0, 2, 0.1, [16, 125], 30), stores: C(1, 4, 0.2, [20, 130], 30), deliveries: C(0, 2, 0.2, [20, 130], 30), medical: C(3, 8, 0.25, [20, 130], 30), law: C(10, 25, 0.4, [30, 140], 30), phone: C(0, 2, 0.3, [10, 100], 30), banks: C(0, 0, 0, [14, 120], 30) } },
+      { id: 'wiper', name: 'a wiper that bricked the controllers', weight: 1, curves: { grid: C(0, 0, 0.9, null, 30), fuel: C(0, 0, 0.8, [7, 30], 20), stores: C(2, 5, 0.5, [20, 90], 30), deliveries: C(0, 2, 0.3, [20, 90], 30), medical: C(1, 4, 0.6, [20, 90], 30), phone: C(0, 1, 0.7, [5, 40], 20), banks: C(0, 0, 0, [20, 100], 30) } },
+      { id: 'rolling', name: 'a coordinated cyberattack', weight: 6, curves: { grid: C(0, 0, 0.3, [10, 60], 40), banks: C(0, 0, 0, [14, 90], 30), phone: C(0, 1, 0.3, [7, 45], 20), fuel: C(0, 1, 0.3, [10, 60], 30), deliveries: C(1, 5, 0.3, [15, 70], 30), stores: C(2, 6, 0.3, [15, 70], 30), medical: C(2, 7, 0.5, [15, 70], 30), law: C(14, 30, 0.5, [30, 100], 30) } },
     ],
     hints: [['A ransomware attack shuts a pipeline for a week.', 'Bank apps down "for maintenance" in three states.'], ['The water utility in the city reports "anomalies".', 'Gas stations can\'t take cards.'], ['The power flickers off and on across the region.', 'Phones show "No Service" for an hour.']],
     hit: ['Everything digital stops at once: the grid, the banks, the phones. A cyberattack.'],
@@ -232,7 +238,8 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
   // ── placeholders for the owner-chosen scenarios (WP0): minimal curves on the collapse clock, selectable; their packages add the teeth ──
   emp: {
     kind: 'emp', name: 'High-altitude EMP', pulpy: false, warn: [1, 3],
-    variants: [{ id: 'flash', name: 'a high-altitude burst', weight: 1, curves: { grid: C(0, 0, 0, null), phone: C(0, 0, 0, null), banks: C(0, 0, 0, null), fuel: C(0, 1, 0, null), deliveries: C(0, 1, 0, null), stores: C(0, 2, 0.05, null), medical: C(0, 2, 0.1, null), law: C(3, 20, 0.1, null) } }],
+    variants: [{ id: 'flash', name: 'a high-altitude burst (continental)', weight: 3, curves: { grid: C(0, 0, 0, null), phone: C(0, 0, 0, null), banks: C(0, 0, 0, null), fuel: C(0, 1, 0, null), deliveries: C(0, 1, 0, null), stores: C(0, 2, 0.05, null), medical: C(0, 2, 0.1, null), law: C(3, 20, 0.1, null) } },
+      { id: 'local_burst', name: 'a high-altitude burst over one region', weight: 2, curves: { grid: C(0, 0, 0.1, [60, 365], 60), fuel: C(0, 0, 0.1, [90, 400], 60), stores: C(1, 4, 0.15, [90, 400], 60), deliveries: C(0, 2, 0.1, [90, 400], 60), medical: C(1, 6, 0.15, [120, 400], 60), law: C(7, 20, 0.3, [150, 450], 60), phone: C(0, 0, 0, [120, 400], 60), banks: C(0, 0, 0, [120, 400], 60) } }],
     hints: [['Officials warn of a possible high-altitude test over the Pacific.'], ['A strange light on the horizon at dawn, then nothing on the radio.'], ['The grid has been flickering for an hour.']],
     hit: ['One bright flash at dawn, and every modern machine in the valley is dead.'],
     chain: [],

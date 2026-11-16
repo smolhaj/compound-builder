@@ -1,6 +1,6 @@
-import type { KindFx } from '../disasterFx';
+import { makeAshFx } from './ashShared';
+import { ASH_WINTER_OPTS } from '../ashState';
 
-/** Supervolcano / ash winter (WP6). (stub: no behavior of its own yet; see docs/DISASTER_TEETH.md and the PR for the package that owns this file). */
-export const fx: KindFx = {
-  legacy: { economy: 'finance.ts: the market crash (35%)', supplies: 'effects.ts climate(): growing season to a quarter for a year; wildfood', npcs: 'neighborLife: refugee flow 2x', atmosphere: 'collapseLook: ash, dim sun, cold', buildings: 'effects.ts: ash_roofs one-time roof collapse' },
-};
+/** Ash winter (the Yellowstone eruption): the ashfall phase with a daily roof-load clock, then the volcanic winter on the shared engine (sim/winter.ts). */
+export { ASH_WINTER_OPTS };
+export const fx = makeAshFx(ASH_WINTER_OPTS);

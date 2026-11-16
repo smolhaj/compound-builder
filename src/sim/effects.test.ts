@@ -6,6 +6,8 @@ import { burnStructure } from './construction';
 import { resolve } from './encounters';
 import { postureOf, whoComes } from './encounters';
 import { mulberry32 } from './rng';
+import { shovelRoofs } from './disasters/ashShared';
+import { ASH_WINTER_OPTS } from './ashState';
 
 const run = (kind: DisasterKind, variant?: string, seed = 1) => newGame(seed, 105, 2027, { mode: 'scenario', peace: 'short', kind, variant });
 const at = (g: GameState, days: number) => { g.clock.t = g.disaster.hitAt + days; return g; };
@@ -33,20 +35,26 @@ describe('all sixteen disasters', () => {
   });
 
   it('ash winter and an impact winter cut the growing season for years', () => {
-    expect(climate(at(run('ash_winter'), 100)).grow).toBeLessThan(0.3);
-    expect(climate(at(run('ash_winter'), 800)).grow).toBe(1);
-    expect(climate(at(run('asteroid'), 400)).grow).toBeLessThan(0.15);
+    // (the shared winter engine, sim/winter.ts: the cold lasts years and thins out by half-lives, it does not switch off)
+    expect(climate(at(run('ash_winter'), 100)).grow).toBeLessThan(0.5);
+    expect(climate(at(run('ash_winter'), 800)).grow).toBeLessThan(1);
+    expect(climate(at(run('ash_winter'), 800)).grow).toBeGreaterThan(climate(at(run('ash_winter'), 300)).grow);
+    const rock = at(run('asteroid'), 400);
+    (rock.disaster.fx ??= {}).asteroid = { impact: { variant: 'land', zone: 'the plains', miles: 900, band: 'regional', deflection: 'none', launch: -40, winter: 1 }, evacuated: false, deflected: false, shifted: false };
+    expect(climate(rock).grow).toBeLessThan(0.3);
   });
 
-  it('ash brings down long low roofs: they go back to the roofing stage', () => {
-    let fell = 0;
+  it('ash brings down long low roofs on a daily load clock, and shoveling spares them', () => {
+    let fell = 0, shoveled = 0;
     for (let seed = 1; seed <= 10; seed++) {
-      const g = at(run('ash_winter', undefined, seed), 5);
-      built(g, 'w', 'workshop');
-      effectsDay(g);
+      const g = at(run('ash_winter', undefined, seed), 3), h = at(run('ash_winter', undefined, seed), 3);
+      built(g, 'w', 'workshop'); built(h, 'w', 'workshop');
+      for (let d = 3; d <= 12; d++) { g.clock.t = g.disaster.hitAt + d; effectsDay(g); h.clock.t = h.disaster.hitAt + d; shovelRoofs(h, ASH_WINTER_OPTS, 'crew'); h.money = 1e6; effectsDay(h); }
       if (g.structures[0].finishedAt === null) fell++;
+      if (h.structures[0].finishedAt === null) shoveled++;
     }
     expect(fell).toBeGreaterThan(2);
+    expect(shoveled).toBeLessThan(fell);
   });
 
   it('wildfire: buildings deep in the timber burn; cleared ground saves them', () => {

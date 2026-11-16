@@ -76,7 +76,7 @@ describe('scheduling', () => {
       g.clock.t = g.disaster.hitAt + d;
       feltCards(g, ctx(g), feltSpec('grid_down')!);
       const p = feltOf(g)?.cards.pending;
-      if (p) { seen.push(p.id); expect(answerCard(g, p.id, cardsFor('grid_down').find(c => c.id === p.id)!.fallback)).toHaveProperty('lines'); }
+      if (p) { seen.push(p.id); expect(answerCard(g, p.id, cardsFor('grid_down', feltSpec('grid_down')).find(c => c.id === p.id)!.fallback)).toHaveProperty('lines'); }
     }
     expect(seen.length).toBeGreaterThanOrEqual(1);
     expect(seen.length).toBeLessThanOrEqual(PHASE_BUDGET);
@@ -105,7 +105,7 @@ describe('scheduling', () => {
   it('a card left too long takes its safe fallback and says so; Cozy waits longer than Hardcore', () => {
     const g = at('grid_down', 0);
     feltCards(g, ctx(g), feltSpec('grid_down')!);
-    const p = feltOf(g)!.cards.pending!, c = cardsFor('grid_down').find(x => x.id === p.id)!;
+    const p = feltOf(g)!.cards.pending!, c = cardsFor('grid_down', feltSpec('grid_down')).find(x => x.id === p.id)!;
     const cozy = structuredClone(g), hard = structuredClone(g);
     cozy.disaster.difficulty = 'cozy'; hard.disaster.difficulty = 'hardcore';
     expect(timeoutDays(cozy, c)).toBeGreaterThan(timeoutDays(hard, c));
@@ -117,7 +117,7 @@ describe('scheduling', () => {
   });
   it('is cheap: 365 simulated days cost well under 5 ms a day', () => {
     const g = at('grid_down', 0), t0 = performance.now();
-    for (let d = 0; d < 365; d++) { g.clock.t = g.disaster.hitAt + d; feltCards(g, ctx(g), feltSpec('grid_down')!); const p = feltOf(g)?.cards.pending; if (p) answerCard(g, p.id, cardsFor('grid_down').find(c => c.id === p.id)!.fallback); }
+    for (let d = 0; d < 365; d++) { g.clock.t = g.disaster.hitAt + d; feltCards(g, ctx(g), feltSpec('grid_down')!); const p = feltOf(g)?.cards.pending; if (p) answerCard(g, p.id, cardsFor('grid_down', feltSpec('grid_down')).find(c => c.id === p.id)!.fallback); }
     expect((performance.now() - t0) / 365).toBeLessThan(5);
   });
 });
@@ -169,7 +169,7 @@ describe('answering changes real state', () => {
     structuredClone(a.g);
   });
   it('Cozy makes the bad branch less likely than Hardcore', () => {
-    const c = cardsFor('grid_down').find(x => x.id.endsWith('first_night'))!, o = c.options.find(x => x.id === 'scavenge')!;
+    const c = cardsFor('grid_down', feltSpec('grid_down')).find(x => x.id.endsWith('first_night'))!, o = c.options.find(x => x.id === 'scavenge')!;
     const cozy = at('grid_down', 2), hard = at('grid_down', 2);
     cozy.disaster.difficulty = 'cozy'; hard.disaster.difficulty = 'hardcore';
     expect(o.odds!(cozy).p).toBeGreaterThan(o.odds!(hard).p);
