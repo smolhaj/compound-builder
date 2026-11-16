@@ -23,27 +23,18 @@ const BASELINE: Record<DisasterKind, FxColumn[]> = {
   pandemic: ['economy', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'medical', 'media'],
   solar_flare: ['economy', 'encounters', 'infrastructure', 'media'],
   wildfire: ['npcs', 'atmosphere', 'buildings'],
-<<<<<<< HEAD
   ash_winter: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'buildings', 'medical', 'media'],
-  cyberattack: ['economy'],
-=======
-  ash_winter: ['economy', 'supplies', 'npcs', 'atmosphere', 'buildings'],
   cyberattack: ['economy', 'encounters', 'atmosphere', 'infrastructure', 'media'],
->>>>>>> origin/main
   zombies: ['economy', 'encounters', 'npcs', 'atmosphere', 'medical', 'media'],
   bioweapon: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'medical', 'media'],
   invasion: ['economy', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'media'],
   civil_war: ['economy', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'media'],
   asteroid: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'buildings', 'medical', 'media'],
   unknown: ['encounters', 'npcs'],
-<<<<<<< HEAD
-  emp: [],
+  emp: ['economy', 'encounters', 'npcs', 'infrastructure', 'media'],
   mega_quake: ['economy', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'buildings', 'medical', 'media'],
   dam_flood: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'buildings', 'medical', 'media'],
   supervolcano: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'buildings', 'medical', 'media'],
-=======
-  emp: ['economy', 'encounters', 'npcs', 'infrastructure', 'media'], mega_quake: [], dam_flood: [], supervolcano: [],
->>>>>>> origin/main
   crop_blight: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'media'],
   livestock_plague: ['economy', 'encounters', 'atmosphere', 'medical', 'media'],
 };
