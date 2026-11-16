@@ -16,6 +16,7 @@ import { DayCard } from './ui/DayCard';
 import { TitleScreen } from './ui/feel/TitleScreen';
 import { RecapCard } from './ui/feel/RecapCard';
 import { PurchaseToast, MilestoneCard } from './ui/feel/PurchaseToast';
+import { TechCard } from './ui/TechCard';
 import { useOverlayPlan } from './ui/feel/useOverlayPlan';
 import { startFeedback } from './ui/feel/feedbackWatcher';
 import { useFeelStore } from './store/feelStore';
@@ -84,6 +85,7 @@ export default function App() {
       {!clean && !raid && <BattleOverlay />}
       {!clean && <CutsceneOverlay />}
       {!clean && plan.gate && <GateCard />}
+      {!clean && !raid && !title && <TechCard />}
       {!clean && !raid && !title && <RoadAlert />}
       {!clean && plan.ending && <ReportCard />}
       {!clean && plan.dayCard && <DayCard />}

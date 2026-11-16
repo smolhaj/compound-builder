@@ -336,7 +336,7 @@ export interface GameStore {
   /** Keep or quit an adult's day job (peacetime only). */
   setEmployed: (personId: string, on: boolean) => void;
   /** Free build: start a disaster now, after `warnDays` of warning signs. */
-  trigger: (kind: DisasterKind, warnDays: number) => void;
+  trigger: (kind: DisasterKind, warnDays: number, variant?: string) => void;
   /** Whether the new-game screen is up. */
   setupOpen: boolean;
   /** The shop & money window. */
@@ -996,11 +996,11 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     log(g, on ? `${p.first} is back at work as a ${p.job.title.toLowerCase()}.` : `${p.first} quit the job to work on the place full time.`);
     set({ game: g });
   },
-  trigger: (kind, warnDays) => {
+  trigger: (kind, warnDays, variant) => {
     if (locked()) return;
     const g = structuredClone(get().game);
     if (!unscripted(g.disaster.mode) || (g.disaster.kind && g.disaster.phase !== 'peace')) return;
-    triggerDisaster(g.disaster, g.clock.t, kind, g.seed, warnDays);
+    triggerDisaster(g.disaster, g.clock.t, kind, g.seed, warnDays, variant);
     set({ game: g });
   },
   setupOpen: false,

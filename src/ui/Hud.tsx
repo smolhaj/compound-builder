@@ -184,15 +184,20 @@ function FreeBuild() {
   const g = useGameStore();
   const [kind, setKind] = useState<DisasterKind>('grid_down');
   const [warn, setWarn] = useState(14);
+  const [variant, setVariant] = useState('');
+  const variants = DISASTERS[kind]?.variants ?? [];
   return <Section title="Free build">
     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-      <select value={kind} onChange={e => setKind(e.target.value as DisasterKind)}>
+      <select value={kind} onChange={e => { setKind(e.target.value as DisasterKind); setVariant(''); }}>
         {(Object.keys(DISASTERS) as DisasterKind[]).map(k => <option key={k} value={k}>{DISASTERS[k]!.name}</option>)}
       </select>
       <select value={warn} onChange={e => setWarn(+e.target.value)} title="Warning signs before it hits">
         <option value={0}>no warning</option><option value={7}>a week's warning</option><option value={14}>two weeks'</option><option value={45}>six weeks'</option>
       </select>
-      <button style={btn(true)} onClick={() => g.trigger(kind, warn)}>Trigger</button>
+      {variants.length > 1 && <select value={variant} onChange={e => setVariant(e.target.value)} title="Which variant (random if not chosen)">
+        <option value="">any variant</option>{variants.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+      </select>}
+      <button style={btn(true)} onClick={() => g.trigger(kind, warn, variant || undefined)}>Trigger</button>
     </div>
   </Section>;
 }

@@ -15,23 +15,23 @@ export const ENFORCE_MIN = 0;
 
 /** Baseline coverage at WP0 (hook columns plus legacy notes), from the audit matrix. Raise, never lower. */
 const BASELINE: Record<DisasterKind, FxColumn[]> = {
-  grid_down: ['media'],
+  grid_down: ['economy', 'encounters', 'npcs', 'atmosphere', 'media'],
   nuclear: ['economy', 'supplies', 'npcs', 'atmosphere', 'infrastructure', 'medical', 'media'],
   lawless: ['npcs'],
-  financial: ['economy'],
+  financial: ['economy', 'encounters', 'npcs', 'infrastructure', 'media'],
   drought: ['supplies', 'encounters', 'npcs', 'infrastructure'],
   pandemic: ['encounters', 'npcs', 'medical'],
-  solar_flare: ['economy'],
+  solar_flare: ['economy', 'encounters', 'infrastructure', 'media'],
   wildfire: ['npcs', 'atmosphere', 'buildings'],
   ash_winter: ['economy', 'supplies', 'npcs', 'atmosphere', 'buildings'],
-  cyberattack: ['economy'],
+  cyberattack: ['economy', 'encounters', 'atmosphere', 'infrastructure', 'media'],
   zombies: ['economy', 'encounters'],
   invasion: ['encounters'],
   civil_war: ['encounters'],
   bioweapon: ['supplies', 'encounters', 'npcs', 'medical'],
   asteroid: ['economy', 'supplies', 'atmosphere'],
   unknown: ['encounters', 'npcs'],
-  emp: [], mega_quake: [], crop_blight: [], dam_flood: [], supervolcano: [],
+  emp: ['economy', 'encounters', 'npcs', 'infrastructure', 'media'], mega_quake: [], crop_blight: [], dam_flood: [], supervolcano: [],
 };
 
 describe('disaster teeth', () => {

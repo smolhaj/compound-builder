@@ -16,7 +16,7 @@ describe('the per-kind hook seam', () => {
   });
 
   it('a stub kind changes nothing: price, service, climate and contagion are the identity', () => {
-    for (const k of ['grid_down', 'emp', 'mega_quake', 'crop_blight', 'dam_flood', 'supervolcano', 'cyberattack'] as DisasterKind[]) {
+    for (const k of ['mega_quake', 'crop_blight', 'dam_flood', 'supervolcano'] as DisasterKind[]) {
       const g = hit(k), before = { ...g.disaster.tracks };
       expect(fxPriceMod(g)).toBe(1);
       expect(fxSupplyMods(g)).toEqual({ grow: 1, cold: 0 });
@@ -39,7 +39,7 @@ describe('the per-kind hook seam', () => {
   it('contagion keeps its numbers; nuclear strikes through onHit', () => {
     expect(fxMedical(hit('bioweapon'))).toEqual({ contact: 0.55, spread: 0.12 });
     expect(fxMedical(hit('pandemic'))).toEqual({ contact: 0.25, spread: 0.06 });
-    expect(fxOnHit(hit('grid_down'))).toEqual([]);
+    expect(fxOnHit(hit('mega_quake'))).toEqual([]);
     expect(fxOnHit(hit('nuclear')).length).toBeGreaterThan(0);
   });
 });
