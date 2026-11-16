@@ -12,6 +12,16 @@ One doc per end-times scenario: real-world basis, warning signs, a phase timelin
 - **Regions:** the 11 in `src/sim/regions.ts`: mountain_west, appalachia, desert, north_woods, plains, pnw, upper_midwest, new_england, ozarks, hill_country, rust_belt.
 - Text only, no audio. American English and US units. Figures are public record or widely cited estimates; each doc names its sources and flags numbers to recheck before they appear on screen.
 
+## Shared model for physical shocks (natural group)
+
+Used by [mega_quake](mega_quake.md), [dam_flood](dam_flood.md), [supervolcano](supervolcano.md), [ash_winter](ash_winter.md), [asteroid](asteroid.md), [wildfire](wildfire.md) and [drought](drought.md). It is the design for `src/sim/structureDamage.ts` (WP6) and `src/sim/winter.ts`; nothing here is built.
+
+- **Damage states** per finished structure: 0 sound; 1 minor (a hardware kit and 1 to 3 person-days; no stage lost); 2 major (`knockBack` to the roof, frame or interior stage; 30 to 60% of the blueprint's materials); 3 destroyed (`burnStructure`-style loss, clear the wreck, rebuild from the footing). A roll is `hazard(intensity) x resistance(style, site, stage)`; every kind supplies its own hazard table and shares the resistance idea (lower is better).
+- **Resistance inputs** the sim already has or can derive: housing style (`housingStyles.ts`: cabin, log, lodge, stone, timber frame, container, adobe), blueprint kind, build stage (half-built walls are the weak point), hardening tier, retaining walls, terrain slope and creek-bottom flags (`terrainFx.ts`). `Structure` has no quality or foundation field today; derive a **build-quality tier** (1 to 3) from style, hardening and any fitted upgrades, and keep any new field in the `disaster.fx` bag (v98) rather than a new save bump.
+- **Repair:** by hand costs person-days; the existing crews (`crews.ts`: four people at $60 an hour each) have a **lead time of 3 x (1 + 8 x affected share) days** after a regional event and cost x1.3 for 60 days; paying x1.5 jumps the queue. Crews stop when roads and banks fail. Wealth buys speed (crews, generators, materials ahead of the demand surge); poverty buys time and risk. **Insurance** exists through `insuranceClaim` but ordinary policies exclude earthquake and flood: those need a rider or a flood policy (a peacetime decision with an annual cost). Fire and ash-load collapse are covered.
+- **Winter engine** (`ash_winter.md`): one pure `WinterState` (sun dimming, cold anomaly, growing-season factor, solar derate, food stress) that `ash_winter`, `asteroid` and the nuclear exchange all call with their own severity.
+- **Source note for this group:** web access was restricted while these docs were written, so figures come from memory of the cited agencies and standard reports and are tagged "commonly cited" (not re-checked), except where a doc says a figure was verified. Re-check every number before it reaches player-facing text.
+
 ## Index
 
 <!-- group: social collapse (claude/scenarios-social) -->
@@ -37,3 +47,13 @@ One doc per end-times scenario: real-world basis, warning signs, a phase timelin
 - [oil_shock](oil_shock.md): new; Hormuz, pipeline, Gulf refineries; fuel is food and currency, the grid stays up; 1973, 1979, Colonial.
 - [reactor_meltdown](reactor_meltdown.md): new; regional plume stripe on the map, KI, milk bans, decontamination, settlers; the world otherwise works; Chernobyl, Fukushima, plants by region.
 <!-- end group: tech and economy -->
+
+<!-- group: natural and physical (claude/scenarios-natural) -->
+- [mega_quake](mega_quake.md): new kind; Cascadia, Wasatch, New Madrid, rift and eastern variants; 3 to 5 minutes of shaking, aftershock schedule (Omori), roads and bridges cut, earthquake insurance excluded; a kind first two weeks then a hard third; bolt the sill. Tohoku, Hebgen Lake, Northridge, Christchurch, Kahramanmaras.
+- [dam_flood](dam_flood.md): new kind; dam breach, levee flood, watershed cascade; a local catastrophe inside a working world (help comes); siting above the creek, mold clock, flooded wells, hosting neighbors. Johnstown, Teton, Taum Sauk, Helene, Guadalupe 2025.
+- [supervolcano](supervolcano.md): the ashfall phase of `ash_winter`; the Yellowstone alert ladder and ash forecast cone, a daily roof-load clock replacing the one-roll collapse, respirators, filters, solar and vehicles in ash. Mount St. Helens, Pinatubo, Novarupta, Laki.
+- [ash_winter](ash_winter.md): the volcanic winter, years 0 to 5; growing-season factor by region, seed and storage as the game, price index on food stress, plus the shared winter engine. Tambora 1816, Laki, 536 AD, Pinatubo.
+- [asteroid](asteroid.md): four variants (airburst, ocean, land, comet); a public odds arc and a narrowing impact corridor so the player decides stay or move; blast bands, a prep-race price curve, a rare deflection ending, then the winter engine. Chelyabinsk, Tunguska, 2024 YR4, DART.
+- [wildfire](wildfire.md): keeps the fire-front core, adds Ready/Set/Go, layered ember, radiant and building-to-building rolls, stay-and-defend vs leave, smoke exposure, post-fire flood and salvage and morels. Camp, Marshall, Lahaina, Black Saturday, 1910.
+- [drought](drought.md): megadrought, dust bowl, aquifer collapse and the heat dome; a numeric well-table model, herd triage by water use, a heat meter, welfare checks, water thieves. Dust Bowl, Ogallala, 2021 heat dome, Chicago 1995, Cape Town.
+<!-- end group: natural and physical -->
