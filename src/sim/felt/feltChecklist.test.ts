@@ -12,11 +12,11 @@ import type { FeltKind } from './types';
 export const FELT_ENFORCE: FeltKind[] = [];
 
 /** What each kind passes today (the teeth item mirrors disasterTeeth's columnsOf >= 4). Raise, never lower. */
-const BASELINE: Partial<Record<FeltKind, FeltItem[]>> = { nuclear: ['teeth'], drought: ['teeth'], ash_winter: ['teeth'], bioweapon: ['teeth'] };
+const BASELINE: Partial<Record<FeltKind, FeltItem[]>> = { lawless: ['teeth'], drought: ['teeth'], pandemic: ['teeth'], nuclear: ['teeth'], ash_winter: ['teeth'], zombies: ['teeth'], invasion: ['teeth'], civil_war: ['teeth'], bioweapon: ['teeth'], crop_blight: ['teeth'], livestock_plague: ['teeth'] };
 
 describe('felt checklist', () => {
   it('never loses an item the baseline records, and the baseline is exact today', () => {
-    for (const k of FELT_KINDS) expect(feltPassing(k), k).toEqual(FELT_ITEMS.filter(i => (BASELINE[k] ?? []).includes(i)));
+    for (const k of FELT_KINDS) expect(feltPassing(k), k).toEqual(FELT_ITEMS.filter(i => i === 'radio' /* FL3: the generic radio set fills every kind (felt/radioLines.ts) */ || (BASELINE[k] ?? []).includes(i)));
   });
   it('enforces every item for the kinds in FELT_ENFORCE', () => {
     for (const k of FELT_ENFORCE) expect(FELT_ITEMS.filter(i => !feltChecks(k)[i]), k).toEqual([]);
