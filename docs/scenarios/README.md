@@ -37,3 +37,11 @@ One doc per end-times scenario: real-world basis, warning signs, a phase timelin
 - [oil_shock](oil_shock.md): new; Hormuz, pipeline, Gulf refineries; fuel is food and currency, the grid stays up; 1973, 1979, Colonial.
 - [reactor_meltdown](reactor_meltdown.md): new; regional plume stripe on the map, KI, milk bans, decontamination, settlers; the world otherwise works; Chernobyl, Fukushima, plants by region.
 <!-- end group: tech and economy -->
+
+<!-- group: biological (claude/scenarios-bio) -->
+- [pandemic](pandemic.md): people fail, infrastructure stays; three variants (covid_like, flu_1918, high_fatality), a wave clock with a false calm, an exposure and incubation model, immune survivors as runners, drop box and quarantine cabin; 1918, Gunnison, St. Louis vs Philadelphia, COVID.
+- [bioweapon](bioweapon.md): an adversary, not an accident; engineered flu, hemorrhagic, smallpox-like, a local plume, an optional "still being used" modifier; carriers at the gate, filtered bunker air, salvage of empty towns; Sverdlovsk, Biopreparat, smallpox.
+- [crop_blight](crop_blight.md): new kind; five variants (late blight, wheat rust, locusts, 1816 cold year, seed failure); selective food prices with the grid up, seed diversity and seed saving as the answer, hunger raiders and neighbors; Irish famine, 1816, 1970 corn blight, Ug99.
+- [livestock_plague](livestock_plague.md): new kind; avian flu, foot-and-mouth, African swine fever, feed-borne prion; biosecurity score, the cull card (comply, hide, selective, eat, move); egg price as the first warning; UK 2001, HPAI 2022-25, China ASF.
+- [zombies](zombies.md): an infection model (bite, 24-hour rule), three variants (outbreak, everyone_turns, rage), noise and light signature in feet, wall crowd load in lb per foot, freeze and thaw, decay stages, hidden bites, lure raids; rabies, Munz model, crowd crush.
+<!-- end group: biological -->
