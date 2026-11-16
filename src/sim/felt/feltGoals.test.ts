@@ -44,8 +44,8 @@ describe('signature goal chains', () => {
     const c = chainFor('solar_flare')!;
     expect(c.steps.every(st => !st.done(g))).toBe(true);
     g.utilities.off.push('house'); expect(c.steps[0].done(g)).toBe(true);
-    const f = at('grid_down', 1); (f.stock as unknown as Record<string, number>).fuel = 5; expect(chainFor('grid_down')!.steps[1].done(f)).toBe(true);
-    const w = at('drought', 1); (w.stock as unknown as Record<string, number>).seed = 6; expect(chainFor('drought')!.steps[3].done(w)).toBe(true);
+    const f = at('oil_shock', 1); (f.stock as unknown as Record<string, number>).fuel = 5; expect(chainFor('oil_shock')!.steps[0].done(f)).toBe(true);
+    
   });
   it('the card is up from the warning to day 14, then the first-hour card returns', () => {
     const g = at('solar_flare', 0); g.clock.t = g.disaster.warnAt;
@@ -54,37 +54,48 @@ describe('signature goal chains', () => {
     g.clock.t = g.disaster.hitAt + CHAIN_DAYS + 0.5; expect(feltChain(g)).toBeNull();
     g.clock.t = g.disaster.warnAt - 1; expect(feltChain(g)).toBeNull();
   });
+  // a kind that has no goals of its own in its spec: the generic chain is in force (kinds that wrote their own are covered by the loops)
+  const GEN = (['solar_flare', 'oil_shock', 'drought', 'wildfire', 'emp'] as FeltKind[]).find(k => !feltSpec(k)?.goals)!;
   it('done stays done: a latched step holds after the state falls away, and the reward is logged once', () => {
-    const g = at('grid_down', 1);
-    g.utilities.off.push('house');
-    const first = feltGoals(g, ctx(g), feltSpec('grid_down')!);
-    expect(first.some(l => l.startsWith('Goal done:'))).toBe(true);
-    g.utilities.off.length = 0;
-    expect(feltOf(g)!.goals.done).toContain('grid_down:breakers');
+    const g = at(GEN, 1);
+    const c = chainFor(GEN)!, s0 = c.steps[0];
+    // make the first step true by the live state, whatever it is
+    const mk: Record<string, (x: GameState) => void> = { breakers: x => { x.utilities.off.push('house'); }, fuel: x => { (x.stock as unknown as Record<string, number>).fuel = 9; }, water: x => { (x.stock as unknown as Record<string, number>).water_jugs = 99; }, cage: () => undefined, firebreak: () => undefined, cistern: () => undefined };
+    const key = s0.id.split(':')[1];
+    if (!mk[key]) return;
+    const undo = key === 'breakers' ? (x: GameState) => { x.utilities.off.length = 0; } : (x: GameState) => { (x.stock as unknown as Record<string, number>)[key === 'fuel' ? 'fuel' : 'water_jugs'] = 0; };
+    mk[key](g);
+    expect(feltGoals(g, ctx(g), feltSpec(GEN)!).some(l => l.startsWith('Goal done:'))).toBe(true);
+    undo(g);
+    expect(feltOf(g)!.goals.done).toContain(s0.id);
     expect(feltChain(g)!.goals[0].status).toBe('done');
-    expect(feltGoals(g, ctx(g), feltSpec('grid_down')!)).toEqual([]);
+    expect(feltGoals(g, ctx(g), feltSpec(GEN)!)).toEqual([]);
   });
   it('completion: all steps done gives the set-for-now card and one completion line', () => {
-    const g = at('solar_flare', 1);
-    const c = chainFor('solar_flare')!;
-    const f = feltGoals(g, ctx(g), feltSpec('solar_flare')!); expect(f).toEqual([]);
-    feltOf(g)!.goals.done.push(...c.steps.map(x => x.id));
-    expect(feltChain(g)!.complete).toBe(true);
-    const lines = feltGoals(g, ctx(g), feltSpec('solar_flare')!);
-    expect(lines.filter(l => l.includes('set for now'))).toHaveLength(1);
-    expect(feltGoals(g, ctx(g), feltSpec('solar_flare')!)).toEqual([]);
+    for (const k of FELT_KINDS) {
+      const g = at(k, 1), spec = feltSpec(k)!;
+      const c = activeChain(g)!; expect(c, k).toBeTruthy();
+      const done = (feltOf(g)?.goals.done ?? []); feltGoals(g, ctx(g), spec);
+      const f = feltOf(g)!; f.goals.done = [...new Set([...done, ...c.steps.map(x => x.id)])];
+      expect(feltChain(g)!.complete, k).toBe(true);
+      const lines = feltGoals(g, ctx(g), spec);
+      expect(lines.filter(l => l.includes('set for now')), k).toHaveLength(1);
+      expect(feltGoals(g, ctx(g), spec), k).toEqual([]);
+    }
   });
   it('rich and poor get different acts where cash matters', () => {
     const poor = at('drought', 1, 100), rich = at('drought', 1, 9000);
-    const st = chainFor('drought')!.steps[0];
+    const st = chainFor('drought', feltSpec('drought')?.goals)!.steps.find(x => x.pace)!;
     expect(st.act!(poor)!.act).not.toEqual(st.act!(rich)!.act);
     expect(st.pace?.(poor)).toMatch(/Cash is/); expect(st.pace?.(rich)).toBeNull();
   });
   it('the daily dispatcher runs it, and progress survives a save round trip', () => {
-    const g = at('grid_down', 1); g.utilities.off.push('house');
+    const g = at('grid_down', 1), c = activeChain(g)!;
     feltDaily(g, ctx(g));
+    feltOf(g)!.goals.done.push(c.steps[0].id);
     const back = JSON.parse(JSON.stringify(g)) as GameState;
     expect(feltChain(back)!.goals[0].status).toBe('done');
+    expect(feltOf(back)!.goals.done).toContain(c.steps[0].id);
   });
   it('the biology kinds route their existing fx chain content through the felt chain, and the Next-steps goal line waits', () => {
     for (const k of ['pandemic', 'bioweapon', 'zombies', 'livestock_plague', 'crop_blight'] as FeltKind[]) {

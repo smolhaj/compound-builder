@@ -213,9 +213,24 @@ function fxChain(kind: FeltKind): GoalChain | null {
   return { id: kind, title: def.title, startsAt: 'warning', steps };
 }
 
+/** Keyword -> library step whose "Do it" fits, for a kind's own steps that came without one (the tech adapter, sim/techFelt.ts). */
+const ACT_WORDS: Array<[RegExp, PrimId]> = [
+  [/water|well|tank/i, 'water'], [/freezer|food|pantry|meal|ration/i, 'food30'], [/fuel|generator|diesel|gas/i, 'fuel'], [/neighbo|pact|trade|barter/i, 'pact'],
+  [/radio|news|listen/i, 'radio'], [/cash|money|bank/i, 'cash'], [/dark|light|window/i, 'dark'], [/watch|guard|gate/i, 'watch'], [/med|first.?aid|sick/i, 'meds'],
+  [/breaker|grid|line|power|solar|battery/i, 'breakers'], [/seed|garden|plant/i, 'seed'], [/wall|fence|defen/i, 'defended'], [/cellar|bunker|shelter/i, 'shelter'],
+];
+/** Give a step with no "Do it" a working one: the best-fitting library handler, else the people tab. */
+function withActs(c: GoalChain): GoalChain {
+  return { ...c, steps: c.steps.map(st => {
+    if (st.act) return st;
+    const hit = ACT_WORDS.find(([re]) => re.test(st.title))?.[1];
+    return { ...st, act: hit ? PRIMS[hit].act : () => ({ label: 'Open the family tab', act: { type: 'open' as const, right: 'family' as const } }) };
+  }) };
+}
+
 /** The chain for a kind: its own spec's if it wrote one, else the fx hook's, else the generic one. */
 export function chainFor(kind: FeltKind, own?: GoalChain): GoalChain | null {
-  if (own) return own;
+  if (own) return withActs(own);
   const fx = fxChain(kind);
   if (fx) return fx;
   const def = CHAINS[kind];
