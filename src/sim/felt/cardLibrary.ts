@@ -94,7 +94,7 @@ function signature(kind: FeltKind): Omit<DecisionCard, 'id'> {
       ] };
     case 'fallout': return { ...base, title: () => 'How long to stay sealed', text: () => 'The air outside is not the air you remember. Every trip out costs something you cannot see.', fallback: 'sealed',
       options: [
-        opt({ id: 'buy', label: 'Buy potassium iodide and a meter, then go out carefully', hint: 'Knowing where it is bad is half of staying safe.', cost: s => ({ money: r25(250 + N(s) * 80) }), now: s => [{ k: 'stock', id: 'potassium_iodide', n: N(s) }, { k: 'stock', id: 'geiger_counter', n: 1 }], line: 'You bought pills and a meter.' }),
+        opt({ id: 'buy', label: 'Buy potassium iodide and a Geiger counter, then go out carefully', hint: 'Knowing where it is bad is half of staying safe.', cost: s => ({ money: r25(250 + N(s) * 80) }), now: s => [{ k: 'stock', id: 'potassium_iodide', n: N(s) }, { k: 'stock', id: 'geiger_counter', n: 1 }], line: 'You bought pills and a Geiger counter.' }),
         opt({ id: 'sealed', label: 'Stay sealed for two full weeks', hint: 'Eats the pantry and tempers, but nobody is exposed.', cost: s => ({ stock: { canned: N(s) * 2 } }), now: [{ k: 'morale', n: -6 }, { k: 'raidDelay', days: 6 }], line: 'You stayed sealed in.' }),
         opt({ id: 'dash', label: 'Make short dashes outside for water and wood', hint: 'Fast and cheap. Each dash is a dose.', cost: () => ({ hours: 6 }), now: [{ k: 'stock', id: 'water_jugs', n: 2 }, { k: 'stock', id: 'firewood', n: 2 }], risk: { p: 0.4, good: 'You kept clear of the hot spots.', bad: 'You walked through the worst of it.', lose: [{ k: 'dose', n: 0.2 }] }, line: 'You made quick runs outside.' }),
       ] };
