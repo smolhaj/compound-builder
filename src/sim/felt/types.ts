@@ -10,7 +10,7 @@ import type { MaterialId } from '../materials';
 import type { GameState } from '../state';
 
 /** The eight kinds that are designed (docs/scenarios) but not yet in the DisasterKind union; WP10 adds them and this alias collapses. */
-export const PLANNED_KINDS = ['livestock_plague', 'satellite_loss', 'oil_shock', 'reactor_meltdown', 'global_famine', 'water_war', 'cult_takeover', 'mass_exodus'] as const;
+export const PLANNED_KINDS = ['satellite_loss', 'oil_shock', 'reactor_meltdown', 'global_famine', 'water_war', 'cult_takeover', 'mass_exodus'] as const;
 export type PlannedKind = typeof PLANNED_KINDS[number];
 export type FeltKind = DisasterKind | PlannedKind;
 
