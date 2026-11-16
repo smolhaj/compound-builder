@@ -10,13 +10,13 @@ const hit = (kind: DisasterKind) => { const g = newGame(1, 105, 2027, { mode: 's
 
 describe('the per-kind hook seam', () => {
   it('has a module for every kind, and every kind has a ruleset', () => {
-    expect(KINDS.length).toBe(21);
+    expect(KINDS.length).toBe(22);
     for (const k of KINDS) expect(FX[k], k).toBeDefined();
     expect(Object.keys(FX).sort()).toEqual([...KINDS].sort());
   });
 
   it('a stub kind changes nothing: price, service, climate and contagion are the identity', () => {
-    for (const k of ['grid_down', 'emp', 'mega_quake', 'crop_blight', 'dam_flood', 'supervolcano', 'cyberattack'] as DisasterKind[]) {
+    for (const k of ['grid_down', 'emp', 'mega_quake', 'dam_flood', 'supervolcano', 'cyberattack'] as DisasterKind[]) {
       const g = hit(k), before = { ...g.disaster.tracks };
       expect(fxPriceMod(g)).toBe(1);
       expect(fxSupplyMods(g)).toEqual({ grow: 1, cold: 0 });
@@ -29,7 +29,7 @@ describe('the per-kind hook seam', () => {
   it('the encounter mix moved behind the hooks, unchanged', () => {
     const p = { visibility: 50, fortress: 40 } as never;
     const mix = (k: DisasterKind) => { const g = hit(k); const w: Array<[EncounterKind, number]> = [['arrival', 30], ['refugees', 12], ['looters', 10], ['requisition', 10], ['trader', 10]]; fxEncounterWeights(g, w, p); return Object.fromEntries(w); };
-    expect(mix('zombies')).toMatchObject({ horde: 60, trader: 2, refugees: 6, requisition: 0 });
+    expect(mix('zombies')).toMatchObject({ horde: 15, trader: 2, refugees: 6, requisition: 0 });   // (WP4: a quiet day-one place draws a small horde weight; it grows with the crowd at the wall)
     expect(mix('invasion')).toMatchObject({ patrol: 40, requisition: 0 });
     expect(mix('civil_war').militia).toBeCloseTo(35 * (0.4 + 0.4 + 50 / 150));
     expect(mix('drought')).toMatchObject({ refugees: 12 * 1.6, looters: 13 });
@@ -37,8 +37,8 @@ describe('the per-kind hook seam', () => {
   });
 
   it('contagion keeps its numbers; nuclear strikes through onHit', () => {
-    expect(fxMedical(hit('bioweapon'))).toEqual({ contact: 0.55, spread: 0.12 });
-    expect(fxMedical(hit('pandemic'))).toEqual({ contact: 0.25, spread: 0.06 });
+    expect(fxMedical(hit('bioweapon')).contact).toBeGreaterThan(0.2);   // (WP4: scaled by the wave clock and what the family does)
+    expect(fxMedical(hit('pandemic')).contact).toBeGreaterThan(0.02);
     expect(fxOnHit(hit('grid_down'))).toEqual([]);
     expect(fxOnHit(hit('nuclear')).length).toBeGreaterThan(0);
   });
