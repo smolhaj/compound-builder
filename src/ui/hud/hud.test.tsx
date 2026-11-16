@@ -310,6 +310,19 @@ describe('the first-hour goals card (server-rendered)', () => {
     expect(t).toMatch(/Water: .*well/i);
     expect(t).toMatch(/Food: .*garden/i);
   });
+  it('the "Also open" heading wraps in the narrow panel instead of being cut off (playtest 3: it read "START ANY OF THES")', () => {
+    Object.assign(useFeelStore.getInitialState(), { goalsClosed: null });
+    withGame(g => {
+      g.money = 900_000;
+      const st = planStructure(g, 'timber_cabin', 0, 0, 0); st.stage = 99; st.finishedAt = 0;
+      while (g.people.length < 5) { const p = structuredClone(g.people[0]); p.id = 'x' + g.people.length; g.people.push(p); g.personState.push(structuredClone(g.personState[0])); }
+    });
+    const html = renderToStaticMarkup(<BuildMenu />);
+    const m = /<div style="([^"]*)">Also open: start any of these now<\/div>/.exec(html);
+    expect(m).not.toBeNull();
+    expect(m![1]).toContain('white-space:normal');
+    expect(m![1]).not.toContain('white-space:nowrap');
+  });
 });
 
 describe('the Projects tab never says nothing is under way beside a stuck repair', () => {
