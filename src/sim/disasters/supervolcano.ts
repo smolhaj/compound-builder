@@ -1,5 +1,6 @@
-import type { KindFx } from '../disasterFx';
+import { makeAshFx } from './ashShared';
+import { SUPERVOLCANO_OPTS } from '../ashState';
 
-/** Supervolcano (placeholder kind; the ash winter stays the grounded one, WP6 decides how they differ). (stub: no behavior of its own yet; see docs/DISASTER_TEETH.md and the PR for the package that owns this file). */
-export const fx: KindFx = {
-};
+/** Supervolcano (a caldera eruption): the same ash engine, a bigger fall and a harsher winter than the Yellowstone default. */
+export { SUPERVOLCANO_OPTS };
+export const fx = makeAshFx(SUPERVOLCANO_OPTS);
