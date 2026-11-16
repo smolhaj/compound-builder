@@ -45,7 +45,9 @@ export type GoalStatus = 'todo' | 'underway' | 'done';
 export type GoalAct = { type: 'starter' } | SuggestionAct;
 
 export interface FirstHourGoal {
-  id: GoalId;
+  id: string;
+  /** A short word for the strip (a felt-layer goal supplies its own; the first-hour goals use the card's table). */
+  short?: string;
   /** "A roof for the family". */
   title: string;
   status: GoalStatus;
@@ -72,6 +74,9 @@ export interface GoalMemory {
 export const EMPTY_MEMORY: GoalMemory = { seen: [], done: [] };
 
 export interface FirstHour {
+  /** The card's heading when it is not "Get operational" (a disaster's signature chain), and the reward line of the last step done. */
+  heading?: string;
+  rewardLine?: string;
   /** The goals that apply to this lot, in order. */
   goals: FirstHourGoal[];
   /** The one to show: the first with something to do, else the first still under way. Null when all are done. */
