@@ -26,6 +26,8 @@ import { fogRadioLine } from './fogFx';
 import { fogHash } from './fog';
 import { passerRumor } from './roadPassers';
 import { fxCtxFor, fxRadio } from './disasterFx';
+import { feltRadioLine } from './felt/feltRadio';
+import type { Claim } from './felt/claims';
 
 export interface RadioState {
   /** Day index until which the watch is up after a raider warning, and its detection bonus. */
@@ -41,7 +43,9 @@ export interface RadioState {
 }
 
 export type RumorKind = 'raiders' | 'service' | 'relief' | 'city' | 'checkpoint' | 'poison' | 'travelers';
-export interface Heard { id: string; day: number; text: string; kind: RumorKind; truth: boolean; status: 'open' | 'confirmed' | 'false' | 'unclear' }
+export interface Heard { id: string; day: number; text: string; kind: RumorKind; truth: boolean; status: 'open' | 'confirmed' | 'false' | 'unclear';
+  /** FL3: the checkable fact the line asserted; scouting resolves it from the live world (sim/rumors.ts). */
+  claim?: Claim }
 
 export type RadioSet = 'ham' | 'shortwave' | 'none';
 
@@ -95,7 +99,7 @@ export function radioDay(s: GameState): string[] {
   const set = radioSet(s), { hear, truth } = reception(s);
   if (r() > hear) return [];
   const src = pick(r, SOURCE[set]);
-  const say = (text: string, tone: 0 | 1 | 2 | 3, meta?: { kind: RumorKind; truth: boolean }) => {
+  const say = (text: string, tone: 0 | 1 | 2 | 3, meta?: { kind: RumorKind; truth: boolean; claim?: Claim }) => {
     d.news.push({ t, text, tone });
     if (d.news.length > 40) d.news.splice(0, d.news.length - 40);
     if (meta) remember(st, { id: `h${day}`, day, text, ...meta, status: 'open' });
@@ -112,7 +116,11 @@ export function radioDay(s: GameState): string[] {
   // the kind's own bulletin (sim/disasters/<kind>.ts radioBulletins); its own dice, so the rest of the day's news is unchanged
   const fb = fxRadio(s, fxCtxFor(s, 13));
   if (fb) return say(`${src} ${fb.text}`, fb.tone);
-  if (r() < truth) {
+  const want = r() < truth;
+  // FL3: a felt line for the active kind, tied to a checkable claim (sim/felt/feltRadio.ts); the rest of the day is the usual news
+  const fl = feltRadioLine(s, set, want, fxCtxFor(s, 17));
+  if (fl) { if (want) st.truths++; else st.rumors++; return say(`${src} ${fl.text}`, fl.tone, { kind: fl.kind, truth: fl.truth, claim: fl.claim }); }
+  if (want) {
     st.truths++;
     // a raider warning, likelier the more the law has gone
     if (r() < 0.15 + 0.4 * lawless) { warn(3); return say(`${src} a group raiding farms is working this side of the county. Keep a watch.`, 2, { kind: 'raiders', truth: true }); }

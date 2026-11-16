@@ -16,7 +16,7 @@ const BASELINE: Partial<Record<FeltKind, FeltItem[]>> = { nuclear: ['teeth'], dr
 
 describe('felt checklist', () => {
   it('never loses an item the baseline records, and the baseline is exact today', () => {
-    for (const k of FELT_KINDS) expect(feltPassing(k), k).toEqual(FELT_ITEMS.filter(i => (BASELINE[k] ?? []).includes(i)));
+    for (const k of FELT_KINDS) expect(feltPassing(k), k).toEqual(FELT_ITEMS.filter(i => i === 'radio' /* FL3: the generic radio set fills every kind (felt/radioLines.ts) */ || (BASELINE[k] ?? []).includes(i)));
   });
   it('enforces every item for the kinds in FELT_ENFORCE', () => {
     for (const k of FELT_ENFORCE) expect(FELT_ITEMS.filter(i => !feltChecks(k)[i]), k).toEqual([]);
