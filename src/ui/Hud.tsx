@@ -2,7 +2,7 @@ import { interrogationScene, raiderFace, type Exchange, type Face } from '../sim
 import { MAX_QUESTIONS, QUESTIONS, QUESTION_NAME, type Question } from '../sim/interrogation';
 import { flowLine } from '../sim/flow';
 import { PlansOrderButton } from './hud/SpendConfirm';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { EDGE, hudLayout, useBox } from './hudLayout';
 import { unscripted } from '../sim/godMode';
 import { TERRAIN_LEGEND, type TerrainMode } from '../game/terrain/TerrainOverlay';
@@ -65,7 +65,8 @@ import { needsHookup } from '../sim/hookups';
 import { HousingPanel } from './HousingPanel';
 import { QuartersPanel } from './QuartersPanel';
 import { bestShelter, doseRate, isNuclear, SHELTER_DAYS } from '../sim/nuclear';
-import { DISASTERS, TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaster';
+import { triggerChoices } from '../sim/felt/triggerMenu';
+import { TRACKS, TRACK_NAME, type DisasterKind } from '../sim/disaster';
 import { livingPerDay } from '../sim/engine';
 import { roman } from '../sim/eras';
 import { canRigMines, rigMines } from '../sim/battle';
@@ -185,15 +186,21 @@ function FreeBuild() {
   const g = useGameStore();
   const [kind, setKind] = useState<DisasterKind>('grid_down');
   const [warn, setWarn] = useState(14);
+  const [variant, setVariant] = useState('');   // '' = random, as before
+  const choices = useMemo(() => triggerChoices(), []);
+  const variants = choices.find(c => c.kind === kind)?.variants ?? [];
   return <Section title="Free build">
     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-      <select value={kind} onChange={e => setKind(e.target.value as DisasterKind)}>
-        {(Object.keys(DISASTERS) as DisasterKind[]).map(k => <option key={k} value={k}>{DISASTERS[k]!.name}</option>)}
+      <select value={kind} onChange={e => { setKind(e.target.value as DisasterKind); setVariant(''); }}>
+        {choices.map(c => <option key={c.kind} value={c.kind}>{c.name}</option>)}
+      </select>
+      <select value={variant} onChange={e => setVariant(e.target.value)} title="Which version of it">
+        <option value="">any version</option>{variants.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
       </select>
       <select value={warn} onChange={e => setWarn(+e.target.value)} title="Warning signs before it hits">
         <option value={0}>no warning</option><option value={7}>a week's warning</option><option value={14}>two weeks'</option><option value={45}>six weeks'</option>
       </select>
-      <button style={btn(true)} onClick={() => g.trigger(kind, warn)}>Trigger</button>
+      <button style={btn(true)} onClick={() => g.trigger(kind, warn, variant || undefined)}>Trigger</button>
     </div>
   </Section>;
 }

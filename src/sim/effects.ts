@@ -18,6 +18,7 @@ import { mulberry32 } from './rng';
 import type { GameState } from './state';
 import { threatOn } from './threatState';
 import { fxDaily, fxMedical, fxStructureDamage, fxSupplyMods } from './disasterFx';
+import { feltDaily } from './felt/daily';
 
 /** Growing-season and warmth factor after a full exchange: 1–3 years of nuclear winter. */
 export function winterFactor(s: GameState): { grow: number; cold: number } {
@@ -104,7 +105,7 @@ export function effectsDay(s: GameState): string[] {
   }
   // the kind's own daily teeth and its damage to buildings (sim/disasters/<kind>.ts)
   const fctx = { day, r: mulberry32(s.seed * 6011 + day * 5 + 3), once };
-  out.push(...fxStructureDamage(s, fctx), ...fxDaily(s, fctx));
+  out.push(...fxStructureDamage(s, fctx), ...fxDaily(s, fctx), ...feltDaily(s, fctx));
   // sickness spreads at home (a medical bay lets you keep the sick apart)
   const c = contagion(s);
   if (c.spread > 0) {
