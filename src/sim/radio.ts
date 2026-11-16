@@ -115,7 +115,8 @@ export function radioDay(s: GameState): string[] {
   if (pr) { if (pr.truth) st.truths++; else st.rumors++; if (pr.warn) warn(3); return say(pr.text, pr.tone, { kind: pr.kind, truth: pr.truth }); }
   // the kind's own bulletin (sim/disasters/<kind>.ts radioBulletins); its own dice, so the rest of the day's news is unchanged
   const fb = fxRadio(s, fxCtxFor(s, 13));
-  if (fb) return say(`${src} ${fb.text}`, fb.tone);
+  // the kind's bulletin takes about 6 days in 10, so the felt lines (rumors with a checkable claim) still get the other days
+  if (fb && fogHash(s.seed * 6011 + day, 19) < 0.6) return say(`${src} ${fb.text}`, fb.tone);
   const want = r() < truth;
   // FL3: a felt line for the active kind, tied to a checkable claim (sim/felt/feltRadio.ts); the rest of the day is the usual news
   const fl = feltRadioLine(s, set, want, fxCtxFor(s, 17));
