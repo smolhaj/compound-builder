@@ -47,6 +47,7 @@ import { FleetPanel } from './FleetPanel';
 import { buyLicense, hasLicense, inSeason, lawful, TAG_USD, type License } from '../sim/wildfood';
 import { chimneyState, greenRicks, SEASON_DAYS, SWEEP_USD } from '../sim/upkeep';
 import { countyWorks, premium, yearlyTax } from '../sim/paperwork';
+import { PhysicalPanel } from './PhysicalPanel';
 import { altitudeClimate } from '../sim/climate';
 import { LOT_NAME } from '../sim/lots';
 import { roadClosedFor, winterRoadLine } from '../sim/slope';
@@ -577,6 +578,7 @@ export function Hud() {
                 {game.paper.fines > 0 && <Row label="Fines paid" value={usd(game.paper.fines)} />}
               </> : <Note>Nobody at the county now: no permits, no tax bills{game.paper.backTax > 0 ? ` (back taxes on the books: ${usd(game.paper.backTax)})` : ''}, and no insurer paying out.</Note>}
             </Section>
+            <PhysicalPanel game={game} />
             <Section title="Land next door">
               {game.land.parcels.map(p => {
                 const n = game.neighbors.find(x => x.id === p.owner), why = buyProblem(game, p);

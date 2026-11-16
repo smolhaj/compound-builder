@@ -33,6 +33,7 @@ import { log } from './economy';
 import { mulberry32 } from './rng';
 import type { GameState } from './state';
 import type { DisasterKind } from './disaster';
+import { noteWithdrawal, withdrawalRoom } from './moneyMath';
 
 export type MetalKind = 'gold_coin' | 'gold_bar' | 'silver_coin' | 'silver_round' | 'junk_silver';
 export type Where = 'safe' | 'buried' | 'bank';
@@ -115,6 +116,12 @@ export function transfer(s: GameState, from: Account, to: Account, amount: numbe
   if (!banksOpen(s)) return 'the banks are shut';
   if (amount <= 0 || from === to) return 'nothing to move';
   if (get(s, from) < amount) return 'not that much in it';
+  // a run on the banks: withdrawal limits through the last days and after the hit (sim/moneyMath.ts)
+  if (to === 'cash' && (from === 'checking' || from === 'savings')) {
+    const room = withdrawalRoom(s);
+    if (amount > room + 0.005) return `the bank limits withdrawals: $${Math.floor(room).toLocaleString('en-US')} left today`;
+    noteWithdrawal(s, amount);
+  }
   put(s, from, get(s, from) - amount);
   put(s, to, get(s, to) + amount);
   log(s, `Moved $${Math.round(amount).toLocaleString('en-US')} from ${from} to ${to}.${to === 'cash' && amount > 10_000 ? ' The bank filed its cash report.' : ''}`);

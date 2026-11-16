@@ -113,3 +113,20 @@ describe('in the engine', () => {
     ritualHour(g, 18);
   });
 });
+
+describe('ritual caption (People panel)', () => {
+  it('says dinner together when calm and fed, eating in shifts after a breach, and nothing with nobody home', async () => {
+    const { ritualCaption, ritualsOf } = await import('./rituals');
+    const { newGame } = await import('./state');
+    const g = newGame(4);
+    g.stock.staples = 200;
+    ritualsOf(g).calm = 1;
+    expect(ritualCaption(g)!.text).toMatch(/Dinner together/);
+    ritualsOf(g).calm = 0.2;
+    expect(ritualCaption(g)!.text).toMatch(/in shifts/);
+    ritualsOf(g).calm = 0.5;
+    expect(ritualCaption(g)!.tone).toBe('warn');
+    g.personState.forEach(ps => { ps.needs.died = 1; });
+    expect(ritualCaption(g)).toBeNull();
+  });
+});

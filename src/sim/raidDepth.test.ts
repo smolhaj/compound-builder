@@ -223,6 +223,8 @@ describe('negotiation', () => {
           if (t === 'neg_aid') { expect(g.stock.canned).toBeLessThan(canned); expect(g.gate.humanity).toBeGreaterThan(hum); }
           if (t === 'neg_redirect') { expect(g.gate.humanity).toBeLessThan(hum); expect(g.neighbors.some((n, i) => n.disposition < disp[i])).toBe(true); expect(g.stock.canned).toBe(canned); }
           expect(out.tone).not.toBe('bad');
+        } else if (out.title === 'They thought better of it') {
+          expect(g.gate.battle).toBeUndefined();   // turned back at first contact (sim/deterrence.ts): the stance stays 'defend', no fight
         } else {
           expect(last.stance).toBe('defend'); expect(g.gate.battle).toBeDefined();
           outcomes.add(tally.ambushed ? 'ambush' : 'refused');

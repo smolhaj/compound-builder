@@ -16,6 +16,7 @@ import { GUARD_MONTH, guardCount, guardProblem, MAX_GUARDS } from './guards';
 import { metalsValue } from './finance';
 import { structureNeedLines } from './structureNeed';
 import { committedCrewWages, livingReserve } from './spendGuard';
+import { sinkOffers, type SinkOffer } from './richSinks';
 import type { GameState, OrderLine } from './state';
 
 /** Cash beyond the living reserve, the wages already committed and the materials the open plans lack must pass this before anything is offered. */
@@ -35,6 +36,8 @@ export const IDLE_METALS_CAP = 100_000;
 /** Guards are offered once the warning is up and the spare cash covers this many months of the first one. */
 export const IDLE_GUARD_MONTHS = 6;
 export const IDLE_TWO_GUARDS = 300_000;
+/** With this much spare cash the whole hired watch (every guard the contract covers, two to a shift) is offered, not one or two. */
+export const IDLE_WATCH = 600_000;
 
 export interface IdleCrew { id: string; name: string; weeks: number; usd: number; totalUsd: number; lines: OrderLine[] }
 export interface IdleCash {
@@ -47,6 +50,8 @@ export interface IdleCash {
   guards: { n: number; usd: number } | null;
   /** With no project open, the next one to stake (a home that sleeps everyone first, then water, food, power): spare cash with nothing to spend it on was silent. */
   stake: IdleStake | null;
+  /** Tier 2 (sim/richSinks.ts): a clinic, a gate house, a second well, a power plant. Offered in peace and warning once the family has a roof. */
+  sinks: SinkOffer[];
 }
 export interface IdleStake { kind: string; name: string; usd: number }
 
@@ -110,10 +115,11 @@ export function idleCash(s: GameState): IdleCash | null {
     }
     const room = MAX_GUARDS - guardCount(s);
     if (room > 0 && !guardProblem(s) && spare >= GUARD_MONTH * IDLE_GUARD_MONTHS) {
-      const n = Math.min(room, spare >= IDLE_TWO_GUARDS ? 2 : 1);
+      const n = Math.min(room, spare >= IDLE_WATCH ? room : spare >= IDLE_TWO_GUARDS ? 2 : 1);
       guards = { n, usd: n * GUARD_MONTH * 3 };
     }
   }
-  if (!crew && metals <= 0 && !guards && !stake) return null;
-  return { spare, crew, metals: Math.max(0, metals), guards, stake };
+  const sinks = sinkOffers(s, spare);
+  if (!crew && metals <= 0 && !guards && !stake && !sinks.length) return null;
+  return { spare, crew, metals: Math.max(0, metals), guards, stake, sinks };
 }

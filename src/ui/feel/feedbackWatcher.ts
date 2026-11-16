@@ -37,7 +37,7 @@ const driveOf = () => useWorldStore.getState().siteGeo?.drive;
 function goals(g: GameState): void {
   const f = useFeelStore.getState();
   const fh = firstHour(g, driveOf(), f.goalMem);
-  const was = new Set(f.goalMem.done);
+  const was = new Set<string>(f.goalMem.done);
   const fresh = fh.goals.filter(x => x.status === 'done' && !was.has(x.id));
   const changed = JSON.stringify(fh.memory) !== JSON.stringify(f.goalMem);
   if (!changed) return;

@@ -8,9 +8,8 @@
  * gone. Pure.
  */
 import { medicalBay } from './richSinks';
-import { burnStructure, isFinished, knockBack } from './construction';
+import { burnStructure, isFinished } from './construction';
 import { insuranceClaim } from './paperwork';
-import { BLUEPRINTS } from './blueprints';
 import { emberFactor } from './housingStyles';
 import { emberK } from './houseHardening';
 import { isHome } from './blueprints';
@@ -83,18 +82,7 @@ export function effectsDay(s: GameState): string[] {
   const r = mulberry32(s.seed * 6007 + day * 3 + 1);
   const out: string[] = [];
   const once = (key: string) => { if (d.done?.includes(key)) return false; (d.done ??= []).push(key); return true; };
-  // ash: long, low-pitched roofs give way under wet ash (about 10 cm of it is enough)
-  if (d.kind === 'ash_winter' && day >= 4 && once('ash_roofs')) {
-    for (const st of s.structures.filter(isFinished)) {
-      if (!['workshop', 'chicken_coop', 'garden'].includes(st.kind) || r() > 0.55) continue;
-      const roof = BLUEPRINTS[st.kind].stages.findIndex(x => x.id === 'roof');
-      if (roof < 0) continue;
-      knockBack(s, st, roof);
-      out.push(`The ${st.kind.replace('_', ' ')} roof came down under the wet ash: it has to be rebuilt.`);
-      const paid = insuranceClaim(s, st, 0.4);
-      if (paid) out.push(paid);
-    }
-  }
+  // (ash on the roofs is a daily load clock now: sim/disasters/ashShared.ts structureDamage, sim/ashfall.ts)
   // the fire front: buildings burn by the fuel round them (trees close in, measured by the world); bunkers and stone don't
   if (d.kind === 'wildfire' && day === 0 && once('fire_front')) {
     const fuel = d.fuel ?? {};

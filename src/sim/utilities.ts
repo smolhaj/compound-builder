@@ -12,6 +12,7 @@
  * plumbed), rain into the cisterns. Batteries fade, pumps fail and need
  * repair. Shortages are logged. Pure (tested).
  */
+import { solarDerate } from './physicalSolar';
 import { lakeIntakeL } from './waterfront';
 import { pumpDrawFactor, sunFactor } from './terrainFx';
 import { orchardWaterL } from './orchard';
@@ -431,7 +432,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     // grid-tied solar shuts off in a blackout unless a battery (hybrid inverter) is on the network
     const solarOk = gridUp || cap > 0 || !u.grid;
     // each array's ground faces the sun a little more or less (sim/terrainFx.ts: south-facing slope up to +25 %, north-facing down to -25 %)
-    const sol = solarOk ? members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.solarKw ?? 0) * sunFactor(s, o) * (GROUND_ARRAYS.includes(o.kind) ? solarCoolK(s, o) : 1), 0) * sunHours(doy) * fogK * 0.8 : 0;
+    const sol = solarOk ? members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.solarKw ?? 0) * sunFactor(s, o) * (GROUND_ARRAYS.includes(o.kind) ? solarCoolK(s, o) : 1), 0) * sunHours(doy) * fogK * solarDerate(s) * 0.8 : 0;
     // falling water and wind (sim/renewables.ts): their own day's energy, not the sun's; grid-tied they trip with the grid like the panels
     const ren = solarOk ? members.filter(live).reduce((a, o) => a + (renew.hydro.get(o.id)?.kwh ?? 0) + (renew.wind.get(o.id)?.kwh ?? 0), 0) : 0;
     draw += d; solar += sol + ren; capKwh += cap;

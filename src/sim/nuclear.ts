@@ -88,15 +88,18 @@ export function faradayShare(s: GameState): number {
  * The moment of the strikes: the EMP fries what it reaches, the people at
  * work in town try to get home, everyone else runs for the best shelter.
  */
-export function strike(s: GameState): string[] {
+/**
+ * The EMP itself, shared by the war (`nuclear`) and the lone high-altitude burst (`emp`): installed electronics fry, then the spares in the
+ * stockpile (those in a Faraday room may survive), then the vehicles with chips (`vehicleFry` 1 = all; less rolls each one).
+ */
+export function empStrike(s: GameState, opts: { vehicleFry?: number; extra?: Array<keyof Stock>; floor?: number } = {}): string[] {
   const out: string[] = [];
   const r = mulberry32(s.seed * 4441 + 9);
-  const v = s.disaster.variant;
   // EMP: installed electronics, then the spares in the stockpile (those in a Faraday room may survive)
-  const share = faradayShare(s);
+  const share = Math.max(faradayShare(s), opts.floor ?? 0);
   for (const st of s.structures.filter(isFinished)) if (SPARE_FOR[st.kind] && !s.utilities.fried.includes(st.id)) s.utilities.fried.push(st.id);
   const lost: string[] = [];
-  for (const k of SPARES) {
+  for (const k of [...SPARES, ...(opts.extra ?? [])]) {
     const have = Math.floor(s.stock[k]);
     let keep = 0;
     for (let i = 0; i < have; i++) if (r() < share) keep++;
@@ -104,7 +107,14 @@ export function strike(s: GameState): string[] {
     s.stock[k] = keep + (s.stock[k] - have);
   }
   out.push(`The EMP took out the inverters, the pump controller and the generator's electronics.${lost.length ? ` Spares fried: ${lost.join(', ')}.` : share > 0 ? ' The spares in the Faraday room came through.' : ''}`);
-  out.push(...empVehicles(s));
+  const fry = opts.vehicleFry ?? 1;
+  out.push(...empVehicles(s, fry, mulberry32(s.seed * 4441 + 77)));
+  return out;
+}
+
+export function strike(s: GameState): string[] {
+  const v = s.disaster.variant;
+  const out: string[] = empStrike(s);
   // the dash: people in town at work
   s.people.forEach((p, i) => {
     const ps = s.personState[i];

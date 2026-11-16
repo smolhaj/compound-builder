@@ -139,7 +139,7 @@ describe('every disaster has a look of its own', () => {
   });
   it('the dead-grid kinds are told apart by their night: no town lights, a lifted dark', () => {
     for (const k of ['grid_down', 'solar_flare', 'cyberattack'] as DisasterKind[]) {
-      const l = collapseLook(at(k, k === 'cyberattack' ? 20 : 6, k === 'grid_down' ? 'substation' : undefined));
+      const l = collapseLook(at(k, k === 'cyberattack' ? 20 : 6, k === 'grid_down' ? 'substation' : k === 'solar_flare' ? 'carrington' : k === 'cyberattack' ? 'rolling' : undefined));
       expect(l.townGlow, k).toBeLessThan(0.5);
       expect(l.nightLift, k).toBeGreaterThan(0.1);
     }

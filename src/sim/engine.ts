@@ -98,6 +98,7 @@ import { nightWork } from './blackout';
 import { choresDay, choresStep, dailyTick, DUTY, DUTY_TASK, restFactor, tire, dutyWork, choreRate } from './daily';
 import { gatheringStep, gatheringsDay } from './gatherings';
 import { awayRates, caretakerWork, heatShare, presenceStep, weekenderDay, workDay, livingShare } from './weekender';
+import './felt/goalLib';
 import type { GameState, Structure } from './state';
 import { ritualDay, ritualHour } from './rituals';
 

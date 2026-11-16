@@ -15,6 +15,8 @@ import { askPrice, CURRENCY, daysToMarket, goodName, goProblem, goToMarket, MARK
 import { BAG_BASE, BAG_GOODS } from '../sim/tradeGoods';
 import { answerCallout, askPact, joinGroup, joinGroupProblem, leaveGroup, leavePact, PACT_MIN, stateWord, surname } from '../sim/neighborLife';
 import { inPact } from '../sim/pact';
+import { verifyRumor } from '../sim/cyberMath';
+import { radioSet } from '../sim/radio';
 import { clarity, openRumors, roadRisk, scoutProblem, sendScout } from '../sim/rumors';
 import { pluralize } from '../sim/words';
 import { gallonsText, kmText, remText } from '../sim/units';
@@ -130,6 +132,8 @@ export function RumorsSection() {
         <Note>{h.text}{h.status === 'unclear' ? ' (nobody could tell)' : ''}</Note>
         <button style={{ ...btn(), opacity: why ? 0.4 : 1 }} disabled={!!why} title={why ?? 'Go and see, on foot. Back tomorrow.'}
           onClick={() => { const w = g.money(d => sendScout(d, h.id, pid)); if (w) alert(w); }}>Go and see</button>
+        {radioSet(game) === 'ham' && <button style={{ ...btn(), marginLeft: 4 }} title="Check it against another net: an hour of the operator, two a day."
+          onClick={() => { const w = g.money(d => verifyRumor(d, h.id)); if (w) alert(w); }}>Verify on ham</button>}
       </div>;
     })}
   </Section>;

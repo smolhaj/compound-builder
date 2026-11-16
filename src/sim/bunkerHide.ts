@@ -36,6 +36,7 @@ import { crewKindOf } from './surrender';
 import { backgroundOf } from './family';
 import { gallonsText } from './units';
 import { pluralize } from './words';
+import { lootPoints } from './deterrence';
 
 /** Every number here is tunable. */
 export const BUNKER_HIDE = {
@@ -170,13 +171,14 @@ export function entranceOf(s: GameState): Entrance | null {
 export const entranceWord = (kind: string): string => (kind === 'bunker_floorhatch' ? 'the floor hatch' : kind === 'bunker_stairs' ? 'the stairs' : 'the hatch');
 
 /** The give-aways in exposure points: noise, dogs, smoke, the trodden path, and a crew with dogs of its own. */
-export function giveAways(s: GameState, e: Pick<Encounter, 'temper' | 'scouted'>, ent: Pick<Entrance, 'kind'>): { noise: number; dogs: number; smoke: number; tracks: number; raiderDogs: number; total: number } {
+export function giveAways(s: GameState, e: Pick<Encounter, 'temper' | 'scouted'>, ent: Pick<Entrance, 'kind'>): { noise: number; dogs: number; smoke: number; tracks: number; raiderDogs: number; rich: number; total: number } {
   const noise = s.utilities.report.genKwh > 0.05 ? BUNKER_HIDE.GEN * genSound(s) : 0;
   const dogs = Math.min(BUNKER_HIDE.DOG_CAP, dogCount(s) * BUNKER_HIDE.DOG) * (dogsQuiet(s) ? BUNKER_HIDE.DOG_QUIET : 1);
   const smoke = chimneyPoints(s) * BUNKER_HIDE.SMOKE;
   const tracks = BUNKER_HIDE.TRACKS[ent.kind] ?? 4;
   const raiderDogs = e.temper === 'savage' || e.scouted ? BUNKER_HIDE.RAIDER_DOGS : 0;
-  return { noise, dogs, smoke, tracks, raiderDogs, total: noise + dogs + smoke + tracks + raiderDogs };
+  const rich = s.disaster.difficulty === 'hardcore' ? 0 : lootPoints(s) * 0.5;   // a stocked place is searched harder (sim/deterrence.ts)
+  return { noise, dogs, smoke, tracks, raiderDogs, rich, total: noise + dogs + smoke + tracks + raiderDogs + rich };
 }
 
 /** One day's chance the crew finds the bunker's entrance (day 1 = the first day they search). */

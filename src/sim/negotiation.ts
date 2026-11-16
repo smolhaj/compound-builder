@@ -136,7 +136,7 @@ export function talkOffer(s: GameState, e: Encounter, p: TalkPlace): TalkOffer {
     const hum = t === 'neg_aid' ? 4 : t === 'neg_redirect' ? -8 : 0;
     const homes = s.neighbors.filter(n => n.status === 'home');
     const missing = Object.entries(stock).filter(([k, n]) => (s.stock[k as keyof Stock] ?? 0) < (n as number));
-    const blocked = missing.length ? 'You do not have enough to offer.' : t === 'neg_redirect' && !homes.length ? 'There is no one left up the road to send them to.' : null;
+    const blocked = missing.length ? `They want goods, not cash (money is no use at the gate now). You are short ${missing.map(([k, n]) => `${Math.max(1, Math.ceil((n as number) - (s.stock[k as keyof Stock] ?? 0)))} ${k}`).join(', ')}.` : t === 'neg_redirect' && !homes.length ? 'There is no one left up the road to send them to.' : null;
     const pS = settleChance(s, e, t, p), pA = ambushChance(s, e, t, pS);
     terms.push({ stance: t, name: NAME[t][0], blurb: NAME[t][1], cost: costWords(stock, hum, t === 'neg_redirect'), stock, humanity: hum, pSettle: pS, pAmbush: pA, odds: oddsWord(pS), risk: riskWord(pA), blocked });
   }

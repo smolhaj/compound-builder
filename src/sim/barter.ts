@@ -14,6 +14,7 @@ import { MATERIALS } from './materials';
 import { addTool, kitOf, readKit, TOOL_KINDS, TOOLS, usedValue, type ToolKind } from './tools';
 import { blockedReason, isFinished, addWork } from './construction';
 import { mulberry32 } from './rng';
+import { barterMult } from './moneyMath';
 import { dayIndex, type GameState } from './state';
 
 /** A day's labor in peacetime (2025 dollars, farm hand). */
@@ -77,6 +78,8 @@ export function barterPrices(s: GameState): Record<Good, number> {
   for (const k of TOOL_KINDS) out[`tool:${k}`] = usedValue(k, 0.65) * (TOOLS[k].crude ? 0.5 : 1) * (1 + 1.5 * scarce * Math.min(1, sinceHit(s) / 365));
   // a day's work is worth less in goods when everyone has time and nobody has things
   out.labor = LABOR_DAY * (1 - 0.4 * scarce);
+  // a financial collapse: cash is dear, so hard goods are worth several times their cash price (sim/moneyMath.ts)
+  for (const g of Object.keys(out) as Good[]) out[g] *= barterMult(s, g);
   return out;
 }
 
