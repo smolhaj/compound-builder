@@ -36,4 +36,9 @@ try {
   await page.waitForTimeout(1500);
   await page.screenshot({ path: `${outDir}/${kind}_hud.png` });
   console.log(`${outDir}/${kind}_hud.png`);
+  // the Land tab holds Paperwork and the physical panel
+  await page.getByText('Land', { exact: true }).first().click();
+  await page.waitForTimeout(800);
+  await page.screenshot({ path: `${outDir}/${kind}_land.png` });
+  console.log(`${outDir}/${kind}_land.png`);
 } finally { await browser.close(); vite.kill(); }
