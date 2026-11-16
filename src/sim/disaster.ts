@@ -22,7 +22,9 @@ export const TRACK_NAME: Record<Track, string> = {
 export type DisasterKind = 'grid_down' | 'financial' | 'lawless' | 'drought' | 'pandemic' | 'nuclear' | 'solar_flare' | 'wildfire' | 'ash_winter' | 'cyberattack'
   | 'zombies' | 'invasion' | 'civil_war' | 'bioweapon' | 'asteroid' | 'unknown'
   // placeholders (WP0): selectable and minimal until their packages land; not in the Surprise pool until WP10
-  | 'emp' | 'mega_quake' | 'crop_blight' | 'dam_flood' | 'supervolcano';
+  | 'emp' | 'mega_quake' | 'crop_blight' | 'dam_flood' | 'supervolcano'
+  // WP7: the herd and the flock (docs/scenarios/livestock_plague.md)
+  | 'livestock_plague';
 import { unscripted } from './godMode';
 export type Mode = 'surprise' | 'scenario' | 'sandbox' | 'god';
 /** GDS difficulty presets: Cozy (long warning, gentle raids), Standard, Hardcore (little warning, harsh raids, permadeath). */
@@ -96,7 +98,13 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
   },
   lawless: {
     kind: 'lawless', name: 'End of the rule of law', pulpy: false, warn: [7, 20],
-    variants: [{ id: 'collapse', name: 'the collapse of order', weight: 1, curves: { law: C(0, 10, 0, [180, 540], 60), stores: C(0, 5, 0.1, [150, 500]), deliveries: C(0, 3, 0.1, [150, 500]), banks: C(0, 3, 0.1, [150, 500]) } }],
+    variants: [
+      { id: 'walkout', name: 'the walkout of the county\'s police', weight: 3, curves: { law: C(0, 10, 0, [180, 540], 60), stores: C(0, 5, 0.1, [150, 500]), deliveries: C(0, 3, 0.1, [150, 500]), banks: C(0, 3, 0.1, [150, 500]), fuel: C(2, 20, 0.4, [120, 420]), medical: C(5, 30, 0.6, [200, 500]) } },
+      { id: 'blackout_of_order', name: 'a blackout of order', weight: 2, curves: { law: C(0, 2, 0, [20, 60], 14), stores: C(0, 2, 0.1, [25, 70]), deliveries: C(0, 2, 0, [25, 70]), grid: C(0, 1, 0.2, [10, 45]), phone: C(0, 1, 0.3, [10, 40]) } },
+      { id: 'drift', name: 'a slow drift into no law', weight: 1, curves: { law: C(0, 30, 0.02, null), banks: C(0, 10, 0.05, null), stores: C(10, 60, 0.2, null), grid: C(40, 90, 0.4, null), phone: C(60, 90, 0.4, null) } },
+      // the single variant before WP3 (saves made then carry this id; never rolled for a new run): same curves as the walkout
+      { id: 'collapse', name: 'the collapse of order', weight: 0, curves: { law: C(0, 10, 0, [180, 540], 60), stores: C(0, 5, 0.1, [150, 500]), deliveries: C(0, 3, 0.1, [150, 500]), banks: C(0, 3, 0.1, [150, 500]) } },
+    ],
     hints: [['Police union warns of unpaid overtime.', 'Break-ins up sharply in town.', 'Sheriff asks residents to "be patient".'], ['Looting reported in the city.', 'Deputies stop answering calls past the county line.', 'Pawn shop out of guns and ammo.'], ['Sheriff\'s office closed "until further notice".', 'A gang is working the farms east of town.', 'Neighbors set up a roadblock at the bridge.']],
     hit: ['Nobody is coming: the sheriff\'s office has shut its doors.'],
     chain: [],
@@ -123,7 +131,9 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
   pandemic: {
     kind: 'pandemic', name: 'Pandemic', pulpy: false, warn: [30, 60],
     variants: [
-      { id: 'wave', name: 'the pandemic', weight: 1, curves: { medical: C(0, 14, 0.1, [200, 420], 60), stores: C(3, 14, 0.4, [60, 200], 30), deliveries: C(5, 20, 0.5, [60, 200], 30), law: C(30, 60, 0.6, [120, 300], 30), banks: C(10, 30, 0.7, [60, 200], 30), fuel: C(10, 30, 0.6, [60, 200], 30) } },
+      { id: 'wave', name: 'the pandemic', weight: 3, curves: { medical: C(0, 14, 0.1, [200, 420], 60), stores: C(3, 14, 0.4, [60, 200], 30), deliveries: C(5, 20, 0.5, [60, 200], 30), law: C(30, 60, 0.6, [120, 300], 30), banks: C(10, 30, 0.7, [60, 200], 30), fuel: C(10, 30, 0.6, [60, 200], 30) } },
+      { id: 'flu_1918', name: 'a 1918-type influenza', weight: 2, curves: { medical: C(0, 10, 0.05, [240, 500], 90), stores: C(3, 14, 0.35, [90, 260], 45), deliveries: C(5, 20, 0.4, [90, 260], 45), law: C(25, 50, 0.45, [150, 330], 45), banks: C(10, 30, 0.6, [90, 260], 45), fuel: C(10, 30, 0.5, [90, 260], 45), grid: C(120, 90, 0.8, [240, 420], 90) } },
+      { id: 'high_fatality', name: 'a high-fatality plague', weight: 1, curves: { medical: C(0, 7, 0, [300, 600], 120), stores: C(5, 20, 0.2, [150, 400], 60), deliveries: C(7, 25, 0.25, [150, 400], 60), law: C(20, 45, 0.25, [180, 420], 60), banks: C(10, 30, 0.4, [150, 400], 60), fuel: C(12, 40, 0.3, [150, 400], 60), grid: C(90, 120, 0.5, [300, 600], 120), phone: C(150, 120, 0.7, [400, 700], 90) } },
     ],
     hints: [['A cluster of "atypical pneumonia" overseas.', 'Airports begin screening.', 'Masks sold out online.'], ['First case in the state.', 'The hospital restricts visitors.', 'A neighbor\'s daughter, a nurse: "it\'s bad in the ER."'], ['Schools close statewide.', 'Toilet paper gone from every shelf.', 'Stay-at-home order expected tonight.']],
     hit: ['Stay-at-home order: the hospitals are full and the county is locking down.'],
@@ -167,28 +177,40 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
   },
   zombies: {
     kind: 'zombies', name: 'Zombies', pulpy: true, warn: [5, 15],
-    variants: [{ id: 'outbreak', name: 'the outbreak', weight: 1, curves: { law: C(3, 10, 0, null), medical: C(2, 7, 0, null), stores: C(3, 7, 0, null), deliveries: C(2, 5, 0, null), grid: C(14, 30, 0, null), fuel: C(5, 15, 0, null), banks: C(5, 10, 0, null), phone: C(10, 30, 0, null) } }],
+    variants: [{ id: 'outbreak', name: 'the outbreak', weight: 3, curves: { law: C(3, 10, 0, null), medical: C(2, 7, 0, null), stores: C(3, 7, 0, null), deliveries: C(2, 5, 0, null), grid: C(14, 30, 0, null), fuel: C(5, 15, 0, null), banks: C(5, 10, 0, null), phone: C(10, 30, 0, null) } },
+      { id: 'everyone_turns', name: 'the sleeper plague', weight: 2, curves: { law: C(3, 10, 0, null), medical: C(1, 5, 0, null), stores: C(3, 7, 0, null), deliveries: C(2, 5, 0, null), grid: C(10, 25, 0, null), fuel: C(5, 15, 0, null), banks: C(5, 10, 0, null), phone: C(10, 30, 0, null) } },
+      { id: 'rage', name: 'the rage', weight: 1, curves: { law: C(2, 7, 0.05, [60, 120]), medical: C(2, 7, 0, [90, 200]), stores: C(2, 6, 0.1, [40, 100]), deliveries: C(2, 5, 0.1, [50, 120]), grid: C(10, 20, 0.1, [40, 90]), fuel: C(5, 15, 0.05, [60, 140]), banks: C(5, 10, 0.1, [60, 140]), phone: C(10, 30, 0.1, [60, 140]) } }],
     hints: [['Riot at a hospital in the city: patients "attacking staff".', 'A strange rabies-like illness in the news.'], ['The National Guard is in the city. Footage is being taken down.', 'Neighbors say the interstate is closed east of here.'], ['The city has gone quiet on the radio.', 'Something is walking up the county road.']],
     hit: ['They\'re here. The dead are walking out of town.'],
     chain: [],
   },
   invasion: {
     kind: 'invasion', name: 'Invasion', pulpy: true, warn: [10, 40],
-    variants: [{ id: 'occupation', name: 'the occupation', weight: 1, curves: { law: C(0, 5, 0.2, null), grid: C(0, 2, 0.2, null), phone: C(0, 0, 0, null), banks: C(0, 2, 0, null), fuel: C(0, 5, 0.1, null), stores: C(2, 10, 0.2, null), deliveries: C(0, 3, 0.1, null), medical: C(2, 10, 0.3, null) } }],
+    variants: [
+      { id: 'occupation', name: 'the occupation', weight: 3, curves: { law: C(0, 5, 0.2, null), grid: C(0, 2, 0.2, null), phone: C(0, 0, 0, null), banks: C(0, 2, 0, null), fuel: C(0, 5, 0.1, null), stores: C(2, 10, 0.2, null), deliveries: C(0, 3, 0.1, null), medical: C(2, 10, 0.3, null) } },
+      { id: 'soft', name: 'a friendlier occupation', weight: 1, curves: { law: C(0, 5, 0.3, null), grid: C(0, 2, 0.2, [30, 60], 14), phone: C(0, 0, 0, null), banks: C(0, 2, 0.1, null), fuel: C(0, 5, 0.2, null), stores: C(2, 10, 0.3, null), deliveries: C(0, 3, 0.2, null), medical: C(2, 10, 0.4, null) } },
+      { id: 'contested', name: 'an occupation with a moving front', weight: 1, curves: { law: C(0, 5, 0.2, null), grid: C(0, 2, 0.2, null), phone: C(0, 0, 0, null), banks: C(0, 2, 0, null), fuel: C(0, 5, 0.1, null), stores: C(2, 10, 0.2, null), deliveries: C(0, 3, 0.1, null), medical: C(2, 10, 0.3, null) } },
+    ],
     hints: [['Satellites over the Pacific go dark.', 'Carrier groups recalled; the President addresses the nation.'], ['Paratroopers reported near the missile fields.', 'Martial law declared in three states.'], ['Columns of vehicles on the interstate, not ours.', 'Radio stations off the air one by one.']],
     hit: ['Foreign troops are in the valley. Checkpoints on every road.'],
     chain: [],
   },
   civil_war: {
     kind: 'civil_war', name: 'Civil war', pulpy: true, warn: [20, 60],
-    variants: [{ id: 'factions', name: 'the war between the Cascade Compact and the Plains Alliance', weight: 1, curves: { law: C(0, 20, 0.1, null), grid: C(10, 30, 0.3, null), fuel: C(0, 20, 0.2, null), banks: C(0, 10, 0.1, null), stores: C(5, 30, 0.3, null), deliveries: C(5, 30, 0.2, null), medical: C(10, 40, 0.3, null), phone: C(5, 20, 0.4, null) } }],
+    variants: [
+      { id: 'factions', name: 'the war between the Cascade Compact and the Plains Alliance', weight: 3, curves: { law: C(0, 20, 0.1, null), grid: C(10, 30, 0.3, null), fuel: C(0, 20, 0.2, null), banks: C(0, 10, 0.1, null), stores: C(5, 30, 0.3, null), deliveries: C(5, 30, 0.2, null), medical: C(10, 40, 0.3, null), phone: C(5, 20, 0.4, null) } },
+      { id: 'uprising', name: 'a sudden uprising between the Compact and the Alliance', weight: 1, curves: { law: C(0, 10, 0.2, [300, 700], 60), grid: C(5, 20, 0.5, [200, 500]), fuel: C(0, 20, 0.2, null), banks: C(0, 10, 0.1, null), stores: C(5, 30, 0.3, null), deliveries: C(5, 30, 0.2, null), medical: C(10, 40, 0.3, null), phone: C(5, 20, 0.4, null) } },
+      { id: 'partition', name: 'a slow partition of the country', weight: 1, curves: { law: C(0, 20, 0.1, null), grid: C(10, 30, 0.3, null), fuel: C(0, 20, 0.2, null), banks: C(20, 60, 0.4, [300, 900]), stores: C(5, 30, 0.3, null), deliveries: C(5, 30, 0.2, null), medical: C(10, 40, 0.3, null), phone: C(5, 20, 0.4, null) } },
+    ],
     hints: [['The Cascade Compact refuses federal orders.', 'Protests become armed standoffs in two capitals.'], ['The Plains Alliance seizes a federal depot.', 'Checkpoints on the state line.'], ['Fighting around Billings; the interstate is cut.', 'Militia recruiters at the feed store.']],
     hit: ['The war reaches the valley: the Plains Alliance holds the town, the Compact the passes.'],
     chain: [],
   },
   bioweapon: {
     kind: 'bioweapon', name: 'Engineered bioweapon', pulpy: true, warn: [7, 20],
-    variants: [{ id: 'release', name: 'the release', weight: 1, curves: { medical: C(0, 5, 0, null), stores: C(1, 5, 0.05, null), deliveries: C(1, 5, 0, null), law: C(7, 20, 0.05, null), grid: C(20, 60, 0.2, null), fuel: C(5, 20, 0.05, null), banks: C(5, 15, 0, null), phone: C(30, 90, 0.2, null) } }],
+    variants: [{ id: 'release', name: 'the release', weight: 3, curves: { medical: C(0, 5, 0, null), stores: C(1, 5, 0.05, null), deliveries: C(1, 5, 0, null), law: C(7, 20, 0.05, null), grid: C(20, 60, 0.2, null), fuel: C(5, 20, 0.05, null), banks: C(5, 15, 0, null), phone: C(30, 90, 0.2, null) } },
+      { id: 'hemorrhagic', name: 'a hemorrhagic fever', weight: 2, curves: { medical: C(0, 4, 0, null), stores: C(1, 5, 0.05, null), deliveries: C(1, 5, 0, null), law: C(5, 15, 0.05, null), grid: C(15, 50, 0.2, null), fuel: C(5, 20, 0.05, null), banks: C(5, 15, 0, null), phone: C(25, 80, 0.2, null) } },
+      { id: 'smallpox_like', name: 'a smallpox-like virus', weight: 1, curves: { medical: C(0, 8, 0.05, [200, 500], 90), stores: C(3, 10, 0.2, [150, 450], 60), deliveries: C(3, 10, 0.2, [150, 450], 60), law: C(10, 30, 0.3, [200, 500], 60), grid: C(30, 60, 0.4, [250, 500], 90), banks: C(7, 20, 0.2, [150, 450], 60) } }],
     hints: [['An outbreak in three cities at once.', 'Officials won\'t say where it started.'], ['Hospitals in the city overwhelmed in days.', 'The CDC tells everyone to stay home.'], ['Bodies in the streets in the city footage.', 'Roadblocks on the highway into the county.']],
     hit: ['It\'s here. Anyone from outside could be carrying it.'],
     chain: [],
@@ -224,7 +246,9 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
   },
   crop_blight: {
     kind: 'crop_blight', name: 'Crop blight and pest plague', pulpy: false, warn: [30, 90],
-    variants: [{ id: 'rust', name: 'a wheat rust and locust year', weight: 1, curves: { stores: C(20, 120, 0.4, [240, 500], 180), deliveries: C(30, 120, 0.5, [240, 500], 120), law: C(90, 120, 0.7, [300, 600], 150) } }],
+    variants: [{ id: 'late_blight', name: 'a potato late blight that spreads to everything wet', weight: 2, curves: { stores: C(20, 100, 0.5, [200, 420], 150), deliveries: C(30, 100, 0.55, [200, 420], 100), law: C(90, 100, 0.75, [300, 600], 150) } },
+      { id: 'locusts', name: 'a locust plague', weight: 1, curves: { stores: C(10, 60, 0.35, [150, 330], 120), deliveries: C(15, 60, 0.45, [150, 330], 100), law: C(60, 90, 0.7, [250, 500], 120) } },
+      { id: 'rust', name: 'a wheat rust and locust year', weight: 3, curves: { stores: C(20, 120, 0.4, [240, 500], 180), deliveries: C(30, 120, 0.5, [240, 500], 120), law: C(90, 120, 0.7, [300, 600], 150) } }],
     hints: [['Farm extension agents report a new rust strain on wheat.'], ['Grain prices double at the elevator.'], ['Locusts are in the next county; fields are being stripped.']],
     hit: ['The harvest has failed across the county. The shelves will thin all year.'],
     chain: [],
@@ -241,6 +265,19 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
     variants: [{ id: 'caldera', name: 'a caldera eruption', weight: 1, curves: { grid: C(1, 5, 0.1, null), fuel: C(2, 10, 0.1, null), stores: C(5, 20, 0.1, null), deliveries: C(3, 10, 0.05, null), medical: C(5, 20, 0.2, null), law: C(14, 40, 0.1, null), phone: C(3, 10, 0.2, null), banks: C(3, 10, 0.05, null) } }],
     hints: [['Earthquake swarms and ground lifting reported at the caldera.'], ['The park is evacuated; flights are rerouted.'], ['The sky to the east has gone a dull orange.']],
     hit: ['The mountain has erupted. Ash is falling out of a dark sky.'],
+    chain: [],
+  },
+  livestock_plague: {
+    kind: 'livestock_plague', name: 'Livestock plague', pulpy: false, warn: [14, 60],
+    variants: [
+      { id: 'hpai', name: 'avian influenza', weight: 4, curves: { stores: C(7, 45, 0.7, [90, 300], 90), deliveries: C(10, 45, 0.8, [90, 300], 90), medical: C(60, 90, 0.9, [200, 500], 90) } },
+      { id: 'fmd', name: 'foot-and-mouth disease', weight: 3, curves: { stores: C(10, 60, 0.6, [150, 420], 90), deliveries: C(10, 60, 0.7, [150, 420], 90), law: C(30, 60, 0.85, [200, 500], 90) } },
+      { id: 'asf', name: 'African swine fever', weight: 2, curves: { stores: C(15, 60, 0.75, [180, 450], 90), deliveries: C(15, 60, 0.8, [180, 450], 90) } },
+      { id: 'mixed_zoonotic', name: 'an avian flu that crosses to cattle and people', weight: 1, curves: { stores: C(7, 45, 0.7, [90, 300], 90), deliveries: C(10, 45, 0.8, [90, 300], 90), medical: C(100, 120, 0.7, [300, 600], 90) } },
+      { id: 'bse_like', name: 'a feed-borne prion disease', weight: 1, curves: { stores: C(30, 120, 0.7, [400, 800], 120), deliveries: C(30, 120, 0.75, [400, 800], 120) } },
+    ],
+    hints: [['Dead wild geese found at the reservoir.', 'Egg prices are up 40% since Monday.'], ['State veterinarian bans all livestock movement for 30 days.', 'Quarantine zone declared around a dairy in the next county.'], ['Mandatory cull of infected premises and of the 3-mile ring around them.', 'A column of black smoke to the north: they are burning stock.']],
+    hit: ['A case is confirmed within three miles. Every barn in the county is a suspect.'],
     chain: [],
   },
 };
@@ -277,7 +314,7 @@ export const FATE_ODDS: Partial<Record<DisasterKind, [number, number, number]>> 
   lawless: [0.45, 0.38, 0.17], financial: [0.4, 0.42, 0.18], drought: [0.35, 0.45, 0.2], solar_flare: [0.3, 0.42, 0.28],
   ash_winter: [0.2, 0.45, 0.35], nuclear: [0.12, 0.43, 0.45],
   // placeholders (WP0)
-  emp: [0.1, 0.3, 0.6], mega_quake: [0.45, 0.4, 0.15], crop_blight: [0.5, 0.35, 0.15], dam_flood: [0.8, 0.17, 0.03], supervolcano: [0.05, 0.3, 0.65],
+  emp: [0.1, 0.3, 0.6], mega_quake: [0.45, 0.4, 0.15], crop_blight: [0.5, 0.35, 0.15], dam_flood: [0.8, 0.17, 0.03], supervolcano: [0.05, 0.3, 0.65], livestock_plague: [0.55, 0.35, 0.1],
 };
 export function rollFate(kind: DisasterKind, u: number): Fate {
   const [f, p] = FATE_ODDS[kind] ?? [0, 0, 1];

@@ -64,8 +64,8 @@ describe('felt daily dispatcher', () => {
     expect(feltDaily(g, ctx)).toEqual([]);
     for (const k of Object.keys(DISASTERS) as DisasterKind[]) {
       const h = fresh(); triggerDisaster(h.disaster, h.clock.t, k, h.seed, 0); h.clock.t += 1;
-      expect(feltDaily(h, ctx), k).toEqual([]);
-      expect(feltOf(h), k).toBeUndefined();
+      // FL4: decision cards come from the generic library now, so a hit day may raise one; the other steps stay silent for a stub
+      expect(feltDaily(h, ctx).filter(l => !l.startsWith('Decision:')), k).toEqual([]);
     }
   });
 });
