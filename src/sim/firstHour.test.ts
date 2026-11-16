@@ -167,7 +167,7 @@ describe('while the roof is open the other basics are not blocked behind it', ()
     const f = firstHour(g);
     expect(f.current!.id).toBe('roof');
     expect(f.current!.title).toBe('A bed for everyone');
-    expect(f.alsoOpen.map(x => x.id)).toEqual(['water', 'food', 'power']);
+    expect(f.alsoOpen.map(x => x.id).sort()).toEqual(['food', 'power', 'water']);   // a low pantry puts food first (promoted)
     for (const o of f.alsoOpen) expect(o.act!.act.type).not.toBe('starter');
   });
 });

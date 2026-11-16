@@ -239,3 +239,17 @@ export function ritualDay(s: GameState): string[] {
   R.day = day;
   return out;
 }
+
+/**
+ * One line for the People panel (playtest 3: rituals had no caption outside the Cutaway): what the family's evenings are like right now.
+ * Reads only the calm, the streak and the pantry; null before there is anything to say (no table, nobody home).
+ */
+export function ritualCaption(s: GameState): { text: string; tone: 'good' | 'warn' } | null {
+  const heads = s.personState.filter(ps => ps.needs.died == null && !ps.needs.left).length;
+  if (heads === 0) return null;
+  const r = ritualsOf(s);
+  if (r.calm < ALERT_BELOW) return { text: 'Eating in shifts after the breach: nobody sits down together while the place feels unsafe.', tone: 'warn' };
+  if (r.calm < CALM_MIN) return { text: 'The family is wary: dinner is quick and quiet, and the evenings are short.', tone: 'warn' };
+  if (!tableSet(s)) return { text: 'No plate for everyone tonight: the table is bare, so the family eats where it can.', tone: 'warn' };
+  return { text: r.streak >= 3 ? `Dinner together tonight, ${r.streak} days running. Fireside and play after: it steadies everyone.` : 'Dinner together tonight. Fireside and play after: it steadies everyone.', tone: 'good' };
+}

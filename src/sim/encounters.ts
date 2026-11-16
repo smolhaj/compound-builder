@@ -34,6 +34,7 @@ import { daysOfFood } from './needs';
 import { forewarned } from './radio';
 import { gearPosture } from './gear';
 import { fxEncounterWeights, fxMakeExtra, fxResolveExtra, isExtraRaid } from './disasterFx';
+import { deterrence, turnBackChance, lootPoints, lootK } from './deterrence';
 import { fogSightK } from './fogFx';
 import { fenceHold, watchDetection } from './daily';
 import { armed, firepower } from './armory';
@@ -396,7 +397,7 @@ export function strengthOf(s: GameState, p: Posture = postureOf(s)): number {
 }
 
 /** What the battle sim is told about a crew: how they fight and how well they have learned this place. */
-const battleOpts = (e: Encounter, extra: { insideBreach?: boolean; angry?: boolean; scoutPlan?: import('./scoutPlans').ScoutPlan; orders?: import('./raidOrders').RaidOrder[] } = {}) => ({ armed: e.armed, temper: e.temper, kind: e.kind, organized: ORGANIZED.has(e.kind), ...(e.opener ? { opener: e.opener } : {}), ...(extra.angry ? { angry: true } : {}), ...(extra.scoutPlan ? { scoutPlan: extra.scoutPlan } : {}), ...(e.adapt ? { adapt: e.adapt } : {}), ...extra });
+const battleOpts = (e: Encounter, extra: { insideBreach?: boolean; angry?: boolean; deter?: number; scoutPlan?: import('./scoutPlans').ScoutPlan; orders?: import('./raidOrders').RaidOrder[] } = {}) => ({ armed: e.armed, temper: e.temper, kind: e.kind, organized: ORGANIZED.has(e.kind), ...(e.opener ? { opener: e.opener } : {}), ...(extra.angry ? { angry: true } : {}), ...(extra.scoutPlan ? { scoutPlan: extra.scoutPlan } : {}), ...(e.adapt ? { adapt: e.adapt } : {}), ...extra });
 
 /**
  * The threat matrix: who comes. Opportunists (looters) are put off by a
@@ -711,7 +712,7 @@ export const holdOutK = (barrier: number): number => 1 - HIDE_WALL.MAX * Math.ma
 export function hideFoundChance(s: GameState, e: Encounter, p: Posture = postureOf(s)): number {
   const hunt = diffOf(s.disaster).hunt;
   if (e.kind === 'horde') return Math.min(0.95, p.visibility * 0.6 / 100);
-  return Math.max(0, Math.min(0.95, (p.visibility * 0.6 + (e.temper === 'savage' ? 25 : 0) + (e.back ? 20 : 0) + HIDE_COST_K[s.disaster.difficulty ?? 'standard'] * (HIDE.WAVE * Math.min(HIDE.WAVE_MAX, e.wave ?? 0) + repeatFinds(s, e)) + (e.scouted ? SCOUT_HIDE_BONUS : 0) + (e.dig ? 40 : 0) + hunt + findBonus(e.adapt ?? 0)) / 100));
+  return Math.max(0, Math.min(0.95, (p.visibility * 0.6 + (e.temper === 'savage' ? 25 : 0) + (e.back ? 20 : 0) + HIDE_COST_K[s.disaster.difficulty ?? 'standard'] * (HIDE.WAVE * Math.min(HIDE.WAVE_MAX, e.wave ?? 0) + repeatFinds(s, e)) + (e.scouted ? SCOUT_HIDE_BONUS : 0) + (e.dig ? 40 : 0) + hunt + findBonus(e.adapt ?? 0) + HIDE_COST_K[s.disaster.difficulty ?? 'standard'] * lootPoints(s)) / 100));
 }
 
 /** The share of the stores a crew carries off from a place where the family hid and was found: BASE + PER_HEAD per man, to CAP (it was 8 % + 1.5 %, to 30 %). */
@@ -734,7 +735,7 @@ function stripEmpty(s: GameState, e: Encounter, p: Posture, r: () => number, los
   const belowBase = s.structures.some(st => st.kind === 'bunker_stores' && isFinished(st)) ? 0.3 : p.bunker ? 0.6 : 1;
   // a scout counted the doors: they know there is a stores room below, and dig for it
   const below = Math.min(1, belowBase + (e.scouted ? SCOUT_BELOW_EXTRA : 0) + belowExtra(e.adapt ?? 0));
-  const strip = s.disaster.difficulty === 'hardcore' ? STRIP_HARDCORE : STRIP, share = Math.min(strip.CAP, strip.BASE + strip.PER_HEAD * e.size) * (e.temper === 'savage' || e.temper === 'hard' ? 1.3 : 1) * below * holdOutK(p.barrier) * (crew ? 1 : e.kind === 'refugees' ? 0.3 : 0.5);
+  const strip = s.disaster.difficulty === 'hardcore' ? STRIP_HARDCORE : STRIP, share = Math.min(strip.CAP, strip.BASE + strip.PER_HEAD * e.size) * (e.temper === 'savage' || e.temper === 'hard' ? 1.3 : 1) * below * holdOutK(p.barrier) * (HIDE_COST_K[s.disaster.difficulty ?? 'standard'] ? lootK(s) : 1) * (crew ? 1 : e.kind === 'refugees' ? 0.3 : 0.5);
   for (const k of ['fresh', 'canned', 'staples', 'frozen', 'fuel', 'meds'] as const) {
     const t = Math.floor((s.stock[k] ?? 0) * share);
     if (t > 0) { s.stock[k] -= t; lost.push(`${t} ${k}`); }
@@ -770,6 +771,9 @@ export interface FightOdds {
   /** Killed or taken, on average. */
   lost: number;
   tries: number;
+  /** Share of crews that turn back before a shot (already counted in win and loseSomeone) and the place's deterrence score 0-0.9 (sim/deterrence.ts). */
+  turnBack?: number;
+  deter?: number;
 }
 const ODDS_CACHE = new Map<string, FightOdds>();
 /**
@@ -786,14 +790,15 @@ export function fightOdds(s: GameState, e: Encounter, tries = Math.max(10, Math.
   if (hit) return hit;
   const help = alliesOf(s).reduce((a, n) => a + n.members * 6, 0);
   let win = 0, loseSomeone = 0, lost = 0;
+  const inside = !!(e.dig || e.insiderHelp), d = deterrence(s, postureOf(s)).score, tb = inside ? 0 : turnBackChance(d, e);
   for (let i = 0; i < tries; i++) {
-    const b = planBattle(s, raidersAfterHelp(e, help), 7_919 + i * 104_729 + e.day, battleOpts(e, e.dig || e.insiderHelp ? { insideBreach: true } : {}));
+    const b = planBattle(s, raidersAfterHelp(e, help), 7_919 + i * 104_729 + e.day, battleOpts(e, { deter: d, ...(inside ? { insideBreach: true } : {}) }));
     if (b.result === 'repelled' || b.result === 'fled') win++;
     const n = b.events.filter(x => (x.kind === 'death' || x.kind === 'taken') && x.unit.startsWith('h_') && !isGuardUnit(x.unit)).length;
     if (n) loseSomeone++;
     lost += n;
   }
-  const o = { win: win / tries, loseSomeone: loseSomeone / tries, lost: lost / tries, tries };
+  const o = { win: tb + (1 - tb) * win / tries, loseSomeone: (1 - tb) * loseSomeone / tries, lost: (1 - tb) * lost / tries, tries, turnBack: tb, deter: d };
   if (ODDS_CACHE.size > 64) ODDS_CACHE.clear();
   ODDS_CACHE.set(key, o);
   return o;
@@ -1018,16 +1023,25 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       if (deterred) { title = 'They thought better of it'; text = 'A shot over the truck and the walls behind it. They turn around in the road.'; tone = 'good'; if (e.kind === 'refugees') g.humanity = Math.max(0, g.humanity - 5); }
       else stance = 'defend';
     }
+    const deter = stance === 'defend' && !skipFight ? deterrence(s, p).score : 0;
     if (stance === 'defend' && !skipFight) {
       // the fight itself, second by second (sim/battle.ts); the world can play it back from g.battle
       // a crew up inside the wall (tunnelers), or one that finds a hatch outside it (an underground passage's way in): no wall to get over
+      // first contact (sim/deterrence.ts): guards, dogs, cameras, the wall and towers can turn the crew back before a shot
+      if (!e.dig && !e.insiderHelp && !talkAmbush && r() < turnBackChance(deter, e, angry)) {
+        title = 'They thought better of it'; tone = 'good'; text = 'They looked the place over from the road, the wall, the men on it and what watched from the poles, and the crew turned round. No shot was fired.';
+        g.respect = Math.min(1, (g.respect ?? 0) + 0.12); g.next = Math.max(g.next, e.day + Math.round(12 + 30 * g.respect)); g.raidsHeld++;
+        skipFight = true;
+      }
+    }
+    if (stance === 'defend' && !skipFight) {
       boltPassages(s);
       const via = e.dig ? null : passageEntry(s, r, ORGANIZED.has(e.kind), e.scouted ? SCOUT_HATCH_FOUND : 1);
       if (via && e.scouted) lines.push(`${e.scouted} had marked the hatch on the way in.`);
       if (via) lines.push(via.forced ? 'They found a steel hatch in the leaf litter out in the trees and blew the blast door. They are in the passage.' : 'They found a steel hatch out in the trees, left unbolted. They are in the passage.');
       const raiders = via ? Math.min(raidersAfterHelp(e, help), 4 + Math.floor(e.size / 4)) : raidersAfterHelp(e, help);
       const orders = g.orders; delete g.orders;
-      const b = planBattle(s, raiders, s.seed * 131 + e.day * 7 + 1, battleOpts(e, { ...(e.dig || via || e.insiderHelp || talkAmbush ? { insideBreach: true } : {}), ...(orders?.length ? { orders } : {}), ...(angry ? { angry: true } : {}), ...(scoutPlan ? { scoutPlan } : {}) }));
+      const b = planBattle(s, raiders, s.seed * 131 + e.day * 7 + 1, battleOpts(e, { deter, ...(e.dig || via || e.insiderHelp || talkAmbush ? { insideBreach: true } : {}), ...(orders?.length ? { orders } : {}), ...(angry ? { angry: true } : {}), ...(scoutPlan ? { scoutPlan } : {}) }));
       if (via) { const run = s.perimeter.find(x => x.id === via.runId); if (run) run.revealed = true; }
       g.battle = b;
       const stockBefore = stockTotal(s);

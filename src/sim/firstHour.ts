@@ -355,8 +355,14 @@ export function firstHour(s: GameState, drive?: readonly Pt[], memory: GoalMemor
   // the first goal with a button; else the first one the family is working on; else a goal waiting on cash
   const payable = (g: FirstHourGoal) => !!g.act && !g.act.off && actCost(s, g.act.act) <= s.money;   // (a button the cash cannot press is not the one to lead with)
   const current = goals.find(g => g.status === 'todo' && payable(g)) ?? goals.find(g => g.status === 'underway') ?? goals.find(g => g.status === 'todo' && g.act && !g.act.off) ?? goals.find(g => g.status === 'todo') ?? null;
-  const alsoOpen = current?.id === 'roof' && current.status === 'todo'
-    ? goals.filter(g => (g.id === 'water' || g.id === 'food' || g.id === 'power') && g.status === 'todo' && g.act && !g.act.off && g.act.act.type !== 'starter') : [];
+  // food is promoted (playtest 3: 2 days of food at day 146 with $486k): once the roof is staked the drive and the fence do not push it off the card,
+  // and a low pantry gets its own one-tap order of a month of staples in place of "plant a garden"
+  const lead = current && (current.id === 'roof' || current.id === 'drive' || current.id === 'fence') && current.status === 'todo';
+  const fn = foodNudge(s);
+  const alsoOpen = lead
+    ? goals.filter(g => (g.id === 'water' || g.id === 'food' || g.id === 'power') && g.status === 'todo' && g.act && !g.act.off && g.act.act.type !== 'starter')
+      .map(g => g.id === 'food' && fn ? { ...g, act: { label: `Stock a month of staples (~${usd(fn.cost)})`, act: { type: 'order' as const, lines: fn.lines } } } : g)
+      .sort((a, b) => (b.id === 'food' && fn ? 1 : 0) - (a.id === 'food' && fn ? 1 : 0)) : [];
   return { goals, current, alsoOpen, done, total: goals.length, complete: goals.length > 0 && done === goals.length,
     memory: { seen: GOAL_IDS.filter(i => seen.has(i)), done: GOAL_IDS.filter(i => doneMem.has(i)) } };
 }

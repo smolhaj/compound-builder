@@ -18,10 +18,12 @@ import { operational } from '../src/sim/operational';
 import { daysOfFood } from '../src/sim/needs';
 import { hireCrew, crewProblem } from '../src/sim/crews';
 import { hireGuard, guardCount } from '../src/sim/guards';
+import { idleCash } from '../src/sim/idleCash';
+import { placeOrder, orderProblem } from '../src/sim/economy';
 import { isFinished } from '../src/sim/construction';
 import { isHome } from '../src/sim/blueprints';
 import { runFinished } from '../src/sim/perimeter';
-import { defenseOf, postureOf } from '../src/sim/encounters';
+import { defenseOf, postureOf, fightOdds, hideFoundChance } from '../src/sim/encounters';
 import type { GameState } from '../src/sim/state';
 import type { DisasterKind } from '../src/sim/disaster';
 import type { PlannedBattle } from '../src/sim/battle';
@@ -39,6 +41,8 @@ const STRATS = (process.env.WEALTH_STRATS?.split(',') ?? ['prepper']) as Strateg
 const N = Number(process.env.WEALTH ?? 0);
 const [SH, SHN] = (process.env.WEALTH_SHARD ?? '0/1').split('/').map(Number);
 const SPEND = process.env.WEALTH_SPEND !== '0';
+const ODDS = process.env.WEALTH_ODDS !== '0';
+const SINKS2 = process.env.WEALTH_SINKS !== '0';
 const living = (s: GameState) => s.personState.filter(p => p.needs.died == null).length;
 
 function run(w: W, region: RegionId, kind: DisasterKind, diff: string, strat: Strategy, k: number) {
@@ -48,6 +52,7 @@ function run(w: W, region: RegionId, kind: DisasterKind, diff: string, strat: St
   if (spec.funds) process.env.FUNDS = String(spec.funds); else delete process.env.FUNDS;
   const site = siteFor(seed, region);
   const opDay: Record<string, number> = {}, paidSeen = new Map<string, number>(), orderSeen = new Set<string>();
+  const sinksBought: string[] = [], odds: Array<Record<string, number>> = [];
   let crewPaid = 0, orders = 0, peakCrews = 0, guardsMax = 0, firstGuard = -1;
   const waves: Array<{ day: number; result: string; dead: number; lostPeople: number; def: number; size: number; stance: string }> = [];
   let pend: { size: number; def: number; stance: string; before: number } | null = null, lastB: unknown, hides = 0;
@@ -70,9 +75,17 @@ function run(w: W, region: RegionId, kind: DisasterKind, diff: string, strat: St
       // a contract guard per $120k over a $150k cushion, once there is a roof to guard
       if (s.structures.some(x => isHome(x.kind) && isFinished(x)) && guardCount(s) < Math.floor((s.money - 150_000) / 120_000) && !hireGuard(s) && firstGuard < 0) firstGuard = day;
       guardsMax = Math.max(guardsMax, guardCount(s));
+      // tier-2 sinks the Idle-cash card offers (sim/richSinks.ts): the goods are ordered; WEALTH_SINKS=0 turns this off (the before/after control)
+      if (SINKS2 && day % 10 === 0) {
+        const ic = idleCash(s);
+        for (const o of ic?.sinks ?? []) if (o.act.type === 'order' && !orderProblem(s, o.act.lines)) { placeOrder(s, o.act.lines); sinksBought.push(o.id); }
+      }
     }
   };
-  HOOKS.gate = (s, e, stance, def) => { pend = e.wave ? { size: e.size, def, stance, before: living(s) } : null; lastB = s.gate.battle; if (stance === 'hide') hides++; };
+  HOOKS.gate = (s, e, stance, def) => {
+    // what the gate card would have shown for this crew (fight odds and the house find chance if hiding): the defend-versus-hide comparison, whatever the bot chose
+    if (e.wave && ODDS) { const o = fightOdds(s, e), p = postureOf(s); odds.push({ day: Math.floor(s.clock.t - s.disaster.hitAt), win: +o.win.toFixed(3), lose: +o.loseSomeone.toFixed(3), tb: +(o.turnBack ?? 0).toFixed(3), deter: +(o.deter ?? 0).toFixed(3), found: +hideFoundChance(s, e, p).toFixed(3), barrier: Math.round(p.barrier), size: e.size }); }
+    pend = e.wave ? { size: e.size, def, stance, before: living(s) } : null; lastB = s.gate.battle; if (stance === 'hide') hides++; };
   HOOKS.after = (s) => {
     const b = (s.gate.battle !== lastB ? s.gate.battle : undefined) as PlannedBattle | undefined;
     if (pend) waves.push({ day: Math.floor(s.clock.t - s.disaster.hitAt), result: b?.result ?? pend.stance, dead: b ? b.events.filter(x => x.kind === 'death' && x.unit.startsWith('h_')).length : 0, lostPeople: pend.before - living(s), size: pend.size, def: pend.def, stance: pend.stance });
@@ -87,7 +100,7 @@ function run(w: W, region: RegionId, kind: DisasterKind, diff: string, strat: St
   return {
     k, seed, wealth: w, region, kind, diff, strat, ending: r.ending, grade: r.grade, alive, total, lost: total - alive, causes: r.causes, hungry: r.hungry, hit,
     landUsd: land, acres: s.site.acres, startMoney: initial, passive: s.startFunds?.passive ?? 0, moneyAtHit: r.moneyAtHit, endMoney: Math.round(s.money), minMoney: r.minMoney, builtAtHit: r.builtAtHit,
-    opDay, opAll: opDay.all ?? null, foodDays: Math.round(daysOfFood(s)), crewPaid: Math.round(crewPaid), orders: Math.round(orders), guardsPaid: Math.round(guardsPaid), other: spentOther, peakCrews, guardsMax, firstGuard,
+    opDay, opAll: opDay.all ?? null, foodDays: Math.round(daysOfFood(s)), crewPaid: Math.round(crewPaid), orders: Math.round(orders), guardsPaid: Math.round(guardsPaid), other: spentOther, peakCrews, guardsMax, firstGuard, sinks: sinksBought, odds,
     waves, raids: waves.length, raidsWon: waves.filter(x => x.result === 'repelled' || x.result === 'fled').length, raidDead: waves.reduce((a, x) => a + x.lostPeople, 0), raidsLostSomeone: waves.filter(x => x.lostPeople > 0).length, hides, defense: Math.round(defenseOf(postureOf(s))),
     structures: s.structures.filter(isFinished).length, ms: Date.now() - t0, bugs: r.bugs,
   };

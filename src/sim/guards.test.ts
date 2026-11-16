@@ -20,7 +20,7 @@ describe('hired guards: shifts', () => {
     const g = game();
     for (let i = 0; i < MAX_GUARDS; i++) { expect(hireGuard(g)).toBeNull(); if (i === 0) expect(coverage(g)).toBeCloseTo(1 / 3); }
     expect(coverage(g)).toBe(1);
-    for (let h = 0; h < 24; h++) expect(onDuty(g, h).length).toBe(1);
+    for (let h = 0; h < 24; h++) expect(onDuty(g, h).length).toBe(MAX_GUARDS / 3);
     expect(guardProblem(g)).toMatch(/most/);
     expect(onShift({ shift: 22 }, 23)).toBe(true); expect(onShift({ shift: 22 }, 3)).toBe(true); expect(onShift({ shift: 22 }, 12)).toBe(false);
   });

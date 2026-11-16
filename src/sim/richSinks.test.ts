@@ -86,3 +86,26 @@ describe('save v80', () => {
     expect(m.stock.clinic_suite).toBe(0); expect(m.stock.radio_mast).toBe(0); expect(m.stock.gate_house).toBe(0);
   });
 });
+
+describe('tier 2 sinks (the Idle-cash card)', () => {
+  it('a family with a roof and cash is offered clinic, gate house, second well and power plant, each with an effect line; nothing in tents', async () => {
+    const { sinkOffers, pumpSeizeK } = await import('./richSinks');
+    const g = game();
+    expect(sinkOffers(g, 2_000_000)).toEqual([]);
+    built(g, 'timber_cabin'); g.structures.at(-1)!.stage = 99;
+    const ids = sinkOffers(g, 2_000_000).map(o => o.id);
+    expect(ids).toEqual(expect.arrayContaining(['clinic_suite', 'gate_house']));
+    for (const o of sinkOffers(g, 2_000_000)) { expect(o.usd).toBeGreaterThan(0); expect(o.effect.length).toBeGreaterThan(20); }
+    expect(sinkOffers(g, 20_000).length).toBe(0);
+    g.stock.clinic_suite = 1; g.stock.gate_house = 1;
+    expect(sinkOffers(g, 2_000_000).map(o => o.id)).not.toContain('clinic_suite');
+    expect(pumpSeizeK(g)).toBe(1);
+  });
+  it('a second finished well halves the hard-water seizure rate', async () => {
+    const { pumpSeizeK } = await import('./richSinks');
+    const g = game();
+    built(g, 'well_drilled'); built(g, 'well_hand');
+    g.structures.forEach(x => { x.stage = 6; });
+    expect(pumpSeizeK(g)).toBe(2);
+  });
+});

@@ -15,9 +15,9 @@ import type { GameState } from './state';
 import { pluralize } from './words';
 
 /** Homes the advice may pick, in the order they are listed (a guest house and Mom's house only once the family has a home). */
-const FIRST_HOMES = ['cottage', 'timber_cabin', 'log_house'] as const;
-const MORE_HOMES = ['guest_house', 'cottage', 'moms_house', 'timber_cabin', 'log_house'] as const;
-const NAME: Record<string, string> = { guest_house: 'guest house', cottage: 'cottage', moms_house: 'Mom’s house', timber_cabin: 'timber cabin', log_house: 'log house' };
+const FIRST_HOMES = ['modular_home', 'cottage', 'timber_cabin', 'log_house'] as const;
+const MORE_HOMES = ['guest_house', 'modular_home', 'cottage', 'moms_house', 'timber_cabin', 'log_house'] as const;
+const NAME: Record<string, string> = { modular_home: 'modular home', guest_house: 'guest house', cottage: 'cottage', moms_house: 'Mom’s house', timber_cabin: 'timber cabin', log_house: 'log house' };
 
 export interface HomeAdvice {
   kind: string;
@@ -64,13 +64,23 @@ export function homeAdvice(s: GameState, cost: (kind: string) => number = k => k
   const pool = (hasHome ? MORE_HOMES : FIRST_HOMES).filter(k => BLUEPRINTS[k]);
   const open = pool.filter(k => !planProblem(s, k)), list = open.length ? open : pool;
   const rows = list.map(k => ({ k, beds: HOME_BEDS[k] ?? 0, usd: cost(k) }));
-  const enough = rows.filter(r => r.beds >= gap).sort((a, b) => a.usd - b.usd)[0];
-  const pick = enough ?? [...rows].sort((a, b) => b.beds - a.beds || a.usd - b.usd)[0];
-  if (!pick) return null;
-  // the crew's bill for the whole kit (the same arithmetic as crews.crewQuote on a fresh stake)
-  const hours = totalHours(BLUEPRINTS[pick.k]), crewUsd = Math.round(hours * CREW_RATE / 100) * 100, crewWeeks = Math.max(1, Math.ceil(hours / (CREW_SIZE * 9 * 5)));
   const t = s.disaster.tracks;
-  const easy = s.weekend?.mode !== 'split' && t.banks >= 0.5 && t.law >= 0.5 && t.fuel >= 0.3 && s.money >= pick.usd + crewUsd * CREW_NUDGE_SHARE + CREW_NUDGE_SLACK;
+  // the crew's bill for the whole kit (the same arithmetic as crews.crewQuote on a fresh stake)
+  const crewOf = (k: string) => { const hours = totalHours(BLUEPRINTS[k]); return { hours, usd: Math.round(hours * CREW_RATE / 100) * 100, weeks: Math.max(1, Math.ceil(hours / (CREW_SIZE * 9 * 5))) }; };
+  const crewsOk = s.weekend?.mode !== 'split' && t.banks >= 0.5 && t.law >= 0.5 && t.fuel >= 0.3;
+  const affordable = (r: { k: string; usd: number }) => crewsOk && s.money >= r.usd + crewOf(r.k).usd * CREW_NUDGE_SHARE + CREW_NUDGE_SLACK;
+  const enough = rows.filter(r => r.beds >= gap).sort((a, b) => a.usd - b.usd)[0];
+  // money buys speed (owner principle): with a crew affordable, the fastest home that nearly closes the gap beats the cheapest one that closes it
+  // (a family in tents in winter: a modular home in about a week, the next home for the last bed)
+  const byHours = (a: { k: string; usd: number }, b: { k: string; usd: number }) => crewOf(a.k).hours - crewOf(b.k).hours || a.usd - b.usd;
+  const closing = rows.filter(r => r.beds >= gap && affordable(r)).sort(byHours)[0];
+  const near = rows.filter(r => r.beds >= Math.max(2, gap - 1) && r.beds < gap && affordable(r)).sort(byHours)[0];
+  // a home one bed short is taken only when it is at least three times quicker than the quickest that closes the gap
+  const quick = near && (!closing || crewOf(near.k).hours * 3 <= crewOf(closing.k).hours) ? near : closing;
+  const pick = quick ?? enough ?? [...rows].sort((a, b) => b.beds - a.beds || a.usd - b.usd)[0];
+  if (!pick) return null;
+  const { usd: crewUsd, weeks: crewWeeks } = crewOf(pick.k);
+  const easy = affordable(pick);
   return { kind: pick.k, name: NAME[pick.k] ?? pick.k.replace(/_/g, ' '), usd: pick.usd, beds: pick.beds, gap, stillShort: Math.max(0, gap - pick.beds), crewUsd: easy ? crewUsd : null, crewWeeks: easy ? crewWeeks : null, off: planProblem(s, pick.k) };
 }
 

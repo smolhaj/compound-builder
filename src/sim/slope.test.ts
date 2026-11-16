@@ -212,9 +212,9 @@ describe('winter access', () => {
       return g;
     };
     const g = settled(site);
-    expect(suggestions(g).some(x => x.id === 'plow')).toBe(true);
+    expect(suggestions(g, 12).some(x => x.id === 'plow')).toBe(true);
     g.stock.plow = 1;
-    expect(suggestions(g).some(x => x.id === 'plow')).toBe(false);
-    expect(suggestions(settled(easy())).some(x => x.id === 'plow')).toBe(false);
+    expect(suggestions(g, 12).some(x => x.id === 'plow')).toBe(false);
+    expect(suggestions(settled(easy()), 12).some(x => x.id === 'plow')).toBe(false);
   });
 });

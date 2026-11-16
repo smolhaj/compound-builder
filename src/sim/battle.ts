@@ -66,6 +66,7 @@ import { breachFates, takeCap, type Fate } from './breachFates';
 import { crewKindOf, crewSurrenders, downedSurrenderOdds, type CrewKind } from './surrender';
 import { FUSE_S, blastOdds, chooseHow, countersOf, crewMeans, ramOdds, truckSeconds, wallTarget, whyRamFailed, type BreachHow, type CrewMeans } from './breachMeans';
 import { nervesAim, woundFx } from './lingering';
+import { nerveK } from './deterrence';
 import { freezeSecs, heroOdds, lastWords, panicOdds, traitsOf, type DefenderTraits } from './defenderTraits';
 import { WALL_RESIST } from './breachMeans';
 import { envOf, FLARE, SMOKE_ACC } from './raidConditions';
@@ -148,6 +149,8 @@ const GRENADE_RANGE = 5;   // ≈ 30 m
 const ROCKET_RANGE = 50;
 
 export interface BattleOptions {
+  /** First-contact deterrence of the place, 0-0.9 (sim/deterrence.ts): raiders break after fewer losses and more of them quit the line. */
+  deter?: number;
   /** false: the raid always comes up the road side (the ground's lanes are ignored: sim/terrainFx.ts). */
   terrain?: boolean;
   /** Raiders armed with guns (false: clubs, the dead). Default true. */
@@ -1302,7 +1305,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     // a savage crew doesn't scare: they take more losses before they quit
     // the post-breach fight: a crew in the yard is winning, so it takes more to break it, but a family that holds (or counterattacks) can still beat it back out
     const upArmed = hUp.filter(h => h.arm !== FISTS).length;
-    const lossLimit = Math.max(1, raiders * (0.25 + 0.3 * org + (crewKind === 'militia' ? MILITIA.morale : 0) + (temper === 'savage' ? 0.2 : 0) + (breached ? 0.2 : 0) + (opts.angry ? 0.15 : 0)) * ordFx.morale);
+    const lossLimit = Math.max(1, raiders * (0.25 + 0.3 * org + (crewKind === 'militia' ? MILITIA.morale : 0) + (temper === 'savage' ? 0.2 : 0) + (breached ? 0.2 : 0) + (opts.angry ? 0.15 : 0)) * ordFx.morale * nerveK(opts.deter ?? 0));
     const leaderBreak = R[0].out && temper !== 'savage' && (!breached || losses >= Math.ceil(raiders * 0.3));
     let rallied = false;
     if (leaderBreak && !leaderRallied && !fled && org > 0.3 && mr() < 0.3 + 0.3 * org) { leaderRallied = true; rallied = true; const lt = rUp.find(f => f !== R[0]); if (lt) { ev.push({ t, kind: 'rally', unit: lt.id }); say(t + 0.3, pick(['I\'ve got them! Hold, HOLD — we\'re not leaving!', 'Stay on it! He\'s down, I\'m in charge — keep moving!']), lt); } }
@@ -1479,7 +1482,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         hurt(f, wallDogs.minHurt + r() * wallDogs.spanHurt, t + 0.1, undefined, 'leg');
         if (!f.dead && r() < 0.6) say(t + 0.3, pick(['The dog — get it off me — GET IT OFF!', 'Dog! It\'s got my leg — aah —']), f);
       }
-      if (temper !== 'savage' && !peace && t - lineSince >= 6) for (const f of atLine) if (!f.fled && !f.out && r() < 0.03 + 0.05 * Math.min(1, losses / Math.max(1, raiders)) + 0.03 * bitten) {
+      if (temper !== 'savage' && !peace && t - lineSince >= 6) for (const f of atLine) if (!f.fled && !f.out && r() < (0.03 + 0.05 * Math.min(1, losses / Math.max(1, raiders)) + 0.03 * bitten) * (1 + 1.5 * (opts.deter ?? 0))) {
         f.fled = true; ev.push({ t, kind: 'flee', unit: f.id });
         if (r() < 0.5) say(t + 0.2, pick(['Fuck this — I\'m not going over that.', 'It\'s not worth it — back, get BACK!', 'No way — I\'m out — I\'m out of here!']), f);
       }

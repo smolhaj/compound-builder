@@ -23,6 +23,7 @@ import { Note, Row, Section } from './hud/common';
 import { closeRows } from '../sim/bonds';
 import { pluralize } from '../sim/words';
 import { runOver } from '../sim/wipe';
+import { ritualCaption } from '../sim/rituals';
 
 const strainColor = (v: number) => (v >= 65 ? TONE.bad : v >= 40 ? TONE.warn : '#9cc070');
 const bar = (v: number, c: string, t: string) => <div title={t} style={{ flex: 1, height: 4, background: '#333', borderRadius: 2 }}><div style={{ width: `${Math.max(0, Math.min(100, v))}%`, height: '100%', background: c, borderRadius: 2 }} /></div>;
@@ -102,6 +103,7 @@ export function PeopleSection() {
     {!nobodyHome && struggling.length === 0 && <Note tone="good">Everyone is holding up.{game.stock.games >= 1 || game.stock.instrument >= 1 ? ' The evenings help.' : ''}</Note>}
     {struggling.map(x => <Row key={x.p.id} label={x.p.first} value={<span style={{ color: x.kind === 'break' ? TONE.bad : TONE.warn }}>{x.why}</span>} title={(game.mind?.psyche[x.p.id]?.weighs ?? []).slice(0, 3).map(w => `${w[0]} ${w[1]}`).join(', ')} />)}
     {M?.rift && <Note tone="warn">{game.people.find(p => p.id === M.rift!.a)?.first} and {game.people.find(p => p.id === M.rift!.b)?.first} are not speaking.</Note>}
+    {!nobodyHome && (() => { const rc = ritualCaption(game); return rc ? <Note tone={rc.tone}>{rc.text}</Note> : null; })()}
     {hardened(game) && <Note tone="warn">The house has gone hard since what was done at the gate. The kids feel it.</Note>}
     {!over && <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 4 }}>
       <button style={btn(rest)} disabled={rest} title="Everyone off everything that can wait until midnight: the animals, the kitchen, the dogs, the watch and the sick are still tended. Lowers stress; the backlog grows." onClick={() => g.daily(d => takeRestDay(d))}>{rest ? 'Resting today' : 'Take a rest day'}</button>

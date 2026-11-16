@@ -8,7 +8,7 @@ import { RESERVE_MIN, RESERVE_SHARE } from './starterCompound';
 import { daysOfFood, KCAL, needOf } from './needs';
 import { orderCost, prices } from './economy';
 import { CREW_RATE, crewHoursLeft, crewMarket } from './crews';
-import type { GameState } from './state';
+import type { GameState, OrderLine } from './state';
 import { isGod } from './godMode';
 import { countyWorks, needsPermit, permitFee } from './paperwork';
 
@@ -87,7 +87,7 @@ export function foodUrgency(s: GameState, days: number): number {
   return days < 1 ? 54 : FOOD_URGENCY;
 }
 
-export interface FoodNudge { days: number; cost: number }
+export interface FoodNudge { days: number; cost: number; /** The order that gets the family to a month of staples. */ lines: OrderLine[] }
 
 /** Low on put-by food with the cash to fix it (a month of staples leaves the living reserve intact); null otherwise. */
 export function foodNudge(s: GameState): FoodNudge | null {
@@ -98,5 +98,5 @@ export function foodNudge(s: GameState): FoodNudge | null {
   if (perDay <= 0) return null;
   const qty = Math.max(1, Math.ceil((FOOD_NUDGE_TARGET_DAYS - Math.max(0, days)) * perDay / KCAL.staples));
   const cost = orderCost([{ material: 'staples', qty }], prices(s));
-  return spendCheck(s.money, cost).below ? null : { days, cost };
+  return spendCheck(s.money, cost).below ? null : { days, cost, lines: [{ material: 'staples', qty }] };
 }
