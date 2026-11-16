@@ -26,26 +26,28 @@ function Strip({ fh }: { fh: FirstHour }) {
     {fh.goals.map(g => {
       const cur = fh.current?.id === g.id;
       return <span key={g.id} data-goal={g.id} data-status={g.status} style={{ color: g.status === 'done' ? TONE.good : cur ? '#f0e6c8' : DIM, fontWeight: cur ? 700 : 400, whiteSpace: 'nowrap' }}>
-        {g.status === 'done' ? '✓' : cur ? '▸' : g.status === 'underway' ? '◐' : '○'} {SHORT[g.id]}
+        {g.status === 'done' ? '✓' : cur ? '▸' : g.status === 'underway' ? '◐' : '○'} {g.short ?? SHORT[g.id] ?? g.id}
       </span>;
     })}
   </div>;
 }
 const SHORT: Record<string, string> = { roof: 'Roof', water: 'Water', food: 'Food', power: 'Power', drive: 'Drive', fence: 'Fence' };
 
-export function GoalsCard({ fh, run, ticks, children }: { fh: FirstHour; run: (a: Exclude<GoalAct, { type: 'starter' }>) => void; /** The plain five-line checklist, shown when the card is folded and "Details" is open. */ ticks: ReactNode; children?: ReactNode }) {
-  const closed = useFeelStore(s => s.goalsClosed), askStarter = useFeelStore(s => s.askStarter);
+export function GoalsCard({ fh, run, ticks, children, felt }: { fh: FirstHour; /** A disaster's signature chain: its own heading, and "Hide" folds back to the first-hour goals (the felt layer, sim/felt/goals.ts). */ felt?: { onClose: () => void }; run: (a: Exclude<GoalAct, { type: 'starter' }>) => void; /** The plain five-line checklist, shown when the card is folded and "Details" is open. */ ticks: ReactNode; children?: ReactNode }) {
+  const storeClosed = useFeelStore(s => s.goalsClosed), askStarter = useFeelStore(s => s.askStarter);
   const [why, setWhy] = useState<string | null>(null), [details, setDetails] = useState(false);
   const game = useGameStore(s => s.game);
+  const closed = felt ? null : storeClosed, head = fh.heading ?? 'Get operational';
   const press = (g: FirstHourGoal) => { if (!g.act) return; if (g.act.act.type === 'starter') askStarter(); else run(g.act.act); };
 
   if (fh.complete && closed === null) {
     const items = watchItems(game);
     return <div data-testid="goals-set" style={{ marginBottom: 2 }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}><span style={H}>You're set for now</span><span style={{ color: TONE.good, fontWeight: 600 }}>{fh.done} of {fh.total}</span></div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}><span style={{ ...H, whiteSpace: 'normal' }}>{fh.heading ? `${fh.heading}: set for now` : "You're set for now"}</span><span style={{ color: TONE.good, fontWeight: 600 }}>{fh.done} of {fh.total}</span></div>
+      {fh.rewardLine && <Note>{fh.rewardLine}</Note>}
       <Note>Every goal on the list is done. Here is what to watch from here on (the Board tab has the rest):</Note>
       {items.map(i => <div key={i.id} style={{ display: 'flex', gap: 6, padding: '2px 0', fontSize: FS.small }}><span style={{ color: i.tone === 'good' ? TONE.good : i.tone === 'bad' ? TONE.bad : '#e0b050' }}>●</span><span>{i.text}</span></div>)}
-      <button style={{ ...btn(true), width: '100%', marginTop: 5 }} onClick={() => setClosed('set')}>Got it</button>
+      <button style={{ ...btn(true), width: '100%', marginTop: 5 }} onClick={() => (felt ? felt.onClose() : setClosed('set'))}>Got it</button>
       {children}
     </div>;
   }
@@ -68,7 +70,7 @@ export function GoalsCard({ fh, run, ticks, children }: { fh: FirstHour; run: (a
   const open = why === g.id;
   return <div data-testid="goals-card" data-goal={g.id}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }} title="Your first goals, one at a time. A suggestion list: nothing is locked.">
-      <span style={H}>Get operational</span>
+      <span style={{ ...H, whiteSpace: 'normal' }}>{head}</span>
       <span style={{ color: DIM, fontWeight: 600 }} data-testid="goal-progress">{fh.done} of {fh.total}</span>
     </div>
     <Strip fh={fh} />
@@ -80,15 +82,16 @@ export function GoalsCard({ fh, run, ticks, children }: { fh: FirstHour; run: (a
     {!g.act && g.status === 'underway' && <Note>Nothing to press right now. Let the clock run (play, or the fast-forward button) and the family gets on with it.</Note>}
     {fh.alsoOpen.length > 0 && <div data-testid="goals-also" style={{ margin: '6px 0 2px' }}>
       <div style={{ ...H, whiteSpace: 'normal', marginBottom: 2 }}>Also open: start any of these now</div>
-      {fh.alsoOpen.map(o => <button key={o.id} data-testid={`goal-also-${o.id}`} style={{ ...btn(false), width: '100%', marginTop: 3, whiteSpace: 'normal', textAlign: 'left', lineHeight: 1.25 }} title={`${o.title}: ${o.line}`} onClick={() => press(o)}>{SHORT[o.id]}: {o.act!.label}</button>)}
+      {fh.alsoOpen.map(o => <button key={o.id} data-testid={`goal-also-${o.id}`} style={{ ...btn(false), width: '100%', marginTop: 3, whiteSpace: 'normal', textAlign: 'left', lineHeight: 1.25 }} title={`${o.title}: ${o.line}`} onClick={() => press(o)}>{o.short ?? SHORT[o.id]}: {o.act!.label}</button>)}
     </div>}
+    {fh.rewardLine && <div data-testid="goal-last-reward" style={{ color: TONE.good, fontSize: FS.small, margin: '4px 0 0' }}>✓ {fh.rewardLine}</div>}
     {g.money && <Note tone="warn">{g.money}</Note>}
     {g.pace && <Note>{g.pace}</Note>}
     <button style={{ ...link, marginTop: 3, display: 'block' }} aria-expanded={open} onClick={() => setWhy(open ? null : g.id)}>{open ? 'Hide why this matters' : 'Why this matters'}</button>
     {open && <Note>{g.why}</Note>}
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4, gap: 6 }}>
       <span style={{ color: DIM, fontSize: FS.fine }}>Reward: {g.reward.title.toLowerCase()}</span>
-      <button style={link} onClick={() => setClosed('dismissed')} title="Fold this away. It stays one click off in the Build tab.">Hide goals</button>
+      <button style={link} onClick={() => (felt ? felt.onClose() : setClosed('dismissed'))} title={felt ? 'Go back to the first-hour goals.' : 'Fold this away. It stays one click off in the Build tab.'}>{felt ? 'Show first-hour goals' : 'Hide goals'}</button>
     </div>
     {children}
   </div>;

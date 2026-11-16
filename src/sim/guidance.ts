@@ -63,6 +63,7 @@ import { nobodyHome } from './orphans';
 import { damageHoursLeft, damageName, damageNeed, damageSummary, openDamage } from './raidDamage';
 import { lengthText } from './units';
 import { fxCards, fxGoal } from './disasterFx';
+import { chainWindowOpen } from './felt/goalWindow';
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 
@@ -485,9 +486,9 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
     } }
   // the land: a ridge that suits a keep, a gorge that is a choke, a bench for a reservoir (sim/terrainFx.ts): a card to look at, never a requirement
   for (const c of terrainCards(s)) out.push({ id: c.id, kind: '', title: c.title, urgency: c.urgency, why: c.why, acts: [{ label: 'Show me on the map', act: { type: 'terrain', mode: c.mode } }, ...(c.span ? [{ label: `Plan a tunnel-bridge across it (~${usd(costPer100m('tunnel_bridge') * c.span.lengthM / 100)})`, act: { type: 'span' as const, a: c.span.a, b: c.span.b } }] : []), ...(c.bore ? [{ label: `Plan a rock tunnel (${lengthText(c.bore.lengthM)}, ~${usd(costPer100m('rock_tunnel') * c.bore.lengthM / 100)})`, act: { type: 'span' as const, kind: 'rock_tunnel' as const, a: c.bore.a, b: c.bore.b } }] : []), ...(c.drain ? [{ label: `Plan a drainage channel (~${usd(costPer100m('drain_channel') * Math.hypot(c.drain.b[0] - c.drain.a[0], c.drain.b[1] - c.drain.a[1]) * 6 / 100)})`, act: { type: 'drain' as const, a: c.drain.a, b: c.drain.b } }] : [])] });
-  // the running disaster's own decision cards and its signature goal chain (sim/disasters/<kind>.ts)
+  // the running disaster's own decision cards and its signature goal chain (sim/disasters/<kind>.ts); while the felt goal card is up it shows the same chain (sim/felt/goals.ts), so this line waits
   for (const c of fxCards(s)) out.push({ id: c.id, kind: '', title: c.title, why: c.why, urgency: c.urgency, ...(c.tone ? { tone: c.tone } : {}), acts: c.acts.map(a => ({ label: a.label, act: { type: 'fx' as const, choice: a.choice } })) });
-  { const gl = fxGoal(s); if (gl && gl.steps.some(x => !x.done)) { const next = gl.steps.find(x => !x.done)!; out.push({ id: `goal_${gl.id}`, kind: '', title: gl.title, urgency: 40, why: `${gl.steps.filter(x => x.done).length} of ${gl.steps.length} done: ${gl.steps.map(x => `${x.done ? '✓' : '○'} ${x.label}`).join(', ')}. Next: ${next.label}` }); } }
+  { const gl = chainWindowOpen(s) ? null : fxGoal(s); if (gl && gl.steps.some(x => !x.done)) { const next = gl.steps.find(x => !x.done)!; out.push({ id: `goal_${gl.id}`, kind: '', title: gl.title, urgency: 40, why: `${gl.steps.filter(x => x.done).length} of ${gl.steps.length} done: ${gl.steps.map(x => `${x.done ? '✓' : '○'} ${x.label}`).join(', ')}. Next: ${next.label}` }); } }
   { const t = terraceSuggestion(s); if (t) out.push(t); }   // a slope that suits terraced beds: offered, never staked unasked
   { const c = courseSuggestion(s); if (c) out.push(c); }
   { const d = drillsSuggestion(s); if (d) out.push(d); }
