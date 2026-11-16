@@ -122,6 +122,13 @@ export const PROFILE: Partial<Record<DisasterKind, Profile>> = {
   bioweapon: P(0, 0.1, 0.06, 0.3, 1, 3, 'hazmat', 14, 0.3, 14),
   asteroid: P(0.8, 0.02, 0.01, 0.1, 2, 2, null, 0, 0.1),
   unknown: P(0.3, 0.05, 0.02, 0.3, 3, 2, null, 0, 0.3),
+  // FL2: the kinds that had no profile (so their roads looked like peacetime): dead cars and dark vehicles after an EMP, cut roads after a quake or a flood, empty roads under ash
+  emp: P(0.2, 0.05, 0.03, 0.8, 6, 1, null, 0, 0.5, 0, true),
+  mega_quake: P(0.3, 0.12, 0.1, 0.9, 3, 2, null, 0, 0.3),
+  dam_flood: P(0.4, 0.15, 0.2, 0.5, 1, 2, null, 0, 0.2),
+  supervolcano: P(0.5, 0.1, 0.03, 0.4, 3, 3, null, 0, 0.4),
+  crop_blight: P(0.1, 0.7, 0.3, 0.8, 0, 1, null, 0, 0.5),
+  livestock_plague: P(0.1, 0.35, 0.2, 0.3, 0, 1, 'hazmat', 10, 0.2, 5),
 };
 
 /** The grid-down variants differ in how many cars die on the road: an ice storm strands a few, a dead grid with no fuel pumps strands more. */

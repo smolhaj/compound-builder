@@ -10,6 +10,8 @@ export interface Farmstead {
   uni?: boolean;
   /** Burned out (Compound Builder: a neighbor's farm after a raid or a fire): charred walls. */
   burned?: boolean;
+  /** FL2 (the felt layer): the house is boarded up or the household has left (open door); drawn as a few extra planks and a dark doorway. */
+  variant?: 'boarded' | 'empty';
 }
 
 /** Is (x, z) on a farmstead's yard or annex (plus `pad`)? */

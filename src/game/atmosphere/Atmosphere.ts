@@ -30,7 +30,7 @@ import { Flashlights, type Carrier } from '../fx/Flashlights';
 import type { FamilyRenderer } from '../people/FamilyRenderer';
 import { SmokePlume } from '../../engine/world/fx/SmokePlume';
 import { FireFx } from '../../engine/world/fx/FireFx';
-import { fireSources, type FireBox } from './fireSources';
+import { feltFireCount, fireSources, type FireBox } from './fireSources';
 import { seasonState } from '../../engine/world/season/seasonState';
 import { writeSeasonExtras } from '../../engine/world/season/seasonShader';
 import { containerWear, overgrowth, packWear, structureAge, wearFor, wetnessOf, type Wear } from './aging';
@@ -236,7 +236,7 @@ export class Atmosphere {
     const wx = 0.08 + f.wind * 0.45, wz = 0.03 + f.wind * 0.12;
     this.firePit.update(f.time, lit, wx, wz, f.daylight, f.viewportH);
     // ── fire: flames, embers and smoke on what burns, smoke over a fresh ruin; soot stays on what burned ──
-    const burning = (game.raidFires?.length ?? 0) > 0 || (game.raidDamage?.length ?? 0) > 0;
+    const burning = (game.raidFires?.length ?? 0) > 0 || (game.raidDamage?.length ?? 0) > 0 || feltFireCount() > 0;
     if (burning) {
       const grp = new Map(built.map(b => [b.id, b.group]));
       const src = fireSources(game, id => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { corpus, makeScene, layStarterCompound, layHamlet, sceneProblems, STEEP_LOTS, type SceneSpec } from './sceneAudit';
+import { corpus, makeScene, layStarterCompound, layHamlet, sceneProblems, feltSceneProblems, STEEP_LOTS, type SceneSpec } from './sceneAudit';
 import { makeLotSite } from './lotListing';
 import { REGION_IDS } from './regions';
 import { KIT, placementProblem, footprint, type SiteQuery } from '../game/buildkit/kit';
@@ -148,6 +148,20 @@ describe('scene audit: road culverts on the real, carved terrain', () => {
       }
     }
     expect(n).toBeGreaterThan(10);
+    expect(bad).toEqual([]);
+  });
+});
+
+describe('scene audit: the felt layer\'s world marks (FL2)', () => {
+  it('lays every mark kind on a starter compound at day 7 and day 30 with nothing on water, in a building or on the drive', { timeout: 120_000 }, () => {
+    const bad: string[] = [];
+    const kinds = ['wildfire', 'mega_quake', 'dam_flood', 'supervolcano', 'ash_winter', 'zombies', 'civil_war', 'invasion', 'grid_down', 'solar_flare', 'pandemic', 'drought', 'nuclear', 'financial'] as const;
+    for (const region of ['mountain_west', 'plains', 'appalachia'] as const) {
+      const spec = corpus([1], [region])[0];
+      const sc = makeScene(spec.site, spec.seed, spec.label);
+      layStarterCompound(sc);
+      for (const k of kinds) for (const d of [7, 30]) bad.push(...fmt(feltSceneProblems(sc, k, d)).map(s => `${k} d${d} ${s}`));
+    }
     expect(bad).toEqual([]);
   });
 });

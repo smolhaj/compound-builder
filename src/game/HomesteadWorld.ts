@@ -27,6 +27,7 @@ import { RegionalProps } from '../engine/world/houses/regionalProps';
 import { buildFarmstead, type FarmTree } from '../engine/world/houses/regionalFarmsteads';
 import { onFarmstead, type Farmstead } from '../engine/world/houses/farmstead';
 import { planNeighbors } from './region/neighbors';
+import type { PlaceHost } from './felt/markPlacement';
 import { buildCamp } from './props/campGeometry';
 import { Atmosphere, type AtmosBuilding, type AtmosFrame } from './atmosphere/Atmosphere';
 import { PathLayer } from './paths/PathLayer';
@@ -756,6 +757,37 @@ export class HomesteadWorld {
     if (this.regionWorld.powerline) buildPowerline(props, this.groundAt, (x, z) => onFarmstead(this.farms, x, z, 4) || (wy !== null && this.parcel.region.height(x, z) < wy + 0.3) || insideHome(x, z));
     props.finish();
     this._props = props;
+  }
+
+  /** The neighbor farmsteads' felt-layer looks (game/felt: boarded up, left empty): rebuilt whole only when a look changes. */
+  setFarmLooks(looks: ReadonlyArray<{ variant: string }>): void {
+    let changed = false;
+    this.farms.forEach((f, i) => {
+      const v = looks[i]?.variant;
+      const want = v === 'boarded' || v === 'empty' ? v : undefined;
+      if (f.variant !== want) { f.variant = want; changed = true; }
+    });
+    if (!changed) return;
+    this._buildFarms();
+    this._ws.invalidateShadows();
+  }
+
+  /** What the felt layer needs to place its marks (game/felt/markPlacement.ts). */
+  feltHost(): PlaceHost {
+    const wy = this.parcel.region.waterY ?? -Infinity;
+    return {
+      size: PARCEL_SIZE, camp: this.camp, groundAt: this.groundAt,
+      roadX: z => this.county.x(z), roadHalf: ROAD_W / 2, gateZ: this._truckRoute()[0][1],
+      creekZ: x => this.parcel.creek.zAt(x), creekWaterY: x => this.parcel.creek.waterY(x),
+      farms: this.farms,
+      boxOf: id => {
+        const b = this._built.get(id); if (!b) return undefined;
+        const b3 = new THREE.Box3().setFromObject(b.group);
+        return { cx: (b3.min.x + b3.max.x) / 2, cz: (b3.min.z + b3.max.z) / 2, w: b3.max.x - b3.min.x, d: b3.max.z - b3.min.z, y0: b3.min.y, h: b3.max.y - b3.min.y };
+      },
+      blocked: (x, z) => this.onBuilding(x, z, 0.4, false) || this.onAccess(x, z, 0.5) || this.onCamp(x, z, 1.2) || onFarmstead(this.farms, x, z, 0.5),
+      water: (x, z) => (x >= 0 && x <= PARCEL_SIZE && z >= 0 && z <= PARCEL_SIZE && this.parcel.isCreek(x, z)) || this.parcel.region.height(x, z) < wy + 0.05 || (this.parcel.lakeY !== null && this.parcel.lakeY !== undefined && this.terrain.surfaceAt(x, z) < this.parcel.lakeY + 0.1),
+    };
   }
 
   /** Neighbor farms that have burned (sim/neighborLife.burnedFarms, in farm order): rebuild their props charred. */

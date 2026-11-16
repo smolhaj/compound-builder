@@ -143,6 +143,19 @@ export function buildFarmstead(
     for (let k = 0; k < n; k++) { const [x, z] = W(lx, lz0 + k * (r * 2 + 0.25)); props.bin(x, ground(x, z), z, r, ht); }
   };
 
+  if (f.variant && !f.uni) {
+    // FL2: the farmhouse (near local (-3.2, -3.4) in most regions; its front faces -z or +z by region, so both faces are dressed)
+    for (const fz of [-4.13, -2.68]) {
+      if (f.variant === 'boarded') {
+        for (const wx of [-3.62, -2.78]) for (let k = 0; k < 3; k++) BX(wx, fz, 0.0, 0.34, 0.03, 0.035, k === 1 ? 0x6b5a43 : 0x7d6a4e, 0.14 + k * 0.1);
+        BX(-3.2, fz, 0, 0.22, 0.36, 0.03, 0x6b5a43, 0.02);
+      } else {
+        BX(-3.2, fz, 0, 0.2, 0.36, 0.035, 0x14110e, 0.02);                 // the dark doorway
+        BX(-3.02, fz + (fz < -3.4 ? -0.1 : 0.1), 0.9, 0.2, 0.34, 0.02, 0x7a6a52, 0.02);   // the door standing open
+      }
+    }
+    if (f.variant === 'empty') BX(-1.6, -2.4, 0.3, 0.5, 0.25, 0.3, 0x5a5044, 0.0);   // something left on the porch step
+  }
   if (f.uni) {
     // Land-grant research farm (Illinois South Farms, Iowa State dairy farm,
     // Utah State's Caine dairy): white institutional barns, a red round barn

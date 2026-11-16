@@ -36,6 +36,11 @@ import { PERIMETER, type PerimeterRun } from './perimeter';
 import { ungatedCrossings } from './roadGate';
 import { lengthText } from './units';
 import { planParcelTrees } from '../game/parcel/parcelTrees';
+import { planNeighbors } from '../game/region/neighbors';
+import { feltMarks } from './felt/marks';
+import { feltSpec } from './felt/registry';
+import { placeMarks, type PlaceHost } from '../game/felt/markPlacement';
+import type { DisasterKind } from './disaster';
 import { animalGoal, housesFor, PADDOCK_TRIES, type Home, type StockKind } from '../game/livestock/livestockPlan';
 
 export type Pt = [number, number];
@@ -379,3 +384,58 @@ export const STEEP_LOTS: ReadonlyArray<{ region: RegionId; kind: Parameters<type
   { region: 'north_woods', kind: 'bluff', relief: 6, seed: 15 },
   { region: 'north_woods', kind: 'island', relief: 6, seed: 16 },
 ];
+
+
+// ── FL2: the felt layer's marks laid on a scene ──
+
+/** The ground the felt layer places on, built from a scene with no THREE (the same questions HomesteadWorld.feltHost answers). */
+export function feltHostOf(sc: Scene): PlaceHost {
+  const onAccess = onAccessOf(sc), farms = planNeighbors(sc.parcel);
+  const surface = () => sc.g.structures.filter(st => !st.unplaced && KIT[st.kind]);
+  return {
+    size: PARCEL_SIZE, camp: sc.camp, groundAt: sc.parcel.height,
+    roadX: z => sc.county.x(z), roadHalf: ROAD_W / 2, gateZ: sc.access.drive[0]?.[1] ?? PARCEL_SIZE / 2,
+    creekZ: x => sc.parcel.creek.zAt(x), creekWaterY: x => sc.parcel.creek.waterY(x),
+    farms,
+    boxOf: id => { const st = sc.g.structures.find(s => s.id === id); if (!st || !KIT[st.kind]) return undefined; const r = rectOf(st, false); return { cx: (r.x0 + r.x1) / 2, cz: (r.z0 + r.z1) / 2, w: r.x1 - r.x0, d: r.z1 - r.z0, y0: sc.parcel.height((r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2), h: 0.6 }; },
+    blocked: (x, z) => onAccess(x, z, 0.5) || Math.hypot(x - sc.camp.x, z - sc.camp.z) < 2.3 || surface().some(st => { const r = rectOf(st); return x > r.x0 - 0.4 && x < r.x1 + 0.4 && z > r.z0 - 0.4 && z < r.z1 + 0.4; }) || farms.some(f => Math.abs(x - f.x) < 10.5 && Math.abs(z - f.z) < 10.5),
+    water: (x, z) => (x >= 0 && x <= PARCEL_SIZE && z >= 0 && z <= PARCEL_SIZE && sc.parcel.isCreek(x, z)) || (sc.parcel.lakeY !== null && sc.parcel.lakeY !== undefined && sc.parcel.height(x, z) < sc.parcel.lakeY + 0.1),
+  };
+}
+
+/**
+ * What the felt layer lays on a scene `day` days after a `kind` hit, checked the way the rest of the audit is: no decal on open water (except the
+ * flood's own mud and dry bed), none inside a footprint or on the drive; no prop inside a footprint (a tarp and a tag are on one, by design) or on the
+ * drive; a checkpoint inside the county road's corridor; a flood no deeper than a sane stage.
+ */
+export function feltSceneProblems(sc: Scene, kind: DisasterKind, day: number): SceneProblem[] {
+  const out: SceneProblem[] = [];
+  const add = (what: string, detail: string) => out.push({ scene: sc.label, what, detail });
+  const g = sc.g;
+  g.disaster.kind = kind; g.disaster.hitAt = 20; g.clock.t = 20 + day;
+  const host = feltHostOf(sc), onAccess = onAccessOf(sc);
+  const marks = feltMarks(g, day, feltSpec(kind));
+  const placed = placeMarks(g, marks, host);
+  const surface = g.structures.filter(st => !st.unplaced && KIT[st.kind]);
+  const inside = (x: number, z: number): string | null => { for (const st of surface) { const r = rectOf(st, false); if (x > r.x0 && x < r.x1 && z > r.z0 && z < r.z1) return st.kind; } return null; };
+  const wetOk = new Set(['mud_line', 'dry_bed']);
+  for (const d of placed.decals) {
+    const m = marks.find(k => k.id === d.markId);
+    if (!m) continue;
+    if (host.water(d.x, d.z) && !wetOk.has(m.kind) && m.anchor.at !== 'road') add('felt decal on water', `${m.kind} at ${d.x.toFixed(1)}, ${d.z.toFixed(1)}`);
+    if (m.anchor.at !== 'structure' && m.kind !== 'ruin') { const k = inside(d.x, d.z); if (k) add('felt decal inside a building', `${m.kind} on a ${k}`); }
+    if (m.anchor.at !== 'road' && onAccess(d.x, d.z, 0.0)) add('felt decal on the road or drive', `${m.kind} at ${d.x.toFixed(1)}, ${d.z.toFixed(1)}`);
+  }
+  for (const p of placed.props) {
+    const m = marks.find(k => k.id === p.markId);
+    if (!m) continue;
+    if (m.anchor.at === 'structure') continue;
+    const k = inside(p.x, p.z); if (k) add('felt prop inside a building', `${p.type} on a ${k}`);
+    if (m.anchor.at !== 'road' && Math.abs(p.x - host.roadX(p.z)) < host.roadHalf) add('felt prop on the county road', `${p.type} (${m.kind})`);
+    if (m.kind === 'checkpoint' && Math.abs(p.x - host.roadX(p.z)) > host.roadHalf + 1.5) add('checkpoint off the road corridor', `${p.type} at ${p.x.toFixed(1)}`);
+    if (m.anchor.at !== 'road' && onAccess(p.x, p.z, 0.0) && p.type !== 'tarp') add('felt prop on the drive', `${p.type} (${m.kind})`);
+  }
+  if (placed.flood && placed.flood.feet > 45) add('flood deeper than a sane stage', `${placed.flood.feet} ft`);
+  if (placed.fires.length > 6) add('too many fire sources', String(placed.fires.length));
+  return out;
+}
