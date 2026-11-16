@@ -1,6 +1,6 @@
 import type { KindFx } from '../disasterFx';
 import { mulberry32 } from '../rng';
-import { daysSince, kfx, outcome, offerCards, expireCards, type Goal, type TechCard } from '../techFx';
+import { daysSince, kfx, outcome, type Goal, type TechCard } from '../techFx';
 import { empStrike, faradayShare } from '../nuclear';
 import { EMP_VEHICLE_FRY, fleetOf, VEHICLES, runs } from '../vehicles';
 import { radioSet } from '../radio';
@@ -61,7 +61,7 @@ const LINES: Array<[number, string, 0 | 1 | 2 | 3]> = [
 ];
 
 export const fx: KindFx = {
-  onWarning: s => ['Officials warn of a possible high-altitude test. Preppers on the air: "buy a trash can and some aluminum foil."', ...offerCards(s, cards)],
+  onWarning: () => ['Officials warn of a possible high-altitude test. Preppers on the air: "buy a trash can and some aluminum foil."'],
   onHit: s => {
     const e = empOf(s);
     if (e.struck) return [];
@@ -74,7 +74,7 @@ export const fx: KindFx = {
     return out;
   },
   daily: (s, ctx) => {
-    const out = [...expireCards(s, cards, ctx.r), ...offerCards(s, cards)];
+    const out: string[] = [];
     const e = empOf(s);
     if (ctx.day === e.quietUntil) out.push('The first walkers reach the road: looters on foot are about.');
     if (ctx.day === 3) out.push('The roads are jammed with dead cars. People are walking home from town.');

@@ -42,6 +42,7 @@ import { setQuarantine } from '../../sim/medical';
 import { callGathering } from '../../sim/gatherings';
 import { pluralize } from '../../sim/words';
 import { lengthText } from '../../sim/units';
+import { fxChoose } from '../../sim/disasterFx';
 import { HousingStyleCards } from './HousingStyles';
 
 /** The build menu's groups (kit pieces by what they are for). */
@@ -99,6 +100,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     else if (a.type === 'open') g.focusHud({ right: a.right, ...(a.supplies ? { supplies: a.supplies } : {}) });
     else if (a.type === 'restDay') { const why = g.daily(d => takeRestDay(d)); if (why) setNote(why); }
     else if (a.type === 'quarantine') { const why = g.daily(d => setQuarantine(d, a.on)); if (why) setNote(why); }
+    else if (a.type === 'fx') { const why = g.daily(d => fxChoose(d, a.choice)); if (why) setNote(why); }
     else if (a.type === 'rx') g.stockUpRx();
     else if (a.type === 'terrain') useWorldStore.getState().setTerrainMode(a.mode);
     else if (a.type === 'enroll') { const why = g.money(d => enroll(d, a.course, a.pid, a.mode, a.teacher)); if (why) setNote(`Could not sign up: ${why}.`); }

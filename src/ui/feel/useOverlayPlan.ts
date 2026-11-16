@@ -1,6 +1,9 @@
 import { useGameStore } from '../../store/gameStore';
 import { useFeelStore } from '../../store/feelStore';
 import { planningHold } from '../../sim/clockResume';
+import { useFeltStore } from '../../store/feltStore';
+import { feltCardPending, hitMomentUp } from '../../sim/felt/state';
+import { feltSpec } from '../../sim/felt/registry';
 import { overlayPlan, type OverlayPlan } from '../../sim/overlayQueue';
 
 /** Which of the cards over the map is up right now (sim/overlayQueue.ts). */
@@ -11,5 +14,9 @@ export function useOverlayPlan(): OverlayPlan {
   const decision = useGameStore(s => !!(s.game.gate.pending || s.game.gate.card || s.game.gate.aftermath));
   const planning = useGameStore(s => planningHold(s.tool, s.planOpen));
   const dayCard = useGameStore(s => s.dayCard !== null);
-  return overlayPlan({ title, setup, ending, cutscene: cutscene ? (cutscene.phase === 'prompt' ? 'prompt' : 'playing') : 'none', decision, dayCard, recap, milestones, planning });
+  const feltCard = useGameStore(s => feltCardPending(s.game));
+  const hasHit = useGameStore(s => !!feltSpec(s.game.disaster.kind)?.hit);
+  const { hitShown, skipHit } = useFeltStore();
+  const hitMoment = hitMomentUp(useGameStore(s => s.dayCard), hitShown, skipHit, hasHit);
+  return overlayPlan({ title, setup, ending, cutscene: cutscene ? (cutscene.phase === 'prompt' ? 'prompt' : 'playing') : 'none', decision, dayCard, recap, milestones, planning, hitMoment, feltCard });
 }

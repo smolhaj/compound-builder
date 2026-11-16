@@ -11,7 +11,10 @@ import { cashPowerAt, cashPriceMult, barterMult, cashPower, CASH_FLOOR, runMeter
 import { transfer } from './finance';
 import { barterPrices } from './barter';
 import { cyberOf, cyberStrike, flicker, RUMOR_PLAN, verifyRumor, hear, BRICK } from './cyberMath';
-import { answerTechCard, openTechCard, signatureGoals } from './techCards';
+import { toFeltCards, toFeltGoals } from './techFelt';
+import { cards as cyberCards, goals as cyberGoals } from './disasters/cyberattack';
+import { cards as gridCards } from './disasters/grid_down';
+import { FELT } from './felt';
 import { prices } from './economy';
 import { FX, columnsOf } from './disasterFx';
 import { mulberry32 } from './rng';
@@ -121,17 +124,17 @@ describe('cyberattack', () => {
       expect(verifyRumor(g, hs[2].id)).toMatch(/two checks/);
     } else expect(r1).toMatch(/ham/);
   });
-  it('live: the cash card comes up at the hit, spending the safe buys stock, and the goals are tracked', () => {
+  it('live: the cash card comes up after the hit as a felt card, spending the safe buys stock, and the goal chain has five steps', () => {
     let g = mk('cyberattack', 'payments_and_pipeline', 9); g.fin.cash = 5000;
     g = toHit(g, 0);
-    const c = openTechCard(g);
-    expect(c?.id === 'cy_cash' || c?.id === 'cy_firmware').toBe(true);
-    if (c?.id === 'cy_cash') {
-      const before = g.stock.staples;
-      expect(answerTechCard(g, 'spend')).toMatchObject({ tone: 'good' });
-      expect(g.stock.staples).toBe(before + 5); expect(g.fin.cash).toBe(4000);
-    }
-    expect(signatureGoals(g).length).toBe(5);
+    const cash = toFeltCards(cyberCards).find(c => c.id === 'cy_cash')!;
+    expect(cash.when(g)).toBe(true);
+    const spend = cash.options.find(o => o.id === 'spend')!;
+    expect(spend.off?.(g)).toBeNull();
+    const before = g.stock.staples;
+    spend.apply(g, () => 0.5);
+    expect(g.stock.staples).toBe(before + 5); expect(g.fin.cash).toBe(4000);
+    expect(toFeltGoals('c', 'c', 'warning', cyberGoals).steps.length).toBe(5);
   });
 });
 
@@ -145,11 +148,14 @@ describe('grid-down', () => {
     expect(h.weather?.active?.kind === 'ice_storm' || h.weather?.last !== undefined).toBe(true);
   });
   it('the neighbor card pays in goodwill and costs fuel', () => {
-    let g = mk('grid_down', 'cascade', 6); g.stock.fuel = 6;
+    let g = mk('grid_down', 'cascade', 6);
     g = toHit(g, 6);
-    const c = openTechCard(g);
-    if (c?.id === 'gd_charging') { const d0 = g.neighbors.filter(n => n.status === 'home').map(n => n.disposition); const f0 = g.stock.fuel; g.stock.fuel = Math.max(f0, 3); const f1 = g.stock.fuel; answerTechCard(g, 'power'); expect(g.stock.fuel).toBe(f1 - 2); expect(g.neighbors.filter(n => n.status === 'home').map(n => n.disposition).every((d, i) => d >= d0[i])).toBe(true); }
-    else expect(c === null || typeof c.id === 'string').toBe(true);
+    const card = toFeltCards(gridCards).find(c => c.id === 'gd_charging')!;
+    g.stock.fuel = 5;
+    const d0 = g.neighbors.filter(n => n.status === 'home').map(n => n.disposition);
+    card.options.find(o => o.id === 'power')!.apply(g, () => 0.5);
+    expect(g.stock.fuel).toBe(3);
+    expect(g.neighbors.filter(n => n.status === 'home').map(n => n.disposition).every((d, i) => d >= d0[i])).toBe(true);
   });
 });
 
@@ -182,6 +188,16 @@ describe('financial collapse', () => {
       expect(withdrawalLimit(g)).toBe(500);
       expect(transfer(g, 'checking', 'cash', 10_000)).toMatch(/limits/);
       expect(transfer(g, 'checking', 'cash', 400)).toBeNull();
+    }
+  });
+});
+
+describe('felt layer', () => {
+  it('each kind registers its cards and a goal chain with the felt registry', () => {
+    for (const k of ['solar_flare', 'emp', 'cyberattack', 'grid_down', 'financial'] as DisasterKind[]) {
+      expect(FELT[k]?.cards?.length, k).toBeGreaterThanOrEqual(2);
+      expect(FELT[k]?.goals?.steps.length, k).toBe(5);
+      for (const c of FELT[k]!.cards!) expect(c.options.length).toBeGreaterThanOrEqual(2);
     }
   });
 });

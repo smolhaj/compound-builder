@@ -1,6 +1,6 @@
 import type { KindFx } from '../disasterFx';
 import { mulberry32 } from '../rng';
-import { daysSince, outcome, offerCards, expireCards, type Goal, type TechCard } from '../techFx';
+import { daysSince, outcome, type Goal, type TechCard } from '../techFx';
 import { cyberOf, cyberPrice, cyberRestore, cyberStrike, flicker, hear, nextRumor, RUMOR_PLAN, wellSafe } from '../cyberMath';
 import { radioSet } from '../radio';
 import { isFinished } from '../construction';
@@ -70,9 +70,9 @@ export const goals: Goal[] = [
 
 export const fx: KindFx = {
   legacy: { economy: 'finance.ts: the market crash (20%)' },
-  onWarning: s => ['A ransomware attack shut a county hospital. A pipeline operator reports "an incident". Cards fail at the farm store: cash only.', ...offerCards(s, cards)],
+  onWarning: () => ['A ransomware attack shut a county hospital. A pipeline operator reports "an incident". Cards fail at the farm store: cash only.'],
   onHit: s => cyberStrike(s, mulberry32(s.seed * 3571 + 7)),
-  daily: (s, ctx) => [...cyberRestore(s, ctx.day), ...expireCards(s, cards, ctx.r), ...offerCards(s, cards)],
+  daily: (s, ctx) => cyberRestore(s, ctx.day),
   priceMods: s => (s.clock.t < s.disaster.hitAt ? (s.clock.t >= s.disaster.warnAt && s.disaster.hitAt - s.clock.t < 7 ? 1.05 : 1) : cyberPrice(daysSince(s))),
   serviceMods: s => {
     const d = daysSince(s), f = flicker(s.seed % 97, d);

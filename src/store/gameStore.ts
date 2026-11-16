@@ -70,6 +70,7 @@ import { opsecOf } from '../sim/opsec';
 import { hardenProblem, orderHarden, orderHardenAll, tierOf, type HardenId } from '../sim/hardening';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
 import { decisionOpen, planningHold, resumeSpeed } from '../sim/clockResume';
+import { feltCardPending } from '../sim/felt/state';
 import { useFeelStore } from './feelStore';
 import { muteFeedback } from '../ui/feel/quiet';
 
@@ -449,12 +450,12 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const feel = useFeelStore.getState();
     if (feel.title || feel.recap) return;
     if (planningHold(get().tool, get().planOpen)) return;   // drawing or placing, or the starter proposal is open: the clock waits (speed kept)
-    if (get().cutscene || get().dayCard !== null || g.clock.speed === 0 || g.gate.pending || g.gate.aftermath || (g.ending && !g.ending.continued)) return;
+    if (get().cutscene || get().dayCard !== null || g.clock.speed === 0 || g.gate.pending || g.gate.aftermath || (g.ending && !g.ending.continued) || feltCardPending(g)) return;
     const days = Math.min(realDt, MAX_DT) / SECONDS_PER_DAY[g.clock.speed];
     const next = step(g, days);
     // someone at the gate: stop the clock until the player decides
     // (and when news of a rescue comes in: the card)
-    const paused = (next.gate.pending && !g.gate.pending) || (next.gate.card && !g.gate.card) || (next.ending && !g.ending);
+    const paused = (next.gate.pending && !g.gate.pending) || (next.gate.card && !g.gate.card) || (next.ending && !g.ending) || (feltCardPending(next) && !feltCardPending(g));
     // the collapse hits: the day-it-happened card, and the clock waits for the player
     const hitNow = !!next.disaster.kind && g.clock.t < g.disaster.hitAt && next.clock.t >= next.disaster.hitAt && get().dayCardSeen !== next.disaster.hitAt;
     if (paused || hitNow) next.clock = { ...next.clock, speed: 0 };

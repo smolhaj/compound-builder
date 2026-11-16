@@ -1,6 +1,6 @@
 import type { KindFx } from '../disasterFx';
 import { mulberry32 } from '../rng';
-import { daysSince, outcome, offerCards, expireCards, wealthOf, type Goal, type TechCard } from '../techFx';
+import { daysSince, outcome, wealthOf, type Goal, type TechCard } from '../techFx';
 import { flareGridFactor, flareOf, flareStrike, gicOf, disconnect } from '../flareFry';
 import { faradayShare } from '../nuclear';
 import { repairPlan } from '../structureDamage';
@@ -62,10 +62,10 @@ const LINES: Array<[number, string, 0 | 1 | 2 | 3]> = [
 
 export const fx: KindFx = {
   legacy: { economy: 'finance.ts: the market crash (30%)' },
-  onWarning: s => s.disaster.variant === 'near_miss' ? ['The sky is green and red to the south. Compasses wander. That is all.'] : ['A G-class storm watch is up. Aurora is forecast as far south as Texas.', ...offerCards(s, cards)],
+  onWarning: s => s.disaster.variant === 'near_miss' ? ['The sky is green and red to the south. Compasses wander. That is all.'] : ['A G-class storm watch is up. Aurora is forecast as far south as Texas.'],
   onHit: s => flareStrike(s, mulberry32(s.seed * 3571 + 1)),
   daily: (s, ctx) => {
-    const out = [...expireCards(s, cards, ctx.r), ...offerCards(s, cards)];
+    const out: string[] = [];
     const f = flareOf(s);
     if (f.dipAt && ctx.day === f.dipAt) out.push('A damaged county transformer tripped: the grid dipped again, for days this time.');
     return out;

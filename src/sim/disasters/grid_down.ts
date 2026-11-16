@@ -1,5 +1,5 @@
 import type { KindFx } from '../disasterFx';
-import { daysSince, outcome, offerCards, expireCards, type Goal, type TechCard } from '../techFx';
+import { daysSince, outcome, type Goal, type TechCard } from '../techFx';
 import { dayIndex } from '../state';
 import { weatherOf } from '../weatherThreats';
 import { radioSet } from '../radio';
@@ -16,7 +16,7 @@ export const cards: TechCard[] = [
       { id: 'tank', label: 'Lend a portable tank and two cans', hint: 'Nearly the same goodwill, quieter, but the tank is gone.', locked: s.stock.fuel >= 2 ? undefined : 'needs 2 cans of fuel' },
       { id: 'refuse', label: 'Tell them you cannot spare it', hint: 'Humanity and goodwill drop; word gets round.' },
     ],
-    due: s => gone(s) && daysSince(s) >= 4 && s.neighbors.some(n => n.status === 'home'),
+    due: s => gone(s) && daysSince(s) >= 8 && s.neighbors.some(n => n.status === 'home'),
     answer: (s, o) => {
       const home = s.neighbors.filter(n => n.status === 'home');
       if (o === 'refuse') { for (const n of home) n.disposition = Math.max(-100, n.disposition - 6); s.gate.humanity = Math.max(0, s.gate.humanity - 4); return outcome('You send them home', 'You hear he did not make it through the week. The road does not forget.', 'bad'); }
@@ -34,7 +34,7 @@ export const cards: TechCard[] = [
       { id: 'host', label: 'Offer the compound as the hub', hint: 'Greater goodwill, strangers at the gate every barter day.' },
       { id: 'stay', label: 'Keep to yourselves', hint: 'Safe, and alone.' },
     ],
-    due: s => gone(s) && s.disaster.variant === 'transformer_shortage' && daysSince(s) >= 5,
+    due: s => gone(s) && s.disaster.variant === 'transformer_shortage' && daysSince(s) >= 8,
     answer: (s, o) => {
       const home = s.neighbors.filter(n => n.status === 'home');
       if (o === 'stay') return outcome('You stay out of it', 'The hub runs without you.', 'mixed');
@@ -64,7 +64,7 @@ const LINES: Array<[number, string, 0 | 1 | 2 | 3]> = [
 
 export const fx: KindFx = {
   legacy: { media: 'report.ts: the solar grid-tie line' },
-  onWarning: s => ['"Conserve power 4 to 9 p.m." The lights dimmed twice at supper.', ...offerCards(s, cards)],
+  onWarning: () => ['"Conserve power 4 to 9 p.m." The lights dimmed twice at supper.'],
   onHit: s => {
     const out: string[] = [];
     const v = s.disaster.variant;
@@ -77,7 +77,7 @@ export const fx: KindFx = {
     else out.push('The line to the road went dead. Yours did not, if you built your own plant.');
     return out;
   },
-  daily: (s, ctx) => [...expireCards(s, cards, ctx.r), ...offerCards(s, cards)],
+  
   priceMods: s => (s.clock.t < s.disaster.hitAt ? (s.clock.t < s.disaster.warnAt ? 1 : 1 + 0.08 * Math.max(0, Math.min(1, 1 - (s.disaster.hitAt - s.clock.t) / 30))) : 1 + 0.2 * Math.max(0, 1 - daysSince(s) / 14)),
   encounterWeights: (s, mix) => {
     const d = daysSince(s);

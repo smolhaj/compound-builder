@@ -1,5 +1,5 @@
 import type { KindFx } from '../disasterFx';
-import { daysSince, kfx, outcome, offerCards, expireCards, type Goal, type TechCard } from '../techFx';
+import { daysSince, kfx, outcome, type Goal, type TechCard } from '../techFx';
 import { cashPower, cashPowerAt, cashPriceMult, runMeter, withdrawalRoom } from '../moneyMath';
 import { debtOf, transfer } from '../finance';
 
@@ -70,10 +70,10 @@ export const goals: Goal[] = [
 const fmt = (n: number) => '$' + (n < 100 ? n.toFixed(2) : Math.round(n).toLocaleString('en-US'));
 export const fx: KindFx = {
   legacy: { economy: 'finance.ts: the market crash (45%) and the bail-in' },
-  onWarning: s => ['Two regional banks failed this week. Treasury says deposits are safe.', ...offerCards(s, cards)],
+  onWarning: () => ['Two regional banks failed this week. Treasury says deposits are safe.'],
   onHit: s => [`The banks did not open. A dollar still buys something, but not much: cash is dear, not worthless (it will not fall below ${Math.round(cashPowerAt(s.disaster.variant, 9999) * 100)} cents on the old dollar).`],
-  daily: (s, ctx) => {
-    const out = [...expireCards(s, cards, ctx.r), ...offerCards(s, cards)];
+  daily: s => {
+    const out: string[] = [];
     const f = finOf(s), cp = cashPower(s);
     // hyperinflation shrinks debts as the dollar sinks; a bank holiday does not
     if (s.disaster.variant === 'hyperinflation' && f.lastCp > 0) { const d = debtOf(s); if (d.owed > 0) d.owed *= cp / f.lastCp; }

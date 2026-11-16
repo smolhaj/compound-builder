@@ -39,4 +39,20 @@ describe('overlay queue', () => {
     expect(up(overlayPlan({ ...none, milestones: 2, planning: true }))).toEqual([]);
     expect(up(overlayPlan({ ...none, milestones: 2, planning: false }))).toEqual(['milestone']);
   });
+  it('felt layer: gate > hit moment > day card > felt card > recap > milestone, and nothing is lost', () => {
+    const all = { ...none, hitMoment: true, dayCard: true, feltCard: true, recap: true, milestones: 1 };
+    expect(up(overlayPlan({ ...all, decision: true }))).toEqual(['gate']);
+    expect(up(overlayPlan(all))).toEqual(['hitMoment']);
+    expect(up(overlayPlan({ ...all, hitMoment: false }))).toEqual(['dayCard']);
+    expect(up(overlayPlan({ ...all, hitMoment: false, dayCard: false }))).toEqual(['feltCard']);
+    expect(up(overlayPlan({ ...all, hitMoment: false, dayCard: false, feltCard: false }))).toEqual(['recap']);
+    expect(up(overlayPlan({ ...all, hitMoment: false, dayCard: false, feltCard: false, recap: false }))).toEqual(['milestone']);
+  });
+  it('felt layer: a felt card waits for the new-game screen and a placing tool; the title and a cutscene hide the new slots', () => {
+    expect(up(overlayPlan({ ...none, feltCard: true, setup: true }))).toEqual([]);
+    expect(up(overlayPlan({ ...none, feltCard: true, planning: true }))).toEqual([]);
+    expect(up(overlayPlan({ ...none, feltCard: true, planning: false }))).toEqual(['feltCard']);
+    expect(up(overlayPlan({ ...none, title: true, hitMoment: true, feltCard: true }))).toEqual([]);
+    expect(up(overlayPlan({ ...none, cutscene: 'playing', hitMoment: true, feltCard: true }))).toEqual(['gate']);
+  });
 });
