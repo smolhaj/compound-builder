@@ -70,6 +70,7 @@ import { opsecOf } from '../sim/opsec';
 import { hardenProblem, orderHarden, orderHardenAll, tierOf, type HardenId } from '../sim/hardening';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
 import { decisionOpen, planningHold, resumeSpeed } from '../sim/clockResume';
+import { feltCardPending } from '../sim/felt/state';
 import { useFeelStore } from './feelStore';
 import { muteFeedback } from '../ui/feel/quiet';
 
@@ -336,7 +337,7 @@ export interface GameStore {
   /** Keep or quit an adult's day job (peacetime only). */
   setEmployed: (personId: string, on: boolean) => void;
   /** Free build: start a disaster now, after `warnDays` of warning signs. */
-  trigger: (kind: DisasterKind, warnDays: number) => void;
+  trigger: (kind: DisasterKind, warnDays: number, variant?: string) => void;
   /** Whether the new-game screen is up. */
   setupOpen: boolean;
   /** The shop & money window. */
@@ -449,12 +450,12 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const feel = useFeelStore.getState();
     if (feel.title || feel.recap) return;
     if (planningHold(get().tool, get().planOpen)) return;   // drawing or placing, or the starter proposal is open: the clock waits (speed kept)
-    if (get().cutscene || get().dayCard !== null || g.clock.speed === 0 || g.gate.pending || g.gate.aftermath || (g.ending && !g.ending.continued)) return;
+    if (get().cutscene || get().dayCard !== null || g.clock.speed === 0 || g.gate.pending || g.gate.aftermath || (g.ending && !g.ending.continued) || feltCardPending(g)) return;
     const days = Math.min(realDt, MAX_DT) / SECONDS_PER_DAY[g.clock.speed];
     const next = step(g, days);
     // someone at the gate: stop the clock until the player decides
     // (and when news of a rescue comes in: the card)
-    const paused = (next.gate.pending && !g.gate.pending) || (next.gate.card && !g.gate.card) || (next.ending && !g.ending);
+    const paused = (next.gate.pending && !g.gate.pending) || (next.gate.card && !g.gate.card) || (next.ending && !g.ending) || (feltCardPending(next) && !feltCardPending(g));
     // the collapse hits: the day-it-happened card, and the clock waits for the player
     const hitNow = !!next.disaster.kind && g.clock.t < g.disaster.hitAt && next.clock.t >= next.disaster.hitAt && get().dayCardSeen !== next.disaster.hitAt;
     if (paused || hitNow) next.clock = { ...next.clock, speed: 0 };
@@ -996,11 +997,11 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     log(g, on ? `${p.first} is back at work as a ${p.job.title.toLowerCase()}.` : `${p.first} quit the job to work on the place full time.`);
     set({ game: g });
   },
-  trigger: (kind, warnDays) => {
+  trigger: (kind, warnDays, variant) => {
     if (locked()) return;
     const g = structuredClone(get().game);
     if (!unscripted(g.disaster.mode) || (g.disaster.kind && g.disaster.phase !== 'peace')) return;
-    triggerDisaster(g.disaster, g.clock.t, kind, g.seed, warnDays);
+    triggerDisaster(g.disaster, g.clock.t, kind, g.seed, warnDays, variant);
     set({ game: g });
   },
   setupOpen: false,

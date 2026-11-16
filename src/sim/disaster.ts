@@ -98,7 +98,13 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
   },
   lawless: {
     kind: 'lawless', name: 'End of the rule of law', pulpy: false, warn: [7, 20],
-    variants: [{ id: 'collapse', name: 'the collapse of order', weight: 1, curves: { law: C(0, 10, 0, [180, 540], 60), stores: C(0, 5, 0.1, [150, 500]), deliveries: C(0, 3, 0.1, [150, 500]), banks: C(0, 3, 0.1, [150, 500]) } }],
+    variants: [
+      { id: 'walkout', name: 'the walkout of the county\'s police', weight: 3, curves: { law: C(0, 10, 0, [180, 540], 60), stores: C(0, 5, 0.1, [150, 500]), deliveries: C(0, 3, 0.1, [150, 500]), banks: C(0, 3, 0.1, [150, 500]), fuel: C(2, 20, 0.4, [120, 420]), medical: C(5, 30, 0.6, [200, 500]) } },
+      { id: 'blackout_of_order', name: 'a blackout of order', weight: 2, curves: { law: C(0, 2, 0, [20, 60], 14), stores: C(0, 2, 0.1, [25, 70]), deliveries: C(0, 2, 0, [25, 70]), grid: C(0, 1, 0.2, [10, 45]), phone: C(0, 1, 0.3, [10, 40]) } },
+      { id: 'drift', name: 'a slow drift into no law', weight: 1, curves: { law: C(0, 30, 0.02, null), banks: C(0, 10, 0.05, null), stores: C(10, 60, 0.2, null), grid: C(40, 90, 0.4, null), phone: C(60, 90, 0.4, null) } },
+      // the single variant before WP3 (saves made then carry this id; never rolled for a new run): same curves as the walkout
+      { id: 'collapse', name: 'the collapse of order', weight: 0, curves: { law: C(0, 10, 0, [180, 540], 60), stores: C(0, 5, 0.1, [150, 500]), deliveries: C(0, 3, 0.1, [150, 500]), banks: C(0, 3, 0.1, [150, 500]) } },
+    ],
     hints: [['Police union warns of unpaid overtime.', 'Break-ins up sharply in town.', 'Sheriff asks residents to "be patient".'], ['Looting reported in the city.', 'Deputies stop answering calls past the county line.', 'Pawn shop out of guns and ammo.'], ['Sheriff\'s office closed "until further notice".', 'A gang is working the farms east of town.', 'Neighbors set up a roadblock at the bridge.']],
     hit: ['Nobody is coming: the sheriff\'s office has shut its doors.'],
     chain: [],
@@ -180,14 +186,22 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
   },
   invasion: {
     kind: 'invasion', name: 'Invasion', pulpy: true, warn: [10, 40],
-    variants: [{ id: 'occupation', name: 'the occupation', weight: 1, curves: { law: C(0, 5, 0.2, null), grid: C(0, 2, 0.2, null), phone: C(0, 0, 0, null), banks: C(0, 2, 0, null), fuel: C(0, 5, 0.1, null), stores: C(2, 10, 0.2, null), deliveries: C(0, 3, 0.1, null), medical: C(2, 10, 0.3, null) } }],
+    variants: [
+      { id: 'occupation', name: 'the occupation', weight: 3, curves: { law: C(0, 5, 0.2, null), grid: C(0, 2, 0.2, null), phone: C(0, 0, 0, null), banks: C(0, 2, 0, null), fuel: C(0, 5, 0.1, null), stores: C(2, 10, 0.2, null), deliveries: C(0, 3, 0.1, null), medical: C(2, 10, 0.3, null) } },
+      { id: 'soft', name: 'a friendlier occupation', weight: 1, curves: { law: C(0, 5, 0.3, null), grid: C(0, 2, 0.2, [30, 60], 14), phone: C(0, 0, 0, null), banks: C(0, 2, 0.1, null), fuel: C(0, 5, 0.2, null), stores: C(2, 10, 0.3, null), deliveries: C(0, 3, 0.2, null), medical: C(2, 10, 0.4, null) } },
+      { id: 'contested', name: 'an occupation with a moving front', weight: 1, curves: { law: C(0, 5, 0.2, null), grid: C(0, 2, 0.2, null), phone: C(0, 0, 0, null), banks: C(0, 2, 0, null), fuel: C(0, 5, 0.1, null), stores: C(2, 10, 0.2, null), deliveries: C(0, 3, 0.1, null), medical: C(2, 10, 0.3, null) } },
+    ],
     hints: [['Satellites over the Pacific go dark.', 'Carrier groups recalled; the President addresses the nation.'], ['Paratroopers reported near the missile fields.', 'Martial law declared in three states.'], ['Columns of vehicles on the interstate, not ours.', 'Radio stations off the air one by one.']],
     hit: ['Foreign troops are in the valley. Checkpoints on every road.'],
     chain: [],
   },
   civil_war: {
     kind: 'civil_war', name: 'Civil war', pulpy: true, warn: [20, 60],
-    variants: [{ id: 'factions', name: 'the war between the Cascade Compact and the Plains Alliance', weight: 1, curves: { law: C(0, 20, 0.1, null), grid: C(10, 30, 0.3, null), fuel: C(0, 20, 0.2, null), banks: C(0, 10, 0.1, null), stores: C(5, 30, 0.3, null), deliveries: C(5, 30, 0.2, null), medical: C(10, 40, 0.3, null), phone: C(5, 20, 0.4, null) } }],
+    variants: [
+      { id: 'factions', name: 'the war between the Cascade Compact and the Plains Alliance', weight: 3, curves: { law: C(0, 20, 0.1, null), grid: C(10, 30, 0.3, null), fuel: C(0, 20, 0.2, null), banks: C(0, 10, 0.1, null), stores: C(5, 30, 0.3, null), deliveries: C(5, 30, 0.2, null), medical: C(10, 40, 0.3, null), phone: C(5, 20, 0.4, null) } },
+      { id: 'uprising', name: 'a sudden uprising between the Compact and the Alliance', weight: 1, curves: { law: C(0, 10, 0.2, [300, 700], 60), grid: C(5, 20, 0.5, [200, 500]), fuel: C(0, 20, 0.2, null), banks: C(0, 10, 0.1, null), stores: C(5, 30, 0.3, null), deliveries: C(5, 30, 0.2, null), medical: C(10, 40, 0.3, null), phone: C(5, 20, 0.4, null) } },
+      { id: 'partition', name: 'a slow partition of the country', weight: 1, curves: { law: C(0, 20, 0.1, null), grid: C(10, 30, 0.3, null), fuel: C(0, 20, 0.2, null), banks: C(20, 60, 0.4, [300, 900]), stores: C(5, 30, 0.3, null), deliveries: C(5, 30, 0.2, null), medical: C(10, 40, 0.3, null), phone: C(5, 20, 0.4, null) } },
+    ],
     hints: [['The Cascade Compact refuses federal orders.', 'Protests become armed standoffs in two capitals.'], ['The Plains Alliance seizes a federal depot.', 'Checkpoints on the state line.'], ['Fighting around Billings; the interstate is cut.', 'Militia recruiters at the feed store.']],
     hit: ['The war reaches the valley: the Plains Alliance holds the town, the Compact the passes.'],
     chain: [],
