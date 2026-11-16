@@ -21,7 +21,7 @@ Compound Builder must look at least as good as **University Empire** (`smolhaj/U
 
 ## Standing rules (workflow)
 - **US spelling and U.S. units** in code, UI text and docs. The sim keeps SI internally; convert only at the formatting layer (`sim/units.ts`). `sim/unitsLint.test.ts` fails when a metric unit reaches player-facing text. **Procedural art only** and **real scale** (1 unit ≈ 20 ft; check a street-level shot with a person).
-- **PR workflow:** one feature branch per change, open a **draft PR**, squash-merge when `check` and `perf-budget` are green. **Merge main into the branch first**: CI does not run on conflicting PRs. `npm run lint`, `npm test` and `npm run build` must pass locally (they are the `check` job). Never force-push; **never raise the perf budgets** (fix the cost instead).
+- **PR workflow:** one feature branch per change, open a **draft PR**, squash-merge when the local checks pass; CI is manual-only (Actions tab, `workflow_dispatch`) so PRs do not send failure mail. **Merge main into the branch first** so the merge is clean. `npm run lint`, `npm test` and `npm run build` must pass locally (they are the `check` job). Never force-push; **never raise the perf budgets** (fix the cost instead).
 - **`docs/DECISIONS.md`**: add a dated row for every design decision. On a merge conflict in that file keep both sides.
 - Save version is `SAVE_VERSION` in `src/sim/state.ts` (now **95**; the migration table in `sim/save/migrations.ts` has a pass-through step for versions that only add optional fields). Bump it and migrate when state fields change; the per-version history is in the DECISIONS rows ("Save vNN").
 

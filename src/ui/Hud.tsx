@@ -12,6 +12,7 @@ import { PersonInsight, PeopleSection, MedicalSection, ClassesSection } from './
 import { DailySection } from './SchedulePanel';
 import { DAILY_TASK_TEXT } from './dailyText';
 import { HomeLine } from './HomeLine';
+import { useFeltStore } from '../store/feltStore';
 import { useWorldStore, type BuildingView, type CameraMode, type FrameCap } from '../store/worldStore';
 import { useGameStore } from '../store/gameStore';
 import type { Quality } from '../engine/world/WorldScene';
@@ -211,6 +212,7 @@ const worstTone = (a?: Tone, b?: Tone): Tone | undefined => (a === 'bad' || b ==
 /** Game HUD. Hidden with ?clean (QA shots). */
 export function Hud() {
   const w = useWorldStore();
+  const skipHit = useFeltStore(f => f.skipHit), setSkipHit = useFeltStore(f => f.setSkipHit);
   const g = useGameStore();
   const [leftTab, setLeftTab] = useState<'build' | 'projects' | 'log'>('build');
   const [rightTab, setRightTab] = useState<'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle'>(() => g.hudFocus?.right ?? 'family');
@@ -728,6 +730,7 @@ export function Hud() {
         <select value={w.frameCap} onChange={e => w.setFrameCap(Number(e.target.value) as FrameCap)} title="Frame-rate cap: 60 is smooth and halves the work on a 120 Hz display" aria-label="Frame-rate cap">
           <option value={60}>60 fps</option><option value={30}>30 fps</option><option value={0}>uncapped</option>
         </select>
+        <button data-testid="skip-hit-toggle" style={btn(skipHit)} title="Skip the short cinematic when a disaster hits (it plays once per hit; any key or click also skips it)" onClick={() => setSkipHit(!skipHit)}>{skipHit ? 'Hit cinematic: skipped' : 'Skip hit cinematic'}</button>
         <button style={btn(w.showPerf)} title="Show frames per second, frame time and draw calls" onClick={() => w.setShowPerf(!w.showPerf)}>FPS</button>
         {w.showPerf && w.quality !== 'high' && <button style={btn(false)} title="Switch to High graphics (remembered). If it runs slowly the game steps back down by itself." onClick={() => { w.setQuality('high', true); w.setPerfNotice(null); }}>Try High</button>}
         {w.showPerf && w.perfStats && (

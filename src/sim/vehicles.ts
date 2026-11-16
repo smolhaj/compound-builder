@@ -153,11 +153,22 @@ export function burnTractor(s: GameState, hours: number): void {
   t.mileage += hours;
 }
 
-/** The EMP: every vehicle with electronics dies; the 1970s truck and the trailer don't. */
-export function empVehicles(s: GameState): string[] {
-  const hit = fleetOf(s).filter(v => VEHICLES[v.kind].emp && !v.fried);
+/** Share of electronic vehicles an EMP kills, by difficulty (the Commission's mixed findings on Cozy, the dramatic case on Hardcore). */
+export const EMP_VEHICLE_FRY = { cozy: 0.3, standard: 0.6, hardcore: 0.85 } as const;
+
+/**
+ * The EMP: every vehicle with electronics dies (nuclear war: `chance` 1); for the lone-burst kind each one rolls (`chance`, dice `r`) and
+ * the survivors are the ones that "ran or restarted". The 1970s truck and the trailer never roll.
+ */
+export function empVehicles(s: GameState, chance = 1, r: () => number = () => 0): string[] {
+  const hit = fleetOf(s).filter(v => VEHICLES[v.kind].emp && !v.fried && (chance >= 1 || r() < chance));
   hit.forEach(v => { v.fried = true; delete v.down; });
-  return hit.length ? [`The EMP killed ${hit.map(v => VEHICLES[v.kind].name.toLowerCase()).join(', ')}.`] : [];
+  const spared = fleetOf(s).filter(v => VEHICLES[v.kind].emp && !v.fried);
+  const out = hit.length ? [`The EMP killed ${hit.map(v => VEHICLES[v.kind].name.toLowerCase()).join(', ')}.`] : [];
+  if (chance < 1 && spared.length) out.push(`${spared.map(v => VEHICLES[v.kind].name).join(', ')} stalled and restarted: the pulse missed it.`);
+  const old = fleetOf(s).filter(v => !VEHICLES[v.kind].emp && VEHICLES[v.kind].mpg > 0 && !v.fried);
+  if (chance < 1 && old.length) out.push(`The ${old.map(v => VEHICLES[v.kind].name.toLowerCase()).join(' and ')} (no electronics) runs as if nothing happened.`);
+  return out;
 }
 
 /** Top a tank up: at the pump in peacetime, from the jerry cans after. True if any fuel went in. */

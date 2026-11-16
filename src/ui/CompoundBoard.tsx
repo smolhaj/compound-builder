@@ -8,6 +8,7 @@ import { Clamp, Group, Hint } from './hud/common';
 import { WaveCard } from './WaveClock';
 import { useSpendGuard } from './hud/useSpendGuard';
 import { orderCost, prices } from '../sim/economy';
+import { FeedCard } from './felt/FeedCard';
 import { DIM, FS, LINE, TONE, btn, miniBtn } from './hud/style';
 
 const PAPER = 'rgba(32,29,22,0.97)';
@@ -61,6 +62,7 @@ export function CompoundBoardPanel({ top, bottom, narrow, onClose, onSide }: { t
       </span>
     </div>
     {guardNode}
+    <FeedCard />
     {b.vitals.map(vital)}
     <WaveCard />
     <Group id="board.runway" title="Days with no resupply" extra={tightest && tightest.tone !== 'good' ? `${tightest.label}: ${tightest.value}` : undefined}>

@@ -1,5 +1,6 @@
 /** The felt layer's per-kind specs (docs/FELT_LAYER.md section 4.2). One module per kind; the FL7 to FL11 content packages fill their own files. */
 import type { FeltKind, FeltSpec } from './types';
+import { radioFor } from './radioLines';
 import { felt as gridDown } from './kinds/grid_down';
 import { felt as financial } from './kinds/financial';
 import { felt as lawless } from './kinds/lawless';
@@ -63,5 +64,7 @@ export const FELT: Record<FeltKind, FeltSpec> = {
 };
 
 export const FELT_KINDS = Object.keys(FELT) as FeltKind[];
+// FL3: every kind gets the generic radio set unless its own content package wrote lines (felt/radioLines.ts)
+for (const k of FELT_KINDS) FELT[k].radio ??= radioFor(k);
 /** The spec for a kind (a kind the registry does not know has none). */
 export const feltSpec = (kind: string | null | undefined): FeltSpec | null => (kind ? (FELT as Record<string, FeltSpec | undefined>)[kind] ?? null : null);

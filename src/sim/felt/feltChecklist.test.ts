@@ -12,11 +12,11 @@ import type { FeltKind } from './types';
 export const FELT_ENFORCE: FeltKind[] = [];
 
 /** What each kind passes today (the teeth item mirrors disasterTeeth's columnsOf >= 4). Raise, never lower. */
-const BASELINE: Partial<Record<FeltKind, FeltItem[]>> = { nuclear: ['teeth'], drought: ['teeth'], ash_winter: ['teeth'], bioweapon: ['teeth'] };
+const BASELINE: Partial<Record<FeltKind, FeltItem[]>> = { grid_down: ['teeth', 'radio', 'cards', 'goals'], financial: ['teeth', 'radio', 'cards', 'goals'], lawless: ['teeth', 'radio'], drought: ['teeth', 'radio'], pandemic: ['teeth', 'radio'], nuclear: ['teeth', 'radio'], solar_flare: ['teeth', 'radio', 'cards', 'goals'], wildfire: ['radio'], ash_winter: ['teeth', 'radio'], cyberattack: ['teeth', 'radio', 'cards', 'goals'], zombies: ['teeth', 'radio'], invasion: ['teeth', 'radio'], civil_war: ['teeth', 'radio'], bioweapon: ['teeth', 'radio'], asteroid: ['radio'], unknown: ['radio'], emp: ['teeth', 'radio', 'cards', 'goals'], mega_quake: ['radio'], crop_blight: ['teeth', 'radio'], dam_flood: ['radio'], supervolcano: ['radio'], livestock_plague: ['teeth', 'radio'], satellite_loss: ['radio'], oil_shock: ['radio'], reactor_meltdown: ['radio'], global_famine: ['radio'], water_war: ['radio'], cult_takeover: ['radio'], mass_exodus: ['radio'] };
 
 describe('felt checklist', () => {
   it('never loses an item the baseline records, and the baseline is exact today', () => {
-    for (const k of FELT_KINDS) expect(feltPassing(k), k).toEqual(FELT_ITEMS.filter(i => (BASELINE[k] ?? []).includes(i)));
+    for (const k of FELT_KINDS) expect(feltPassing(k), k).toEqual(FELT_ITEMS.filter(i => i === 'radio' /* FL3: the generic radio set fills every kind (felt/radioLines.ts) */ || (BASELINE[k] ?? []).includes(i)));
   });
   it('enforces every item for the kinds in FELT_ENFORCE', () => {
     for (const k of FELT_ENFORCE) expect(FELT_ITEMS.filter(i => !feltChecks(k)[i]), k).toEqual([]);
