@@ -9,6 +9,7 @@ import { weatherDelay } from './upkeep';
 import type { GameState, OrderLine } from './state';
 import { truckHold } from './roadPost';
 import { canOrder, priceFactor } from './disaster';
+import { fxPriceMod } from './disasterFx';
 import { CARRY_H } from './improvements';
 import { adoptDog, coatName } from './pets';
 import { addFood, CAT_KCAL, FOOD, foodCount, type FoodItemId } from './pantry';
@@ -47,7 +48,7 @@ export function orderCost(lines: readonly OrderLine[], factor = 1): number {
 }
 
 /** Today's price level. */
-export const prices = (s: GameState) => priceFactor(s.disaster, s.clock.t);
+export const prices = (s: GameState) => priceFactor(s.disaster, s.clock.t) * fxPriceMod(s);   // (sim/disasters/<kind>.ts priceMods)
 
 export function orderProblem(s: GameState, lines: readonly OrderLine[]): OrderProblem | null {
   const real = lines.filter(isReal);

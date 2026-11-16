@@ -33,6 +33,7 @@ import { logGate } from './nag';
 import { daysOfFood } from './needs';
 import { forewarned } from './radio';
 import { gearPosture } from './gear';
+import { fxEncounterWeights } from './disasterFx';
 import { fogSightK } from './fogFx';
 import { fenceHold, watchDetection } from './daily';
 import { armed, firepower } from './armory';
@@ -414,13 +415,8 @@ export function whoComes(s: GameState, p: Posture, r: () => number): EncounterKi
     ['neighbor_help', s.gate.government === 'help' ? 8 : 4],
   ];
   // each disaster has its own crowd at the gate
-  const k = s.disaster.kind, scale = (kind: EncounterKind, f: number) => { for (const e of w) if (e[0] === kind) e[1] *= f; };
-  if (k === 'zombies') { w.push(['horde', 60 * (0.5 + p.visibility / 100)]); scale('trader', 0.2); scale('refugees', 0.5); scale('requisition', 0); }
-  if (k === 'invasion') { w.push(['patrol', 40 * (0.5 + p.visibility / 100)]); scale('requisition', 0); scale('trader', 0.3); }
-  if (k === 'civil_war') { w.push(['militia', 35 * (0.4 + p.fortress / 100 + p.visibility / 150)]); }
-  if (k === 'pandemic' || k === 'bioweapon') { scale('arrival', 1.4); scale('refugees', 1.5); scale('trader', 0.5); }
-  if (k === 'drought') { scale('refugees', 1.6); scale('looters', 1.3); }
-  if (k === 'unknown') { scale('arrival', 0.4); scale('looters', 0.3); scale('gang', 0.3); scale('trader', 0.1); }
+  fxEncounterWeights(s, w, p);   // (sim/disasters/<kind>.ts)
+  const scale = (kind: EncounterKind, f: number) => { for (const e of w) if (e[0] === kind) e[1] *= f; };
   // OPSEC: the more the county knows, the more of them come for what you have
   const rp = raidPressure(s);
   for (const kind of ['looters', 'gang', 'requisition', 'horde', 'militia'] as EncounterKind[]) scale(kind, rp);

@@ -47,6 +47,7 @@ import type { Person, SkillId } from './family';
 import { calendarOf, dayIndex, type GameState } from './state';
 import { inPact } from './pact';
 import { threatOn } from './threatState';
+import { fxNpcMod } from './disasterFx';
 import { bringsLine, householdPeople, neighborBrings, neighborSecret, requestShelter, trustLine, trustMult } from './newcomers';
 import type { Caliber } from './armory';
 import { caloriesText, kmText } from './units';
@@ -131,7 +132,7 @@ export const perDay = (yearly: number) => 1 - Math.pow(1 - yearly, 1 / 365);
 export function hardship(s: GameState): number {
   if (!s.disaster.kind || s.clock.t < s.disaster.hitAt) return 1;
   const t = s.disaster.tracks;
-  return 1 + 2 * (1 - t.medical) + (1 - t.stores);
+  return (1 + 2 * (1 - t.medical) + (1 - t.stores)) * fxNpcMod(s);
 }
 /** A household's daily chance of being raided. */
 export function raidChance(s: GameState, n: Neighbor): number {

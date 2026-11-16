@@ -12,11 +12,15 @@ const at = (g: GameState, days: number) => { g.clock.t = g.disaster.hitAt + days
 const built = (g: GameState, id: string, kind: string): Structure => { const st: Structure = { id, kind, x: 10, z: 10, rot: 0, stage: 5, done: 0, supplied: true, finishedAt: 0 }; g.structures.push(st); return st; };
 
 describe('all sixteen disasters', () => {
-  it('every one has a ruleset; Surprise rolls only the grounded ones', () => {
+  it('every one has a ruleset; Surprise rolls the grounded ones and, rarely, the six pulpy ones', () => {
     const all: DisasterKind[] = ['grid_down', 'financial', 'lawless', 'drought', 'pandemic', 'nuclear', 'solar_flare', 'wildfire', 'ash_winter', 'cyberattack', 'zombies', 'invasion', 'civil_war', 'bioweapon', 'asteroid', 'unknown'];
     for (const k of all) expect(DISASTERS[k], k).toBeDefined();
-    expect(SURPRISE_POOL.every(k => !DISASTERS[k]!.pulpy)).toBe(true);
-    for (let s = 1; s < 40; s++) expect(DISASTERS[newDisaster(s, 'surprise').kind!]!.pulpy).toBe(false);
+    expect(SURPRISE_POOL.every(k => DISASTERS[k])).toBe(true);
+    for (const k of all.filter(k => DISASTERS[k]!.pulpy)) expect(SURPRISE_POOL, k).toContain(k);
+    // the pulpy ones are rare: 40 seeds land on grounded kinds almost always
+    let pulpy = 0;
+    for (let s = 1; s < 41; s++) if (DISASTERS[newDisaster(s, 'surprise').kind!]!.pulpy) pulpy++;
+    expect(pulpy).toBeLessThan(8);
   });
 
   it('drought: the hand-dug well fails first, the drilled well holds on; the garden needs stored water', () => {

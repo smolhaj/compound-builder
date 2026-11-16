@@ -134,4 +134,13 @@ describe('save migrations', () => {
     expect(m.site.listed ?? false).toBe(false);
     expect(() => step(structuredClone(m), 3)).not.toThrow();
   });
+
+  it('v97 → v98: the per-kind hook seam adds an optional `disaster.fx` bag; an old save loads and runs', () => {
+    const old = JSON.parse(JSON.stringify(newGame(3)));
+    old.version = 97;
+    const m = migrate(old);
+    expect(m.version).toBe(SAVE_VERSION);
+    expect(m.disaster.fx ?? {}).toEqual({});
+    expect(() => step(structuredClone(m), 3)).not.toThrow();
+  });
 });

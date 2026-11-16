@@ -13,6 +13,7 @@
  * Disaster-free peacetime always reads 1 (nothing to be safe from), so nothing looks different before the collapse.
  */
 import { tracksAt, tension, TRACKS } from '../../sim/disaster';
+import { fxOasis } from '../../sim/disasterFx';
 import { postureOf } from '../../sim/encounters';
 import { openDamage } from '../../sim/raidDamage';
 import { isHome } from '../../sim/blueprints';
@@ -97,7 +98,7 @@ export function collapseProgress(s: GameState): number {
   const lv = tracksAt(d, t);
   let sum = 0;
   for (const k of TRACKS) sum += 1 - lv[k];
-  return clamp01(Math.max(0.3, 0.3 + 0.7 * (sum / TRACKS.length) / 0.6));
+  return clamp01(Math.max(0.3, 0.3 + 0.7 * (sum / TRACKS.length) / 0.6) + fxOasis(s));   // (a kind's oasisWeight, sim/disasters/<kind>.ts)
 }
 
 /** What the renderer knows and the state does not. */

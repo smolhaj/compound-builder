@@ -22,6 +22,7 @@
 import { DISASTERS, tension, type DisasterKind, type DisasterState } from './disaster';
 import { nuclearSky } from './nuclear';
 import type { GameState } from './state';
+import { fxLook } from './disasterFx';
 
 type RGB = [number, number, number];
 
@@ -210,6 +211,10 @@ const SEED_AZ = new Map<number, CollapseLook['az']>();
 
 /** The look for the state now. Cheap enough to call every frame. */
 export function collapseLook(s: Pick<GameState, 'disaster' | 'clock'> & Partial<GameState>): CollapseLook {
+  const l = collapseLookBase(s);
+  return s.disaster.kind ? fxLook(s as GameState, l) : l;   // (a kind's own adjustments, sim/disasters/<kind>.ts)
+}
+function collapseLookBase(s: Pick<GameState, 'disaster' | 'clock'> & Partial<GameState>): CollapseLook {
   const d: DisasterState = s.disaster, t = s.clock.t;
   const kind = d.kind;
   if (!kind || !DISASTERS[kind] || t < d.warnAt) return NO_LOOK;
