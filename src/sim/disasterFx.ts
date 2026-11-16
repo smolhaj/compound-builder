@@ -38,6 +38,7 @@ import { fx as megaQuake } from './disasters/mega_quake';
 import { fx as cropBlight } from './disasters/crop_blight';
 import { fx as damFlood } from './disasters/dam_flood';
 import { fx as supervolcano } from './disasters/supervolcano';
+import { fx as livestockPlague } from './disasters/livestock_plague';
 
 /** The ten places a disaster can be felt (docs/DISASTER_TEETH.md section 2; Raiders and NPC merged into encounters / npcs, Sky = atmosphere). */
 export type FxColumn = 'economy' | 'supplies' | 'encounters' | 'npcs' | 'atmosphere' | 'infrastructure' | 'buildings' | 'medical' | 'media';
@@ -73,6 +74,11 @@ export const asKind = (k: ExtraEncounterKind): EncounterKind => k as unknown as 
 /** What a hit does to one finished building (see structureDamage.ts for the shared roll). */
 export interface StructureHit { structure: Structure; day: number; r: () => number }
 
+/** A decision card: a title, why it matters, and one button per choice (the choice string goes back to `KindFx.choose`). */
+export interface FxCard { id: string; title: string; why: string; urgency: number; tone?: 'alarm'; acts: Array<{ label: string; choice: string }> }
+/** A signature goal chain: ordered steps, each done or not. */
+export interface FxGoal { id: string; title: string; steps: Array<{ label: string; done: boolean }> }
+
 export interface KindFx {
   /** Behaviour that already exists outside the seam: column -> where. Counted by the teeth test; move it behind a hook when convenient. */
   legacy?: Partial<Record<FxColumn, string>>;
@@ -106,6 +112,12 @@ export interface KindFx {
   radioBulletins?(s: GameState, ctx: FxCtx): { text: string; tone: 0 | 1 | 2 | 3 } | null;
   /** atmosphere: adjust the sky and light (collapseLook) after the shared profile has run. */
   look?(s: GameState, look: CollapseLook): Partial<CollapseLook>;
+  /** Decision cards for the Next-steps board (docs/DECISIONS.md "WP4 + WP7"): what the player is asked right now. Pure of the state. */
+  cards?(s: GameState): FxCard[];
+  /** Apply the choice a card's button carries (`FxCard.acts[].choice`); returns a note for the player, or null. May change the state. */
+  choose?(s: GameState, choice: string): string | null;
+  /** The kind's signature goal chain (steps ticked from the state), shown as a quiet card on the board. */
+  goal?(s: GameState): FxGoal | null;
   /** atmosphere: added to the oasis contrast (collapseProgress, 0..1 overall) so a kind can read as collapsed even with the grid up. */
   oasisWeight?(s: GameState): number;
 }
@@ -118,7 +130,7 @@ export const HOOK_COLUMN: Partial<Record<keyof KindFx, FxColumn>> = {
 
 export const FX: Record<DisasterKind, KindFx> = {
   grid_down: gridDown, nuclear, lawless, financial, drought, pandemic, solar_flare: solarFlare, wildfire, ash_winter: ashWinter, cyberattack,
-  zombies, invasion, civil_war: civilWar, bioweapon, asteroid, unknown, emp, mega_quake: megaQuake, crop_blight: cropBlight, dam_flood: damFlood, supervolcano,
+  zombies, invasion, civil_war: civilWar, bioweapon, asteroid, unknown, emp, mega_quake: megaQuake, crop_blight: cropBlight, dam_flood: damFlood, supervolcano, livestock_plague: livestockPlague,
 };
 
 /** The columns a kind covers right now: by hook, plus the legacy notes. */
@@ -149,6 +161,9 @@ export const fxNpcMod = (s: GameState): number => after(s)?.npcMods?.(s) ?? 1;
 export const fxMedical = (s: GameState): { contact: number; spread: number } => after(s)?.medical?.(s) ?? { contact: 0, spread: 0 };
 export const fxSupplyMods = (s: GameState): { grow: number; cold: number } => { const m = after(s)?.supplyMods?.(s); return { grow: m?.grow ?? 1, cold: m?.cold ?? 0 }; };
 export const fxRadio = (s: GameState, ctx: FxCtx) => after(s)?.radioBulletins?.(s, ctx) ?? null;
+export const fxCards = (s: GameState): FxCard[] => active(s)?.cards?.(s) ?? [];
+export const fxChoose = (s: GameState, choice: string): string | null => active(s)?.choose?.(s, choice) ?? null;
+export const fxGoal = (s: GameState): FxGoal | null => active(s)?.goal?.(s) ?? null;
 export const fxMakeExtra = (s: GameState, kind: string, r: () => number, id: string, day: number): Encounter | null => (isExtraKind(kind) ? active(s)?.makeExtra?.(s, kind, r, id, day) ?? null : null);
 export const fxResolveExtra = (s: GameState, e: Encounter, stance: Stance): Outcome | null => (isExtraKind(e.kind) ? active(s)?.resolveExtra?.(s, e, stance) ?? null : null);
 export const fxStanceLabels = (s: GameState, e: Encounter): Partial<Record<Stance, [string, string]>> | null => (isExtraKind(e.kind) ? active(s)?.stanceLabels?.(s, e) ?? null : null);

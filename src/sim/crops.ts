@@ -44,6 +44,7 @@ import { farmOf } from './farm';
 import { regionFor } from './climate';
 import { fieldSiteK } from './microclimate';
 import { pluralize } from './words';
+import { blightCut } from './blight';
 
 export type CropId = 'potatoes' | 'beans' | 'wheat' | 'rest';
 export const CROP_IDS: readonly CropId[] = ['potatoes', 'beans', 'wheat', 'rest'];
@@ -198,12 +199,13 @@ export function troubleOf(seed: number, y: number): { name: string; crop: CropId
 
 /** Share of this year's trouble a plot takes: rotation halves it, hybrid seed resists a third. */
 export function troubleFactor(s: GameState, p: Plot): number {
+  const strain = blightCut(s, p);   // a crop blight and pest plague (sim/blight.ts): the cut by crop family; 1 in every other run
   const t = troubleOf(s.seed, year(s));
-  if (!t || p.crop !== t.crop) return 1;
+  if (!t || p.crop !== t.crop) return strain;
   let hit = 1 - t.hit;
   if (p.prev !== p.crop) hit *= 0.5; else hit *= 1.6;
   if (p.sown?.line === 'hybrid') hit *= 0.67;
-  return 1 - hit;
+  return (1 - hit) * strain;
 }
 
 /** A plot nobody has recorded (an old save or a hand-built state): the field as it was, sown on time, fertility 1. */
