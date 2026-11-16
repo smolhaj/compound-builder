@@ -16,7 +16,7 @@ describe('the per-kind hook seam', () => {
   });
 
   it('a stub kind changes nothing: price, service, climate and contagion are the identity', () => {
-    for (const k of ['grid_down', 'emp', 'mega_quake', 'crop_blight', 'dam_flood', 'supervolcano', 'cyberattack'] as DisasterKind[]) {
+    for (const k of ['grid_down', 'emp', 'crop_blight', 'cyberattack'] as DisasterKind[]) {
       const g = hit(k), before = { ...g.disaster.tracks };
       expect(fxPriceMod(g)).toBe(1);
       expect(fxSupplyMods(g)).toEqual({ grow: 1, cold: 0 });

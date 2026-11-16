@@ -15,6 +15,7 @@ import { wantedNow } from './stalls';
 import { addWork, blockedReason, blueprintOf, isFinished } from './construction';
 import { addFixWork, fixBlocked, fixHoursLeft, pendingFixes } from './improvements';
 import { dayIndex, hourOf, type GameState, type Structure } from './state';
+import { repairMarket } from './physical';
 
 export const CREW_SIZE = 4;
 /** $ per person-hour. */
@@ -74,7 +75,7 @@ export interface CrewMarket { open: boolean; rateMult: number; maxCrews: number;
 export function crewMarket(s: GameState): CrewMarket {
   const t = s.disaster.tracks, reach = Math.min(t.banks, t.law, t.fuel);
   if (t.banks < 0.2 || t.law < 0.2 || t.fuel < 0.15) return { open: false, rateMult: 1, maxCrews: 0, why: 'nobody is hiring out crews now' };
-  const rateMult = 1 + 1.5 * (1 - Math.min(1, t.banks, t.law));
+  const rateMult = (1 + 1.5 * (1 - Math.min(1, t.banks, t.law))) * repairMarket(s).rate;   // (a regional quake, flood or blast: the demand surge, sim/physical.ts)
   return { open: true, rateMult: Math.round(rateMult * 100) / 100, maxCrews: reach >= 0.95 ? Infinity : Math.max(1, Math.round(8 * reach)), why: null };
 }
 
@@ -105,6 +106,8 @@ export function crewProblem(s: GameState, st: Structure | PerimeterRun): string 
   }
   const m = crewMarket(s);
   if (!m.open) return m.why;
+  const wait = repairMarket(s).why;
+  if (wait) return wait;
   if ((s.crews ?? []).length >= m.maxCrews) return 'no more crews can be found now';
   if (s.money < crewRate(s) * CREW_WEEK) return 'not enough money for a week of a crew';
   return null;

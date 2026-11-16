@@ -23,15 +23,18 @@ const BASELINE: Record<DisasterKind, FxColumn[]> = {
   pandemic: ['encounters', 'npcs', 'medical'],
   solar_flare: ['economy'],
   wildfire: ['npcs', 'atmosphere', 'buildings'],
-  ash_winter: ['economy', 'supplies', 'npcs', 'atmosphere', 'buildings'],
+  ash_winter: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'buildings', 'medical', 'media'],
   cyberattack: ['economy'],
   zombies: ['economy', 'encounters'],
   invasion: ['encounters'],
   civil_war: ['encounters'],
   bioweapon: ['supplies', 'encounters', 'npcs', 'medical'],
-  asteroid: ['economy', 'supplies', 'atmosphere'],
+  asteroid: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'buildings', 'medical', 'media'],
   unknown: ['encounters', 'npcs'],
-  emp: [], mega_quake: [], crop_blight: [], dam_flood: [], supervolcano: [],
+  emp: [], crop_blight: [],
+  mega_quake: ['economy', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'buildings', 'medical', 'media'],
+  dam_flood: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'buildings', 'medical', 'media'],
+  supervolcano: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'buildings', 'medical', 'media'],
 };
 
 describe('disaster teeth', () => {
