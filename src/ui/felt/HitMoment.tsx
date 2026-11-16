@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useFeltStore } from '../../store/feltStore';
 import { shakeOffset } from '../../game/felt/cameraKick';
+import { setHitLive } from '../../game/felt/hitLive';
 import { at, duration, hitFor, reduceMotion } from '../../sim/felt/hitMoment';
 
 const serif = 'Georgia, "Times New Roman", serif';
@@ -40,6 +41,9 @@ export function HitMoment() {
     const o = f ? shakeOffset(f.shake, t, reduced()) : { x: 0, y: 0 };
     cv.style.transform = o.x || o.y ? `translate(${o.x.toFixed(1)}px, ${o.y.toFixed(1)}px) scale(1.03)` : '';
   }, [f, t]);
+  // the canvas nudges its camera toward the beat's bearing and flashes the weather with it (FL2, game/felt/hitLive.ts)
+  useEffect(() => { setHitLive(f ? { flash: f.flash, tint: f.tint, bearing: f.bearing } : null); }, [f]);
+  useEffect(() => () => setHitLive(null), []);
   useEffect(() => () => { const cv = document.querySelector('canvas') as HTMLCanvasElement | null; if (cv) cv.style.transform = ''; }, []);
 
   if (!seq || !f || hitAt === null) return null;

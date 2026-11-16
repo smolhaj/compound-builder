@@ -12,6 +12,10 @@ import { siteCandidates } from '../sim/terrain';
 import { goodsKey, houseGoods } from '../sim/evenings';
 import { blackoutNow } from '../sim/lights';
 import { burnedFarms } from '../sim/neighborLife';
+import { FeltWorld } from './felt/FeltWorld';
+import { tracksAt, triggerDisaster, type DisasterKind } from '../sim/disaster';
+import { bearingNudge } from './felt/cameraKick';
+import { getHitLive } from './felt/hitLive';
 import { useEffect, useRef } from 'react';
 import type { GameState } from '../sim/state';
 import { MushroomCloud } from './fx/MushroomCloud';
@@ -289,6 +293,12 @@ export function GameCanvas() {
     });
     const starter = new StarterPreview(ws.scene, world);
     world.setBurnedFarms(burnedFarms(useGameStore.getState().game));
+    // FL2: persistent world state (flood, cracks, roadside set, dark and boarded farms, fires): rebuilt only when the marks change
+    const felt = new FeltWorld(ws.scene);
+    felt.onFarms = looks => world.setFarmLooks(looks);
+    const feltTier = (): 'low' | 'medium' | 'high' => (renderReq.quality ?? useWorldStore.getState().quality) as 'low' | 'medium' | 'high';
+    const feltSync = (now: boolean): void => felt.update(useGameStore.getState().game, world.feltHost(), feltTier(), now);
+    let feltAcc = 9, hitOff = 0, hitBase = 0, hitHeld = false;
     const terrainOv = new TerrainOverlay(ws.scene, world.groundAt);
     const showTerrain = () => {
       const g = useGameStore.getState().game, m = useWorldStore.getState().terrainMode, t = terrainOf(g);
@@ -619,13 +629,17 @@ export function GameCanvas() {
       ws.setCollapseLook({ dim: look.dim, tint: look.skyTint, amt: look.skyAmt, night: look.skyNight, cast: look.cast, sat: look.sat, contrast: look.contrast, townGlow: look.townGlow, flicker: look.flicker, fireGlow: look.fireGlow, smoke: look.smoke, nightLift: look.nightLift, nightGlow: look.nightGlow,
         fog: look.fog, haze: look.haze, townLights: look.townLights, traffic: look.traffic, convoy: look.convoy, flashes: look.flashes, aurora: look.aurora, comet: look.comet, az: look.az });
       ws.cutsceneLift = player.active ? 1 : 0;
-      ws.setWeather(wx, Math.max(weather.flash, look.flash), weather.skyLightning);
+      ws.setWeather(wx, Math.max(weather.flash, look.flash, 0.6 * (getHitLive()?.flash ?? 0)), weather.skyLightning);
       // lamps on inside from dusk (which windows, and how, is the atmosphere's: who's up, power, blackout curtains)
       setWindowGlow(Math.max(0, Math.min(1, (ws.nightFactor - 0.25) / 0.4)), now / 1000, world.atmos.warmth, world.atmos.hearthFire);
       world.updateAtmosphere({
         dt, time: now / 1000, hour: t, night: ws.nightFactor, daylight: 1 - ws.nightFactor * 0.85, wind: wx.wind, rain: wx.rain, cloud: wx.cloud,
         snow: Math.max(sp.snow, wx.snowCover * seasonState.weatherSnow) * (wx.rain > 0.3 ? 0.4 : 1), viewportH: canvas.clientHeight || 800, battle: battle.playing, fov: ws.camera.fov,
       }, gs, seasonState.doy);
+      // FL2: the persistent marks (about once a second; at once when a QA shot asks for a full-quality frame)
+      feltAcc += dt;
+      if (feltAcc >= 1 || renderReq.quality) { feltAcc = 0; feltSync(!!renderReq.quality || qa.skipDraw === true); }
+      felt.frame(dt, ws.nightFactor);
       if (tour.active) {
         const f = tour.update(dt);
         // walking indoors: a near plane short enough that walls and furniture never clip
@@ -649,6 +663,19 @@ export function GameCanvas() {
       } else {
         cam.step(dt, shiftDown);
         cam.stepGlide(dt);
+        // the hit moment's camera nudge (FL1 beats carry a bearing): turn up to 25 degrees toward it, then ease back (FL2)
+        {
+          const hl = getHitLive(), az = hl?.bearing != null ? (typeof hl.bearing === 'number' ? hl.bearing : look.az[hl.bearing]) : null;
+          if (az != null && cam.enabled) {
+            if (!hitHeld) { hitHeld = true; hitBase = cam.yaw; hitOff = 0; }
+            hitOff += (bearingNudge(hitBase, az) - hitOff) * Math.min(1, dt * 1.6);
+            cam.yaw = hitBase + hitOff;
+          } else if (hitHeld) {
+            hitOff -= hitOff * Math.min(1, dt * 2.5);
+            cam.yaw = hitBase + hitOff;
+            if (Math.abs(hitOff) < 0.002) { cam.yaw = hitBase; hitHeld = false; hitOff = 0; }
+          }
+        }
         cam.apply(ws.camera);
         occluders.keepOut(ws.camera, cam.target.x, cam.target.z, cam.target.y);
         // looking down, fit the shadows to the ground actually on screen (the far edge of the view
@@ -736,6 +763,7 @@ export function GameCanvas() {
 
     // QA hook (screenshot harness, console poking).
     (window as unknown as Record<string, unknown>).__cb = { oasis, census: () => sceneCensus(ws.scene), terrainOv, blueprintOv, player, ws, world, weather, valley, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
+      feltWorld: felt, feltSync,
       demoBattle: () => {
         const g = useGameStore.getState().game;
         const b = demoBattle(g.structures, g.people, g.structures.length ? undefined : world.camp);
@@ -766,6 +794,21 @@ export function GameCanvas() {
           });
         } catch (e) { w.__showcase = { error: String((e as Error)?.stack ?? e) }; }
         w.__showcaseMs = performance.now() - t0;
+        // perf scenes (scripts/perfBudget.json "felt_*"): the same compound with a disaster `feltday` days past its hit, the felt layer's marks laid
+        const fk = qs.get('feltkind');
+        if (fk && !cancelled) {
+          const fd = Number(qs.get('feltday') ?? 30) || 30;
+          useGameStore.setState(s => {
+            const g = structuredClone(s.game);
+            g.disaster.mode = 'sandbox'; g.disaster.phase = 'survival';
+            triggerDisaster(g.disaster, 0, fk as DisasterKind, g.seed, 14);
+            // (the hit is put in the past, so the clock, the season and the trees stay as the mountain scene has them)
+            g.disaster.hitAt = g.clock.t - fd; g.disaster.warnAt = g.disaster.hitAt - 14; g.disaster.fate = 'full';
+            g.clock.speed = 0; g.disaster.tracks = tracksAt(g.disaster, g.clock.t);
+            return { game: g };
+          });
+          feltSync(true);
+        }
         // the new pieces' shaders compile behind the loading screen too
         boot('Compiling shaders', 0.97, true); await warmShaders(ws);
         if (!cancelled) useWorldStore.getState().setBoot(null);
@@ -804,6 +847,7 @@ export function GameCanvas() {
       canvas.removeEventListener('pointerup', onVsUp);
       cam.dispose();
       weather.dispose();
+      felt.dispose();
       world.dispose();
       ws.dispose();
     };

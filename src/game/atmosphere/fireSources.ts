@@ -15,6 +15,11 @@ export interface FireGame {
 export const SMOLDER_DAYS = 10;
 const MAX = 8;
 
+/** Fires and smoke the felt layer's marks ask for (game/felt/FeltWorld.ts sets them; the raid's own fires win the slots). */
+let feltFires: FireSource[] = [];
+export const setFeltFires = (list: FireSource[]): void => { feltFires = list; };
+export const feltFireCount = (): number => feltFires.length;
+
 export function fireSources(g: FireGame, boxOf: (structureId: string) => FireBox | undefined, ground: (x: number, z: number) => number): FireSource[] {
   const out: FireSource[] = [];
   for (const f of [...(g.raidFires ?? [])].sort((a, b) => b.intensity - a.intensity)) {
@@ -30,6 +35,7 @@ export function fireSources(g: FireGame, boxOf: (structureId: string) => FireBox
     if (out.length >= MAX) break;
     out.push({ x: d.x, y: ground(d.x, d.z) + 0.04, z: d.z, radius: 0.28, height: 0.35, intensity: 0, smolder: clamp01(k) * 0.9 });
   }
+  for (const f of feltFires) { if (out.length >= MAX) break; out.push(f); }
   return out;
 }
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
