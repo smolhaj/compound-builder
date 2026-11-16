@@ -141,7 +141,7 @@ export function makeAshFx(o: AshOpts): KindFx {
       return null;
     },
     look(s, look) {
-      const I = intensity(s, o), cover = Math.min(1, ashDepth(s, o) / 6), w = winterOf(s, o);
+      const I = intensity(s, o), cover = Math.min(1, ashDepth(s, o) / 6) * Math.max(0, 1 - since(s) / 730), w = winterOf(s, o);   // (the ash on the ground weathers into the soil over two years)
       return { ashCover: Math.max(look.ashCover, cover * 0.9), dim: Math.min(look.dim, 1 - 0.55 * I) * w.sunDim, haze: Math.max(look.haze, 0.5 * I) };
     },
     oasisWeight(s) { return 0.2 * (1 - Math.min(s.disaster.tracks.stores, s.disaster.tracks.deliveries)); },
