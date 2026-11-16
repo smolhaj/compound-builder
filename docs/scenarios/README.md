@@ -48,6 +48,13 @@ Used by [mega_quake](mega_quake.md), [dam_flood](dam_flood.md), [supervolcano](s
 - [reactor_meltdown](reactor_meltdown.md): new; regional plume stripe on the map, KI, milk bans, decontamination, settlers; the world otherwise works; Chernobyl, Fukushima, plants by region.
 <!-- end group: tech and economy -->
 
+<!-- group: biological (claude/scenarios-bio) -->
+- [pandemic](pandemic.md): people fail, infrastructure stays; three variants (covid_like, flu_1918, high_fatality), a wave clock with a false calm, an exposure and incubation model, immune survivors as runners, drop box and quarantine cabin; 1918, Gunnison, St. Louis vs Philadelphia, COVID.
+- [bioweapon](bioweapon.md): an adversary, not an accident; engineered flu, hemorrhagic, smallpox-like, a local plume, an optional "still being used" modifier; carriers at the gate, filtered bunker air, salvage of empty towns; Sverdlovsk, Biopreparat, smallpox.
+- [crop_blight](crop_blight.md): new kind; five variants (late blight, wheat rust, locusts, 1816 cold year, seed failure); selective food prices with the grid up, seed diversity and seed saving as the answer, hunger raiders and neighbors; Irish famine, 1816, 1970 corn blight, Ug99.
+- [livestock_plague](livestock_plague.md): new kind; avian flu, foot-and-mouth, African swine fever, feed-borne prion; biosecurity score, the cull card (comply, hide, selective, eat, move); egg price as the first warning; UK 2001, HPAI 2022-25, China ASF.
+- [zombies](zombies.md): an infection model (bite, 24-hour rule), three variants (outbreak, everyone_turns, rage), noise and light signature in feet, wall crowd load in lb per foot, freeze and thaw, decay stages, hidden bites, lure raids; rabies, Munz model, crowd crush.
+<!-- end group: biological -->
 <!-- group: natural and physical (claude/scenarios-natural) -->
 - [mega_quake](mega_quake.md): new kind; Cascadia, Wasatch, New Madrid, rift and eastern variants; 3 to 5 minutes of shaking, aftershock schedule (Omori), roads and bridges cut, earthquake insurance excluded; a kind first two weeks then a hard third; bolt the sill. Tohoku, Hebgen Lake, Northridge, Christchurch, Kahramanmaras.
 - [dam_flood](dam_flood.md): new kind; dam breach, levee flood, watershed cascade; a local catastrophe inside a working world (help comes); siting above the creek, mold clock, flooded wells, hosting neighbors. Johnstown, Teton, Taum Sauk, Helene, Guadalupe 2025.
