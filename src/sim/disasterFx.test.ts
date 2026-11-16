@@ -29,7 +29,7 @@ describe('the per-kind hook seam', () => {
   it('the encounter mix moved behind the hooks, unchanged', () => {
     const p = { visibility: 50, fortress: 40 } as never;
     const mix = (k: DisasterKind) => { const g = hit(k); const w: Array<[EncounterKind, number]> = [['arrival', 30], ['refugees', 12], ['looters', 10], ['requisition', 10], ['trader', 10]]; fxEncounterWeights(g, w, p); return Object.fromEntries(w); };
-    expect(mix('zombies')).toMatchObject({ horde: 15, trader: 2, refugees: 6, requisition: 0 });   // (WP4: a quiet day-one place draws a small horde weight; it grows with the crowd at the wall)
+    expect(mix('zombies')).toMatchObject({ horde: expect.closeTo(70, -2), trader: 2, refugees: 6, requisition: 0 });   // (WP4: 60 plus the crowd at the wall and the compound's light and noise)
     expect(mix('invasion')).toMatchObject({ patrol: 40, requisition: 0 });
     expect(mix('civil_war').militia).toBeCloseTo(35 * (0.4 + 0.4 + 50 / 150));
     expect(mix('drought')).toMatchObject({ refugees: 12 * 1.6, looters: 13 });

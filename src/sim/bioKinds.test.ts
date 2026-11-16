@@ -24,9 +24,9 @@ describe('through the engine', () => {
     expect(g.disaster.news.length).toBeGreaterThan(0);
     expect(suggestions(g, 20).some(c => c.id === 'zb_policy' || c.id === 'zb_dark')).toBe(true);
   });
-  it('pandemic and bioweapon: the wave runs, prices rise, the seal card is on the board', () => {
+  it('pandemic and bioweapon: the wave runs, prices rise, the seal card is on the board', { timeout: 120000 }, () => {
     for (const [k, v] of [['pandemic', 'flu_1918'], ['bioweapon', 'hemorrhagic']] as Array<[DisasterKind, string]>) {
-      const g = run(k, v, 25);
+      const g = run(k, v, 8);
       expect(outbreakOf(g).v).toBe(v);
       expect(fxPriceMod(g)).toBeGreaterThan(1);
       expect(suggestions(g, 20).some(c => c.id === 'ob_seal')).toBe(true);

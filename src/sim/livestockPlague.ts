@@ -115,7 +115,7 @@ export function plagueDaily(s: GameState, ctx: FxCtx): string[] {
 export function plagueBulletin(s: GameState, ctx: FxCtx): { text: string; tone: 0 | 1 | 2 | 3 } | null {
   const d = plagueVariant(s), f = plagueOf(s);
   if (ctx.r() > 0.5) return null;
-  if (ctx.day < 10) return { text: d.poultry ? 'the state veterinarian bans all poultry and livestock movement for thirty days. Auctions are cancelled.' : 'a quarantine zone is declared round a farm two counties over. Do not move animals, and do not visit other barns.', tone: 2 };
+  if (ctx.day < 10) return { text: d.poultry ? 'the state veterinarian bans all poultry and livestock movement for thirty days. Auctions are canceled.' : 'a quarantine zone is declared round a farm two counties over. Do not move animals, and do not visit other barns.', tone: 2 };
   if (f.onPlace) return { text: 'control areas are being drawn: infected premises and the three-mile ring around them are to be culled. Pyres are burning.', tone: 3 };
   if (d.feedBorne) return { text: 'the feed mills are under investigation. If you buy bagged feed, check the lot number against the recall.', tone: 2 };
   return { text: ['egg and milk prices are up again this week.', 'sick animals reported on three farms within ten miles. Keep your boots at the door.', 'a lot of smoke from the north: they are burning stock at the Larson dairy.'][ctx.day % 3], tone: 1 };

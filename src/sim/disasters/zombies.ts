@@ -8,7 +8,7 @@ export const fx: KindFx = {
   daily: (s, ctx) => [...walkerNight(s, ctx), ...walkerTurns(s, ctx), ...walkerVisitor(s, ctx)],
   encounterWeights(s, { w, p, scale }) {
     const z = zombiesOf(s), sig = signatureNow(s).ft;
-    w.push(['horde', Math.min(120, 10 + 2 * z.crowd + sig / 60) * (0.5 + p.visibility / 100)]);
+    w.push(['horde', Math.min(160, 60 + 2 * z.crowd + sig / 60) * (0.5 + p.visibility / 100)]);
     scale('trader', 0.2); scale('refugees', 0.5); scale('requisition', 0);
   },
   npcMods: s => 1 + Math.min(2, 0.4 + (s.clock.t - s.disaster.hitAt) / 30),
