@@ -18,6 +18,7 @@ import { burnChance } from './fireRisk';
 import { mulberry32 } from './rng';
 import type { GameState } from './state';
 import { threatOn } from './threatState';
+import { fxDaily, fxMedical, fxStructureDamage, fxSupplyMods } from './disasterFx';
 
 /** Growing-season and warmth factor after a full exchange: 1–3 years of nuclear winter. */
 export function winterFactor(s: GameState): { grow: number; cold: number } {
@@ -52,14 +53,13 @@ export function climate(s: GameState): { grow: number; cold: number } {
   // a famine year (sim/threats.ts): a poor harvest across the county, up to a third off at full strength
   const famine = threatOn(s, 'famine');
   grow *= 1 - 0.35 * famine;
-  return { grow, cold };
+  const m = fxSupplyMods(s);
+  return { grow: grow * m.grow, cold: cold + m.cold };
 }
 
 /** How catching the sickness is: per contact at the gate, and spread at home per sick person a day. */
 export function contagion(s: GameState): { contact: number; spread: number } {
-  if (hit(s, 'bioweapon')) return { contact: 0.55, spread: 0.12 };
-  if (hit(s, 'pandemic')) return { contact: 0.25, spread: 0.06 };
-  return { contact: 0, spread: 0 };
+  return fxMedical(s);   // (sim/disasters/pandemic.ts, bioweapon.ts)
 }
 
 /** Someone catches it (from a contact at the gate). */
@@ -114,6 +114,9 @@ export function effectsDay(s: GameState): string[] {
   if (d.kind === 'unknown' && once('vanished')) {
     for (const n of s.neighbors) if (r() < 0.5) { n.status = 'gone'; out.push(`${n.name[0].toUpperCase() + n.name.slice(1)} are gone. Their trucks are still in the drive.`); }
   }
+  // the kind's own daily teeth and its damage to buildings (sim/disasters/<kind>.ts)
+  const fctx = { day, r: mulberry32(s.seed * 6011 + day * 5 + 3), once };
+  out.push(...fxStructureDamage(s, fctx), ...fxDaily(s, fctx));
   // sickness spreads at home (a medical bay lets you keep the sick apart)
   const c = contagion(s);
   if (c.spread > 0) {

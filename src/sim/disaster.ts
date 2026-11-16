@@ -20,7 +20,9 @@ export const TRACK_NAME: Record<Track, string> = {
 };
 
 export type DisasterKind = 'grid_down' | 'financial' | 'lawless' | 'drought' | 'pandemic' | 'nuclear' | 'solar_flare' | 'wildfire' | 'ash_winter' | 'cyberattack'
-  | 'zombies' | 'invasion' | 'civil_war' | 'bioweapon' | 'asteroid' | 'unknown';
+  | 'zombies' | 'invasion' | 'civil_war' | 'bioweapon' | 'asteroid' | 'unknown'
+  // placeholders (WP0): selectable and minimal until their packages land; not in the Surprise pool until WP10
+  | 'emp' | 'mega_quake' | 'crop_blight' | 'dam_flood' | 'supervolcano';
 import { unscripted } from './godMode';
 export type Mode = 'surprise' | 'scenario' | 'sandbox' | 'god';
 /** GDS difficulty presets: Cozy (long warning, gentle raids), Standard, Hardcore (little warning, harsh raids, permadeath). */
@@ -205,13 +207,54 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
     hit: ['A white light, and then silence. Half the valley is simply gone.'],
     chain: [],
   },
+  // ── placeholders for the owner-chosen scenarios (WP0): minimal curves on the collapse clock, selectable; their packages add the teeth ──
+  emp: {
+    kind: 'emp', name: 'High-altitude EMP', pulpy: false, warn: [1, 3],
+    variants: [{ id: 'flash', name: 'a high-altitude burst', weight: 1, curves: { grid: C(0, 0, 0, null), phone: C(0, 0, 0, null), banks: C(0, 0, 0, null), fuel: C(0, 1, 0, null), deliveries: C(0, 1, 0, null), stores: C(0, 2, 0.05, null), medical: C(0, 2, 0.1, null), law: C(3, 20, 0.1, null) } }],
+    hints: [['Officials warn of a possible high-altitude test over the Pacific.'], ['A strange light on the horizon at dawn, then nothing on the radio.'], ['The grid has been flickering for an hour.']],
+    hit: ['One bright flash at dawn, and every modern machine in the valley is dead.'],
+    chain: [],
+  },
+  mega_quake: {
+    kind: 'mega_quake', name: 'Mega-earthquake', pulpy: false, warn: [1, 2],
+    variants: [{ id: 'm9', name: 'a magnitude-9 earthquake', weight: 1, curves: { grid: C(0, 0, 0.2, [20, 120], 60), fuel: C(0, 1, 0.2, [20, 120], 60), deliveries: C(0, 0, 0.1, [30, 150], 60), medical: C(0, 1, 0.3, [20, 90], 40), phone: C(0, 0, 0.2, [10, 60], 30), law: C(0, 2, 0.5, [10, 60], 30), stores: C(0, 2, 0.4, [20, 100], 40), banks: C(0, 0, 0.3, [14, 60], 30) } }],
+    hints: [['A swarm of small quakes under the coast, four days running.'], ['Wells in the valley go cloudy overnight.'], ['Dogs will not settle; the animals are restless.']],
+    hit: ['The ground rolls for four minutes. Chimneys are down across the county and the road is cracked.'],
+    chain: [],
+  },
+  crop_blight: {
+    kind: 'crop_blight', name: 'Crop blight and pest plague', pulpy: false, warn: [30, 90],
+    variants: [{ id: 'rust', name: 'a wheat rust and locust year', weight: 1, curves: { stores: C(20, 120, 0.4, [240, 500], 180), deliveries: C(30, 120, 0.5, [240, 500], 120), law: C(90, 120, 0.7, [300, 600], 150) } }],
+    hints: [['Farm extension agents report a new rust strain on wheat.'], ['Grain prices double at the elevator.'], ['Locusts are in the next county; fields are being stripped.']],
+    hit: ['The harvest has failed across the county. The shelves will thin all year.'],
+    chain: [],
+  },
+  dam_flood: {
+    kind: 'dam_flood', name: 'Dam failure and great flood', pulpy: false, warn: [1, 2],
+    variants: [{ id: 'breach', name: 'a failed upstream dam', weight: 1, curves: { grid: C(0, 0, 0.3, [7, 40], 20), fuel: C(0, 1, 0.4, [10, 40], 20), deliveries: C(0, 1, 0.2, [20, 90], 40), phone: C(0, 0, 0.4, [5, 30], 14), law: C(0, 1, 0.6, [5, 30], 14), medical: C(0, 1, 0.5, [7, 30], 14), stores: C(0, 2, 0.5, [10, 50], 20) } }],
+    hints: [['The county warns of seepage at the upstream dam.'], ['Engineers are at the dam; the road is closed.'], ['Sirens in the river bottoms: leave now.']],
+    hit: ['The dam has gone. A wall of water is coming down the valley.'],
+    chain: [],
+  },
+  supervolcano: {
+    kind: 'supervolcano', name: 'Supervolcano', pulpy: false, warn: [7, 30],
+    variants: [{ id: 'caldera', name: 'a caldera eruption', weight: 1, curves: { grid: C(1, 5, 0.1, null), fuel: C(2, 10, 0.1, null), stores: C(5, 20, 0.1, null), deliveries: C(3, 10, 0.05, null), medical: C(5, 20, 0.2, null), law: C(14, 40, 0.1, null), phone: C(3, 10, 0.2, null), banks: C(3, 10, 0.05, null) } }],
+    hints: [['Earthquake swarms and ground lifting reported at the caldera.'], ['The park is evacuated; flights are rerouted.'], ['The sky to the east has gone a dull orange.']],
+    hit: ['The mountain has erupted. Ash is falling out of a dark sky.'],
+    chain: [],
+  },
 };
 
-/** Grounded disasters a Surprise run may roll (the pulpy ones are unlockables: Scenario and Free build). */
-export const SURPRISE_POOL: DisasterKind[] = ['grid_down', 'nuclear', 'financial', 'lawless', 'drought', 'pandemic', 'solar_flare', 'wildfire', 'ash_winter', 'cyberattack'];
+
+/** Disasters a Surprise run may roll: the ten grounded kinds, plus the six pulpy ones at rare base odds (SURPRISE_BASE) that regions scale (owner decision, WP0). The WP0 placeholders join at WP10. */
+export const SURPRISE_POOL: DisasterKind[] = ['grid_down', 'nuclear', 'financial', 'lawless', 'drought', 'pandemic', 'solar_flare', 'wildfire', 'ash_winter', 'cyberattack', 'invasion', 'civil_war', 'bioweapon', 'zombies', 'asteroid', 'unknown'];
+/** Base weight of a pool kind before the region's odds (1 = the usual; the pulpy kinds are rare). */
+export const SURPRISE_BASE: Partial<Record<DisasterKind, number>> = { invasion: 0.2, civil_war: 0.2, bioweapon: 0.08, zombies: 0.04, asteroid: 0.04, unknown: 0.04 };
+/** A pool kind's weight in a region: its base weight times the region's odds. */
+export const surpriseWeight = (k: DisasterKind, odds: Partial<Record<DisasterKind, number>> = {}): number => (SURPRISE_BASE[k] ?? 1) * (odds[k] ?? 1);
 /** The Surprise roll, weighted by how likely each disaster is in the region (1 = the usual). */
 export function surpriseKind(u: number, odds: Partial<Record<DisasterKind, number>> = {}): DisasterKind {
-  const w = SURPRISE_POOL.map(k => odds[k] ?? 1), tot = w.reduce((a, b) => a + b, 0);
+  const w = SURPRISE_POOL.map(k => surpriseWeight(k, odds)), tot = w.reduce((a, b) => a + b, 0);
   let acc = 0;
   for (let i = 0; i < w.length; i++) { acc += w[i] / tot; if (u < acc) return SURPRISE_POOL[i]; }
   return SURPRISE_POOL[SURPRISE_POOL.length - 1];
@@ -233,6 +276,8 @@ export const FATE_ODDS: Partial<Record<DisasterKind, [number, number, number]>> 
   wildfire: [0.92, 0.07, 0.01], grid_down: [0.68, 0.24, 0.08], cyberattack: [0.65, 0.27, 0.08], pandemic: [0.62, 0.3, 0.08],
   lawless: [0.45, 0.38, 0.17], financial: [0.4, 0.42, 0.18], drought: [0.35, 0.45, 0.2], solar_flare: [0.3, 0.42, 0.28],
   ash_winter: [0.2, 0.45, 0.35], nuclear: [0.12, 0.43, 0.45],
+  // placeholders (WP0)
+  emp: [0.1, 0.3, 0.6], mega_quake: [0.45, 0.4, 0.15], crop_blight: [0.5, 0.35, 0.15], dam_flood: [0.8, 0.17, 0.03], supervolcano: [0.05, 0.3, 0.65],
 };
 export function rollFate(kind: DisasterKind, u: number): Fate {
   const [f, p] = FATE_ODDS[kind] ?? [0, 0, 1];
@@ -284,6 +329,8 @@ export interface DisasterState {
   fuel?: Record<string, number>;
   /** The long game: where earlier eras left the world (services never get above this; it mends slowly if anything is left). */
   baseline?: Partial<Record<Track, number>>;
+  /** Per-kind state for sim/disasters/<kind>.ts hooks (save v98): optional, JSON-safe, keyed by kind, made on first use. */
+  fx?: Record<string, unknown>;
 }
 
 const PEACE_DAYS: Record<Exclude<PeaceLength, 'random'>, number> = { short: 548, medium: 3 * 365, long: 5 * 365 };
@@ -396,7 +443,7 @@ export function nextEraDisaster(prev: DisasterState, now: number, seed: number, 
     && !(gone('grid') && (k === 'grid_down' || k === 'cyberattack' || k === 'solar_flare'))
     && !(gone('banks') && k === 'financial') && !(gone('law') && k === 'lawless'));
   if (!pool.length) pool = ['drought', 'pandemic', 'wildfire'];
-  const w = pool.map(k => odds[k] ?? 1), tot = w.reduce((a, b) => a + b, 0);
+  const w = pool.map(k => surpriseWeight(k, odds)), tot = w.reduce((a, b) => a + b, 0);
   let u = r() * tot, kind = pool[pool.length - 1];
   for (let i = 0; i < pool.length; i++) { u -= w[i]; if (u <= 0) { kind = pool[i]; break; } }
   const def = DISASTERS[kind]!;

@@ -1,0 +1,145 @@
+/**
+ * The per-kind disaster hook seam (WP0 of docs/DISASTER_TEETH.md).
+ *
+ * Every disaster kind has ONE module, `src/sim/disasters/<kind>.ts`, exporting a `fx: KindFx`. The shared sim files (engine, effects,
+ * encounters, economy, radio, homeSafety, collapseLook, neighborLife, contagion, climate) call the dispatchers below and never name a kind,
+ * so a work package that adds teeth to a kind edits only that kind's module (plus its own new pure module and tests).
+ *
+ * Rules for hooks: pure of rendering; deterministic from the state (use `ctx.r` for dice); every strength reads `DIFFICULTY[...]` so Cozy
+ * stays gentle and Hardcore bites; per-kind state goes in `s.disaster.fx[<kind>]` (optional, JSON-safe, save v98) or `s.disaster.done` keys.
+ * A stub returns nothing: with no hook the dispatcher is the identity, so the sim is unchanged until a package fills one in.
+ *
+ * Teeth columns (see disasterTeeth.test.ts): a kind covers a column when it defines the hook mapped to it in HOOK_COLUMN, or lists the
+ * column in `legacy` (behaviour that predates the seam and still lives in another file; the note says where).
+ */
+import type { DisasterKind, Track } from './disaster';
+import type { EncounterKind, Posture } from './encounters';
+import type { GameState, Structure } from './state';
+import type { CollapseLook } from './collapseLook';
+import { mulberry32 } from './rng';
+import { fx as gridDown } from './disasters/grid_down';
+import { fx as nuclear } from './disasters/nuclear';
+import { fx as lawless } from './disasters/lawless';
+import { fx as financial } from './disasters/financial';
+import { fx as drought } from './disasters/drought';
+import { fx as pandemic } from './disasters/pandemic';
+import { fx as solarFlare } from './disasters/solar_flare';
+import { fx as wildfire } from './disasters/wildfire';
+import { fx as ashWinter } from './disasters/ash_winter';
+import { fx as cyberattack } from './disasters/cyberattack';
+import { fx as zombies } from './disasters/zombies';
+import { fx as invasion } from './disasters/invasion';
+import { fx as civilWar } from './disasters/civil_war';
+import { fx as bioweapon } from './disasters/bioweapon';
+import { fx as asteroid } from './disasters/asteroid';
+import { fx as unknown } from './disasters/unknown';
+import { fx as emp } from './disasters/emp';
+import { fx as megaQuake } from './disasters/mega_quake';
+import { fx as cropBlight } from './disasters/crop_blight';
+import { fx as damFlood } from './disasters/dam_flood';
+import { fx as supervolcano } from './disasters/supervolcano';
+
+/** The ten places a disaster can be felt (docs/DISASTER_TEETH.md section 2; Raiders and NPC merged into encounters / npcs, Sky = atmosphere). */
+export type FxColumn = 'economy' | 'supplies' | 'encounters' | 'npcs' | 'atmosphere' | 'infrastructure' | 'buildings' | 'medical' | 'media';
+export const FX_COLUMNS: FxColumn[] = ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'buildings', 'medical', 'media'];
+
+/** A tick context: the day since the hit, a dice stream unique to (seed, day, kind) and a one-time-key helper backed by `disaster.done`. */
+export interface FxCtx { day: number; r: () => number; once: (key: string) => boolean }
+
+/** The weights `whoComes` rolls over; a hook edits them with `scale` / pushes new ones (kinds beyond EncounterKind need WP3/WP4's own union). */
+export interface EncounterMix { w: Array<[EncounterKind, number]>; p: Posture; scale: (kind: EncounterKind, f: number) => void }
+
+/** What a hit does to one finished building (see structureDamage.ts for the shared roll). */
+export interface StructureHit { structure: Structure; day: number; r: () => number }
+
+export interface KindFx {
+  /** Behaviour that already exists outside the seam: column -> where. Counted by the teeth test; move it behind a hook when convenient. */
+  legacy?: Partial<Record<FxColumn, string>>;
+  /** The first day of the warning signs. Returns log lines. */
+  onWarning?(s: GameState): string[];
+  /** The moment of the hit (phase turns to impact). Returns log lines. */
+  onHit?(s: GameState): string[];
+  /** Once a day from the hit on (effectsDay). Returns log lines. */
+  daily?(s: GameState, ctx: FxCtx): string[];
+  /** economy: a multiplier on prices (1 = none), applied on top of disaster.priceFactor. */
+  priceMods?(s: GameState): number;
+  /** infrastructure: multipliers on the eight service tracks, applied right after the daily track update (so they stack with fate and ceilings). */
+  serviceMods?(s: GameState): Partial<Record<Track, number>>;
+  /** supplies: growing-season and cold adjustments (grow is a multiplier, cold is added), applied at the end of climate(). */
+  supplyMods?(s: GameState): { grow?: number; cold?: number };
+  /** encounters: edit the mix of who comes to the gate (scale existing weights, push new ones). */
+  encounterWeights?(s: GameState, mix: EncounterMix): void;
+  /** npcs: a multiplier on how hard life is for neighbors (neighborLife.hardship; 1 = none). */
+  npcMods?(s: GameState): number;
+  /** buildings: roll damage on the finished buildings (use structureDamage.ts). Called on the hit day and each day after; gate with ctx.once. */
+  structureDamage?(s: GameState, ctx: FxCtx): string[];
+  /** medical: how catching the sickness is (per contact at the gate, spread at home per sick person a day). */
+  medical?(s: GameState): { contact: number; spread: number } | null;
+  /** media: a radio bulletin for today (null = the usual news). Spoken in the radio's own voice by radio.ts; tone 0 calm .. 3 grave. */
+  radioBulletins?(s: GameState, ctx: FxCtx): { text: string; tone: 0 | 1 | 2 | 3 } | null;
+  /** atmosphere: adjust the sky and light (collapseLook) after the shared profile has run. */
+  look?(s: GameState, look: CollapseLook): Partial<CollapseLook>;
+  /** atmosphere: added to the oasis contrast (collapseProgress, 0..1 overall) so a kind can read as collapsed even with the grid up. */
+  oasisWeight?(s: GameState): number;
+}
+
+/** Which teeth column each hook covers (hooks absent here, such as onHit and daily, are plumbing and do not count alone). */
+export const HOOK_COLUMN: Partial<Record<keyof KindFx, FxColumn>> = {
+  priceMods: 'economy', supplyMods: 'supplies', encounterWeights: 'encounters', npcMods: 'npcs', look: 'atmosphere', oasisWeight: 'atmosphere',
+  serviceMods: 'infrastructure', structureDamage: 'buildings', medical: 'medical', radioBulletins: 'media',
+};
+
+export const FX: Record<DisasterKind, KindFx> = {
+  grid_down: gridDown, nuclear, lawless, financial, drought, pandemic, solar_flare: solarFlare, wildfire, ash_winter: ashWinter, cyberattack,
+  zombies, invasion, civil_war: civilWar, bioweapon, asteroid, unknown, emp, mega_quake: megaQuake, crop_blight: cropBlight, dam_flood: damFlood, supervolcano,
+};
+
+/** The columns a kind covers right now: by hook, plus the legacy notes. */
+export function columnsOf(kind: DisasterKind): FxColumn[] {
+  const f = FX[kind], out = new Set<FxColumn>(Object.keys(f.legacy ?? {}) as FxColumn[]);
+  for (const [hook, col] of Object.entries(HOOK_COLUMN) as Array<[keyof KindFx, FxColumn]>) if (typeof f[hook] === 'function') out.add(col);
+  return FX_COLUMNS.filter(c => out.has(c));
+}
+
+/** A tick context for callers outside effectsDay: dice unique to (seed, day, salt), once-keys backed by `disaster.done`. */
+export function fxCtxFor(s: GameState, salt: number): FxCtx {
+  const d = s.disaster, day = Math.floor(s.clock.t - d.hitAt);
+  return { day, r: mulberry32(s.seed * 6029 + Math.floor(s.clock.t) * 7 + salt), once: key => { if (d.done?.includes(key)) return false; (d.done ??= []).push(key); return true; } };
+}
+
+// ── dispatchers (each is the identity when the active kind has no hook) ────────────────────────────
+
+/** The active kind's fx, once the hit has happened (the hooks below that act on the aftermath use this). A chained follow-on has no hooks of its own yet. */
+const after = (s: GameState): KindFx | null => s.disaster.kind && s.clock.t >= s.disaster.hitAt ? FX[s.disaster.kind] : null;
+const active = (s: GameState): KindFx | null => s.disaster.kind ? FX[s.disaster.kind] : null;
+
+export const fxOnWarning = (s: GameState): string[] => active(s)?.onWarning?.(s) ?? [];
+export const fxOnHit = (s: GameState): string[] => active(s)?.onHit?.(s) ?? [];
+export const fxDaily = (s: GameState, ctx: FxCtx): string[] => after(s)?.daily?.(s, ctx) ?? [];
+export const fxStructureDamage = (s: GameState, ctx: FxCtx): string[] => after(s)?.structureDamage?.(s, ctx) ?? [];
+export const fxPriceMod = (s: GameState): number => active(s)?.priceMods?.(s) ?? 1;
+export const fxNpcMod = (s: GameState): number => after(s)?.npcMods?.(s) ?? 1;
+export const fxMedical = (s: GameState): { contact: number; spread: number } => after(s)?.medical?.(s) ?? { contact: 0, spread: 0 };
+export const fxSupplyMods = (s: GameState): { grow: number; cold: number } => { const m = after(s)?.supplyMods?.(s); return { grow: m?.grow ?? 1, cold: m?.cold ?? 0 }; };
+export const fxRadio = (s: GameState, ctx: FxCtx) => after(s)?.radioBulletins?.(s, ctx) ?? null;
+export const fxOasis = (s: GameState): number => active(s)?.oasisWeight?.(s) ?? 0;
+
+/** Apply the kind's service multipliers to the live tracks (call after updateDisaster). */
+export function fxApplyServiceMods(s: GameState): void {
+  const m = after(s)?.serviceMods?.(s);
+  if (!m) return;
+  for (const [k, f] of Object.entries(m) as Array<[Track, number]>) s.disaster.tracks[k] = Math.max(0, Math.min(1, s.disaster.tracks[k] * f));
+}
+
+/** Let the kind edit the encounter weights; returns nothing (mutates `w`). */
+export function fxEncounterWeights(s: GameState, w: Array<[EncounterKind, number]>, p: Posture): void {
+  const f = active(s)?.encounterWeights;
+  if (!f) return;
+  f(s, { w, p, scale: (kind, k) => { for (const e of w) if (e[0] === kind) e[1] *= k; } });
+}
+
+/** Let the kind adjust the look (after the shared profile). */
+export function fxLook(s: GameState, look: CollapseLook): CollapseLook {
+  const f = active(s)?.look;
+  return f ? { ...look, ...f(s, look) } : look;
+}

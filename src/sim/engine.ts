@@ -81,7 +81,8 @@ import { legalDay } from './breakins';
 import { prisonersDay } from './aftermath';
 import { storyDay } from './raiderStory';
 import { isAway, rescueDay } from './rescue';
-import { falloutDay, isNuclear, SHELTER_DAYS, strike } from './nuclear';
+import { falloutDay, isNuclear, SHELTER_DAYS } from './nuclear';
+import { fxApplyServiceMods, fxOnHit, fxOnWarning } from './disasterFx';
 import { tallyDay } from './report';
 import { declareWipe, isWiped, wipeEnded } from './wipe';
 import { lineageDay } from './lineage';
@@ -217,6 +218,8 @@ function subStep(s: GameState): void {
     const before = s.disaster.phase;
     const dayStartCard = s.gate.pending?.id ?? null;
     for (const line of updateDisaster(s.disaster, s.clock.t, s.seed, { region: s.site.region, doy: calendarOf(s.clock).doy })) log(s, line);
+    fxApplyServiceMods(s);   // the kind's multipliers on the eight tracks (sim/disasters/<kind>.ts)
+    if (before !== 'warning' && s.disaster.phase === 'warning') for (const line of fxOnWarning(s)) log(s, line);
     // two homes: the town house's bills, the caretaker, an empty place's troubles, the move-in card, the hit while away
     for (const line of weekenderDay(s, before)) log(s, line);
     // the start of a season: a line of "years in review" in the log
@@ -290,7 +293,7 @@ function subStep(s: GameState): void {
     // kin, a neighbor asking to stay and the rest that set a card themselves walk up the road too
     if (!e && s.gate.pending && s.gate.pending.id !== dayStartCard) scheduleLead(s, s.gate.pending);
     rescueDay(s);   // the taken: their fate, leads, word from the crew, a rescue out (logs its own lines)
-    if (before !== 'impact' && s.disaster.phase === 'impact' && s.disaster.kind === 'nuclear') for (const line of strike(s)) log(s, line);
+    if (before !== 'impact' && s.disaster.phase === 'impact') for (const line of fxOnHit(s)) log(s, line);   // (nuclear's strike lives in sim/disasters/nuclear.ts)
     for (const line of falloutDay(s)) log(s, line);
     for (const line of effectsDay(s)) log(s, line);
     for (const line of choresDay(s, mulberry32(s.seed * 6151 + dayIndex(s.clock.t) * 3))) log(s, line);

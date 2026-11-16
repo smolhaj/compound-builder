@@ -76,8 +76,6 @@ export function bestShelter(s: GameState): [number, string] {
   return best;
 }
 
-/** Electronics the EMP takes out (installed), and the spare that fixes each. */
-export const FRIED: Record<string, keyof Stock> = SPARE_FOR;
 /** Spares in the stockpile that an EMP can kill. */
 const SPARES: Array<keyof Stock> = ['inverter', 'battery', 'solar_panel', 'generator', 'pump'];
 
@@ -96,7 +94,7 @@ export function strike(s: GameState): string[] {
   const v = s.disaster.variant;
   // EMP: installed electronics, then the spares in the stockpile (those in a Faraday room may survive)
   const share = faradayShare(s);
-  for (const st of s.structures.filter(isFinished)) if (FRIED[st.kind] && !s.utilities.fried.includes(st.id)) s.utilities.fried.push(st.id);
+  for (const st of s.structures.filter(isFinished)) if (SPARE_FOR[st.kind] && !s.utilities.fried.includes(st.id)) s.utilities.fried.push(st.id);
   const lost: string[] = [];
   for (const k of SPARES) {
     const have = Math.floor(s.stock[k]);

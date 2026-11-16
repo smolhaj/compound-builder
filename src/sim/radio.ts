@@ -25,6 +25,7 @@ import { dayIndex } from './state';
 import { fogRadioLine } from './fogFx';
 import { fogHash } from './fog';
 import { passerRumor } from './roadPassers';
+import { fxCtxFor, fxRadio } from './disasterFx';
 
 export interface RadioState {
   /** Day index until which the watch is up after a raider warning, and its detection bonus. */
@@ -108,6 +109,9 @@ export function radioDay(s: GameState): string[] {
   // what went by on the county road is what people talk about (sim/roadPassers.ts; its own random stream)
   const pr = passerRumor(s, src, truth);
   if (pr) { if (pr.truth) st.truths++; else st.rumors++; if (pr.warn) warn(3); return say(pr.text, pr.tone, { kind: pr.kind, truth: pr.truth }); }
+  // the kind's own bulletin (sim/disasters/<kind>.ts radioBulletins); its own dice, so the rest of the day's news is unchanged
+  const fb = fxRadio(s, fxCtxFor(s, 13));
+  if (fb) return say(`${src} ${fb.text}`, fb.tone);
   if (r() < truth) {
     st.truths++;
     // a raider warning, likelier the more the law has gone
