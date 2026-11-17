@@ -15,9 +15,11 @@ import { PERIMETER, UTILITY_LINES, runBill, runHours, type PerimeterKind } from 
 import { FT_PER_M, lengthText } from './units';
 import { pluralize } from './words';
 import type { GameState } from './state';
-import { BUNKER_ORDER, GATEHOUSE_ORDER, KIT, POD_ORDER, TERRACE_ORDER, TOWER_ORDER, UTILITY_ORDER } from '../game/buildkit/kit';
+import { tierOfKind } from './dome/tiers';
+import { domeFacts } from './dome/facts';
+import { BUNKER_ORDER, DOME_ORDER, GATEHOUSE_ORDER, KIT, POD_ORDER, TERRACE_ORDER, TOWER_ORDER, UTILITY_ORDER } from '../game/buildkit/kit';
 
-export type CatId = 'shelter' | 'work' | 'food' | 'water' | 'power' | 'defense' | 'underground' | 'walls' | 'lines';
+export type CatId = 'shelter' | 'work' | 'food' | 'water' | 'power' | 'defense' | 'underground' | 'enclosure' | 'walls' | 'lines';
 export interface CatDef { id: CatId; label: string; /** Extra search words. */ words: string }
 export const CATS: readonly CatDef[] = [
   { id: 'shelter', label: 'Shelter', words: 'home house cabin sleep bed room live dwelling' },
@@ -27,10 +29,11 @@ export const CATS: readonly CatDef[] = [
   { id: 'power', label: 'Power', words: 'electric energy solar battery generator light' },
   { id: 'defense', label: 'Defense', words: 'guard watch tower gate security raid' },
   { id: 'underground', label: 'Bunker', words: 'underground bunker shelter hatch tunnel basement' },
+  { id: 'enclosure', label: 'Enclosure', words: 'dome glass greenhouse climate shell cover air weather fallout arcology geodesic earthen conservatory biosphere' },
   { id: 'walls', label: 'Walls', words: 'fence wall hedge perimeter line gate' },
   { id: 'lines', label: 'Lines', words: 'pipe cable wire drain utility' },
 ];
-const CAT_OF_KIT: Record<string, CatId> = { home: 'shelter', work: 'work', food: 'food', sanitation: 'water', water: 'water', power: 'power', bunker: 'underground', defense: 'defense' };
+const CAT_OF_KIT: Record<string, CatId> = { home: 'shelter', work: 'work', food: 'food', sanitation: 'water', water: 'water', power: 'power', bunker: 'underground', defense: 'defense', enclosure: 'enclosure' };
 
 export interface CatalogEntry {
   /** Stable key (the tool id). */
@@ -59,6 +62,7 @@ export function catalogEntries(): CatalogEntry[] {
   const kit = (k: string) => { const d = KIT[k]; if (d) out.push({ key: k, tool: k, name: d.name, cat: CAT_OF_KIT[d.category] ?? 'work', run: false, blurb: d.blurb }); };
   for (const [, , kinds] of KIT_LISTS) kinds.forEach(kit);
   BUNKER_ORDER.forEach(kit);
+  DOME_ORDER.forEach(kit);
   const run = (k: PerimeterKind, cat: CatId) => out.push({ key: `fence:${k}`, tool: `fence:${k}`, name: PERIMETER[k].name, cat, run: true, blurb: PERIMETER[k].blurb });
   run('escape_tunnel', 'underground'); run('underground_passage', 'underground');
   for (const t of perimeterTiers()) t.kinds.forEach(k => run(k, 'walls'));
@@ -212,6 +216,7 @@ export function billFor(s: GameState, e: CatalogEntry, ctx: AdviceCtx = adviceCt
     if (d.shelters) facts.push(`Shelters ${d.shelters}`);
     facts.push(`Footprint ${d.cellsX * 10} x ${d.cellsZ * 10} ft`);
   }
+  { const dt = e.run ? null : tierOfKind(e.key); if (dt) facts.push(...domeFacts(dt)); }
   const needs: string[] = [];
   if (st.reason) needs.push(st.reason);
   if (own) needs.push(`From your own land: ${own}`);

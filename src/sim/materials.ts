@@ -37,7 +37,9 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   // the herd, the bees and the sugar bush (sim/herd.ts, sim/bees.ts, sim/maple.ts)
   | 'cow' | 'cheese_kit' | 'vet_kit' | 'bee_nuc' | 'hive_supplies' | 'beeswax' | 'maple_taps'
   // breeding swine and reusable canning lids (sim/swine.ts, sim/kitchen.ts)
-  | 'sow' | 'boar' | 'lids_reuse';
+  | 'sow' | 'boar' | 'lids_reuse'
+  // the domed compound (sim/dome/): kits sold by the contractor, installed by their erectors
+  | 'dome_earthbag' | 'dome_geodesic_kit' | 'dome_glass_kit' | 'dome_arcology_kit' | 'dome_air_plant' | 'dome_airlock' | 'dome_fitout';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -236,6 +238,14 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   sow: { id: 'sow', name: 'Bred sow', unit: 'a bred gilt: eight or so piglets a litter, two litters a year with a boar on the place (feed, a pen)', price: 450 },
   boar: { id: 'boar', name: 'Boar', unit: 'a breeding boar: sires every sow on the place (feed, a stout pen)', price: 400 },
   lids_reuse: { id: 'lids_reuse', name: 'Reusable canning lids', unit: 'sleeve of 12 Tattler-style lids and rubber rings (one case of quarts a day; the rings wear out about every 16 uses; 4% of jars fail to seal)', price: 32 },
+  // the domed compound (sim/dome/cost.ts sizes the order; the erectors' labor is in each kit's price)
+  dome_earthbag: { id: 'dome_earthbag', name: 'Earthbag dome shell', unit: '100 sq ft of earthbag, barbed wire, plaster and sod, delivered with a mason\'s crew', price: 1800 },
+  dome_geodesic_kit: { id: 'dome_geodesic_kit', name: 'Geodesic dome kit', unit: '1,000 sq ft of steel strut-and-hub frame with twin-wall polycarbonate and film glazing, erected', price: 75000 },
+  dome_glass_kit: { id: 'dome_glass_kit', name: 'Glass and steel dome kit', unit: '1,000 sq ft of steel gridshell with laminated glass, crane-set', price: 128000 },
+  dome_arcology_kit: { id: 'dome_arcology_kit', name: 'Arcology panel kit', unit: '1,000 sq ft of space frame with clear polycarbonate-composite armor panels, set by a contractor firm', price: 320000 },
+  dome_air_plant: { id: 'dome_air_plant', name: 'Dome air plant', unit: 'per 10,000 cu ft of enclosed air: heat pumps, energy-recovery ventilators, particulate filters, ducts and controls', price: 16000 },
+  dome_airlock: { id: 'dome_airlock', name: 'Dome airlock', unit: 'two sealed doors, a vestibule, a pressure gauge and an interlock', price: 85000 },
+  dome_fitout: { id: 'dome_fitout', name: 'Dome fit-out', unit: 'per 1,000 sq ft of floor: paths, drainage, beds, lighting and finishes', price: 18000 },
   lids: { id: 'lids', name: 'Canning lids', unit: 'sleeve of 12 lids (one case of quarts filled; the jars come back, the lids don\'t)', price: 6 },
   filter_set: { id: 'filter_set', name: 'HEPA filter set', unit: 'HEPA cartridges + hand-crank blower', price: 1100 },
 };

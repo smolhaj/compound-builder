@@ -25,7 +25,7 @@ export const ROOF_TOP = 0.47;
 export const MIN_COVER = 0.15;
 export const MAX_COVER = 1.0;
 
-export type Level = 'surface' | 'underground' | 'both';
+export type Level = 'surface' | 'underground' | 'both' | 'cover';
 
 /** Which level a piece occupies: entrances reach both; wells, tanks and septic fields go deep. */
 export function levelOf(def: KitPieceDef): Level {
@@ -172,7 +172,7 @@ export function siteProblem(def: KitPieceDef, x: number, z: number, rot: number,
  * by placementProblem; this tests the ring round it.
  */
 function padOverBlocked(def: KitPieceDef, x: number, z: number, rot: number, site: SiteQuery): PlaceProblem | null {
-  if (!site.blocked || isUnderground(def) || def.climbs || def.waterside || def.stilts || WALLLESS.test(def.id) || !Number.isInteger(rot)) return null;
+  if (!site.blocked || isUnderground(def) || def.level === 'cover' || def.climbs || def.waterside || def.stilts || WALLLESS.test(def.id) || !Number.isInteger(rot)) return null;
   const fp = footprint(def, x, z, rot), pad = planPad(fp, site.height).rect;
   if (pad.x0 >= fp.x0 - 0.065 && pad.x1 <= fp.x1 + 0.065 && pad.z0 >= fp.z0 - 0.065 && pad.z1 <= fp.z1 + 0.065) return null;     // (no apron: the margin was tested)
   const nx = Math.min(40, Math.ceil((pad.x1 - pad.x0) / 0.3)), nz = Math.min(40, Math.ceil((pad.z1 - pad.z0) / 0.3));

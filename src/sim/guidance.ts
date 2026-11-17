@@ -4,6 +4,8 @@
  * what the bunker needs, what the plans still lack, and how the Perimeter
  * list groups by price. Pure (tested); the HUD only draws it.
  */
+import { tierOfKind } from './dome/tiers';
+import { wealthGate } from './dome/siting';
 import { gapLine, homeAdvice, homeAdviceText } from './homeAdvice';
 import { partsOutlook, partsYears } from './parts';
 import { serviceRate } from './vehicles';
@@ -643,6 +645,7 @@ export function selfSufficient(s: GameState): Goal {
 export function buildOff(s: GameState, kind: string): string | null {
   const site = planProblem(s, kind);
   if (site) return site;
+  { const dt = tierOfKind(kind); if (dt) { const g = wealthGate(dt, s.money); if (g) return g; } }
   if (kind === 'sugar_shack' && !hasMaples(s)) return 'no sugar maples in the woods here: the sap will not run';
   if (kind.startsWith('bunker_') && !BUNKER_ENTRANCES.includes(kind) && !bunkerKinds(s).some(st => BUNKER_ENTRANCES.includes(st.kind))) return 'needs a hatch or stairwell first: the way down';
   if (needsPermit(kind) && s.paper.permits && countyWorks(s) && s.money < permitFee(s, kind)) return `needs a ${usd(permitFee(s, kind))} county permit: you have ${usd(s.money)}`;

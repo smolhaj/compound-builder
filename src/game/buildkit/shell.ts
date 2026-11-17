@@ -89,6 +89,8 @@ export interface BuildOpts {
   spur?: number;
   /** ... and the ground's height over the yard's pad at a point of the yard's own frame (x across, z toward the road): the spur is laid draped on it. */
   spurH?: (lx: number, lz: number) => number;
+  /** A dome (cover level, no pad): the natural ground's height over the group's origin at a point of its own frame, so its stem wall and berm meet the hill. */
+  ground?: (lx: number, lz: number) => number;
   /** Underground pieces: doorways by local side (position along that wall) and the ground's height above the floor. */
   doors?: Partial<Record<'front' | 'back' | 'left' | 'right', number>>;
   depth?: number;
@@ -189,7 +191,7 @@ export class Parts {
       if (!g) continue;
       g.computeBoundingSphere();
       const mesh = new THREE.Mesh(g, kitMaterial(m));
-      mesh.castShadow = m !== 'glass' && m !== 'polycarb' && m !== 'snow' && m !== 'glow' && !m.endsWith('_glow') && m !== 'string' && m !== 'wire_mesh' && m !== 'oil_stain';
+      mesh.castShadow = m !== 'glass' && m !== 'polycarb' && m !== 'arcology' && m !== 'snow' && m !== 'glow' && !m.endsWith('_glow') && m !== 'string' && m !== 'wire_mesh' && m !== 'oil_stain';
       mesh.receiveShadow = true;
       mesh.name = `bldg_${layer}_${m}`;
       mesh.userData = { layer, mat: m, vertexCount: g.getAttribute('position').count };

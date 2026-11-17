@@ -28,6 +28,8 @@ import { townTaxHalf } from './weekender';
 import { mulberry32 } from './rng';
 import { diffOf } from './difficulty';
 import { estateFactor } from './estate';
+import { DOME_KIND, DOME_TIERS, TIER, tierOfKind } from './dome/tiers';
+import { reviewDays as domeReview } from './dome/siting';
 import { pluralize } from './words';
 
 export const CLOSING_COSTS = 0.03;
@@ -48,9 +50,11 @@ export const PERMIT_FEE: Record<string, number> = {
   concrete_wall: 1200, container_stack: 900, stone_wall: 800, tunnel_bridge: 2500, covered_bridge: 600, moat: 500, slope_tunnel: 1500, rock_tunnel: 3500, micro_hydro: 1800,cabin_village: 4000, helipad: 1800, tower_pod: 900, stilted_house: 3000,boat_dock: 600, marina: 2500, high_tunnel: 300, aquaponics: 900, wind_turbine: 900, gate_garage: 1500, sugar_shack: 500, forge: 400, barnyard: 600,
   bunker_hatch: 600, bunker_floorhatch: 600, bunker_stairs: 600, bunker_corridor: 300, bunker_container: 600, bunker_dorm: 600, bunker_galley: 600, bunker_stores: 600, bunker_plant: 600, bunker_medical: 600, bunker_comms: 300,
 };
+// the enclosures (sim/dome): the engineered tiers need real permits (owner decision 8)
+for (const t of DOME_TIERS) if (TIER[t].permitFee > 0) PERMIT_FEE[DOME_KIND[t]] = TIER[t].permitFee;
 export const needsPermit = (kind: string) => (PERMIT_FEE[kind] ?? 0) > 0;
 export const permitFee = (s: GameState, kind: string) => Math.round((PERMIT_FEE[kind] ?? 0) * (0.6 + 0.4 * COUNTY[s.site.region].strict) / 10) * 10;
-export const reviewDays = (s: GameState, kind: string) => Math.max(1, Math.round((isHome(kind) || kind === 'log_house' ? 21 : 7) * COUNTY[s.site.region].strict * diffOf(s.disaster).permits));
+export const reviewDays = (s: GameState, kind: string) => tierOfKind(kind) ? Math.max(1, domeReview(tierOfKind(kind)!, COUNTY[s.site.region].strict, diffOf(s.disaster).permits)) : Math.max(1, Math.round((isHome(kind) || kind === 'log_house' ? 21 : 7) * COUNTY[s.site.region].strict * diffOf(s.disaster).permits));
 
 export interface Paper {
   /** Pull permits for new builds (fees and the wait), or build without and take the chance. */

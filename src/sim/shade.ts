@@ -44,6 +44,7 @@ export function treeBox(t: ShadeTree): ShadeBox {
 
 /** How tall a kind of building stands, world units (storeys 0.6-0.7 u, a roof on top; panels tilted; underground nothing). */
 export function buildingHeight(kind: string, category?: string): number {
+  if (/^dome_/.test(kind)) return 0;   // glazed or low: a dome throws no shade box (its own shell is drawn; what stands under it is judged on its own)
   if (/^bunker_|root_cellar|escape_tunnel|underground|^well|septic|cistern_buried/.test(kind)) return 0;
   if (/tower|lookout/.test(kind)) return 2.2;
   if (kind === 'solar_array') return 0.35;

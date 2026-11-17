@@ -16,6 +16,8 @@
  * the state model every WP6 kind rolls with.
  */
 import type { Structure } from './state';
+import { tierOfKind } from './dome/tiers';
+import { SEISMIC, SHELL } from './dome/protection';
 
 export type Hazard = 'quake' | 'flood' | 'blast' | 'ash_load' | 'wind' | 'fire' | 'emp';
 export type DamageState = 'none' | 'cosmetic' | 'major' | 'destroyed';
@@ -106,7 +108,7 @@ export const SEISMIC_K: Record<string, number> = {
   outhouse: 0.6, forge: 1.0, wood_oven: 1.6, well_hand: 0.5, well_drilled: 0.7, cistern: 1.5, water_tower: 1.8, filtration_shed: 0.9, solar_array: 0.5, battery_shed: 0.8, generator_shed: 0.8,
   root_cellar: 0.4, watchtower_wood: 1.1, watchtower_octagon: 1.1, watchtower_concrete: 0.9, watchtower_hex: 1.1, watchtower_flood: 1.1, watchtower_mount: 1.2, watchtower_turret: 1.2,
 };
-export const seismicK = (kind: string): number => kind.startsWith('bunker_') ? 0.2 : SEISMIC_K[kind] ?? 1;
+export const seismicK = (kind: string): number => { const dt = tierOfKind(kind); return dt ? SEISMIC[dt] : kind.startsWith('bunker_') ? 0.2 : SEISMIC_K[kind] ?? 1; };
 
 /** Site and fitted-retrofit inputs to a resistance. */
 export interface ResistCtx {
@@ -124,6 +126,9 @@ export interface ResistCtx {
 
 /** Resistance multiplier for the hazards that are not depth-driven: lower is better. */
 export function resistance(h: 'quake' | 'blast' | 'wind', kind: string, c: ResistCtx = {}): number {
+  // an enclosure shell is rated (sim/dome/protection.ts): wind against a 110 mph film dome, blast against 1 psi of overpressure
+  const dt = tierOfKind(kind);
+  if (dt && h !== 'quake') return h === 'wind' ? 110 / SHELL[dt].wind * (c.unfinished ? 1.5 : 1) : 1 / (1 + SHELL[dt].blast);
   const has = (r: string) => (c.retrofits ?? []).includes(r);
   let k = 1;
   if (h === 'quake') {

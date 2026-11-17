@@ -16,7 +16,7 @@ export function buildingRects(s: Pick<GameState, 'structures'>): Box[] {
   for (const st of s.structures) {
     if (st.unplaced || ON_THE_WALL(st.kind)) continue;
     const def = KIT[st.kind];
-    if (!def || def.level === 'underground') continue;
+    if (!def || def.level === 'underground' || def.level === 'cover') continue;   // (a dome is a shell over open ground: walkers use its airlocks, handled with the shell)
     out.push(footprint(def, st.x, st.z, st.rot));
   }
   return out;

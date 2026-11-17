@@ -99,7 +99,7 @@ export class LivedLayer {
     this.renderer.update(this._plan, { ground: this._h.groundAt, floor: this._h.floorAt, season: look.season, quality: look.quality, key: this._plan.key + look.season });
     const skirts = buildings.flatMap(b => {
       const k = SKIRT[roleOf(b.kind)];
-      if (!k || b.ageDays < 6) return [];
+      if (!k || b.ageDays < 6 || KIT[b.kind].level === 'cover') return [];
       const f = footprint(KIT[b.kind], b.x, b.z, b.rot, false);
       return [{ id: b.id, x0: f.x0, z0: f.z0, x1: f.x1, z1: f.z1, alpha: Math.min(0.85, k * (0.14 + 0.72 * (1 - Math.exp(-b.ageDays / 170)))) }];
     });

@@ -46,7 +46,7 @@ export function sitePad(def: KitPieceDef, p: Placed, ctx: SitePadCtx): SitePad {
   // a house on piles: the floor clears the highest ground under it (the piles run down to the low side); no pad is graded, no wall is built
   if (def.stilts) { let hi = -Infinity; for (let i = 0; i <= 4; i++) for (let j = 0; j <= 4; j++) hi = Math.max(hi, ctx.natural(r.x0 + (r.x1 - r.x0) * i / 4, r.z0 + (r.z1 - r.z0) * j / 4)); y = hi + 0.03; }
   // bunker rooms take no pad (the yard above stays as it is); an entrance's hatch or headhouse gets a small one
-  let pad: Pad | null = (!below || (isEntry(def) && p.kind !== 'bunker_floorhatch')) && !def.waterside && !def.stilts ? { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: below ? 0.4 : p.kind === 'vehicle_yard' ? YARD_SITE.skirt : 0.9 } : null;
+  let pad: Pad | null = (!below || (isEntry(def) && p.kind !== 'bunker_floorhatch')) && !def.waterside && !def.stilts && def.level !== 'cover' ? { x0: r.x0 - 0.05, z0: r.z0 - 0.05, x1: r.x1 + 0.05, z1: r.z1 + 0.05, y, skirt: below ? 0.4 : p.kind === 'vehicle_yard' ? YARD_SITE.skirt : 0.9 } : null;
   // a yard turned to a diagonal drive is graded on a pad between its own size and the box round it (game/buildkit/yardSite), so the road's bed is left alone
   if (pad && p.kind === 'vehicle_yard' && !Number.isInteger(p.rot)) { const hp = yardPadHalf(p.rot, def.cellsX * CELL / 2) + 0.05; pad = { ...pad, x0: p.x - hp, z0: p.z - hp, x1: p.x + hp, z1: p.z + hp }; }
   // a pad cut into a slope is held by a dry-stack wall (sim/retainPlan): a flat apron round the building on the walled sides, the terrain eased only over the wall
