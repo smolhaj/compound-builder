@@ -250,7 +250,7 @@ describe('the empty place', () => {
       expect(g.money).toBeDefined();
     }
     expect(hits).toBeGreaterThan(2);
-  }, 60_000);
+  }, 300_000);   // heavy: 6 seeds x 8 years, about 30 s alone, so it needs headroom when the suite runs in parallel
   it('burns very little wood while away', () => {
     const g = game(3, { mode: 'sandbox' });
     expect(awayRates(g, choreRates(g))).toBeTruthy();

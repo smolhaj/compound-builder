@@ -89,7 +89,7 @@ describe('the armory', () => {
     expect(buyGun(w, 'zpap_m70')).toMatch(/Washington/);
     expect(buyGun(w, 'sw_mp15')).toMatch(/Washington/);
     expect(buyGun(w, 'ruger_mini14')).toBeNull();        // a ranch rifle isn't on the list
-  });
+  }, 180_000);   // heavy: multi-seed sim, about 10 to 20 s alone, so it needs headroom when the suite runs in parallel
 
   it('a machine gun: collector price, the $200 stamp, months on a Form 4, picked up only from an open dealer', () => {
     const g = fresh(); g.money = 100_000;
