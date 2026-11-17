@@ -33,7 +33,7 @@ describe('felt checklist', () => {
     it('records what each kind passes in play, and the baseline is exact', () => {
       for (const p of logs) expect(playedPassing(p, titles), p.kind).toEqual(PLAYED_ITEMS.filter(i => !(PLAYED_FAILS[p.kind] ?? []).includes(i) && !UNTRIGGERABLE.includes(p.kind)));
     });
-    it('every kind with a definition can be triggered; the rest wait for WP10', () => {
+    it('every kind with a definition can be triggered; none are left waiting for WP10', () => {
       for (const p of logs) expect(p.triggerable, p.kind).toBe(!UNTRIGGERABLE.includes(p.kind));
     });
     it('prints the matrix (kind x item) for the PR', () => {
@@ -44,7 +44,7 @@ describe('felt checklist', () => {
   });
 });
 
-/** Kinds with a felt spec but no DisasterDef yet (WP10); they cannot be played, so they fail every played item. */
-const UNTRIGGERABLE: FeltKind[] = ['satellite_loss', 'oil_shock', 'reactor_meltdown', 'global_famine', 'water_war', 'cult_takeover', 'mass_exodus'];
-/** The played items a triggerable kind still fails today (wildfire has 3 teeth columns, unknown 2, the EMP is heard on the radio only 3 times in 30 days). */
-const PLAYED_FAILS: Partial<Record<FeltKind, PlayedItem[]>> = { wildfire: ['teeth'], unknown: ['teeth'], emp: ['radio'] };
+/** Kinds with a felt spec but no DisasterDef (none since WP10); they cannot be played, so they fail every played item. */
+const UNTRIGGERABLE: FeltKind[] = [];
+/** The played items a kind still fails today: the EMP and four WP10 kinds hear fewer than 5 distinct radio lines in 30 days. */
+const PLAYED_FAILS: Partial<Record<FeltKind, PlayedItem[]>> = { emp: ['radio'], reactor_meltdown: ['radio'], global_famine: ['radio'], water_war: ['radio'], cult_takeover: ['radio'] };
