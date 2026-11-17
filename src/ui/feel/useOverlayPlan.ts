@@ -1,6 +1,7 @@
 import { useGameStore } from '../../store/gameStore';
 import { useFeelStore } from '../../store/feelStore';
 import { planningHold } from '../../sim/clockResume';
+import { useWorldStore } from '../../store/worldStore';
 import { useFeltStore } from '../../store/feltStore';
 import { feltCardPending, hitMomentUp } from '../../sim/felt/state';
 import { hitFor } from '../../sim/felt/hitMoment';
@@ -16,7 +17,8 @@ export function useOverlayPlan(): OverlayPlan {
   const dayCard = useGameStore(s => s.dayCard !== null);
   const feltCard = useGameStore(s => feltCardPending(s.game));
   const hasHit = useGameStore(s => !!hitFor(s.game.disaster.kind));
+  const board = useWorldStore(w => w.boardOpen);
   const { hitShown, skipHit } = useFeltStore();
   const hitMoment = hitMomentUp(useGameStore(s => s.dayCard), hitShown, skipHit, hasHit);
-  return overlayPlan({ title, setup, ending, cutscene: cutscene ? (cutscene.phase === 'prompt' ? 'prompt' : 'playing') : 'none', decision, dayCard, recap, milestones, planning, hitMoment, feltCard });
+  return overlayPlan({ title, setup, ending, cutscene: cutscene ? (cutscene.phase === 'prompt' ? 'prompt' : 'playing') : 'none', decision, dayCard, recap, milestones, planning, hitMoment, feltCard, board });
 }
