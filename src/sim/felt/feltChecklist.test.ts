@@ -5,7 +5,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import { FELT_KINDS } from './registry';
-import { FELT_ITEMS, feltChecks, feltPassing, type FeltItem } from './checklist';
+import { FELT_ITEMS, PLAYED_ITEMS, feltChecks, feltPassing, matrixText, playedPassing, titleCounts, type FeltItem, type PlayedItem } from './checklist';
+import { playKind } from './played';
 import type { FeltKind } from './types';
 
 /** Kinds that must pass every item (empty until the content packages land; FL12 fills it). */
@@ -25,4 +26,25 @@ describe('felt checklist', () => {
     const rows = FELT_KINDS.map(k => `${k.padEnd(17)} ${FELT_ITEMS.map(i => feltChecks(k)[i] ? i[0] : '.').join('')}`);
     expect(rows.length).toBe(FELT_KINDS.length);
   });
+  // FL6: the played-state items (30 days of the real sim). Raise, never lower, like BASELINE; FELT_ENFORCE is not touched.
+  describe('played state', () => {
+    const logs = FELT_KINDS.map(k => playKind(k, 30));
+    const titles = titleCounts(logs);
+    it('records what each kind passes in play, and the baseline is exact', () => {
+      for (const p of logs) expect(playedPassing(p, titles), p.kind).toEqual(PLAYED_ITEMS.filter(i => !(PLAYED_FAILS[p.kind] ?? []).includes(i) && !UNTRIGGERABLE.includes(p.kind)));
+    });
+    it('every kind with a definition can be triggered; the rest wait for WP10', () => {
+      for (const p of logs) expect(p.triggerable, p.kind).toBe(!UNTRIGGERABLE.includes(p.kind));
+    });
+    it('prints the matrix (kind x item) for the PR', () => {
+      const text = matrixText(logs);
+      expect(text.split('\n').length).toBe(FELT_KINDS.length + 2);
+      if (process.env.FELT_MATRIX) console.log(text);
+    });
+  });
 });
+
+/** Kinds with a felt spec but no DisasterDef yet (WP10); they cannot be played, so they fail every played item. */
+const UNTRIGGERABLE: FeltKind[] = ['satellite_loss', 'oil_shock', 'reactor_meltdown', 'global_famine', 'water_war', 'cult_takeover', 'mass_exodus'];
+/** The played items a triggerable kind still fails today (wildfire has 3 teeth columns, unknown 2, the EMP is heard on the radio only 3 times in 30 days). */
+const PLAYED_FAILS: Partial<Record<FeltKind, PlayedItem[]>> = { wildfire: ['teeth'], unknown: ['teeth'], emp: ['radio'] };
