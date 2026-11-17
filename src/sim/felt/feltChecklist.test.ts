@@ -46,5 +46,5 @@ describe('felt checklist', () => {
 
 /** Kinds with a felt spec but no DisasterDef (none since WP10); they cannot be played, so they fail every played item. */
 const UNTRIGGERABLE: FeltKind[] = [];
-/** The played items a kind still fails today: the EMP and four WP10 kinds hear fewer than 5 distinct radio lines in 30 days. */
-const PLAYED_FAILS: Partial<Record<FeltKind, PlayedItem[]>> = { emp: ['radio'], reactor_meltdown: ['radio'], global_famine: ['radio'], water_war: ['radio'], cult_takeover: ['radio'] };
+/** The played items a kind still fails today (none for the radio: every kind hears 5 or more distinct lines in 30 days). */
+const PLAYED_FAILS: Partial<Record<FeltKind, PlayedItem[]>> = {};

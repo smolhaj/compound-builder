@@ -24,7 +24,7 @@ describe('hit card', () => {
       expect(c.stays.length).toBeGreaterThanOrEqual(3);
       const first = doFirst(g);
       expect(first.length).toBeLessThanOrEqual(3);
-      for (const f of first) { expect(f.label.length).toBeGreaterThan(0); expect(isDayAct(f.act)).toBe(true); }
+      for (const f of first) { expect(f.label.length).toBeGreaterThan(0); expect(isDayAct(f.act)).toBe(true); expect(f.act, `${kind}: ${f.label} has a button`).toBeTruthy(); }
     });
   }
   it('a short pantry puts the pantry first', () => {

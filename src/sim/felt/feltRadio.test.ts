@@ -104,11 +104,13 @@ describe('felt radio: who hears what', () => {
     }
   });
   it('untrained civilians speak in short, broken fragments; operators in whole sentences', () => {
-    const s = world('mega_quake', 12);
-    for (const l of feltSpec('mega_quake')!.radio!.filter(x => (x.channel === 'local' || x.channel === 'rumor') && x.when(s))) {
-      const sentences = l.text(s, () => 0.5).split(/[.!?]+\s/).filter(Boolean);
-      expect(sentences.length, l.id).toBeGreaterThanOrEqual(3);
-      expect(Math.max(...sentences.map(x => x.split(/\s+/).length)), l.id).toBeLessThanOrEqual(12);
+    for (const k of FELT_KINDS) {
+      const s = world(k, 12);
+      for (const l of feltSpec(k)!.radio!.filter(x => (x.channel === 'local' || x.channel === 'rumor') && x.when(s))) {
+        const sentences = l.text(s, () => 0.5).split(/[.!?]+\s/).filter(Boolean);
+        expect(sentences.length, l.id).toBeGreaterThanOrEqual(3);
+        expect(Math.max(...sentences.map(x => x.split(/\s+/).length)), l.id).toBeLessThanOrEqual(12);
+      }
     }
   });
   it('the same seed and day give the same line', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DISASTERS } from '../disaster';
 import { FELT_KINDS } from './registry';
-import { at, duration, genericHit, hitFor, HIT_BY_KIND, MAX_SECONDS, reduceMotion } from './hitMoment';
+import { at, duration, genericHit, hitFor, HIT_BY_KIND, MAX_SECONDS, reduceMotion, shortTitle } from './hitMoment';
 
 describe('hit moment', () => {
   const kinds = [...new Set([...FELT_KINDS, ...Object.keys(DISASTERS)])];
@@ -17,6 +17,24 @@ describe('hit moment', () => {
       expect(duration(h), k).toBeLessThanOrEqual(MAX_SECONDS);
       for (const b of h.beats) if (b.caption) expect(b.caption.length, k).toBeLessThan(70);
     }
+  });
+  it('every kind has its own table entry: no generic caption, short sentence-case title, no ellipsis', () => {
+    for (const k of kinds) {
+      expect(HIT_BY_KIND[k as keyof typeof HIT_BY_KIND], k).toBeTruthy();
+      const h = hitFor(k)!;
+      expect(h.title.length, k).toBeLessThanOrEqual(46);
+      expect(h.title, k).not.toMatch(/\.\.\.|…|\.$/);
+      expect(h.title[0], k).toBe(h.title[0].toUpperCase());
+      for (const b of h.beats) expect(b.caption ?? '', k).not.toMatch(/Something is very wrong/);
+    }
+  });
+  it('shortTitle never cuts mid-word or adds an ellipsis', () => {
+    const t = shortTitle('the pumps are empty and the sky has gone dark over the whole county tonight. More text.');
+    expect(t).not.toMatch(/\.\.\./);
+    expect(t.length).toBeLessThanOrEqual(44);
+    expect('the pumps are empty and the sky has gone dark over the whole county tonight').toContain(t.charAt(0).toLowerCase() + t.slice(1));
+    expect(shortTitle('Short one.')).toBe('Short one');
+    expect(genericHit('satellite_loss').title).not.toMatch(/\.\.\./);
   });
   it('titles are unique across the table', () => {
     const t = Object.values(HIT_BY_KIND).map(h => h!.title);

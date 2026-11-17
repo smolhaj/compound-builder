@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useFeltStore } from '../../store/feltStore';
+import { useWorldStore } from '../../store/worldStore';
 import { shakeOffset } from '../../game/felt/cameraKick';
 import { setHitLive } from '../../game/felt/hitLive';
 import { at, duration, hitFor, reduceMotion } from '../../sim/felt/hitMoment';
@@ -33,6 +34,15 @@ export function HitMoment() {
     return () => { cancelAnimationFrame(raf); window.removeEventListener('keydown', skip); };
   }, [hitAt, seq]);
 
+  // the side panels step aside while it plays and come back after (the bars below cover the top and bottom bars)
+  const live = hitAt !== null && !!seq;
+  useEffect(() => {
+    if (!live) return;
+    const w = useWorldStore.getState(), was = w.hudHidden;
+    w.setHudHidden(true);
+    return () => { useWorldStore.getState().setHudHidden(was); };
+  }, [live]);
+
   const f = useMemo(() => (seq ? at(seq, t) : null), [seq, t]);
   // the shake moves the canvas itself (a CSS transform, no extra pass)
   useEffect(() => {
@@ -47,21 +57,21 @@ export function HitMoment() {
   useEffect(() => () => { const cv = document.querySelector('canvas') as HTMLCanvasElement | null; if (cv) cv.style.transform = ''; }, []);
 
   if (!seq || !f || hitAt === null) return null;
-  const bar = Math.min(1, t / 0.6) * 12;   // % of the height, eased in
+  const barH = `max(12%, 100px)`, ease = Math.min(1, t / 0.6);   // the bars ease in and always cover the top and bottom bars
   const tint = f.tint ?? [1, 1, 1];
   const wash = `rgba(${tint.map(c => Math.round(c * 255)).join(',')},${f.flash.toFixed(3)})`;
   return (
     <div role="dialog" aria-label="The hit" data-testid="hit-moment" onClick={() => { useFeltStore.getState().hitDone(hitAt); }}
-      style={{ position: 'fixed', inset: 0, zIndex: 15, cursor: 'pointer', overflow: 'hidden', background: 'rgba(0,0,0,0.12)' }}>
+      style={{ position: 'fixed', inset: 0, zIndex: 15, cursor: 'pointer', overflow: 'hidden', background: 'rgba(0,0,0,0.28)' }}>
       <div style={{ position: 'absolute', inset: 0, background: wash, pointerEvents: 'none' }} />
-      <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: `${bar}%`, background: '#000' }} />
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: `${bar}%`, background: '#000' }} />
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: `${bar + 4}%`, textAlign: 'center', padding: '0 24px', fontFamily: serif, color: '#f1ebdb', textShadow: '0 2px 10px rgba(0,0,0,0.9)', pointerEvents: 'none' }}>
+      <div style={{ position: 'absolute', left: 0, right: 0, top: 0, height: barH, transform: `translateY(${(ease - 1) * 100}%)`, background: '#000' }} />
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: barH, transform: `translateY(${(1 - ease) * 100}%)`, background: '#000' }} />
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 'calc(max(12%, 100px) + 4%)', display: 'flex', justifyContent: 'center', padding: '0 24px', fontFamily: serif, color: '#f1ebdb', textShadow: '0 2px 10px rgba(0,0,0,0.9)', pointerEvents: 'none' }}>
         {f.title
-          ? <div style={{ fontSize: 'clamp(24px, 4vw, 44px)', fontWeight: 700, lineHeight: 1.15 }} data-testid="hit-title">{f.title}</div>
-          : <div style={{ fontSize: 'clamp(16px, 2.2vw, 24px)', fontStyle: 'italic', minHeight: 30 }} data-testid="hit-caption">{f.caption}</div>}
+          ? <div style={{ maxWidth: 'min(760px, 100%)', textAlign: 'center', overflowWrap: 'break-word', fontSize: 'clamp(24px, 3.6vw, 40px)', fontWeight: 700, lineHeight: 1.15 }} data-testid="hit-title">{f.title}</div>
+          : <div style={{ maxWidth: 'min(760px, 100%)', textAlign: 'center', overflowWrap: 'break-word', fontSize: 'clamp(16px, 2.2vw, 24px)', fontStyle: 'italic', minHeight: 30 }} data-testid="hit-caption">{f.caption}</div>}
       </div>
-      <div style={{ position: 'absolute', right: 14, top: 8, fontSize: 11, fontFamily: 'system-ui, sans-serif', color: '#f1ebdb', opacity: 0.6, pointerEvents: 'none' }}>Click or press any key to skip</div>
+      <div style={{ position: 'absolute', right: 14, top: 8, zIndex: 1, fontSize: 11, fontFamily: 'system-ui, sans-serif', color: '#f1ebdb', opacity: 0.6, pointerEvents: 'none' }}>Click or press any key to skip</div>
     </div>
   );
 }

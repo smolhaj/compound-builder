@@ -22,7 +22,10 @@ export interface WhatChanged {
 }
 
 /** The acts the day card can run (DayCard.tsx `runStep`): the one-click kinds that need no spend confirmation. */
-export const DAY_ACTS = ['stake', 'tool', 'select', 'open', 'shop'] as const;
+export const DAY_ACTS = ['stake', 'tool', 'select', 'open', 'shop', 'fx'] as const;
+
+/** A step, plus (for a decision with several answers: seal or stay open) one button per answer. */
+export type DoStep = FirstStep & { choices?: Array<{ label: string; act: SuggestionAct }> };
 export const isDayAct = (a: FirstStep['act']): boolean => !a || 'dash' in a || (DAY_ACTS as readonly string[]).includes((a as SuggestionAct).type);
 
 const hope = (back: number | undefined): string => (back === undefined ? 'no word on when' : `earliest hope about ${spanText(back)} out`);
@@ -48,18 +51,20 @@ export function whatChanged(s: GameState): WhatChanged {
 }
 
 /** At most three things to do first: the kind's own steps, then what the place needs most (guidance.suggestions), then the pantry and the radio. */
-export function doFirst(s: GameState): FirstStep[] {
+export function doFirst(s: GameState): DoStep[] {
   const own = feltSpec(s.disaster.kind)?.card?.first(s) ?? [];
-  const out: FirstStep[] = own.filter(x => isDayAct(x.act));
+  const out: DoStep[] = own.filter(x => isDayAct(x.act));
   const food = daysOfFood(s);
   if (Number.isFinite(food) && food < 14) out.push({ label: 'Check the pantry', why: `${spanText(Math.max(1, Math.floor(food)))} of food is not a long time.`, act: { type: 'open', right: 'supplies', supplies: 'stores' } });
   for (const sg of suggestions(s, 3)) {
     const act = sg.acts?.map(a => a.act).find(a => isDayAct(a)) ?? (sg.kind ? { type: 'stake' as const, kind: sg.kind } : undefined);
-    out.push({ label: sg.title ?? (sg.kind ? `Stake the ${sg.kind.replace(/_/g, ' ')}` : 'Look at the place'), why: sg.why, ...(act ? { act } : {}) });
+    const choices = (sg.acts ?? []).filter(a => a.act.type === 'fx');
+    out.push({ label: sg.title ?? (sg.kind ? `Stake the ${sg.kind.replace(/_/g, ' ')}` : 'Look at the place'), why: sg.why, ...(act ? { act } : {}), ...(choices.length > 1 ? { choices } : {}) });
   }
   if (radioSet(s) === 'none') out.push({ label: 'Get a radio', why: 'The news is the only warning you will get.', act: { type: 'shop', tab: 'tools' } as SuggestionAct });
   const seen = new Set<string>();
-  return out.filter(x => (seen.has(x.label) ? false : (seen.add(x.label), true))).slice(0, 3);
+  // every step has a button: one with no handler of its own opens the place's own panel
+  return out.filter(x => (seen.has(x.label) ? false : (seen.add(x.label), true))).slice(0, 3).map(x => (x.act ? x : { ...x, act: { type: 'open', right: 'defense' } as SuggestionAct }));
 }
 
-export const hitCard = (s: GameState): { changed: WhatChanged; first: FirstStep[] } => ({ changed: whatChanged(s), first: doFirst(s) });
+export const hitCard = (s: GameState): { changed: WhatChanged; first: DoStep[] } => ({ changed: whatChanged(s), first: doFirst(s) });

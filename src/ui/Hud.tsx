@@ -227,6 +227,7 @@ export function Hud() {
   const barRef = useRef<HTMLDivElement>(null), brRef = useRef<HTMLDivElement>(null), blRef = useRef<HTMLDivElement>(null);
   const [side, setSide] = useState<'left' | 'right'>('left');
   const [boardOpen, setBoardOpen] = useState(false);
+  useEffect(() => { useWorldStore.getState().setBoardOpen(boardOpen); return () => { useWorldStore.getState().setBoardOpen(false); }; }, [boardOpen]);
   const bar = useBox(barRef), br = useBox(brRef), blBox = useBox(blRef, w.viewOpen);
   const bl = w.viewOpen ? blBox : { w: 0, h: 0 };
   const lay = hudLayout(bar.vw, bar.w, bar.h, br, bl);

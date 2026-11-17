@@ -8,6 +8,7 @@ import { prices } from '../economy';
 import { canOrder } from '../disaster';
 import { awayCount, recoveredTrack, worstTrack, type Claim } from './claims';
 import { AFTER_WEEK, THEME, dayN, days, genLine, trackWord, type GenLine } from './lineKit';
+import { kindLines } from './radioKinds';
 import { rumorLines } from './rumors';
 import type { FeltKind, RadioLine } from './types';
 
@@ -46,6 +47,6 @@ export function radioFor(kind: FeltKind): RadioLine[] {
     genLine(kind, { id: 'trade_banks', channel: 'trade', truth: 'false', tone: 0, when: s => s.disaster.tracks.banks < 0.25, claim: () => ({ id: 'svc_up', a: 'banks' }),
       text: () => `A trader swears the banks reopen Monday, ${T.noun} or not. Cards honored, he says. Cash first, just in case.` }),
   ];
-  return [...lines, ...rumorLines(kind)];
+  return [...lines, ...kindLines(kind), ...rumorLines(kind)];
 }
 
