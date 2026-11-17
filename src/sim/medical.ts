@@ -139,7 +139,7 @@ export function takeCourse(s: GameState): boolean {
 }
 const takeDressings = (s: GameState): boolean => { if (s.stock.meds >= 0.1 - 1e-9) { s.stock.meds -= 0.1; return true; } return false; };
 const hygieneOk = (s: GameState) => s.disaster.tracks.stores >= 0.5 || s.stock.hygiene >= 0.5;
-const bayOn = medicalBay;
+const bayOn = (s: GameState): boolean => medicalBay(s); // a wrapper, not an alias: richSinks imports back into the sim, so the alias was undefined when this module loaded first
 
 /** Is a course worth spending here under the policy: everything on `all`, only the serious ones (sepsis, the old and the little, deep infections) on `serious`. */
 function worthCourse(s: GameState, p: Person, sev: number): boolean {
