@@ -1,11 +1,11 @@
 /**
- * Writes the three layout mockups (layoutA.html, layoutB.html, layoutC.html) as self-contained 1512x860 pages, and the "today" reference (layoutToday.html).
+ * Writes the three layout mockups (layoutOptA/B/C.html) as self-contained 1512x860 pages, and the "today" reference (layoutToday.html).
  * Render them with docs/ux/renderMockups.mjs. Static HTML and CSS only: no game code, no external assets.
  */
 import { writeFileSync } from 'node:fs';
 const here = new URL('.', import.meta.url).pathname;
 
-const I = {   // 16x16 glyphs, stroke-only, drawn here (no assets)
+export const I = {   // 16x16 glyphs, stroke-only, drawn here (no assets)
   coin: '<circle cx="8" cy="8" r="6"/><path d="M8 4v8M5.5 6.5h4a1.5 1.5 0 010 3h-3"/>',
   food: '<path d="M8 14V6M8 6c-2-1-3-3-3-4 2 0 3 2 3 4zM8 6c2-1 3-3 3-4-2 0-3 2-3 4zM8 10c-2-1-3-3-3-4M8 10c2-1 3-3 3-4"/>',
   water: '<path d="M8 2s4 4.5 4 7.5a4 4 0 01-8 0C4 6.5 8 2 8 2z"/>',
@@ -32,9 +32,9 @@ const I = {   // 16x16 glyphs, stroke-only, drawn here (no assets)
   dot: '<circle cx="8" cy="8" r="3"/>',
   road: '<path d="M5 14L7 2M11 14L9 2M8 4v1.5M8 8v1.5M8 12v1"/>',
 };
-const ic = (n, s = 16) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${I[n]}</svg>`;
+export const ic = (n, s = 16) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">${I[n]}</svg>`;
 
-const CSS = `
+export const CSS = `
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{width:1512px;height:860px;overflow:hidden;font:13px/1.35 system-ui,-apple-system,"Segoe UI",sans-serif;color:#eee}
 :root{--panel:rgba(20,22,18,.82);--edge:rgba(255,255,255,.10);--dim:rgba(238,238,238,.64);--accent:#d8c9a0;--good:#a8d080;--warn:#f0c070;--bad:#f08060}
@@ -61,7 +61,7 @@ html,body{width:1512px;height:860px;overflow:hidden;font:13px/1.35 system-ui,-ap
 kbd{font:11px ui-monospace,monospace;background:#3a3d34;border:1px solid var(--edge);border-radius:4px;padding:0 5px;color:var(--dim)}
 `;
 
-const SCENE = `<div class="scene"><svg viewBox="0 0 1512 860" preserveAspectRatio="none">
+export const SCENE = `<div class="scene"><svg viewBox="0 0 1512 860" preserveAspectRatio="none">
 <path d="M0 330 C200 280 380 320 560 300 S980 250 1200 300 S1440 290 1512 270 V420 H0z" fill="#7f8f62"/>
 <path d="M0 360 C260 330 520 380 800 350 S1300 330 1512 350 V860 H0z" fill="#6c7b4b"/>
 <path d="M0 640 C300 600 700 660 1000 620 S1400 600 1512 640 V860 H0z" fill="#627040"/>
@@ -79,7 +79,7 @@ const SCENE = `<div class="scene"><svg viewBox="0 0 1512 860" preserveAspectRati
 const page = (title, body) => `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title><style>${CSS}</style></head><body>${SCENE}${body}</body></html>`;
 
 // ---------- shared pieces ----------
-const speed = `<span class="row" style="gap:3px"><span class="btn" style="padding:0 8px">❚❚</span><span class="btn on" style="padding:0 8px">▶</span><span class="btn" style="padding:0 8px">▶▶</span><span class="btn" style="padding:0 8px">▶▶▶</span></span>`;
+export const speed = `<span class="row" style="gap:3px"><span class="btn" style="padding:0 8px">❚❚</span><span class="btn on" style="padding:0 8px">▶</span><span class="btn" style="padding:0 8px">▶▶</span><span class="btn" style="padding:0 8px">▶▶▶</span></span>`;
 const goalChip = (x, y) => `<div class="p" style="left:${x}px;top:${y}px;width:300px;padding:8px 10px"><div class="row"><span class="h" style="white-space:nowrap">Goal 2 of 6</span><span class="sp"></span><span class="dim" style="font-size:13px;letter-spacing:2px"><b class="good">●●</b><b style="color:var(--accent)">◐</b>○○○</span></div>
 <div style="margin:3px 0 6px;font-weight:600">Drill or dig a well</div><div class="row"><span class="btn pri">Order what the plans need</span><span class="dim" style="font-size:11.5px">about 4 days</span></div></div>`;
 const familyRows = `
@@ -156,5 +156,7 @@ ${goalChip(10, 56)}
 <div class="p" style="left:10px;bottom:34px;width:262px;padding:6px 10px;font-size:12px;white-space:nowrap;overflow:hidden"><span class="h">Feed</span> <span class="warn" style="font-weight:600">Grid operator warns of rolling outages</span></div>
 ${FOOT('C: icon dock with number chips, hover cards, Ctrl K palette')}`);
 
-writeFileSync(here + 'layoutToday.html', today); writeFileSync(here + 'layoutA.html', A); writeFileSync(here + 'layoutB.html', B); writeFileSync(here + 'layoutC.html', C);
+if (process.argv[1]?.endsWith('buildMockups.mjs')) {
+writeFileSync(here + 'layoutToday.html', today); writeFileSync(here + 'layoutOptA.html', A); writeFileSync(here + 'layoutOptB.html', B); writeFileSync(here + 'layoutOptC.html', C);
 console.log('wrote 4 mockups');
+}

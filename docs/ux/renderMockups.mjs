@@ -6,5 +6,5 @@ let chromium; try { ({ chromium } = require('playwright')); } catch { ({ chromiu
 const dir = new URL('.', import.meta.url).pathname;
 const b = await chromium.launch();
 const p = await b.newPage({ viewport: { width: 1512, height: 860 } });
-for (const n of ['Today', 'A', 'B', 'C']) { await p.goto('file://' + resolve(dir, `layout${n}.html`)); await p.screenshot({ path: resolve(dir, `layout${n}.png`) }); console.log('layout' + n + '.png'); }
+for (const n of ['Today', 'OptA', 'OptB', 'OptC']) { await p.goto('file://' + resolve(dir, `layout${n}.html`)); await p.screenshot({ path: resolve(dir, `layout${n}.png`) }); console.log('layout' + n + '.png'); }
 await b.close();
