@@ -7,8 +7,9 @@ import { ensureFelt, feltCardPending, feltOf } from './state';
 import type { DecisionCard, FeltKind, FeltPhase } from './types';
 import { answerCard, cardsFor, eligibleCards, feltCards, optionProblem, timeoutDays, PHASE_BUDGET } from './cards';
 import { feltDaily } from './daily';
-import { THEME } from './cardLibrary';
+import { THEME, genericCards, isSharedCardId } from './cardLibrary';
 import { decisionOpen } from '../clockResume';
+import { stealthOf } from '../stealthState';
 
 const ctx = (s: GameState) => ({ day: 0, r: mulberry32(1), once: () => true, ...{ s } });
 /** A run `days` after the hit of `kind` (planned kinds are set by hand), with some neighbors home, a hurt person and money. */
@@ -64,6 +65,61 @@ describe('generic cards', () => {
       if (pay) { expect(optionProblem(rich, pay)).toBeNull(); expect(optionProblem(poor, pay)).toMatch(/costs/i); }
       expect(c.options.some(o => !optionProblem(poor, o) && !(o.cost(poor).money))).toBe(true);
     }
+  });
+});
+
+describe('kind-specific cards', () => {
+  const own = (k: FeltKind) => cardsFor(k, feltSpec(k)).filter(c => !isSharedCardId(c.id));
+  const titleOf = (k: FeltKind, c: DecisionCard) => c.title(at(k, 6));
+  it('every kind carries its own cards in the hit, month and season phases', () => {
+    for (const k of FELT_KINDS) for (const ph of ['hit', 'month', 'season'] as FeltPhase[]) {
+      const cs = own(k).filter(c => c.phase === ph);
+      // grid_down, nuclear and unknown keep the themed hit card the generic library gives them (nuclear and unknown are the good ones)
+      if (ph === 'hit' && ['nuclear', 'unknown', 'pandemic', 'cyberattack', 'financial'].includes(k)) continue;
+      expect(cs.length, `${k} ${ph}`).toBeGreaterThanOrEqual(1);
+    }
+  });
+  it('no card title is shared by more than two kinds, and every kind has at least two distinct cards in the first three phases', () => {
+    const byTitle = new Map<string, Set<string>>();
+    for (const k of FELT_KINDS) for (const c of cardsFor(k, feltSpec(k)).filter(x => !isSharedCardId(x.id))) {
+      const t = titleOf(k, c).toLowerCase();
+      (byTitle.get(t) ?? byTitle.set(t, new Set()).get(t)!).add(k);
+    }
+    for (const [t, ks] of byTitle) expect(ks.size, `${t}: ${[...ks].join(', ')}`).toBeLessThanOrEqual(2);
+    for (const k of FELT_KINDS) for (const [ph, d] of PHASE_DAY.slice(0, 3)) {
+      const ids = new Set(cardsFor(k, feltSpec(k)).filter(c => c.phase === ph && c.when(at(k, d))).map(c => c.id));
+      expect(ids.size, `${k} ${ph}`).toBeGreaterThanOrEqual(2);
+    }
+  });
+  it('a card names a cost for every paid option, a reason for every unaffordable one, and hostile or merciful crews are not mixed up', () => {
+    for (const k of FELT_KINDS) for (const c of own(k)) {
+      const poor = at(k, 20, 0);
+      for (const o of c.options) {
+        if ((o.cost(at(k, 20, 9e6)).money ?? 0) > 0) expect(optionProblem(poor, o), `${c.id} ${o.id}`).toBeTruthy();
+        expect(o.hint(poor).length, `${c.id} ${o.id}`).toBeGreaterThan(8);
+        expect(`${o.label} ${o.hint(poor)} ${c.text(poor)}`).not.toMatch(/undefined|NaN|\bliters?\b|\bkm\b/);
+      }
+    }
+  });
+  it('the zombie cards route through the walkers module', () => {
+    const g = at('zombies', 0, 5000);
+    feltCards(g, ctx(g), feltSpec('zombies')!);
+    expect(feltOf(g)!.cards.pending!.id).toBe('zombies:lights_out');
+    answerCard(g, 'zombies:lights_out', 'dark');
+    expect(stealthOf(g).full).toBeTruthy();
+  });
+});
+
+describe('fallbacks', () => {
+  it('every card\'s fallback can be taken by a broke household with nothing on the shelf', () => {
+    const bad: string[] = [];
+    for (const k of FELT_KINDS) for (const c of cardsFor(k, feltSpec(k)).filter(x => !isSharedCardId(x.id) && x.id.startsWith(`${k}:`) && x.id !== genericCards(k)[0].id)) {
+      const g = at(k, 20, 0); g.stock = {} as typeof g.stock;
+      const fb = c.options.find(o => o.id === c.fallback)!;
+      if (fb.off?.(g) && /neighbor|home to ask/i.test(fb.off(g)!)) continue;
+      if (optionProblem(g, fb)) bad.push(`${c.id}:${fb.id}`);
+    }
+    expect(bad).toEqual([]);
   });
 });
 
@@ -153,7 +209,14 @@ describe('answering changes real state', () => {
     feltCards(g, ctx(g), feltSpec('grid_down')!);   // first night
     answerCard(g, feltOf(g)!.cards.pending!.id, 'hold');
     g.clock.t += 2;
-    feltCards(g, ctx(g), feltSpec('grid_down')!);   // the neighbor at the fence
+    // cards of the kind's own may come first; answer them safely until the neighbor at the fence comes up
+    for (let i = 0; i < 4; i++) {
+      feltCards(g, ctx(g), feltSpec('grid_down')!);
+      const q = feltOf(g)!.cards.pending!;
+      if (/neighbor/.test(q.id)) break;
+      answerCard(g, q.id, cardsFor('grid_down', feltSpec('grid_down')).find(c => c.id === q.id)!.fallback);
+      g.clock.t += 2;
+    }
     const p = feltOf(g)!.cards.pending!;
     expect(p.id).toMatch(/neighbor/);
     answerCard(g, p.id, 'refuse');

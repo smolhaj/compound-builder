@@ -23,7 +23,9 @@ export type Fx =
   /** Days added to (or, negative, taken off) the wait for the next visitor at the gate. */
   | { k: 'raidDelay'; days: number }
   | { k: 'respect'; n: number }
-  | { k: 'blackout' };
+  | { k: 'blackout' }
+  /** A kind's own hook (a teeth module's choice handler); returns a log line or null. */
+  | { k: 'run'; f: (s: GameState, r: () => number) => string | null };
 
 const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
 const living = (s: GameState) => s.personState.map((ps, i) => ({ ps, p: s.people[i] })).filter(x => x.p && x.ps.needs.died == null);
@@ -78,6 +80,7 @@ export function applyFx(s: GameState, fx: Fx, r: () => number): string | null {
       return fx.days > 0 ? 'the road stays quieter' : 'trouble is likelier on the road';
     }
     case 'respect': s.gate.respect = clamp((s.gate.respect ?? 0) + fx.n, 0, 1); return null;
+    case 'run': return fx.f(s, r);
     case 'blackout': (s.opsec ??= { quietDeliveries: false, blackout: false }).blackout = true; return 'the house goes dark at night';
   }
 }
