@@ -4,6 +4,8 @@ import { flowLine } from '../sim/flow';
 import { PlansOrderButton } from './hud/SpendConfirm';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { EDGE, hudLayout, useBox } from './hudLayout';
+import { clock, dateLabel } from './hud/dateText';
+import { TopBar } from './hud/TopBar';
 import { unscripted } from '../sim/godMode';
 import { TERRAIN_LEGEND, type TerrainMode } from '../game/terrain/TerrainOverlay';
 import { stormOutage } from '../sim/weatherThreats';
@@ -137,8 +139,6 @@ const CAMERAS: Array<[CameraMode, string]> = [['diorama', 'Diorama'], ['walk', '
 const CAMERA_TIP: Record<CameraMode, string> = { diorama: 'Orbit view from above: drag to turn, wheel to zoom, right-drag to pan', walk: 'Walk the place at eye level (WASD)', fly: 'Fly over it (WASD, Space / C for up and down)', cinematic: 'A slow tour of the buildings' };
 const VIEWS: Array<[BuildingView, string, string]> = [['full', 'Walls', 'Show buildings whole, roofs on (V cycles the three views)'], ['cutaway', 'Cutaway', 'Cut the walls at waist height and lift the roofs to see the rooms inside (V)'], ['xray', 'X-ray', 'See-through walls and roof: rooms, pipes and wiring (V)']];
 const SPEEDS: Array<[Speed, string]> = [[0, '❚❚'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⏩']];
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-const MONTH_START = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
 const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died', shelter: 'Sheltering', away: 'Away from the place', town: 'At the town house', ...DAILY_TASK_TEXT };
 
 /** What each sightline map means, shown while it is on (the road / ridge / night maps are faint washes, not outlines). */
@@ -176,12 +176,6 @@ function WeakHint() {
   </div>;
 }
 
-function dateLabel(doy: number): string {
-  let m = 11;
-  while (m > 0 && doy <= MONTH_START[m]) m--;
-  return `${MONTHS[m]} ${doy - MONTH_START[m]}`;
-}
-const clock = (h: number) => `${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')}`;
 /** Free build: start any disaster when you are ready. */
 function FreeBuild() {
   const g = useGameStore();
@@ -280,6 +274,12 @@ export function Hud() {
       <TerrainLegendChip />
       <LineToolBar />
       <WelcomeCard />
+      {/* Layout A: the new top bar (docs/UX_AUDIT.md 11.1); Classic keeps the bar below */}
+      {w.layout === 'a' && <>
+        <TopBar barRef={barRef} onBoard={() => setBoardOpen(true)} onSide={setSide} />
+        {game.clock.speed > 0 && planningHold(g.tool, g.planOpen) && <div data-testid="planning-hint" style={{ position: 'fixed', top: 10 + 44 * w.uiScale + 6, left: '50%', transform: 'translateX(-50%)', zIndex: 3, color: '#f2efe4', background: 'rgba(20,22,18,0.9)', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 8, padding: '3px 10px', fontSize: 12.5, whiteSpace: 'nowrap', pointerEvents: 'none' }}>▲ Paused while planning</div>}
+      </>}
+      {w.layout !== 'a' && <>
       {/* Top bar: date, time, money, speed */}
       <div ref={barRef} style={{ ...panel, position: 'fixed', top: 10, left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '4px 12px', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', fontSize: 13.5, width: 'max-content', maxWidth: 'calc(100vw - 20px)', boxSizing: 'border-box', zIndex: 3 }}>
         <span>{dateLabel(cal.doy)}, {cal.year}</span>
@@ -297,6 +297,7 @@ export function Hud() {
         </span>
         {game.clock.speed > 0 && planningHold(g.tool, g.planOpen) && <span data-testid="planning-hint" style={{ position: 'absolute', top: 'calc(100% + 4px)', left: '50%', transform: 'translateX(-50%)', color: '#e8e0c8', background: 'rgba(20,22,18,0.8)', borderRadius: 4, padding: '1px 8px', fontSize: 12, whiteSpace: 'nowrap', pointerEvents: 'none' }} title="The clock holds while you place or draw something, or look over the starter plan. It picks up at the same speed when you put the tool away.">Paused while planning</span>}
       </div>
+      </>}
 
       {/* Left: build menu (groups) · projects under way · the log */}
       {lay.narrow && !w.hudHidden && <div style={{ position: 'fixed', left: EDGE, top: lay.switchTop, display: 'flex', gap: 4, zIndex: 2 }}>
@@ -701,7 +702,7 @@ export function Hud() {
         {CAMERAS.map(([m, label]) => <button key={m} title={CAMERA_TIP[m]} style={btn(w.cameraMode === m)} onClick={() => w.setCameraMode(m)}>{label}</button>)}
       </div>
       {w.cameraMode !== 'diorama' && (
-        <div style={{ ...panel, position: 'fixed', top: 54, left: '50%', transform: 'translateX(-50%)', fontSize: 12 }}>
+        <div style={{ ...panel, position: 'fixed', top: w.layout === 'a' ? 10 + 44 * w.uiScale + 8 : 54, left: '50%', transform: 'translateX(-50%)', fontSize: 12 }}>
           {w.cameraMode === 'walk' ? 'WASD to walk · drag or click to look · Shift to run · Esc to leave'
             : w.cameraMode === 'fly' ? 'WASD + Space / C to fly · wheel sets speed · Esc to leave'
             : 'Cinematic tour · Esc to leave'}
@@ -717,6 +718,9 @@ export function Hud() {
 
       {/* Bottom left: view (season / weather / quality / photo mode); opened from the View button below */}
       {w.viewOpen && <div ref={blRef} style={{ ...panel, position: 'fixed', left: EDGE, bottom: lay.viewBottom, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', maxWidth: 'min(560px, calc(100vw - 20px))', boxSizing: 'border-box' }}>
+        <select data-testid="view-layout" value={w.layout} onChange={e => w.setLayout(e.target.value as 'a' | 'classic')} title="HUD layout: Classic (today's panels) or the new layout A (Alt+L switches)" aria-label="HUD layout">
+          <option value="classic">Layout: Classic</option><option value="a">Layout: New (A)</option>
+        </select>
         <select value={w.seasonMode} onChange={e => w.setSeasonMode(e.target.value as SeasonMode)} title="Season look">
           {SEASON_MODES.map(x => <option key={x}>{x}</option>)}
         </select>

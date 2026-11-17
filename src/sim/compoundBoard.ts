@@ -34,6 +34,8 @@ export interface BoardLine {
   label: string;
   value: string;
   tone: BoardTone;
+  /** The number behind the value (food days, defense score, average morale) for the top-bar chips; absent for power and water. */
+  n?: number;
   /** Where the row itself jumps to. */
   open: BoardAct;
   /** The one-click fix when the checklist has one (never a requirement). */
@@ -99,17 +101,17 @@ export function compoundBoard(s: GameState, drive?: readonly Pt[]): CompoundBoar
     const growing = o?.done && o.line === 'Growing';
     const value = `${growing ? 'growing, ' : ''}${days(n)} of food on hand`;
     const tone: BoardTone = hungry || n < BOARD.foodBad ? (growing && !hungry ? 'warn' : 'bad') : n < BOARD.foodWarn && !growing ? 'warn' : 'good';
-    vitals.push({ id: 'food', label: 'Food', value, tone, open: open('supplies', 'stores'), fix: fixOf(o) }); }
+    vitals.push({ id: 'food', label: 'Food', value, tone, n, open: open('supplies', 'stores'), fix: fixOf(o) }); }
 
   // defense (the score, and the weakest failing checks come under "Gaps")
-  vitals.push({ id: 'defense', label: 'Defense', value: `${dr.label}, ${dr.score} of 100`, tone: dr.tone, open: open('defense'), fix: undefined });
+  vitals.push({ id: 'defense', label: 'Defense', value: `${dr.label}, ${dr.score} of 100`, tone: dr.tone, n: dr.score, open: open('defense'), fix: undefined });
 
   // morale: the average of those at home, and how many are struggling
   { const avg = alive.length ? alive.reduce((a, x) => a + x.morale, 0) / alive.length : 0;
     const m = moodSummary(s);
     const tone: BoardTone = avg < BOARD.moraleBad || m.breaking > 0 ? 'bad' : avg < BOARD.moraleWarn || m.struggling.length > 0 ? 'warn' : 'good';
     const value = `${Math.round(avg)} of 100${m.struggling.length ? `, ${m.struggling.length} struggling` : ''}`;
-    vitals.push({ id: 'morale', label: 'Morale', value, tone, open: open('family'), fix: undefined }); }
+    vitals.push({ id: 'morale', label: 'Morale', value, tone, n: Math.round(avg), open: open('family'), fix: undefined }); }
 
   // defense gaps: failing checks, red before amber
   const gaps: BoardItem[] = [...dr.walls, ...dr.watch, ...dr.fight, ...dr.shelter]

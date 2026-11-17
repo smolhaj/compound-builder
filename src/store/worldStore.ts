@@ -11,8 +11,11 @@ import type { StarterPlan } from '../sim/starterCompound';
 import type { BpReadout } from '../game/blueprint/blueprintPlan';
 import type { PathSummary } from '../game/paths/pathNet';
 import { autoStartTier } from '../engine/perf/device';
+import { clampScale } from '../ui/hud/tokens';
 
 export type FrameCap = 0 | 30 | 60;
+/** The HUD layout: Classic (today's panels, the default) or layout A (docs/UX_AUDIT.md section 11). `?layout=a|classic` overrides for QA; Settings and Alt+L change it (remembered as cb.layout). */
+export type Layout = 'classic' | 'a';
 /** Once-a-second readout of the running game (Settings -> Graphics). */
 export interface PerfStats { fps: number; ms: number; calls: number; tris: number; tier: Quality; budgetMs: number }
 
@@ -42,6 +45,11 @@ export interface WorldState {
   seasonMode: SeasonMode;
   weatherMode: WeatherMode;
   quality: Quality;
+  layout: Layout;
+  setLayout: (l: Layout) => void;
+  /** UI scale for layout A, 0.9 to 1.25 (Settings; remembered as cb.uiscale). */
+  uiScale: number;
+  setUiScale: (x: number) => void;
   /** The tilt-shift diorama look (engine/world/post/tiltShift.ts): off by default, High quality only. */
   tiltShift: boolean;
   setTiltShift: (on: boolean) => void;
@@ -152,6 +160,14 @@ function savedQuality(): Quality {
   try { const q = localStorage.getItem('cb.quality'); if (q === 'high' || q === 'medium' || q === 'low') return q; } catch { /* no storage */ }
   try { return autoStartTier(); } catch { return 'medium'; }
 }
+function savedLayout(): Layout {
+  try { const q = new URLSearchParams(location.search).get('layout'); if (q === 'a' || q === 'classic') return q; } catch { /* no location */ }
+  try { return localStorage.getItem('cb.layout') === 'a' ? 'a' : 'classic'; } catch { return 'classic'; }
+}
+function savedUiScale(): number {
+  try { const v = Number(localStorage.getItem('cb.uiscale')); if (v) return clampScale(v); } catch { /* no storage */ }
+  return 1;
+}
 function savedFrameCap(): FrameCap {
   try { const v = Number(localStorage.getItem('cb.fpscap')); if (v === 0 || v === 30 || v === 60) return v; } catch { /* no storage */ }
   return 60;
@@ -168,6 +184,10 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   seasonMode: 'auto',
   weatherMode: 'auto',
   quality: savedQuality(),
+  layout: savedLayout(),
+  setLayout: (layout) => { try { localStorage.setItem('cb.layout', layout); } catch { /* private mode */ } set({ layout }); },
+  uiScale: savedUiScale(),
+  setUiScale: (x) => { const uiScale = clampScale(x); try { localStorage.setItem('cb.uiscale', String(uiScale)); } catch { /* private mode */ } set({ uiScale }); },
   tiltShift: false,
   boot: { label: 'Starting', pct: 0.02 },
   frameCap: savedFrameCap(),

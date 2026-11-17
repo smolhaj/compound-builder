@@ -23,6 +23,7 @@ import { startFeedback } from './ui/feel/feedbackWatcher';
 import { useFeelStore } from './store/feelStore';
 import { useGameStore } from './store/gameStore';
 import { useWorldStore } from './store/worldStore';
+import { useLayoutRoot } from './ui/useLayout';
 import { loadGame, AUTOSAVE } from './sim/save/saveSystem';
 import { newGame } from './sim/state';
 import { makeLotSite } from './sim/lotListing';
@@ -36,6 +37,7 @@ import type { RegionId } from './sim/regions';
  */
 export default function App() {
   const [ready, setReady] = useState(false);
+  useLayoutRoot();
   useEffect(() => {
     let stop: (() => void) | undefined;
     const q = new URLSearchParams(location.search);
