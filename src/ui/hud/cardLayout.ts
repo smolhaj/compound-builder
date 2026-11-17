@@ -40,6 +40,6 @@ export function placeCard(anchor: Element, box: HTMLElement): void {
 /** The nearest titled element under a target that is not part of a hover card, or null. */
 export const titled = (t: EventTarget | null): HTMLElement | null => {
   const el = (t as Element | null)?.closest?.('[title]') as HTMLElement | null;
-  if (!el || el.closest('[data-hover-card]') || el.tagName === 'CANVAS' || el.closest('canvas')) return null;
+  if (!el || el.closest('[data-hover-card],[data-testid="build-card"]') || el.tagName === 'CANVAS' || el.closest('canvas')) return null;
   return (el.getAttribute('title') ?? '').trim() ? el : null;
 };

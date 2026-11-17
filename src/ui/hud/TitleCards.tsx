@@ -48,7 +48,7 @@ export function TitleCards() {
     };
     const move = (e: PointerEvent) => { const T = touch.current; if (T.t && Math.hypot(e.clientX - T.x, e.clientY - T.y) > PRESS_SLOP) { clearTimeout(T.t); T.t = undefined; } };
     const up = () => { clearTimeout(touch.current.t); touch.current.t = undefined; };
-    const click = (e: MouseEvent) => { if (touch.current.swallow) { touch.current.swallow = false; e.stopPropagation(); e.preventDefault(); } };
+    const click = (e: MouseEvent) => { if (cur.current && !touch.current.swallow) close(); if (touch.current.swallow) { touch.current.swallow = false; e.stopPropagation(); e.preventDefault(); } };
     const ctx = (e: Event) => { if (touch.current.t || touch.current.touched) e.preventDefault(); };
     const key = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
     const scroll = () => { if (cur.current) close(); };

@@ -22,10 +22,19 @@ export function snapFont(px: number): number {
 
 const D = '.cb-a [data-drawer]';
 
+/** Fixed label widths (px) in the Classic bodies, sized for 12 px text; at the scale's 12.5 they crush a long label onto two lines. */
+export const LABEL_WIDTHS: readonly number[] = [34, 36, 54, 74, 82, 86, 92, 96, 110];
+
 export function layoutACss(): string {
+  const labels = LABEL_WIDTHS.map(w => `${D} [style*="width: ${w}px"]:not(button):not(svg):not(input){width:auto!important;min-width:${w}px;flex:none}`).join('\n');
   const snap = FONT_SNAP.map(([px, step]) => `${D} [style*="font-size: ${px}px"]{font-size:var(--cb-font-${step})!important}`).join('\n');
   return `
 ${snap}
+/* label columns: at least their old width, as wide as the text needs */
+${labels}
+/* a row with a label and a long value: the value takes the rest of the line and wraps right-aligned instead of crushing the label */
+${D} [style*="justify-content: space-between"]>:last-child:not(:first-child){min-width:0;text-align:right;overflow-wrap:anywhere}
+${D} [style*="justify-content: space-between"]{column-gap:8px}
 /* section headings and dim text: the old 0.6 / 0.65 alpha greys were under 4.5:1 over snow; the token is 0.72 */
 ${D} [style*="text-transform: uppercase"]{opacity:.9!important}
 ${D} [style*="color: rgba(238, 238, 238, 0.6)"]{color:var(--cb-color-dim)!important}

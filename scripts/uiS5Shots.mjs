@@ -141,8 +141,35 @@ try {
       }
       await page.evaluate(() => window.__cb.store.getState().setUiScale(1));
     }
+    if (set === 'final') {
+      await disaster(); key = 'final'; await setVp(VPS[0]); await cabin();
+      await drawerState('supplies'); await page.getByTestId('page-chip-kitchen').click(); await page.mouse.move(700, 400); await page.waitForTimeout(300); await shot('supplies-kitchen');
+      await drawerState('defense'); await page.getByTestId('page-chip-walls').click(); await page.mouse.move(700, 400); await page.waitForTimeout(300); await shot('defense-walls');
+      await drawerState('build'); await page.locator('[data-testid="build-card"]').nth(1).hover(); await page.waitForTimeout(600); await shot('build-hover-one-card');
+      await drawerState('none'); await page.mouse.move(700, 400);
+      await page.waitForTimeout(700);       await page.evaluate(() => window.__cb.game.setState({ toast: { id: Date.now(), text: 'Refused click: not enough cash' } })); await page.waitForTimeout(500); await shot('toast');
+      await page.evaluate(() => window.__cb.store.getState().setUiScale(1.25)); await page.waitForTimeout(500); await shot('u125-toast');
+    }
     if (set === 'touch') {
-      await browser.close().catch(() => {});
+      await newRun(); key = 'touch'; await setVp(VPS[0]); await cabin(); await page.evaluate(() => window.__cb.game.getState().setWelcome(false));
+      const cdp = await page.context().newCDPSession(page);
+      await cdp.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 });
+      const press = async (loc, ms) => { const b = await loc.boundingBox(); const x = b.x + b.width / 2, y = b.y + b.height / 2;
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] }); await page.waitForTimeout(ms);
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await page.waitForTimeout(300); };
+      await drawerState('build'); await page.waitForTimeout(300);
+      const card = page.locator('[data-testid="build-card"]').nth(1);
+      await press(card, 700); await shot('long-press-bill');
+      console.log('bill up after long press:', await page.evaluate(() => !!document.querySelector('[data-testid="build-bill"]')), 'tool armed:', await page.evaluate(() => window.__cb.game.getState().tool));
+      await page.mouse.click(600, 500);
+      console.log('bill closed by tap elsewhere:', await page.evaluate(() => !document.querySelector('[data-testid="build-bill"]')));
+      await drawerState('none'); await drawerState('supplies'); await page.waitForTimeout(300);
+      await press(page.locator('[data-drawer=right] [title]').first(), 700); await shot('long-press-title-card');
+      console.log('title card up:', await page.evaluate(() => !!document.querySelector('[data-tip=title]')));
+      await press(page.getByTestId('page-chip-keeping'), 700); await shot('long-press-chip-card');
+      console.log('chip stayed on stores (click swallowed):', await page.evaluate(() => document.querySelector('[data-testid=page-chip-stores]').getAttribute('aria-pressed')));
+      await press(page.getByTestId('page-chip-keeping'), 80);
+      console.log('quick tap switches page:', await page.evaluate(() => document.querySelector('[data-testid=page-chip-keeping]').getAttribute('aria-pressed')));
     }
   }
 } finally { await browser.close().catch(() => {}); vite.kill(); }

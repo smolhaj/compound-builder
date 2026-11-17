@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import { PAGES, hasPages, pagesOf, pickPage, visiblePages } from './subPages';
 import { DRAWER_IDS } from './drawerRegistry';
-import { FONT_SNAP, layoutACss, snapFont } from './layoutACss';
+import { FONT_SNAP, LABEL_WIDTHS, layoutACss, snapFont } from './layoutACss';
 import { tipPlace } from './cardLayout';
 import { useDrawerStore } from '../../store/drawerStore';
 import { T } from './tokens';
@@ -51,6 +51,7 @@ describe('layout A stylesheet', () => {
     for (const [px] of FONT_SNAP) expect(css).toContain(`font-size: ${px}px`);
     expect(css).toContain(':focus-visible'); expect(css).toContain(':focus{outline:none}');
     expect(css).toMatch(/prefers-reduced-motion:reduce\)\{[^}]*animation:none!important;transition:none!important/);
+    for (const w of LABEL_WIDTHS) expect(css).toContain(`width: ${w}px`);
     expect(css).not.toContain('data-drawer="');   // (the Classic server-render test counts that attribute)
   });
 });

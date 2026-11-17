@@ -6,6 +6,7 @@ import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
 import { useDrawerStore } from '../../store/drawerStore';
 import { newGame } from '../../sim/state';
+import { RoadAlert } from '../RoadPanel';
 
 Object.defineProperty(globalThis, 'location', { value: { search: '' }, configurable: true });   // the Hud reads ?clean
 const setup = (layout: 'a' | 'classic', open: 'family' | 'build' | null = null) => {
@@ -49,5 +50,24 @@ describe('Hud under layout A (server-rendered)', () => {
     for (const c of ['Shelter', 'Water', 'Power', 'Food', 'Defense', 'Walls', 'Tools']) expect(html).toContain(`>${c}</button>`);
     const classic = setup('classic');
     expect(classic).not.toContain('build-card'); expect(classic).toContain('Home &amp; work');
+  });
+  it('A: Board is a drawer page, drawers carry sub-page chips, and Classic has no chips', () => {
+    const html = setup('a', 'family');
+    expect(html).toContain('data-drawer="board"'); expect(html).toContain('data-testid="layout-a-style"');
+    expect(html).toContain('data-testid="page-chips"'); expect(html).toContain('data-testid="page-chip-medical"');
+    expect(html).toContain('data-page="medical"'); expect(html).toContain('data-testid="bar-board"');
+    const c = setup('classic');
+    expect(c).not.toContain('data-page='); expect(c).not.toContain('page-chips'); expect(c).not.toContain('layout-a-style');
+  });
+  it('the road alert is a banner under the top bar in A and a card at the bottom in Classic', () => {
+    const g = newGame(11);
+    (g as unknown as { road: unknown }).road = { hail: { id: 'h', text: 'A man at the fence.', want: [], offer: [], begging: false, haggled: false } };
+    Object.assign(useGameStore.getInitialState(), { game: g });
+    Object.assign(useWorldStore.getInitialState(), { layout: 'a', uiScale: 1 });
+    const a = renderToStaticMarkup(<RoadAlert />);
+    expect(a).toContain('data-testid="road-hail"'); expect(a).toContain('translateX(-50%)'); expect(a).not.toContain('bottom:');
+    Object.assign(useWorldStore.getInitialState(), { layout: 'classic' });
+    const c = renderToStaticMarkup(<RoadAlert />);
+    expect(c).toContain('bottom:'); expect(c).not.toContain('translateX(-50%)');
   });
 });
