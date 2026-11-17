@@ -6,13 +6,13 @@
  */
 import type { GameState } from '../state';
 import { feltDay } from './state';
-import type { Cost, DecisionCard, DecisionOption, FeltKind } from './types';
+import type { Cost, DecisionCard, DecisionOption, FeltKind, FeltPhase } from './types';
 import { adultsOf, applyFx, badChance, homeNeighbors, householdSize as N, r25, type Fx } from './cardFx';
 
-type Fxs = Fx[] | ((s: GameState) => Fx[]);
+export type Fxs = Fx[] | ((s: GameState) => Fx[]);
 const fxs = (f: Fxs | undefined, s: GameState): Fx[] => (!f ? [] : typeof f === 'function' ? f(s) : f);
 
-interface OptDef {
+export interface OptDef {
   id: string; label: string; hint: string;
   cost?: (s: GameState) => Cost;
   /** Effects that always happen. */
@@ -24,7 +24,7 @@ interface OptDef {
   off?: (s: GameState) => string | null;
 }
 
-function opt(d: OptDef): DecisionOption {
+export function opt(d: OptDef): DecisionOption {
   return {
     id: d.id, label: d.label, hint: () => d.hint, cost: s => d.cost?.(s) ?? {},
     ...(d.risk ? { odds: (s: GameState) => ({ p: 1 - badChance(s, d.risk!.p), good: d.risk!.good, bad: d.risk!.bad }) } : {}),
@@ -43,8 +43,8 @@ function opt(d: OptDef): DecisionOption {
   };
 }
 
-const noNeighbors = (s: GameState) => (homeNeighbors(s).length ? null : 'No neighbor is home to ask.');
-const hurtOne = (what: string, sev: number): Fx => ({ k: 'hurt', what, sev });
+export const noNeighbors = (s: GameState) => (homeNeighbors(s).length ? null : 'No neighbor is home to ask.');
+export const hurtOne = (what: string, sev: number): Fx => ({ k: 'hurt', what, sev });
 
 export type Theme = 'blackout' | 'sickness' | 'shock' | 'order' | 'hunger' | 'fallout' | 'money' | 'unknown';
 export const THEME: Record<FeltKind, Theme> = {
@@ -202,3 +202,31 @@ export function genericCards(kind: FeltKind): DecisionCard[] {
   }
   return c;
 }
+
+/** The shared cards only (no theme signature): the first night, the neighbor at the fence, the watch, hunger, heat, illness, planting, a stranger, year two. */
+export function sharedCards(kind: FeltKind): DecisionCard[] {
+  return genericCards(kind).slice(1);
+}
+
+/** A kind's own card: a day window in the phase, the options as compact definitions. */
+export interface KindCardDef {
+  id: string; phase: FeltPhase; title: string; text: string | ((s: GameState) => string); fallback: string; options: OptDef[];
+  /** First and last day since the hit the card can come up (defaults: the phase's own window). */
+  from?: number; to?: number;
+  /** Extra eligibility on top of the days (read the state: neighbors home, a track, stock). */
+  if?: (s: GameState) => boolean;
+  timeout?: number;
+}
+const WINDOW: Record<FeltPhase, [number, number]> = { warning: [-30, -1], hit: [0, 5], month: [8, 35], season: [36, 120], year: [121, 9999] };
+
+/** Build a kind's decision cards from compact definitions (ids prefixed with the kind), then the shared ones. Its own cards come first, so they take priority in their phase. */
+export function kindCards(kind: FeltKind, defs: KindCardDef[], shared = true): DecisionCard[] {
+  const own = defs.map((d): DecisionCard => {
+    const [a, b] = [d.from ?? WINDOW[d.phase][0], d.to ?? WINDOW[d.phase][1]];
+    return { id: `${kind}:${d.id}`, phase: d.phase, when: s => feltDay(s) >= a && feltDay(s) <= b && (d.if ? d.if(s) : true), title: () => d.title, text: typeof d.text === 'function' ? d.text : () => d.text as string, fallback: d.fallback, ...(d.timeout ? { timeoutDays: d.timeout } : {}), options: d.options.map(opt) };
+  });
+  return shared ? [...own, ...sharedCards(kind)] : own;
+}
+/** Is this a kind's own card (not one of the shared set every kind gets)? */
+export const isSharedCardId = (id: string): boolean => sharedTitles.has(id.slice(id.indexOf(':') + 1));
+const sharedTitles = new Set(shared().map(x => x.title({} as GameState).toLowerCase().replace(/[^a-z]+/g, '_')));
