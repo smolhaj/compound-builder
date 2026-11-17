@@ -9,9 +9,11 @@ import {
 } from './siege';
 import { commitRaid, restageRaid, stageRaid } from './raidCutscene';
 import { useGameStore } from '../store/gameStore';
+import { answerCard, fallbackOf, pendingCard } from './felt/cards';
 
 function afterHit(seed = 1): GameState {
   const g = newGame(seed, 105, 2027, { mode: 'scenario', peace: 'short', kind: 'grid_down' });
+  delete g.gate.waves;   // these tests pin the gate: the siege-wave clock (sim/waves.ts) would send a raid of its own, and its own tests are in waves.test.ts
   g.clock.t = Math.floor(g.disaster.hitAt + 20) + 0.25;
   g.disaster.tracks = { ...g.disaster.tracks, law: 0, stores: 0, deliveries: 0, banks: 0 };
   g.stock.canned = 20; g.stock.fuel = 10; g.stock.meds = 3;
@@ -269,7 +271,12 @@ describe('the lock: you decide, then you watch', () => {
     const e = raid('gang', 8);
     g.gate.incoming = { e, at: g.clock.t + 0.05 };
     useGameStore.setState({ game: g, cutscene: null });
-    for (let i = 0; i < 400 && !useGameStore.getState().cutscene; i++) useGameStore.getState().tick(0.25);
+    for (let i = 0; i < 400 && !useGameStore.getState().cutscene; i++) {
+      // a felt decision card (sim/felt/cards.ts, twenty days into the collapse) holds the clock by design: take its default answer and go on
+      const gs = useGameStore.getState().game, fc = pendingCard(gs);
+      if (fc) answerCard(gs, fc.id, fallbackOf(gs, fc).id);
+      useGameStore.getState().tick(0.25);
+    }
     const c = useGameStore.getState().cutscene;
     expect(c?.phase).toBe('prompt');
     expect(useGameStore.getState().game.clock.speed).toBe(0);

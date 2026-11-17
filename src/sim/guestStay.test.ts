@@ -50,7 +50,8 @@ describe('shelter guests (real engine)', () => {
     const s = sheltered('fire', 'burned');
     let g = s.g;
     expect(s.until - s.from).toBe(45);
-    for (let i = 0; i < 60 && !g.gate.pending; i++) { pinned(g, s.nid, 'burned'); g = step(g, 1); }
+    // another neighbor in need may knock in the meantime (sim/neighborLife.ts, a real feature): turn that one away and keep waiting for the settle card
+    for (let i = 0; i < 60 && !g.gate.pending?.shelter?.settle; i++) { pinned(g, s.nid, 'burned'); g = step(g, 1); if (g.gate.pending && !g.gate.pending.shelter?.settle) resolve(g, 'turn_away'); }
     expect(g.gate.pending?.shelter?.settle).toBe(true);
     expect(dayIndex(g.clock.t)).toBeGreaterThanOrEqual(s.until);
     // left unanswered the card holds them (and waits for the player); declining sends them on, with no bond line for going home
