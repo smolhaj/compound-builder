@@ -20,7 +20,9 @@ const interp = (pts: Array<[number, number]>, d: number): number => {
 export function cashPowerAt(variant: string, day: number): number {
   const v = variant === 'hyperinflation'
     ? interp([[0, 1], [7, 0.8], [30, 0.3], [90, 0.12], [180, 0.02]], day)
-    : interp([[0, 1], [60, 0.6], [365, 0.35], [1000, 0.3]], day);
+    : variant === 'sovereign_default'
+      ? interp([[0, 1], [30, 0.75], [180, 0.45], [730, 0.3]], day)
+      : interp([[0, 1], [60, 0.6], [365, 0.35], [1000, 0.3]], day);
   return Math.max(CASH_FLOOR, v);
 }
 

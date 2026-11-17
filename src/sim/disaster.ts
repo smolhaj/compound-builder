@@ -9,6 +9,7 @@
 import { pickPeaceNews, seasonOf } from './newsPool';
 import type { RegionId } from './regions';
 import { mulberry32 as rng } from './rng';
+import { rollImpact } from './impactZone';
 
 /** "Never" (Free build until triggered); JSON-safe, unlike Infinity. */
 export const NEVER = 1e9;
@@ -21,10 +22,12 @@ export const TRACK_NAME: Record<Track, string> = {
 
 export type DisasterKind = 'grid_down' | 'financial' | 'lawless' | 'drought' | 'pandemic' | 'nuclear' | 'solar_flare' | 'wildfire' | 'ash_winter' | 'cyberattack'
   | 'zombies' | 'invasion' | 'civil_war' | 'bioweapon' | 'asteroid' | 'unknown'
-  // placeholders (WP0): selectable and minimal until their packages land; not in the Surprise pool until WP10
+  // the owner-chosen scenarios (WP0 placeholders; each has its own module in sim/disasters/ and a place in the Surprise pool since WP10)
   | 'emp' | 'mega_quake' | 'crop_blight' | 'dam_flood' | 'supervolcano'
   // WP7: the herd and the flock (docs/scenarios/livestock_plague.md)
-  | 'livestock_plague';
+  | 'livestock_plague'
+  // WP10: the seven planned kinds (docs/scenarios/<kind>.md), each with a collapse clock and a per-kind module in sim/disasters/
+  | 'satellite_loss' | 'oil_shock' | 'reactor_meltdown' | 'global_famine' | 'water_war' | 'cult_takeover' | 'mass_exodus';
 import { unscripted } from './godMode';
 export type Mode = 'surprise' | 'scenario' | 'sandbox' | 'god';
 /** GDS difficulty presets: Cozy (long warning, gentle raids), Standard, Hardcore (little warning, harsh raids, permadeath). */
@@ -60,6 +63,8 @@ export interface DisasterDef {
   hit: string[];
   /** Likely follow-ons: kind, chance, days after the hit. */
   chain: Array<{ kind: DisasterKind; p: number; after: [number, number] }>;
+  /** Words a hint may carry as `{name}`, rolled from the run (so a headline never contradicts the roll: asteroid zone). Pure of the state. */
+  fill?: (o: { seed: number; region: RegionId; difficulty: Difficulty }) => Record<string, string>;
 }
 
 const C = (at: number, fall: number, floor: number, back: [number, number] | null, ramp = 7): TrackCurve => ({ at, fall, floor, back, ramp });
@@ -115,8 +120,10 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
     variants: [
       { id: 'bank_holiday', name: 'a bank shutdown that never ends', weight: 3, curves: { banks: C(0, 1, 0.05, [90, 300], 60), stores: C(3, 20, 0.3, [60, 200], 60), deliveries: C(5, 25, 0.4, [60, 200], 60), fuel: C(10, 30, 0.4, [60, 220], 60), medical: C(20, 40, 0.4, [90, 300], 60), law: C(20, 40, 0.35, [100, 330], 60) } },
       { id: 'hyperinflation', name: 'hyperinflation', weight: 2, curves: { banks: C(0, 20, 0, [200, 500], 90), stores: C(10, 40, 0.25, [150, 450], 90), deliveries: C(10, 40, 0.3, [150, 450], 90), fuel: C(15, 30, 0.3, [150, 450], 90), medical: C(20, 50, 0.3, [150, 450], 90), law: C(30, 60, 0.3, [150, 450], 90), grid: C(60, 60, 0.5, [150, 450], 60) } },
+      { id: 'sovereign_default', name: 'a default on the national debt', weight: 1, curves: { banks: C(0, 5, 0.3, [60, 200], 60), law: C(10, 40, 0.4, [90, 300], 60), medical: C(15, 40, 0.5, [90, 300], 60), deliveries: C(10, 40, 0.5, [90, 300], 60), stores: C(10, 40, 0.5, [60, 250], 60), fuel: C(10, 30, 0.5, [90, 300], 60), grid: C(60, 60, 0.7, [150, 400], 60), phone: C(60, 60, 0.8, [150, 400], 60) } },
+      { id: 'bail_in', name: 'a banking crisis ended by a bail-in of large deposits', weight: 2, curves: { banks: C(0, 1, 0.1, [45, 150], 30), stores: C(5, 20, 0.5, [40, 150], 30), deliveries: C(5, 20, 0.5, [40, 150], 30), fuel: C(10, 30, 0.6, [60, 180], 30), medical: C(20, 40, 0.5, [90, 250], 60), law: C(20, 40, 0.5, [90, 250], 60) } },
     ],
-    hints: [['Two regional banks fail in a week; lines outside a branch in the city.', 'Groceries up 4% again this month.', 'The mill in town lays off a shift.'], ['"Temporary" withdrawal limits at every bank.', 'Gold hits a record; the pawn shop is buying.', 'Eggs and formula rationed at the store.'], ['ATMs read "temporarily unavailable".', 'The governor asks for calm.', 'Neighbors are swapping eggs for diesel.']],
+    hints: [['Two regional banks fail in a week; lines outside a branch in the city.', 'Groceries up 4% again this month.', 'The mill in town lays off a shift.'], ['"Temporary" withdrawal limits at every bank.', 'Gold hits a record; the pawn shop is buying.', 'Eggs and formula rationed at the store.'], ['ATMs read "temporarily unavailable".', 'The governor asks for calm.', 'Neighbors are swapping eggs for diesel.', 'Treasury auction fails to find buyers; the dollar slides.', 'Officials float "a deposit levy to stabilize the system".']],
     hit: ['The banks don\'t open: accounts frozen "until further notice".'],
     chain: [{ kind: 'lawless', p: 0.5, after: [45, 120] }],
   },
@@ -223,8 +230,9 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
   },
   asteroid: {
     kind: 'asteroid', name: 'Asteroid impact', pulpy: true, warn: [90, 200],
+    fill: o => { const i = rollImpact(o.seed, o.region, o.difficulty); return { where: i.variant === 'airburst' ? `an airburst over ${i.zone}` : i.variant === 'comet' ? `along ${i.zone}` : `in ${i.zone}` }; },
     variants: [{ id: 'impact', name: 'the impact', weight: 1, curves: { grid: C(0, 0, 0, null), fuel: C(0, 2, 0, null), stores: C(0, 3, 0, null), deliveries: C(0, 1, 0, null), medical: C(0, 3, 0.1, null), law: C(2, 20, 0.05, null), phone: C(0, 0, 0, null), banks: C(0, 0, 0, null) } }],
-    hints: [['Astronomers: a 1-in-50 chance of impact next year.', 'The odds firm up: 1 in 3.'], ['Confirmed: impact in the North Atlantic.', 'Seed and canned goods rationed nationwide.'], ['It\'s visible at night now, a smudge brighter every week.', 'Churches full; the roads west are jammed.']],
+    hints: [['Astronomers: a 1-in-50 chance of impact next year.', 'The odds firm up: 1 in 3.'], ['Confirmed: the impact point is {where}.', 'Seed and canned goods rationed nationwide.'], ['It\'s visible at night now, a smudge brighter every week.', 'Churches full; the roads west are jammed.']],
     hit: ['A second sunrise in the east, then the sky goes dark for good.'],
     chain: [],
   },
@@ -245,9 +253,9 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
     chain: [],
   },
   mega_quake: {
-    kind: 'mega_quake', name: 'Mega-earthquake', pulpy: false, warn: [1, 2],
+    kind: 'mega_quake', name: 'Mega-earthquake', pulpy: false, warn: [4, 30],
     variants: [{ id: 'm9', name: 'a magnitude-9 earthquake', weight: 1, curves: { grid: C(0, 0, 0.2, [20, 120], 60), fuel: C(0, 1, 0.2, [20, 120], 60), deliveries: C(0, 0, 0.1, [30, 150], 60), medical: C(0, 1, 0.3, [20, 90], 40), phone: C(0, 0, 0.2, [10, 60], 30), law: C(0, 2, 0.5, [10, 60], 30), stores: C(0, 2, 0.4, [20, 100], 40), banks: C(0, 0, 0.3, [14, 60], 30) } }],
-    hints: [['A swarm of small quakes under the coast, four days running.'], ['Wells in the valley go cloudy overnight.'], ['Dogs will not settle; the animals are restless.']],
+    hints: [['A swarm of small quakes under the fault, four days running.', 'Seismologists: "nothing unusual", then a magnitude 5 rattles the dishes.'], ['Wells in the valley go cloudy overnight.', 'Slow-slip tremor is reported along the fault; the state asks people to check their kits.'], ['Dogs will not settle; the animals are restless.', 'A foreshock shakes the county awake at 3 a.m.']],
     hit: ['The ground rolls for four minutes. Chimneys are down across the county and the road is cracked.'],
     chain: [],
   },
@@ -287,13 +295,130 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
     hit: ['A case is confirmed within three miles. Every barn in the county is a suspect.'],
     chain: [],
   },
+  // ── WP10: the seven kinds from docs/scenarios (collapse clocks from each doc's section 10; the teeth are in sim/disasters/<kind>.ts) ──
+  satellite_loss: {
+    kind: 'satellite_loss', name: 'Satellite and GPS loss', pulpy: false, warn: [3, 30],
+    variants: [
+      { id: 'kessler', name: 'a debris cascade that took out low orbit', weight: 2, curves: { grid: C(7, 40, 0.6, [365, 1500], 120), fuel: C(3, 25, 0.4, [200, 1000], 90), stores: C(5, 35, 0.35, [200, 1000], 90), deliveries: C(1, 14, 0.25, [200, 1000], 90), medical: C(14, 60, 0.6, [300, 1200], 90), law: C(60, 120, 0.8, [400, 1200], 90), phone: C(0, 3, 0.4, [180, 900], 90), banks: C(1, 10, 0.35, [180, 900], 90) } },
+      { id: 'gps_only', name: 'a loss of GPS and the timing signal', weight: 1, curves: { grid: C(5, 20, 0.7, [30, 180], 30), fuel: C(3, 15, 0.5, [30, 200], 30), stores: C(5, 20, 0.6, [40, 220], 30), deliveries: C(1, 10, 0.4, [40, 220], 30), phone: C(0, 2, 0.6, [20, 150], 30), banks: C(1, 5, 0.5, [20, 150], 30) } },
+      { id: 'asat_war', name: 'an anti-satellite war', weight: 1, curves: { grid: C(3, 30, 0.45, [365, 1500], 120), fuel: C(2, 20, 0.35, [200, 1000], 90), stores: C(4, 30, 0.3, [200, 1000], 90), deliveries: C(1, 12, 0.2, [200, 1000], 90), medical: C(10, 50, 0.5, [300, 1200], 90), law: C(20, 90, 0.5, [400, 1200], 90), phone: C(0, 2, 0.25, [180, 900], 90), banks: C(1, 8, 0.3, [180, 900], 90) } },
+    ],
+    hints: [
+      ['Station crew shelters in the return capsule after a debris warning.', 'Reports of GPS jamming and spoofing near two conflict zones.', 'A pilot neighbor mentions "GPS integrity warnings" on her last flight.'],
+      ['Phone map apps drift; the tractor\'s auto-steer wanders across the field.', 'Satellite TV and internet blip out for an hour; the forecast says "data unavailable".', 'Airlines cancel flights for "technical issues" at air traffic control.'],
+      ['Government advises households to keep a paper map and a compass.', 'Card readers at the farm store fail twice in a day.', 'The satellite dish at the Hendersons\' is dead.'],
+    ],
+    hit: ['Nothing breaks and the lights stay on, but every phone says "No Service" and the sky has gone quiet: the satellites are gone.'],
+    chain: [{ kind: 'lawless', p: 0.1, after: [90, 240] }, { kind: 'financial', p: 0.25, after: [30, 120] }],
+  },
+  oil_shock: {
+    kind: 'oil_shock', name: 'Oil and fuel shock', pulpy: false, warn: [14, 90],
+    variants: [
+      { id: 'hormuz', name: 'a closed strait that stopped a fifth of the world\'s oil', weight: 2, curves: { fuel: C(0, 7, 0.15, [180, 720], 90), deliveries: C(3, 20, 0.3, [200, 740], 90), stores: C(7, 40, 0.4, [220, 760], 90), medical: C(30, 60, 0.6, [240, 780], 60), law: C(60, 90, 0.7, [260, 800], 60), banks: C(30, 60, 0.7, [240, 780], 60) } },
+      { id: 'pipeline_cut', name: 'a pipeline cut', weight: 3, curves: { fuel: C(0, 3, 0.25, [14, 60], 20), deliveries: C(2, 10, 0.5, [20, 70], 20), stores: C(5, 15, 0.6, [25, 75], 14) } },
+      { id: 'gulf_refineries', name: 'a storm and a freeze at the Gulf refineries', weight: 2, curves: { fuel: C(0, 5, 0.3, [21, 90], 30), deliveries: C(3, 12, 0.5, [30, 100], 30), stores: C(7, 20, 0.6, [35, 110], 30) } },
+      { id: 'embargo_long', name: 'a long embargo, worse than 1973', weight: 1, curves: { fuel: C(0, 10, 0.2, [300, 900], 120), deliveries: C(5, 40, 0.35, [320, 920], 120), stores: C(10, 60, 0.45, [340, 940], 120), grid: C(90, 180, 0.8, [400, 900], 90), medical: C(60, 90, 0.6, [340, 940], 90), law: C(90, 120, 0.7, [360, 960], 90), banks: C(60, 90, 0.7, [340, 940], 90) } },
+    ],
+    hints: [
+      ['A tanker attack in the strait; insurance rates for tankers spike.', 'Crude and pump prices are up 40% in a month.', 'Government talks about the Strategic Petroleum Reserve and "voluntary conservation".'],
+      ['Gas lines at the nearest town; a station is "out of regular".', 'The farm store runs out of fuel stabilizer and jerry cans.', 'A neighbor puts a lock on his farm tank.'],
+      ['Speed limits cut to 55 to save fuel; rationing plans circulate.', 'Diesel is rationed to farm trucks only; school buses run half routes.', 'Neighbors are filling drums at night.'],
+    ],
+    hit: ['The pumps are empty. {cause}: the trucks are parking and the price of everything that rides on a truck is climbing.'],
+    chain: [{ kind: 'financial', p: 0.35, after: [60, 180] }, { kind: 'lawless', p: 0.15, after: [90, 200] }],
+  },
+  reactor_meltdown: {
+    kind: 'reactor_meltdown', name: 'Reactor meltdown', pulpy: false, warn: [1, 14],
+    variants: [
+      { id: 'meltdown_regional', name: 'a meltdown at the regional plant', weight: 3, curves: { stores: C(2, 5, 0.7, [14, 60], 14), deliveries: C(2, 8, 0.7, [14, 60], 14), medical: C(1, 5, 0.75, [30, 120], 30), law: C(3, 10, 0.85, [20, 90], 20), grid: C(0, 1, 0.85, [10, 60], 20), fuel: C(1, 4, 0.85, [14, 60], 20), phone: C(0, 1, 0.9, [7, 30], 10) } },
+      { id: 'meltdown_pair', name: 'meltdowns at two plants', weight: 1, curves: { stores: C(2, 6, 0.55, [30, 120], 30), deliveries: C(2, 8, 0.6, [30, 120], 30), medical: C(1, 6, 0.6, [60, 180], 30), law: C(3, 10, 0.75, [30, 120], 30), grid: C(0, 2, 0.7, [20, 90], 30), fuel: C(1, 5, 0.7, [30, 120], 30), phone: C(0, 1, 0.85, [10, 40], 10) } },
+      { id: 'dirty_bomb', name: 'a dirty bomb in the nearest town', weight: 2, curves: { stores: C(1, 3, 0.85, [7, 30], 10), deliveries: C(1, 4, 0.85, [7, 30], 10), medical: C(0, 2, 0.85, [14, 60], 20), law: C(1, 5, 0.85, [10, 40], 20), phone: C(0, 1, 0.9, [3, 14], 5) } },
+      { id: 'spent_pool_fire', name: 'a spent-fuel pool fire after the diesel ran out', weight: 1, curves: { stores: C(2, 8, 0.45, [90, 400], 60), deliveries: C(2, 10, 0.5, [90, 400], 60), medical: C(1, 8, 0.5, [120, 500], 60), law: C(3, 14, 0.65, [90, 400], 60), grid: C(0, 3, 0.55, [60, 300], 60), fuel: C(1, 6, 0.6, [90, 400], 60), phone: C(0, 2, 0.75, [30, 150], 30) } },
+    ],
+    hints: [
+      ['The plant declares an unusual event; "no release of radioactivity".', 'Sirens are tested at the plant\'s zone.', 'Offsite power to the plant is lost; the emergency diesels are running.'],
+      ['The plant escalates to a site area emergency.', 'School buses stage on the highway; potassium iodide is handed out in the 10-mile zone.', 'Neighbors near the plant are leaving.'],
+      ['A general emergency is declared; the winds are out of the {wind}.', 'The state orders evacuation of the nearest townships.', 'Your meter ticks over its background count.'],
+    ],
+    hit: ['The core has melted: {cause}. A plume is moving downwind.'],
+    chain: [{ kind: 'financial', p: 0.2, after: [60, 180] }, { kind: 'mass_exodus', p: 0.2, after: [1, 6] }],
+    fill: o => ({ wind: ['northwest', 'west', 'southwest', 'south', 'southeast', 'east', 'northeast', 'north'][Math.floor(rng(o.seed * 6911 + 3)() * 8)] }),
+  },
+  global_famine: {
+    kind: 'global_famine', name: 'Global famine', pulpy: false, warn: [60, 180],
+    variants: [
+      { id: 'breadbasket', name: 'a failure of the world\'s breadbaskets', weight: 3, curves: { stores: C(0, 30, 0.1, [300, 700], 120), deliveries: C(5, 40, 0.25, [300, 700], 120), banks: C(30, 60, 0.5, [250, 600], 90), fuel: C(20, 60, 0.5, [300, 700], 90), medical: C(30, 90, 0.4, [300, 700], 90), law: C(20, 90, 0.3, [300, 800], 90), grid: C(180, 90, 0.7, [400, 900], 90) } },
+      { id: 'export_ban', name: 'export bans on grain', weight: 1, curves: { stores: C(0, 15, 0.3, [150, 400], 90), deliveries: C(5, 20, 0.45, [150, 400], 60), banks: C(20, 40, 0.7, [150, 400], 60), law: C(30, 60, 0.6, [200, 450], 60) } },
+      { id: 'monoculture_blight', name: 'a blight in the one crop the world leaned on', weight: 1, curves: { stores: C(5, 40, 0.25, [250, 600], 120), deliveries: C(5, 40, 0.4, [250, 600], 90), medical: C(40, 90, 0.6, [300, 700], 90), law: C(40, 90, 0.5, [300, 700], 90) } },
+    ],
+    hints: [
+      ['A wheat belt drought and a rice blast in the same season.', 'Export bans announced by three grain exporters.', 'The FAO food price index hits a record.'],
+      ['The grocery store limits rice and flour; a loaf is up 60%.', 'Farm-store seed sells out in a day.', 'Church food banks double their line.'],
+      ['The county announces a rationing plan and talks of "grain reserves".', 'Flour is behind the counter and sold by the pound.', 'Neighbors are planting every yard.'],
+    ],
+    hit: ['The grain has run out: the shelves empty and the county rations bread.'],
+    chain: [{ kind: 'lawless', p: 0.3, after: [60, 160] }, { kind: 'mass_exodus', p: 0.25, after: [30, 90] }, { kind: 'pandemic', p: 0.1, after: [90, 220] }],
+  },
+  water_war: {
+    kind: 'water_war', name: 'Water war', pulpy: false, warn: [60, 180],
+    variants: [
+      { id: 'dead_pool', name: 'a river compact that broke when the reservoir hit dead pool', weight: 3, curves: { grid: C(30, 60, 0.6, [200, 600], 90), stores: C(20, 60, 0.5, [200, 600], 90), deliveries: C(10, 40, 0.5, [200, 600], 90), medical: C(20, 60, 0.5, [250, 600], 90), law: C(20, 80, 0.4, [300, 700], 90), fuel: C(30, 60, 0.6, [250, 600], 90) } },
+      { id: 'aquifer_collapse', name: 'the collapse of the aquifer', weight: 2, curves: { stores: C(30, 90, 0.6, [300, 900], 120), deliveries: C(30, 90, 0.7, [300, 900], 90), medical: C(40, 90, 0.7, [300, 900], 90), law: C(60, 90, 0.6, [300, 900], 90) } },
+      { id: 'contamination', name: 'a poisoned water supply', weight: 1, curves: { medical: C(0, 14, 0.5, [30, 120], 30), stores: C(3, 14, 0.7, [30, 120], 30), law: C(10, 30, 0.8, [60, 150], 30) } },
+    ],
+    hints: [
+      ['The reservoir is at a record low; the water board limits lawn watering.', 'A lawsuit between two counties over the river.', 'Snowpack is a third of normal.'],
+      ['The irrigation district announces cuts by seniority.', 'A neighbor\'s well goes dry.', 'Tanker trucks on the county road with armed escorts.'],
+      ['The first fence is cut at the ditch.', 'The co-op meeting turns angry and a rider is sent to check headgates.', 'Water theft arrests on the front page.'],
+    ],
+    hit: ['The water is rationed and the river is closed to new diversions: {cause}.'],
+    chain: [{ kind: 'mass_exodus', p: 0.25, after: [30, 90] }, { kind: 'lawless', p: 0.2, after: [60, 150] }, { kind: 'global_famine', p: 0.1, after: [90, 200] }],
+  },
+  cult_takeover: {
+    kind: 'cult_takeover', name: 'Cult takeover', pulpy: false, warn: [10, 40],
+    variants: [
+      { id: 'gathering', name: 'a movement called the Gathering that took the council', weight: 3, curves: { law: C(0, 20, 0.5, null), stores: C(10, 40, 0.6, [200, 500], 90), deliveries: C(5, 40, 0.5, [200, 500], 90), medical: C(5, 30, 0.6, [200, 500], 90), banks: C(20, 40, 0.4, [300, 700], 90), fuel: C(10, 30, 0.5, [200, 500], 90) } },
+      { id: 'zealot', name: 'a zealous order that raids unbelievers', weight: 2, curves: { law: C(0, 10, 0.3, null), stores: C(5, 30, 0.5, [300, 700], 90), deliveries: C(5, 30, 0.4, [300, 700], 90), medical: C(3, 20, 0.5, [300, 700], 90), banks: C(10, 30, 0.3, [300, 700], 90), fuel: C(5, 20, 0.4, [300, 700], 90) } },
+      { id: 'prophet_date', name: 'a prophet with a date', weight: 1, curves: { law: C(0, 20, 0.5, [150, 400], 60), stores: C(10, 40, 0.6, [150, 400], 60), deliveries: C(5, 40, 0.5, [150, 400], 60), medical: C(5, 30, 0.6, [150, 400], 60), banks: C(20, 40, 0.5, [200, 500], 60) } },
+    ],
+    hints: [
+      ['A charismatic preacher gathers a crowd at the fairgrounds; free food for those who sign.', 'A new church opens in the old feed store.', 'Neighbors begin giving away their possessions.'],
+      ['The Covenant\'s flag appears in windows along the county road.', 'A bus of new voters arrives at the county clerk\'s office.', 'The sheriff "retires"; his deputy is a member.'],
+      ['The community meeting is packed with strangers.', 'The council votes to hand the food bank to the Gathering.', 'Two teenagers from the next road are missing.'],
+    ],
+    hit: ['The council has voted: the Order now runs the valley and sets "the tithe".'],
+    chain: [{ kind: 'lawless', p: 0.3, after: [90, 220] }, { kind: 'mass_exodus', p: 0.2, after: [60, 150] }],
+  },
+  mass_exodus: {
+    kind: 'mass_exodus', name: 'Mass exodus and martial law', pulpy: false, warn: [5, 30],
+    variants: [
+      { id: 'evacuation', name: 'an evacuation of the cities onto the county road', weight: 3, curves: { law: C(3, 10, 0.5, [60, 200], 30), grid: C(5, 20, 0.6, [30, 120], 30), fuel: C(0, 2, 0.05, [20, 90], 30), stores: C(2, 8, 0.15, [30, 120], 30), deliveries: C(0, 3, 0.3, [30, 120], 30), medical: C(2, 10, 0.3, [30, 120], 30), phone: C(0, 3, 0.4, [20, 90], 20), banks: C(10, 20, 0.7, [40, 160], 30) } },
+      { id: 'fleeing_front', name: 'a flight from a war front', weight: 1, curves: { law: C(3, 10, 0.3, [90, 300], 30), grid: C(5, 20, 0.5, [60, 200], 30), fuel: C(0, 2, 0.05, [40, 150], 30), stores: C(2, 8, 0.15, [60, 200], 30), deliveries: C(0, 3, 0.25, [60, 200], 30), medical: C(2, 10, 0.3, [60, 200], 30), phone: C(0, 3, 0.4, [30, 120], 20), banks: C(10, 20, 0.5, [60, 200], 30) } },
+      { id: 'quarantine_flight', name: 'a flight from a plague, sorted at checkpoints', weight: 1, curves: { law: C(3, 10, 0.4, [60, 200], 30), grid: C(5, 20, 0.6, [30, 120], 30), fuel: C(0, 2, 0.05, [30, 120], 30), stores: C(2, 8, 0.2, [40, 140], 30), deliveries: C(0, 3, 0.25, [40, 140], 30), medical: C(1, 8, 0.2, [60, 200], 30), phone: C(0, 3, 0.4, [20, 90], 20), banks: C(10, 20, 0.6, [50, 160], 30) } },
+    ],
+    hints: [
+      ['A chemical spill threatens the city; officials call for "voluntary evacuation".', 'Traffic counts on the county road are up 40% on last week.', 'The governor declares a state of emergency.'],
+      ['"Shelter in place" becomes "evacuate"; gas lines at every exit.', 'National Guard trucks are parked at the school.', 'A state trooper roadblock at the exit ramp.'],
+      ['Cars, bumper to bumper, headed away from the city.', 'Neighbors are cutting fences to take shortcuts.', 'The Guard says martial law takes effect at midnight.'],
+    ],
+    hit: ['The road is full: {cause}, and the state has declared martial law with a curfew at 8 p.m.'],
+    chain: [{ kind: 'lawless', p: 0.25, after: [45, 120] }, { kind: 'global_famine', p: 0.2, after: [60, 150] }, { kind: 'pandemic', p: 0.1, after: [20, 80] }],
+  },
 };
 
 
-/** Disasters a Surprise run may roll: the ten grounded kinds, plus the six pulpy ones at rare base odds (SURPRISE_BASE) that regions scale (owner decision, WP0). The WP0 placeholders join at WP10. */
-export const SURPRISE_POOL: DisasterKind[] = ['grid_down', 'nuclear', 'financial', 'lawless', 'drought', 'pandemic', 'solar_flare', 'wildfire', 'ash_winter', 'cyberattack', 'invasion', 'civil_war', 'bioweapon', 'zombies', 'asteroid', 'unknown'];
-/** Base weight of a pool kind before the region's odds (1 = the usual; the pulpy kinds are rare). */
-export const SURPRISE_BASE: Partial<Record<DisasterKind, number>> = { invasion: 0.2, civil_war: 0.2, bioweapon: 0.08, zombies: 0.04, asteroid: 0.04, unknown: 0.04 };
+/**
+ * Disasters a Surprise run may roll (WP10): every kind. The ten grounded kinds are the usual; every other kind is rare at its base weight
+ * (SURPRISE_BASE) and the region scales it (a quake in the Pacific Northwest, a flood in a river valley). The pulpy six stay the rarest.
+ */
+export const SURPRISE_POOL: DisasterKind[] = ['grid_down', 'nuclear', 'financial', 'lawless', 'drought', 'pandemic', 'solar_flare', 'wildfire', 'ash_winter', 'cyberattack', 'invasion', 'civil_war', 'bioweapon', 'zombies', 'asteroid', 'unknown',
+  'emp', 'mega_quake', 'crop_blight', 'dam_flood', 'supervolcano', 'livestock_plague', 'satellite_loss', 'oil_shock', 'reactor_meltdown', 'global_famine', 'water_war', 'cult_takeover', 'mass_exodus'];
+/** Base weight of a pool kind before the region's odds (1 = the usual; the rest are rare). */
+export const SURPRISE_BASE: Partial<Record<DisasterKind, number>> = {
+  invasion: 0.2, civil_war: 0.2, bioweapon: 0.08, zombies: 0.04, asteroid: 0.04, unknown: 0.04,
+  emp: 0.1, mega_quake: 0.25, crop_blight: 0.4, dam_flood: 0.3, supervolcano: 0.05, livestock_plague: 0.4,
+  satellite_loss: 0.12, oil_shock: 0.4, reactor_meltdown: 0.15, global_famine: 0.15, water_war: 0.25, cult_takeover: 0.08, mass_exodus: 0.25,
+};
 /** A pool kind's weight in a region: its base weight times the region's odds. */
 export const surpriseWeight = (k: DisasterKind, odds: Partial<Record<DisasterKind, number>> = {}): number => (SURPRISE_BASE[k] ?? 1) * (odds[k] ?? 1);
 /** The Surprise roll, weighted by how likely each disaster is in the region (1 = the usual). */
@@ -320,11 +445,27 @@ export const FATE_ODDS: Partial<Record<DisasterKind, [number, number, number]>> 
   wildfire: [0.92, 0.07, 0.01], grid_down: [0.68, 0.24, 0.08], cyberattack: [0.65, 0.27, 0.08], pandemic: [0.62, 0.3, 0.08],
   lawless: [0.45, 0.38, 0.17], financial: [0.4, 0.42, 0.18], drought: [0.35, 0.45, 0.2], solar_flare: [0.3, 0.42, 0.28],
   ash_winter: [0.2, 0.45, 0.35], nuclear: [0.12, 0.43, 0.45],
-  // placeholders (WP0)
-  emp: [0.1, 0.3, 0.6], mega_quake: [0.45, 0.4, 0.15], crop_blight: [0.5, 0.35, 0.15], dam_flood: [0.8, 0.17, 0.03], supervolcano: [0.05, 0.3, 0.65], livestock_plague: [0.55, 0.35, 0.1],
+  // WP0 placeholders and the WP10 kinds
+  emp: [0.1, 0.3, 0.6], mega_quake: [0.55, 0.35, 0.1], crop_blight: [0.5, 0.35, 0.15], dam_flood: [0.8, 0.17, 0.03], supervolcano: [0.05, 0.3, 0.65], livestock_plague: [0.55, 0.35, 0.1],
+  satellite_loss: [0.25, 0.4, 0.35], oil_shock: [0.6, 0.3, 0.1], reactor_meltdown: [0.55, 0.35, 0.1], global_famine: [0.35, 0.4, 0.25], water_war: [0.3, 0.45, 0.25], cult_takeover: [0.3, 0.45, 0.25], mass_exodus: [0.55, 0.35, 0.1],
 };
-export function rollFate(kind: DisasterKind, u: number): Fate {
-  const [f, p] = FATE_ODDS[kind] ?? [0, 0, 1];
+/**
+ * Per-variant fate odds (override the kind's): a bank holiday mends sooner than a default; an ice storm is over by spring and a
+ * transformer shortage is not. Keyed `kind/variant`; a variant without an entry uses its kind's odds.
+ */
+export const VARIANT_FATE: Record<string, [number, number, number]> = {
+  'grid_down/ice_storm': [0.85, 0.12, 0.03], 'grid_down/substation': [0.6, 0.3, 0.1], 'grid_down/transformer_shortage': [0.2, 0.5, 0.3], 'grid_down/cascade': [0.4, 0.4, 0.2],
+  'financial/bank_holiday': [0.45, 0.4, 0.15], 'financial/hyperinflation': [0.3, 0.45, 0.25], 'financial/sovereign_default': [0.4, 0.4, 0.2], 'financial/bail_in': [0.5, 0.4, 0.1],
+  'pandemic/high_fatality': [0.4, 0.4, 0.2], 'solar_flare/near_miss': [1, 0, 0], 'solar_flare/g4': [0.55, 0.35, 0.1], 'solar_flare/carrington': [0.2, 0.4, 0.4],
+  'oil_shock/hormuz': [0.35, 0.45, 0.2], 'oil_shock/pipeline_cut': [0.85, 0.12, 0.03], 'oil_shock/gulf_refineries': [0.8, 0.17, 0.03], 'oil_shock/embargo_long': [0.3, 0.45, 0.25],
+  'reactor_meltdown/spent_pool_fire': [0.1, 0.4, 0.5], 'reactor_meltdown/dirty_bomb': [0.75, 0.2, 0.05],
+  'global_famine/export_ban': [0.6, 0.3, 0.1], 'water_war/contamination': [0.7, 0.25, 0.05], 'satellite_loss/gps_only': [0.6, 0.3, 0.1],
+  'mass_exodus/fleeing_front': [0.3, 0.4, 0.3], 'crop_blight/locusts': [0.65, 0.28, 0.07], 'livestock_plague/hpai': [0.65, 0.28, 0.07], 'livestock_plague/bse_like': [0.3, 0.4, 0.3],
+};
+/** The fate odds for a kind (and variant). */
+export const fateOdds = (kind: DisasterKind, variant?: string): [number, number, number] => (variant && VARIANT_FATE[`${kind}/${variant}`]) || FATE_ODDS[kind] || [0, 0, 1];
+export function rollFate(kind: DisasterKind, u: number, variant?: string): Fate {
+  const [f, p] = fateOdds(kind, variant);
   return u < f ? 'full' : u < f + p ? 'partial' : 'never';
 }
 /** A partial recovery: each service settles somewhere between a third and four fifths of what it was. */
@@ -405,7 +546,7 @@ export function newDisaster(seed: number, mode: Mode, peace: PeaceLength = 'rand
   const warn = def ? Math.max(1, Math.round(roll(r, def.warn) * DIFFICULTY[difficulty].warn)) : 0;
   // the fate on its own stream (the rest of the run's rolls don't move)
   const rf = rng(seed * 6007 + 29);
-  const fate = k ? rollFate(k, rf()) : 'full';
+  const fate = k ? rollFate(k, rf(), v) : 'full';
   return {
     mode, difficulty, peace, kind: k, variant: v, phase: 'peace',
     warnAt: len - warn, hitAt: len,
@@ -423,7 +564,7 @@ export function triggerDisaster(d: DisasterState, now: number, kind: DisasterKin
   d.variant = variant && def.variants.some(x => x.id === variant) ? variant : pick(def.variants, r()).id;
   d.warnAt = now; d.hitAt = now + warnDays;
   const rf = rng(seed * 6007 + 29 + Math.floor(now));
-  d.fate = rollFate(kind, rf());
+  d.fate = rollFate(kind, rf(), d.variant);
   d.ceiling = d.fate === 'partial' ? rollCeiling(rf) : {};
   d.back = fateBack(rollBack(def, d.variant, r), d.fate, d.difficulty);
   d.chained = [];
@@ -485,7 +626,8 @@ export function nextEraDisaster(prev: DisasterState, now: number, seed: number, 
   const gone = (k: Track) => (base[k] ?? 1) < 0.3;
   let pool = SURPRISE_POOL.filter(k => k !== prev.kind
     && !(gone('grid') && (k === 'grid_down' || k === 'cyberattack' || k === 'solar_flare'))
-    && !(gone('banks') && k === 'financial') && !(gone('law') && k === 'lawless'));
+    && !(gone('banks') && k === 'financial') && !(gone('law') && k === 'lawless')
+    && !(gone('fuel') && k === 'oil_shock') && !(gone('phone') && k === 'satellite_loss') && !(gone('grid') && k === 'emp'));
   if (!pool.length) pool = ['drought', 'pandemic', 'wildfire'];
   const w = pool.map(k => surpriseWeight(k, odds)), tot = w.reduce((a, b) => a + b, 0);
   let u = r() * tot, kind = pool[pool.length - 1];
@@ -497,7 +639,7 @@ export function nextEraDisaster(prev: DisasterState, now: number, seed: number, 
   const quiet = Math.round(365 * (lo + (hi - lo) * r()));
   const warn = Math.max(1, Math.round(roll(r, def.warn) * DIFFICULTY[prev.difficulty].warn));
   // each era, a little less chance it all comes back
-  const [f0, p0] = FATE_ODDS[kind] ?? [0, 0, 1];
+  const [f0, p0] = fateOdds(kind, v);
   const f = f0 * Math.pow(0.8, n), pp = p0 * Math.pow(0.92, n), uf = r();
   const fate: Fate = uf < f ? 'full' : uf < f + pp ? 'partial' : 'never';
   return {
@@ -567,7 +709,13 @@ export function updateDisaster(d: DisasterState, t: number, seed: number, ctx?: 
   // headlines
   if (d.phase === 'warning' && def) {
     const w = tension(d, t), stage = w < 0.4 ? 0 : w < 0.8 ? 1 : 2;
-    if (r() < 0.35 + 0.5 * w) say(def.hints[stage][Math.floor(r() * def.hints[stage].length)].replace('{cause}', cause), (stage + 1) as 1 | 2 | 3);
+    if (r() < 0.35 + 0.5 * w) {
+      let line = def.hints[stage][Math.floor(r() * def.hints[stage].length)].replace('{cause}', cause);
+      // words rolled from the run (a headline never contradicts the roll)
+      const vars = def.fill?.({ seed, region: ctx?.region ?? 'mountain_west', difficulty: d.difficulty ?? 'standard' });
+      if (vars) for (const [k, v] of Object.entries(vars)) line = line.split(`{${k}}`).join(v);
+      say(line, (stage + 1) as 1 | 2 | 3);
+    }
   } else if (d.phase === 'peace' && r() < 0.25) {
     const broken = d.baseline && Math.min(d.baseline.stores ?? 1, d.baseline.grid ?? 1) < 0.6;
     const recent = d.news.slice(-30).map(n => n.text);

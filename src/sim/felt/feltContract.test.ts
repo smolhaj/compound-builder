@@ -16,7 +16,7 @@ describe('felt registry', () => {
   it('has a spec for every kind in the DisasterKind union (via FX) and every planned kind', () => {
     for (const k of Object.keys(FX)) expect(feltSpec(k), k).not.toBeNull();
     for (const k of PLANNED_KINDS) expect(feltSpec(k), k).not.toBeNull();
-    expect(FELT_KINDS.length).toBe(Object.keys(FX).length + PLANNED_KINDS.length);
+    expect(new Set(FELT_KINDS).size).toBe(Object.keys(FX).length);   // (the planned kinds are in the union since WP10)
   });
   it('every member is optional: a stub spec is a valid spec', () => {
     for (const k of FELT_KINDS) expect(typeof FELT[k]).toBe('object');
@@ -95,7 +95,8 @@ describe('Free build / God Mode trigger menu', () => {
       expect(g.disaster.kind).toBe(c.kind); expect(g.disaster.variant, `${c.kind}/${v.id}`).toBe(v.id);
     }
   });
-  it('the planned kinds join the menu when WP10 gives them a definition (until then they are listed here)', () => {
-    expect(untriggerable().sort()).toEqual([...PLANNED_KINDS].sort());
+  it('the planned kinds have joined the menu (WP10 gave them a definition)', () => {
+    expect(untriggerable()).toEqual([]);
+    for (const k of PLANNED_KINDS) expect(triggerChoices().map(c => c.kind)).toContain(k);
   });
 });
