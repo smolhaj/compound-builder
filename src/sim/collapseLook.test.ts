@@ -199,10 +199,15 @@ describe('the fading town and the emptying road', () => {
   it('the far town shows on the skyline once the warning starts, and its lights go out over weeks', () => {
     expect(collapseLook(at('lawless', -25)).townLights).toBe(0);            // peace (before the warning): nothing is drawn
     expect(collapseLook(at('lawless', -2)).townLights).toBeGreaterThan(0.7);
+    // lawless now takes the grid down for weeks (disasters/lawless.ts teeth): the lights are out at week two and come back, thinned, once the grid is partly back
     const day0 = collapseLook(at('lawless', 0.5)).townLights, wk = collapseLook(at('lawless', 14)).townLights, mo = collapseLook(at('lawless', 90)).townLights;
     expect(day0).toBeGreaterThan(wk);
-    expect(wk).toBeGreaterThan(mo);
+    expect(wk).toBeLessThan(0.1);
     expect(mo).toBeLessThan(0.45);
+    // a kind that leaves the grid up thins the town's lights steadily over weeks
+    const f0 = collapseLook(at('financial', 0.5)).townLights, f1 = collapseLook(at('financial', 14)).townLights, f2 = collapseLook(at('financial', 90)).townLights;
+    expect(f0).toBeGreaterThan(f1);
+    expect(f1).toBeGreaterThan(f2);
   });
   it('the lights go out with the grid at once, then stay out until it is back', () => {
     expect(collapseLook(at('grid_down', 1, 'substation')).townLights).toBeLessThan(0.05);
@@ -216,8 +221,10 @@ describe('the fading town and the emptying road', () => {
     const peace = collapseLook(at('wildfire', -5)).traffic, hit = collapseLook(at('wildfire', 2)).traffic;
     expect(peace).toBeGreaterThan(0.5);
     expect(hit).toBeLessThan(peace);
-    const early = collapseLook(at('civil_war', 2)).traffic, late = collapseLook(at('civil_war', 40)).traffic;
+    const early = collapseLook(at('zombies', 2)).traffic, late = collapseLook(at('zombies', 40)).traffic;
     expect(late).toBeLessThan(early);
+    // a war keeps military and refugee traffic on the road (disasters/civil_war.ts look floor), so it never empties below it
+    expect(collapseLook(at('civil_war', 40)).traffic).toBeGreaterThanOrEqual(0.35);
     expect(collapseLook(at('unknown', 5)).traffic).toBe(0);
   });
   it('every kind is deterministic and in range, day by day through a year', () => {

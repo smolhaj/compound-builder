@@ -91,7 +91,7 @@ describe('every raid-cutscene shot frames its subject and stays out of the geome
     }
     expect(total).toBeGreaterThan(150);
     for (const k of ['wall', 'raiders', 'house', 'wide', 'close']) expect(kinds.has(k), k).toBe(true);
-  });
+  }, 180_000);   // heavy: multi-seed sim, about 10 to 20 s alone, so it needs headroom when the suite runs in parallel
 
   it('keeps the minimum standoff for its type', () => {
     for (let seed = 1; seed <= 25; seed++) for (const { s, actors } of cuts(seed, bx)) {
@@ -100,7 +100,7 @@ describe('every raid-cutscene shot frames its subject and stays out of the geome
         expect(Math.hypot(a.x - s.eye.x, a.z - s.eye.z), `${s.kind} on ${id}`).toBeGreaterThanOrEqual(STANDOFF[s.kind] - 1e-6);
       }
     }
-  });
+  }, 180_000);   // heavy: multi-seed sim, about 10 to 20 s alone, so it needs headroom when the suite runs in parallel
 
   it('the old failure: a house shot used to put the eye a few centimetres off the cabin roof; now it stands clear in any direction the crew comes from', () => {
     for (let a = 0; a < 16; a++) {
@@ -242,7 +242,7 @@ describe('the daylight lead-in puts the crew in the picture, large, and varies i
       }
     }
     expect(n).toBeGreaterThan(100);
-  });
+  }, 180_000);   // heavy: multi-seed sim, about 10 to 20 s alone, so it needs headroom when the suite runs in parallel
 
   it('by day a wide cut on a crew still far from the house shows the crew at least 14 px tall', () => {
     let n = 0;
@@ -285,7 +285,7 @@ describe('the daylight lead-in puts the crew in the picture, large, and varies i
         expect(same, `seed ${seed}: scenes ${i} and ${j} open on one frame`).toBe(false);
       }
     }
-  });
+  }, 180_000);   // heavy: multi-seed sim, about 10 to 20 s alone, so it needs headroom when the suite runs in parallel
 
   it('the night lead-in keeps its own wide (no pixel rule on the crew)', () => {
     const { out, d } = leadCuts(3, 0, true);
@@ -329,7 +329,7 @@ describe('the lens stays clear of trees and hillsides', () => {
       }
       expect(d.fallbacks, `seed ${seed}`).toBe(0);
     }
-  });
+  }, 180_000);   // heavy: multi-seed sim, about 10 to 20 s alone, so it needs headroom when the suite runs in parallel
 
   it('treeBoxes gives each tree a trunk and a floating crown, nearest first, and skips shrubs', () => {
     const t = (x: number, z: number, scale: number) => ({ x, z, y: 0, scale, kind: 'conifer', sx: 1, sy: 1 });

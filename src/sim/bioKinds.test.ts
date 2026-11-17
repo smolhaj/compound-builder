@@ -7,6 +7,8 @@ import type { DisasterKind } from './disaster';
 import { fxPriceMod } from './disasterFx';
 import { zombiesOf } from './walkers';
 import { outbreakOf } from './outbreak';
+import { feltChain } from './felt/goalLib';
+import { FX_CHAIN_DAYS } from './felt/goalWindow';
 
 const run = (kind: DisasterKind, variant: string, days: number, seed = 3) => {
   let g = newGame(seed, 105, 2027, { mode: 'scenario', peace: 'short', kind, variant });
@@ -32,10 +34,14 @@ describe('through the engine', () => {
       expect(suggestions(g, 20).some(c => c.id === 'ob_seal')).toBe(true);
     }
   });
-  it('crop blight and the livestock plague: the card and the goal chain show on the board', () => {
-    const b = run('crop_blight', 'rust', 20);
-    expect(suggestions(b, 20).some(c => c.id === 'goal_blight')).toBe(true);
-    const l = run('livestock_plague', 'hpai', 20);
-    expect(suggestions(l, 20).some(c => c.id === 'goal_livestock')).toBe(true);
+  it('crop blight and the livestock plague: the goal chain is the felt chain through the window, then the Next-steps card carries it', () => {
+    // inside the window the felt goal chain owns the goal (the Next-steps line waits: felt/feltGoals.test.ts); after it the card returns
+    for (const [k, v, id] of [['crop_blight', 'rust', 'goal_blight'], ['livestock_plague', 'hpai', 'goal_livestock']] as Array<[DisasterKind, string, string]>) {
+      const early = run(k, v, 20);
+      expect(feltChain(early)?.goals.length, k).toBeGreaterThan(0);
+      expect(suggestions(early, 20).some(c => c.id === id), k).toBe(false);
+      const late = run(k, v, FX_CHAIN_DAYS + 4);
+      expect(suggestions(late, 20).some(c => c.id === id), k).toBe(true);
+    }
   });
 });
