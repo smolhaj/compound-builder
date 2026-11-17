@@ -10,7 +10,11 @@ import { prices } from '../economy';
 import { runway, type RunwayId, type RunwayTone } from '../runway';
 import type { GameState } from '../state';
 import { surname } from '../neighborLife';
-import { OUT_BELOW, WORKING_FROM } from './claims';
+import { ashDepth, ashOptsOf } from '../ashState';
+import { FACTION, TIER_NAME, type Faction } from '../occupation';
+import { isRadioNews, radioSet } from '../radio';
+import { dayIndex } from '../state';
+import { OUT_BELOW, WORKING_FROM, sickPercent } from './claims';
 import { feltDay } from './state';
 import type { FeedLine, FeltSpec } from './types';
 
@@ -20,7 +24,11 @@ type NeighborStatus = 'home' | 'left' | 'gone' | 'joined';
 
 /** Yesterday's look. The first day is compared with a world where nothing had happened yet. */
 export interface FeedSnap { day: number; band: Record<Track, Band>; price: number; ordering: boolean; neighbors: Record<string, NeighborStatus>; supply: Partial<Record<RunwayId, RunwayTone>> }
-export interface FeedState { day: number; lines: FeedLine[]; /** Some line is a loss. */ worse: boolean; snap: FeedSnap; /** Game day each service last went out. */ outSince: Partial<Record<Track, number>> }
+export interface FeedState {
+  day: number; lines: FeedLine[]; /** Some line is a loss. */ worse: boolean; snap: FeedSnap; /** Game day each service last went out. */ outSince: Partial<Record<Track, number>>;
+  /** The clock `t` of this feed, so the next one reads only the news since. */ at?: number;
+  /** The ids of the kind's standing facts today (ash depth, who holds the town...), so only a change is news. */ status?: string[];
+}
 
 export const feedOf = (s: Pick<GameState, 'disaster'>): FeedState | undefined => s.disaster?.fx?.feltFeed as FeedState | undefined;
 
@@ -97,11 +105,59 @@ export function diffLines(s: GameState, prev: FeedSnap, now: FeedSnap, outSince:
   return out;
 }
 
+const CAP = (x: string): string => x[0].toUpperCase() + x.slice(1);
+type Bag = Record<string, unknown> | undefined;
+
+/**
+ * The kind's own standing facts, read straight off its saved state (never created here): how deep the ash lies, how many are sick, who
+ * holds the town, the occupation's tier, how many neighbors attend the Gathering. Each has an id that changes when the fact does, so the
+ * feed says it the day it changes and again on a quiet day.
+ */
+export function kindStatus(s: GameState): FeedLine[] {
+  const d = s.disaster, kind = d.kind, out: FeedLine[] = [];
+  if (!kind) return out;
+  const bag = (k: string): Bag => d.fx?.[k] as Bag;
+  const ash = ashOptsOf(kind);
+  if (ash && bag(ash.key)) {
+    const inches = Math.floor(ashDepth(s, ash));
+    if (inches >= 1) out.push({ id: `ash.${inches}`, text: `Ash lies about ${inches} ${inches === 1 ? 'inch' : 'inches'} deep on the roofs and fields.`, tone: inches >= 4 ? 2 : 1 });
+  }
+  if ((kind === 'pandemic' || kind === 'bioweapon') && bag('outbreak')) {
+    const pct = sickPercent(s);
+    if (pct >= 0.5) out.push({ id: `sick.${Math.round(pct / 2)}`, text: `About ${pct < 10 ? Math.round(pct * 10) / 10 : Math.round(pct)} in 100 in the county are sick.`, tone: pct >= 5 ? 3 : 2 });
+    const pol = (bag('outbreak') as { policy?: { sealed?: boolean } }).policy;
+    if (pol?.sealed) out.push({ id: 'quarantine.sealed', text: 'Your place is sealed: nobody comes in.', tone: 0 });
+  }
+  if (kind === 'civil_war') {
+    const front = (bag('civil_war') as { front?: { holder: Faction; contested: number } } | undefined)?.front;
+    if (front) out.push({ id: `front.${front.holder}.${front.contested > 0 ? 'c' : 's'}`, text: front.contested > 0 ? `The front is moving: the shooting is close, and ${FACTION[front.holder].short} is losing the town.` : `${CAP(FACTION[front.holder].name)} holds the town.`, tone: front.contested > 0 ? 3 : 1 });
+  }
+  if (kind === 'invasion') {
+    const f = bag('invasion') as { tier?: 1 | 2 | 3; front?: { holder: Faction } } | undefined;
+    if (f?.tier) out.push({ id: `occupation.${f.tier}.${f.front?.holder ?? '-'}`, text: `${f.front && f.front.holder === 'alliance' ? 'The occupiers hold the town. ' : ''}Occupation, tier ${f.tier}: ${TIER_NAME[f.tier]}.`, tone: f.tier >= 2 ? 2 : 1 });
+  }
+  if (kind === 'cult_takeover') {
+    const c = bag('cult_takeover') as { converts?: string[]; due?: boolean } | undefined;
+    if (c?.converts?.length) out.push({ id: `cult.converts.${c.converts.length}`, text: `${c.converts.length} ${c.converts.length === 1 ? 'household near you now attends' : 'households near you now attend'} the Gathering.`, tone: 1 });
+    if (c?.due) out.push({ id: 'cult.tithe', text: 'The tithe is due. The shepherds have the ledger.', tone: 2 });
+  }
+  return out;
+}
+
 /** The services still out, for a quiet day's line ("Still out: Grid power since day 3"). */
 function stillOut(s: GameState, outSince: Partial<Record<Track, number>>, now: FeedSnap): string {
   const hit = s.disaster.hitAt;
   const names = TRACKS.filter(t => now.band[t] === 0).map(t => `${TRACK_NAME[t]}${outSince[t] !== undefined ? ` (since day ${Math.max(0, Math.floor(outSince[t]! - hit))})` : ''}`);
   return names.join(', ');
+}
+
+/** "Radio: 2 broadcasts today, 1 not checked." Only with a set that is on, and only after the hit day. */
+export function radioDigest(s: GameState): FeedLine | null {
+  if (radioSet(s) === 'none' || s.clock.t - s.disaster.hitAt < 1) return null;
+  const today = (s.radio?.heard ?? []).filter(h => h.day === dayIndex(s.clock.t));
+  if (!today.length) return { id: 'radio.digest', text: 'Radio: only static today.', tone: 0 };
+  const open = today.filter(h => h.status === 'open').length;
+  return { id: 'radio.digest', text: `Radio: ${today.length} ${today.length === 1 ? 'broadcast' : 'broadcasts'} today${open ? `, ${open} not checked` : ''}. The radio can be wrong; send someone to see.`, tone: 0 };
 }
 
 /** One day's feed: updates `fx.feltFeed`, puts the top line on the Ticker, and returns [] (the feed is a card, not a log). */
@@ -121,15 +177,25 @@ export function feltFeed(s: GameState, ctx: FxCtx, spec: FeltSpec): string[] {
   const extra = spec.feed?.(s, null) ?? [];
   const seen = new Set(lines.map(l => l.id));
   for (const l of extra) if (!seen.has(l.id)) lines.push(l);
+  // the kind's own state: a standing fact that changed since yesterday, and the kind's own ticker news (never the radio's, which can be wrong)
+  const status = kindStatus(s), oldStatus = new Set(old?.status ?? []);
+  for (const l of status) if (!oldStatus.has(l.id) && !seen.has(l.id)) { lines.push(l); seen.add(l.id); }
+  const said = new Set((old?.lines ?? []).map(l => l.text));
+  const news = d.news.filter(n => n.t >= (old?.at ?? d.hitAt) && n.t >= d.hitAt && !isRadioNews(n.text) && !said.has(n.text) && !lines.some(l => l.text === n.text)).slice(-2);
+  for (const n of news) lines.push({ id: `news.${n.t.toFixed(2)}`, text: n.text, tone: n.tone });
   const worse = lines.some(l => l.tone >= 2);
   lines = lines.map((l, i) => ({ l, i })).sort((a, b) => b.l.tone - a.l.tone || a.i - b.i).map(x => x.l).slice(0, FEED_CAP);
   if (!lines.length) {
     const still = stillOut(s, outSince, now);
-    lines = [{ id: 'quiet', text: still ? `Nothing new today. Still out: ${still}.` : 'Nothing new today.', tone: 0 }];
+    const standing = status.filter(l => l.tone > 0).slice(0, 2);
+    lines = [{ id: 'quiet', text: still ? `Nothing new today. Still out: ${still}.` : 'Nothing new today.', tone: 0 }, ...standing.map(l => ({ ...l, id: `still.${l.id}`, text: `Still: ${l.text[0].toLowerCase()}${l.text.slice(1)}` }))];
   }
-  fx.feltFeed = { day: now.day, lines, worse, snap: now, outSince } satisfies FeedState;
+  // the radio digest: what the set picked up today (only when a set is on), kept out of the six-line cap so it never crowds a loss out
+  const digest = radioDigest(s);
+  if (digest) lines.push(digest);
+  fx.feltFeed = { day: now.day, lines, worse, snap: now, outSince, at: s.clock.t, status: status.map(l => l.id) } satisfies FeedState;
   const top = lines[0];
-  if (top.id !== 'quiet' && d.news[d.news.length - 1]?.text !== top.text) {
+  if (top.id !== 'quiet' && top.id !== 'radio.digest' && !top.id.startsWith('news.') && d.news[d.news.length - 1]?.text !== top.text) {
     d.news.push({ t: s.clock.t, text: top.text, tone: Math.min(top.tone, 1) as 0 | 1 });
     if (d.news.length > 40) d.news.splice(0, d.news.length - 40);
   }
