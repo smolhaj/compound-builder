@@ -223,3 +223,12 @@ describe('facingReaches', () => {
     r.forEach((v, i) => expect(v).toBeLessThanOrEqual(ext[i]));
   });
 });
+
+import { facingReachMax, FACING_MAX_HEIGHT } from './roadWorks';
+describe('facing reach cap', () => {
+  it('never veneers more than a few feet of bank, however tall the cut', () => {
+    expect(facingReachMax(0.5, 1.2)).toBeCloseTo(FACING_MAX_HEIGHT * 1.2 + 0.1, 6);
+    expect(facingReachMax(0.5, 1.2)).toBeLessThan(0.4);   // 8 ft out at most (1 u = 20 ft), not the 14 ft slab
+    expect(facingReachMax(0.1, 1.2)).toBeCloseTo(0.22, 6);   // a low bank keeps its own height
+  });
+});
