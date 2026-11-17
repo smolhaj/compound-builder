@@ -54,13 +54,14 @@ export class RoadsideProps {
     if (!props.length) { this.mesh.geometry = new THREE.BufferGeometry(); this.mesh.visible = false; return; }
     const geos: THREE.BufferGeometry[] = [];
     for (const p of props) {
+      const zk = p.type === 'figure' ? Math.min(zoom, 3) : zoom;   // people grow less (a giant on the diorama reads as a cartoon)
       for (const part of partsOf(p)) {
         const g = part.geo;
         tmpE.set(part.rx ?? 0, 0, part.rz ?? 0);
         tmpQ.setFromEuler(tmpE);
         // local (part) -> prop frame (rotate about y by the prop's rot) -> world
-        tmpS.set(zoom, zoom, p.type === 'tape' ? 1 : zoom);
-        tmpM.compose(tmpV.set(part.x * zoom, part.y * zoom, part.z * zoom), tmpQ, tmpS);
+        tmpS.set(zk, zk, p.type === 'tape' ? 1 : zk);
+        tmpM.compose(tmpV.set(part.x * zk, part.y * zk, part.z * zk), tmpQ, tmpS);
         g.applyMatrix4(tmpM);
         tmpM.makeRotationY(p.rot); g.applyMatrix4(tmpM);
         g.translate(p.x, p.y, p.z);

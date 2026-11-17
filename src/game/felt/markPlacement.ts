@@ -43,6 +43,11 @@ const ROAD_FAR = 128;
  * comparable to the traffic); the placement draws them closer: the nearest sit about 12 units up the road from the gate (in the eye shot's
  * view, which looks north from the cabin) and the far ones are halved.
  */
+/** How far the marks' road runs in from the real one: the county road is about 33 units off the camp, so the marks stand on a copy of it 13 units out (a roadblock across the drive, a queue at the gate). Zero where the road is already near. */
+export const MARK_ROAD_OFFSET = 13;
+export const markRoadShift = (h: Pick<PlaceHost, 'camp' | 'roadX' | 'gateZ'>): number => Math.max(0, h.roadX(h.gateZ) - h.camp.x - MARK_ROAD_OFFSET);
+/** Center line of the road the marks are drawn on (the county road, brought in toward the camp). */
+export const markRoadX = (h: Pick<PlaceHost, 'camp' | 'roadX' | 'gateZ'>, z: number): number => h.roadX(z) - markRoadShift(h);
 export const near = (s: number): number => (s < 0 ? -8 + s * 0.5 : s * 0.5);
 
 /** Cells of the decal atlas used by each decal kind, with its tint and size range (world units). */
@@ -72,7 +77,7 @@ export function placeMarks(s: GameState, marks: readonly WorldMark[], h: PlaceHo
     return null;
   };
   /** A point on the road (lat across it, in units from the center line) at `s` units from the gate. */
-  const onRoad = (sRoad: number, lat: number): [number, number] => { const z = h.gateZ + sRoad; return [h.roadX(z) + lat, z]; };
+  const onRoad = (sRoad: number, lat: number): [number, number] => { const z = h.gateZ + sRoad; return [markRoadX(h, z) + lat, z]; };
   const shoulder = (sRoad: number, side: 1 | -1): [number, number] => onRoad(sRoad, side * (h.roadHalf + 0.35));
 
   /** The highest ground under a decal of this size (the quad is flat, so on a slope it must clear the high side). */

@@ -179,8 +179,8 @@ try {
     cb.store.setState({ hudHidden: true });
     if (mode === 'eye') { const x = sp[0] + 2, z = sp[1] + 7; cb.qa.pose = { x, y: gr(x, z) + 0.34, z, lx: sp[0] - 1, ly: gr(sp[0], sp[1]) + 0.9, lz: sp[1] - 8, fov: 66 }; }
     else if (mode === 'road') { // from the yard looking up the county road past the gate (where the felt marks stand)
-      const x = sp[0] + 3, z = sp[1] + 6, tz = sp[1] - 4, tx = cb.world.county.x(tz) - 4;
-      cb.qa.pose = { x, y: gr(x, z) + 0.8, z, lx: tx, ly: gr(tx, tz) + 0.2, lz: tz, fov: 66 };
+      const x = sp[0] - 2, z = sp[1] + 5, tx = sp[0] + 14, tz = sp[1] - 8;
+      cb.qa.pose = { x, y: gr(x, z) + 0.8, z, lx: tx, ly: gr(tx, tz) + 0.3, lz: tz, fov: 66 };
     }
     else { cb.qa.pose = null; cb.cam.target.set(sp[0], gr(sp[0], sp[1]), sp[1]); cb.cam.radius = 30; cb.cam.pitch = 0.62; cb.cam.yaw = 0.7; }
   }, mode);
@@ -398,6 +398,7 @@ try {
         const ms = await milestone(); if (ms) { note(kind, `a milestone popup covered the week-1 ${v} view (${ms.trim()}); dismissed`); await page.waitForTimeout(300); }
         const m = await modalUp(); if (m.length) note(kind, `a modal covers the week-1 ${v} shot: ${m.join(', ')}`);
         const f = await shoot(`w1-${v}`, true);
+        R.notes[`proj_${v}`] = await page.evaluate(() => { const cb = window.__cb, cam = cb.ws.camera, pl = cb.feltWorld.placed; if (!pl) return null; return { cam: [cam.position.x, cam.position.y, cam.position.z].map(n => +n.toFixed(1)), camp: [cb.world.camp.x, cb.world.camp.z], zoom: cb.feltWorld._zoom, props: pl.props.filter(p => p.type !== 'figure' && p.type !== 'cone').slice(0, 6).map(p => { const v = { x: p.x, y: p.y + 0.2, z: p.z }; const a = cam.position, d = Math.hypot(v.x - a.x, v.z - a.z); const vv = new cam.position.constructor(v.x, v.y, v.z).project(cam); return [p.type, +p.x.toFixed(1), +p.z.toFixed(1), +vv.x.toFixed(2), +vv.y.toFixed(2), +d.toFixed(1)]; }) }; });
         const pct = await diff(f, peace[v]); R.diff[`w1_${v}`] = +pct.toFixed(2);
       }
       if (night) { await page.evaluate(() => window.__fx.hour(23)); await view('aerial'); await shoot('w1-night-aerial', true); await view('eye'); await shoot('w1-night-eye', true); await page.evaluate(() => window.__fx.noon()); }

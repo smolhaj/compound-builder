@@ -39,7 +39,7 @@ import { planParcelTrees } from '../game/parcel/parcelTrees';
 import { planNeighbors } from '../game/region/neighbors';
 import { feltMarks } from './felt/marks';
 import { feltSpec } from './felt/registry';
-import { placeMarks, type PlaceHost } from '../game/felt/markPlacement';
+import { markRoadX, placeMarks, type PlaceHost } from '../game/felt/markPlacement';
 import type { DisasterKind } from './disaster';
 import { animalGoal, housesFor, PADDOCK_TRIES, type Home, type StockKind } from '../game/livestock/livestockPlan';
 
@@ -432,7 +432,7 @@ export function feltSceneProblems(sc: Scene, kind: DisasterKind, day: number): S
     if (m.anchor.at === 'structure') continue;
     const k = inside(p.x, p.z); if (k) add('felt prop inside a building', `${p.type} on a ${k}`);
     if (m.anchor.at !== 'road' && Math.abs(p.x - host.roadX(p.z)) < host.roadHalf) add('felt prop on the county road', `${p.type} (${m.kind})`);
-    if (m.kind === 'checkpoint' && Math.abs(p.x - host.roadX(p.z)) > host.roadHalf + 1.5) add('checkpoint off the road corridor', `${p.type} at ${p.x.toFixed(1)}`);
+    if (m.kind === 'checkpoint' && Math.abs(p.x - markRoadX(host, p.z)) > host.roadHalf + 1.5) add('checkpoint off the road corridor', `${p.type} at ${p.x.toFixed(1)}`);
     if (m.anchor.at !== 'road' && onAccess(p.x, p.z, 0.0) && p.type !== 'tarp') add('felt prop on the drive', `${p.type} (${m.kind})`);
   }
   if (placed.flood && placed.flood.feet > 45) add('flood deeper than a sane stage', `${placed.flood.feet} ft`);

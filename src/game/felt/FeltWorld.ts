@@ -77,7 +77,7 @@ export class FeltWorld {
    * zoom otherwise). Bucketed to halves so the merged mesh is rebuilt only when the view really changes.
    */
   setViewDistance(d: number): void {
-    const k = Math.round(Math.max(1, Math.min(6, d / 6)) * 2) / 2;
+    const k = Math.round(Math.max(1, Math.min(6, d / 4.5)) * 2) / 2;
     if (k === this._zoom) return;
     this._zoom = k;
     if (this._last) this.props.set(this._last.props, k);
