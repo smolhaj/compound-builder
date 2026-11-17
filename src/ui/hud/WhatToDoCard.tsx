@@ -16,6 +16,9 @@ import { TOP_BAR } from './drawerRegistry';
 import { useOverlayPlan } from '../feel/useOverlayPlan';
 import { topTier } from '../../sim/overlayQueue';
 import { useWindowSize } from './drawerHooks';
+import { feedOf } from '../../sim/felt/feed';
+
+const FEED_GLYPH = ['', '', T.glyph.warn, T.glyph.bad] as const;
 
 const KEY = 'cb.todo.collapsed';
 const readCollapsed = (): boolean => { try { return localStorage.getItem(KEY) === '1'; } catch { return false; } };
@@ -45,7 +48,11 @@ export function WhatToDoCard() {
     return v;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [k, drive]);
-  useEffect(() => { useHudText.getState().set(todo.rows.map(r => r.title)); return () => useHudText.getState().set([]); }, [todo]);
+  // the newest line of "What's different" (the Board's Feed page has all of them), once the world has been hit
+  const d = game.disaster, feed = d.kind && game.clock.t >= d.hitAt ? feedOf(game) : undefined;
+  const feedLines = (feed?.lines ?? []).filter(l => l.id !== 'radio.digest'), top = feedLines[0];
+  const feedText = top && top.id !== 'quiet' ? top.text : null;
+  useEffect(() => { useHudText.getState().set([...todo.rows.map(r => r.title), ...(feedText ? [feedText] : [])]); return () => useHudText.getState().set([]); }, [todo, feedText]);
   // a decision card is centered and wide: on a narrow window it would sit on top of this card, so the card steps aside for it
   const { vw } = useWindowSize(), plan = useOverlayPlan();
   if (!todo.rows.length || (topTier(plan) === 'blocking' && vw / scale < 1240)) return null;
@@ -90,6 +97,12 @@ export function WhatToDoCard() {
         {note && <div style={{ color: tv.color('warn') }}>{note}</div>}
         {guardNode}
       </div>}
+      {feedText && top && <button type="button" data-testid="feed-line" title={`What's different today: ${feedText}`} onMouseDown={e => e.preventDefault()} onClick={() => useDrawerStore.getState().showPage('board', 'feed')}
+        style={{ all: 'unset', boxSizing: 'border-box', width: '100%', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderTop: `1px solid ${T.color.line}`, color: tv.color('dim'), fontSize: tv.font('sm') }}>
+        <span aria-hidden style={{ flex: 'none', color: top.tone >= 3 ? tv.color('bad') : top.tone === 2 ? tv.color('warn') : tv.color('dim') }}>{FEED_GLYPH[top.tone] || T.glyph.info}</span>
+        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: tv.color('text') }}>{feedText}</span>
+        {feedLines.length > 1 && <span style={{ flex: 'none' }}>+{feedLines.length - 1}</span>}
+      </button>}
     </div>
   );
 }

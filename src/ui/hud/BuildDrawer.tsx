@@ -6,6 +6,7 @@
  */
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKey } from 'react';
 import { createPortal } from 'react-dom';
+import { LONG_PRESS_MS, PRESS_SLOP } from './cardLayout';
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
 import { useDrawerStore } from '../../store/drawerStore';
@@ -43,11 +44,18 @@ function OpStrip({ ops, pick }: { ops: OpItem[]; pick: (c: CatId) => void }) {
   </div>;
 }
 
-function Row({ e, st, idx, armed, onHover, onArm }: { e: CatalogEntry; st: CardState; idx: number; armed: boolean; onHover: (e: CatalogEntry | null, el: HTMLElement | null) => void; onArm: (e: CatalogEntry) => void }) {
+function Row({ e, st, idx, armed, onHover, onArm }: { e: CatalogEntry; st: CardState; idx: number; armed: boolean; onHover: (e: CatalogEntry | null, el: HTMLElement | null, touch?: boolean) => void; onArm: (e: CatalogEntry) => void }) {
   const off = st.kind === 'off', next = st.kind === 'next';
+  // touch: a long press opens the bill (hover does not exist), and the tap that ends it does not arm the piece
+  const press = useRef<ReturnType<typeof setTimeout>>(undefined), swallow = useRef(false), at = useRef({ x: 0, y: 0 });
+  const stop = () => clearTimeout(press.current);
   return <button type="button" data-testid="build-card" data-key={e.key} data-state={st.kind} data-idx={idx} aria-disabled={off || undefined}
-    onPointerEnter={ev => onHover(e, ev.currentTarget)} onPointerLeave={() => onHover(null, null)} onFocus={ev => onHover(e, ev.currentTarget)} onBlur={() => onHover(null, null)}
-    onClick={() => { if (!off) onArm(e); }}
+    onPointerEnter={ev => { if (ev.pointerType !== 'touch') onHover(e, ev.currentTarget); }} onPointerLeave={ev => { if (ev.pointerType !== 'touch') onHover(null, null); }}
+    onFocus={ev => { if (ev.currentTarget.matches(':focus-visible')) onHover(e, ev.currentTarget); }} onBlur={() => onHover(null, null)}
+    onPointerDown={ev => { if (ev.pointerType !== 'touch') return; const el = ev.currentTarget; at.current = { x: ev.clientX, y: ev.clientY }; stop(); press.current = setTimeout(() => { swallow.current = true; onHover(e, el, true); }, LONG_PRESS_MS); }}
+    onPointerMove={ev => { if (Math.hypot(ev.clientX - at.current.x, ev.clientY - at.current.y) > PRESS_SLOP) stop(); }} onPointerUp={stop} onPointerCancel={stop}
+    onContextMenu={ev => { if (press.current || swallow.current) ev.preventDefault(); }}
+    onClick={() => { if (swallow.current) { swallow.current = false; return; } if (!off) onArm(e); }}
     style={{ display: 'flex', alignItems: 'center', gap: T.space[2], width: '100%', boxSizing: 'border-box', textAlign: 'left', font: 'inherit', color: armed ? tv.color('onAccent') : tv.color('text'), cursor: off ? 'not-allowed' : 'pointer',
       padding: '5px 8px 5px 6px', minHeight: 46, borderRadius: tv.radius('control'), border: `1px solid ${next && !armed ? tv.color('accent') : 'transparent'}`,
       background: armed ? tv.color('accent') : next ? 'rgba(216,201,160,0.10)' : 'rgba(255,255,255,0.04)' }}>
@@ -100,7 +108,7 @@ export function BuildDrawer() {
   const g = useGameStore(), game = g.game, scale = useWorldStore(w => w.uiScale), drive = useWorldStore(w => w.siteGeo)?.drive;
   const { arm, note, guardNode } = useRunAct(() => useDrawerStore.getState().show('projects'));
   const [query, setQuery] = useState(''), [cat, setCat] = useState<CatId | null>(null), [rec, setRec] = useState(false), [tools, setTools] = useState(false);
-  const [hover, setHover] = useState<{ e: CatalogEntry; el: HTMLElement } | null>(null);
+  const [hover, setHover] = useState<{ e: CatalogEntry; el: HTMLElement; touch?: boolean } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null), listRef = useRef<HTMLDivElement>(null);
 
   const over = runOver(game), foster = fosterNote(game);
@@ -138,6 +146,13 @@ export function BuildDrawer() {
 
   const pick = (c: CatId | null) => { setCat(cur => (cur === c ? null : c)); setRec(false); setTools(false); };
   const onArm = (e: CatalogEntry) => { setHover(null); arm(e.tool); };
+  const touchBill = !!hover?.touch;
+  useEffect(() => {
+    if (!touchBill) return;
+    const f = (ev: PointerEvent) => { if (!(ev.target as Element).closest?.('[data-testid="build-card"]')) setHover(null); };
+    document.addEventListener('pointerdown', f, true);
+    return () => document.removeEventListener('pointerdown', f, true);
+  }, [touchBill]);
 
   // / focuses the search while this drawer is the one open
   useEffect(() => {
@@ -171,7 +186,7 @@ export function BuildDrawer() {
   </div>;
 
   if (over || foster) return <BuildMenu toolsOnly />;
-  const rowOf = (e: CatalogEntry) => <Row key={e.key} e={e} st={states.get(e.key)!} idx={idxOf.get(e.key) ?? 0} armed={g.tool === e.tool} onHover={(x, el) => setHover(x && el ? { e: x, el } : null)} onArm={onArm} />;
+  const rowOf = (e: CatalogEntry) => <Row key={e.key} e={e} st={states.get(e.key)!} idx={idxOf.get(e.key) ?? 0} armed={g.tool === e.tool} onHover={(x, el, touch) => setHover(x && el ? { e: x, el, touch } : null)} onArm={onArm} />;
   return <div data-testid="build-drawer" style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
     <OpStrip ops={ops} pick={c => pick(c)} />
     <StarterCompound wanted={starterWanted(game)} first={!game.structures.some(s => !s.unplaced)} />

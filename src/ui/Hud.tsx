@@ -10,6 +10,11 @@ import { ActionBar } from './hud/ActionBar';
 import { T, tv } from './hud/tokens';
 import { WhatToDoCard } from './hud/WhatToDoCard';
 import { DrawerHeader } from './hud/DrawerHost';
+import { BoardDrawer } from './hud/BoardDrawer';
+import { LayoutAStyle } from './hud/LayoutAStyle';
+import { TitleCards } from './hud/TitleCards';
+import { MaybePages, Page } from './hud/SubPages';
+import { FARM_VIEWS, type FarmView } from './hud/farmViews';
 import { drawerFrame, useDrawerKeys, useHintBottom, useWindowSize } from './hud/drawerHooks';
 import { useDrawerStore } from '../store/drawerStore';
 import { BAR_H, barBottom, hostOf, type DrawerId } from './hud/drawerRegistry';
@@ -90,6 +95,7 @@ import { effectiveDose } from '../sim/radiation';
 import { drinkShare } from '../sim/thirst';
 import { barterPrices, moneyWorks, type Good } from '../sim/barter';
 import { MarketSection, NeighborsSection, RumorsSection, ScavengeSection } from './WorldPanels';
+import { openRumors } from '../sim/rumors';
 import { alliesFor, canGo, FAR_COLD, isAway, latestFarLead, latestLead, LEAD_COLD, LEAD_WARM, leadAge, openCaptives, raidProblem, rescueOdds, tripFuel, tripProblem } from '../sim/rescue';
 import { EXPOSURE_NAME, exposure, raidPressure, topExposure } from '../sim/opsec';
 import { acresOf, buyProblem, LAND_NAME, premiumOffer, priceOf } from '../sim/land';
@@ -241,7 +247,7 @@ export function Hud() {
   const [lastFocus, setLastFocus] = useState<typeof g.hudFocus>(g.hudFocus);
   if (g.hudFocus !== lastFocus) {
     setLastFocus(g.hudFocus);
-    if (g.hudFocus) { setRightTab(g.hudFocus.right); if (g.hudFocus.supplies) setSuppliesTab(g.hudFocus.supplies); }
+    if (g.hudFocus) { setRightTab(g.hudFocus.right); if (g.hudFocus.supplies) { setSuppliesTab(g.hudFocus.supplies); if (w.layout === 'a') useDrawerStore.getState().setPage('supplies', g.hudFocus.supplies === 'farm' ? 'season' : 'stores'); } }
   }
   // First-hour HUD (sim/tabReveal.ts): right-hand tabs appear as they become relevant; "Show all tabs" brings them all back
   const feel = useFeelStore();
@@ -259,10 +265,13 @@ export function Hud() {
   // layout A: one drawer at a time (hud/drawerRegistry.ts); the panel bodies below are the Classic tabs' bodies, so the open drawer picks the tab
   const A = w.layout === 'a';
   const dOpen = useDrawerStore(d => d.open);
+  const supPage = useDrawerStore(d => d.pages.supplies) ?? 'stores';
   const { vw: winW, vh: winH } = useWindowSize();
   useDrawerKeys(A);
+  // anything that asks for the Board (a chip, the menu, a link) opens its drawer in layout A
+  useEffect(() => { if (A && boardOpen) { useDrawerStore.getState().show('board'); useWorldStore.getState().setBoardOpen(false); } }, [A, boardOpen]);
   const wantTab = A ? dOpen : null, [lastWant, setLastWant] = useState(wantTab);
-  if (wantTab !== lastWant) { setLastWant(wantTab); if (wantTab) { if (hostOf(wantTab) === 'left') setLeftTab(wantTab as 'build' | 'projects' | 'log'); else setRightTab(wantTab as RightTab); } }
+  if (wantTab !== lastWant) { setLastWant(wantTab); if (wantTab) { const h = hostOf(wantTab); if (h === 'left') setLeftTab(wantTab as 'build' | 'projects' | 'log'); else if (h === 'right') setRightTab(wantTab as RightTab); } }
   // a link elsewhere ("Show me", a chip, a board line) asked for a tab: open its drawer
   const seenFocus = useRef(g.hudFocus);
   useEffect(() => { const f = g.hudFocus; if (A && f && f !== seenFocus.current) useDrawerStore.getState().show(f.right); seenFocus.current = f; }, [A, g.hudFocus]);
@@ -294,7 +303,7 @@ export function Hud() {
   // layout A pieces: the drawer's frame, the action bar's alerts, and the footer that must stay visible when the drawer steps aside
   const tickerOn = !A && game.disaster.news.length > 0;
   const drawerShown = A && !!dOpen && !w.hudHidden && !parked;
-  const frame = (host: 'left' | 'right') => drawerFrame(winW, winH, w.uiScale, tickerOn, drawerShown && !!dOpen && hostOf(dOpen) === host);
+  const frame = (host: 'left' | 'right' | 'board') => drawerFrame(winW, winH, w.uiScale, tickerOn, drawerShown && !!dOpen && hostOf(dOpen) === host);
   const barAlerts: Partial<Record<DrawerId, Tone>> = { family: familyAlert, supplies: worstTone(foodAlert, farmAlert(game)), utilities: utilAlert, defense: defenseAlert, outside: outsideAlert, projects: projectsAlert };
   const dimTabs = new Set<DrawerId>(RIGHT_TABS.filter(t => !shownTabs.has(t)));
   const freshTabs = new Set<DrawerId>(feel.fresh);
@@ -316,6 +325,14 @@ export function Hud() {
     </div>}
   </>;
 
+  const campsBlock = trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
+              <Row label="On trial" value={`day ${Math.max(0, dayIndex(game.clock.t) - c.from)} of ${c.until - c.from}`} />
+              <Row label="People" value={c.people.map(p => `${p.first}${p.kid ? ` (${p.age})` : ''}`).join(', ')} />
+              <Row label="Their ration" value={`${caloriesText(campNeed(c))} a day from your supplies${c.hungry ? ` · short ${pluralize(c.hungry, 'day')}` : ''}`} />
+              <Row label="Work put in" value={`${Math.round(c.worked)} h`} />
+              {c.learned.map((l, k) => <Note key={k} tone="warn">{l}</Note>)}
+              {!c.learned.length && <div style={{ fontSize: 11, color: DIM }}>Not family yet. You'll know them better by the end of the month.</div>}
+            </Section>);
   return (
     <>
       {!A && <ToastLine />}
@@ -327,6 +344,8 @@ export function Hud() {
       {!A && <WelcomeCard />}
       {/* Layout A: the new top bar (docs/UX_AUDIT.md 11.1); Classic keeps the bar below */}
       {w.layout === 'a' && <>
+        <LayoutAStyle />
+        <TitleCards />
         <TopBar barRef={barRef} onBoard={() => setBoardOpen(true)} onSide={setSide} />
         {game.clock.speed > 0 && planningHold(g.tool, g.planOpen) && <div data-testid="planning-hint" style={{ position: 'fixed', top: 10 + 44 * w.uiScale + 6, left: '50%', transform: 'translateX(-50%)', zIndex: 3, color: '#f2efe4', background: 'rgba(20,22,18,0.9)', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 8, padding: '3px 10px', fontSize: 12.5, whiteSpace: 'nowrap', pointerEvents: 'none' }}>▲ Paused while planning</div>}
       </>}
@@ -378,8 +397,9 @@ export function Hud() {
           .filter(([id]) => shownTabs.has(id) || id === rightTab).map(([id, label, alert]): [RightTab, string, Tone?, boolean?] => [id, label, alert, feel.fresh.includes(id) && id !== rightTab])} value={rightTab} set={setRightTab} />}
         {!A && feel.firstHourHud && <button data-testid="show-all-tabs" onClick={() => feel.setShowAll(!feel.showAll)} title={feel.showAll ? 'Hide the tabs that have nothing to show yet' : 'Tabs appear as they become useful. Show every tab now.'} style={{ alignSelf: 'flex-end', background: 'transparent', border: 0, color: DIM, cursor: 'pointer', fontSize: FS.fine, padding: '0 2px 4px', marginTop: -4, textDecoration: 'underline' }}>{feel.showAll ? 'Hide unused tabs' : 'Show all tabs'}</button>}
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
+          <MaybePages on={A} drawer={rightTab} always={rightTab === 'supplies'} key={rightTab}>
           {rightTab === 'family' && <>
-            {game.people.map((p, i) => {
+            <Page id="people">{game.people.map((p, i) => {
               const st = game.personState[i], n = st?.needs;
               if (n?.left) return null;   // moved away (sim/newcomers.ts): not on the roll, noted under Newcomers
               const bar = (v: number, c: string, t: string) => <div title={t} style={{ flex: 1, height: 4, background: '#333', borderRadius: 2 }}><div style={{ width: `${Math.max(0, v)}%`, height: '100%', background: c, borderRadius: 2 }} /></div>;
@@ -401,33 +421,26 @@ export function Hud() {
                   return <div style={{ fontSize: 11, color: days < 14 ? TONE.bad : days < 45 ? TONE.warn : DIM, marginTop: 2 }}>{p.conditions!.map(c => CONDITION[c].name).join(', ')}: {days > 0 ? `${pluralize(days, 'day')} of ${p.conditions!.map(c => CONDITION[c].rx).join(' and ')}` : 'out of medicine'}</div>;
                 })()}
               </div>;
-            })}
-            <WeekenderPanel />
-            <DogsPanel game={game} />
-            <KinPanel />
-            <NewcomersPanel />
-            <HouseRulesPanel />
-            <RoadSection />
-            <HousingPanel />
-            <QuartersPanel />
-            <PeopleSection />
-            {!runOver(game) && <MedicalSection />}
-            <ClassesSection />
-            {!runOver(game) && <DailySection />}
-            {trialCamps(game).map(c => <Section key={c.id} title={`Camp outside the wall: ${c.title}`}>
-              <Row label="On trial" value={`day ${Math.max(0, dayIndex(game.clock.t) - c.from)} of ${c.until - c.from}`} />
-              <Row label="People" value={c.people.map(p => `${p.first}${p.kid ? ` (${p.age})` : ''}`).join(', ')} />
-              <Row label="Their ration" value={`${caloriesText(campNeed(c))} a day from your supplies${c.hungry ? ` · short ${pluralize(c.hungry, 'day')}` : ''}`} />
-              <Row label="Work put in" value={`${Math.round(c.worked)} h`} />
-              {c.learned.map((l, k) => <Note key={k} tone="warn">{l}</Note>)}
-              {!c.learned.length && <div style={{ fontSize: 11, color: DIM }}>Not family yet. You'll know them better by the end of the month.</div>}
-            </Section>)}
-            {!runOver(game) && game.people.some(p => p.conditions?.length) && <Section title="Medicine & household">
+            })}</Page>
+            <Page id="kin"><WeekenderPanel /></Page>
+            <Page id="dogs"><DogsPanel game={game} /></Page>
+            <Page id="kin"><KinPanel /></Page>
+            <Page id="kin"><NewcomersPanel /></Page>
+            <Page id="home"><HouseRulesPanel /></Page>
+            {!A && <RoadSection />}
+            <Page id="home"><HousingPanel /></Page>
+            <Page id="home"><QuartersPanel /></Page>
+            <Page id="people"><PeopleSection /></Page>
+            <Page id="medical">{!runOver(game) && <MedicalSection />}</Page>
+            <Page id="classes"><ClassesSection /></Page>
+            <Page id="daily">{!runOver(game) && <DailySection />}</Page>
+            {!A && campsBlock}
+            <Page id="medical">{!runOver(game) && game.people.some(p => p.conditions?.length) && <Section title="Medicine & household">
               {pharmacyOpen(game) ? <button style={{ ...btn(), width: '100%' }} title="Fill everyone's prescriptions three months beyond the current month (as far ahead as insurance covers)" onClick={() => g.stockUpRx()}>Fill prescriptions 90 days ahead</button>
                 : <Note tone="warn">The pharmacy is shut: what's on hand is all there is.</Note>}
               <Row label="Hygiene supplies" value={game.disaster.tracks.stores >= 0.5 ? `bought with groceries · ${Math.floor(game.stock.hygiene)} on hand` : `${Math.floor(game.stock.hygiene)} person-months left`} />
-            </Section>}
-            <Section title="Work and money">
+            </Section>}</Page>
+            <Page id="work"><Section title="Work and money">
               {game.disaster.tracks.banks > 0.5 && game.disaster.tracks.stores > 0.5 && <Row label="Household costs" value={`$${livingPerDay(game)}/day`} />}
               {game.people.filter((p, i) => p.job && !game.personState[i]?.needs.left).map(p => {
                 const st = game.personState.find(x => x.id === p.id);
@@ -442,15 +455,17 @@ export function Hud() {
                     : <button style={btn()} title={st?.employed ? `Quitting gives up $${p.job!.wage}/day but puts ${p.first} on the site five more days a week` : undefined} onClick={() => st?.employed ? setQuitAsk(p.id) : g.setEmployed(p.id, true)}>{st?.employed ? 'Quit' : 'Go back'}</button>)}
                 </div>;
               })}
-            </Section>
+            </Section></Page>
           </>}
 
           {rightTab === 'supplies' && <>
-            <Tabs tabs={[['stores', 'Stores', foodAlert], ['farm', 'Farm', farmAlert(game)]]} value={suppliesTab} set={setSuppliesTab} />
-            {suppliesTab === 'farm' && <FarmTab game={game} />}
-            {suppliesTab === 'stores' && <>
-            <PantryPanel game={game} />
-            <ToolsPanel game={game} />
+            {!A && <Tabs tabs={[['stores', 'Stores', foodAlert], ['farm', 'Farm', farmAlert(game)]]} value={suppliesTab} set={setSuppliesTab} />}
+            {!A && suppliesTab === 'farm' && <FarmTab game={game} />}
+            {A && FARM_VIEWS.has(supPage) && <Page id={supPage}><FarmTab game={game} view={supPage as FarmView} /></Page>}
+            {(A || suppliesTab === 'stores') && <>
+            <Page id="stores"><PantryPanel game={game} /></Page>
+            <Page id="stores"><ToolsPanel game={game} /></Page>
+            <Page id="keeping">
             <Group id="sup-keeping" title="Keeping" defaultOpen={false} extra={`rotate ${game.shelf.rotate ? 'on' : 'off'} · traps ${game.shelf.traps > 0 ? 'set' : game.stock.traps >= 1 ? 'boxed' : 'none'}`}>
               {KEPT.filter(k => game.stock[k] > 0.05).map(k => {
                 const kp = keeping(game, k), yrs = (d: number) => d >= 365 ? `${(d / 365).toFixed(1)} yr` : `${Math.round(d / 30)} mo`;
@@ -480,6 +495,8 @@ export function Hud() {
               {populations(game).map(p => <Row key={p.sp} label={p.name} value={<span style={{ color: p.predator ? (p.count ? TONE.warn : DIM) : p.count < p.cap * 0.5 ? TONE.warn : undefined }}>{p.count} <span style={{ color: DIM }}>of ~{p.cap < 1 ? '<1' : Math.round(p.cap)}</span></span>} title={p.predator ? 'A predator: a danger to stock, dogs and kids if the place is careless; kept out by a wall that holds it; a good shot fills the freezer' : 'Counts follow the acres you own, the timber, open ground and water, and what has been hunted'} />)}
               <Note tone={predatorLine(game).ok ? 'good' : 'warn'}>Predators: {predatorLine(game).detail}</Note>
             </Group>
+            </Page>
+            <Page id="stores">
             <Section title="Food">
               {(() => {
                 const f = game.food, d = daysOfFood(game);
@@ -516,6 +533,7 @@ export function Hud() {
                 <button style={btn()} title="Everything else is bought here, grouped by use: building, fencing, water, power, food, and so on" onClick={() => g.openShop(true)}>Buy materials in the Shop…</button>
               </div>
             </Section>
+            </Page>
             </>}
           </>}
 
@@ -524,7 +542,7 @@ export function Hud() {
             const gr = greenRicks(game), next = game.upkeep.green.length ? Math.max(0, Math.ceil(SEASON_DAYS - (game.clock.t - Math.min(...game.upkeep.green.map(x => x.at))))) : 0;
             const ch = chimneyState(game);
             return <>
-              <Section title="Heat">
+              <Page id="heat"><Section title="Heat">
                 <Row label="Firewood, seasoned" value={`${Math.floor(game.stock.firewood)} face cord${Math.floor(game.stock.firewood) === 1 ? '' : 's'}`} />
                 {gr > 0 && <Row label="Green, seasoning" value={`${Math.round(gr * 10) / 10} face cords · next ready in ${pluralize(next, 'day')}`} />}
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
@@ -532,8 +550,8 @@ export function Hud() {
                   {ch !== 'clean' && <button style={btn(ch === 'dirty')} title="Creosote builds up with every face cord burned (green wood three times as fast); a dirty flue can catch fire" onClick={() => g.sweep()}>{game.disaster.tracks.stores >= 0.5 && game.disaster.tracks.banks >= 0.5 ? `Sweep it ($${SWEEP_USD})` : 'Sweep it ourselves'}</button>}
                 </div>
                 {game.stock.firewood < 1 && gr >= 1.5 && <Note tone="warn">Burning green wood: half again as much, and the flue fouls fast.</Note>}
-              </Section>
-              <Section title="Power (yesterday)">
+              </Section></Page>
+              <Page id="power"><Section title="Power (yesterday)">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, padding: '2px 0' }}>
                   <span style={{ color: DIM }}>County grid</span>
                   <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -553,8 +571,8 @@ export function Hud() {
                 {r.genKwh > 0.1 && <Note>The generator ran {Math.round(r.genKwh / 7 * 10) / 10} h: it carries about half a mile on a still night.</Note>}
                 {r.shed.length > 0 && <Note tone="warn">Went without: {r.shed.map(id => KIT[game.structures.find(x => x.id === id)?.kind ?? '']?.name ?? '?').join(', ')}</Note>}
                 {r.shortKwh > 0.5 && <Note tone="warn">Power ran short.</Note>}
-              </Section>
-              <Section title="Water (yesterday)">
+              </Section></Page>
+              <Page id="water"><Section title="Water (yesterday)">
                 <Row label="In / used" value={`${gallonsText(r.waterL)} / ${gallonsText(r.useL)}`} />
                 <Row label="Stored" value={`${gallonsText(r.storedL)} of ${gallonsText(storageCapacity(game))}`} />
                 {irrigationStore(game).cap > 0 && <Row label="Pond (garden, fire)" value={`${gallonsText(irrigationStore(game).have)} of ${gallonsText(irrigationStore(game).cap)}`} title="Pond water waters the garden and fills the fire line; it is not drinking water. A reservoir counts as drinking water once the filtration shed or a filter is on the place." />}
@@ -569,13 +587,13 @@ export function Hud() {
                 {game.utilities.hauling && game.stock.water_filter < 0.01 && <Note tone="warn">{game.stock.firewood >= 0.05 ? 'Boiling the creek water (firewood): a filter would save the wood.' : 'Drinking the creek water untreated: giardia. Get a filter or boil it.'}</Note>}
                 {game.site.gwQuality === 'arsenic' && game.stock.ro_system < 1 && <Note tone="warn">Arsenic in the well water: get reverse osmosis for drinking water.</Note>}
                 {game.site.gwQuality === 'hard' && game.stock.softener < 1 && <Note>Hard water: scale wears the pump faster without a softener.</Note>}
-              </Section>
-              <FleetPanel />
+              </Section></Page>
+              <Page id="vehicles"><FleetPanel /></Page>
             </>;
           })()}
 
           {rightTab === 'land' && <>
-            <Section title="The place">
+            <Page id="place"><Section title="The place">
               <Row label="Home place" value={`${pluralize(game.site.acres, 'acre')}`} />
               <Row label="Region" value={REGIONS[game.site.region].name} />
               {game.site.lot && (() => {
@@ -605,8 +623,8 @@ export function Hud() {
               {(game.roadside ?? []).length > 0 && <Note tone="warn">{game.roadside.length === 1 ? 'A load is' : `${game.roadside.length} loads are`} at the road: about {Math.round(game.roadside.reduce((a, r) => a + r.hours - r.done, 0))} h of carrying before the rest of the building goes on. A gravel drive ends this.</Note>}
               {!game.site.improvements.power && !game.utilities.grid && <Note>No power at the place: run the line, or go solar or a generator.</Note>}
               {game.land.parcels.some(p => p.owner === 'you') && <Row label="Bought since" value={`${pluralize(game.land.parcels.filter(p => p.owner === 'you').reduce((a, p) => a + acresOf(p.rect), 0), 'acre')}`} />}
-            </Section>
-            <Section title="Paperwork">
+            </Section></Page>
+            <Page id="paperwork"><Section title="Paperwork">
               {countyWorks(game) ? <>
                 <Row label="Property tax" value={`${usd(yearlyTax(game))}/yr`} />
                 {hasEstate(game) && <div data-testid="comfort-tier" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6, marginTop: 3 }}>
@@ -624,9 +642,9 @@ export function Hud() {
                 {game.structures.some(x => x.permit === 'none' && !isFinished(x)) && <Note tone="warn">{game.structures.filter(x => x.permit === 'none' && !isFinished(x)).length} build{game.structures.filter(x => x.permit === 'none' && !isFinished(x)).length > 1 ? 's' : ''} going up without a permit.</Note>}
                 {game.paper.fines > 0 && <Row label="Fines paid" value={usd(game.paper.fines)} />}
               </> : <Note>Nobody at the county now: no permits, no tax bills{game.paper.backTax > 0 ? ` (back taxes on the books: ${usd(game.paper.backTax)})` : ''}, and no insurer paying out.</Note>}
-            </Section>
-            <PhysicalPanel game={game} />
-            <Section title="Land next door">
+            </Section></Page>
+            <Page id="place"><PhysicalPanel game={game} /></Page>
+            <Page id="next"><Section title="Land next door">
               {game.land.parcels.map(p => {
                 const n = game.neighbors.find(x => x.id === p.owner), why = buyProblem(game, p);
                 return <div key={p.id} style={{ padding: '4px 0', borderBottom: `1px solid ${LINE}` }}>
@@ -653,7 +671,7 @@ export function Hud() {
                   <div style={{ fontSize: 11, color: DIM }}>{pluralize(acresOf(p.rect), 'acre')} of {LAND_NAME[p.kind]}{p.owner === 'you' ? '' : ` · ${n ? n.name : '?'}`}{p.forSale && p.owner !== 'you' ? <span style={{ color: TONE.warn }}> · for sale</span> : null}{p.ring === 2 && p.owner !== 'you' ? <span style={{ color: DIM }}> · farther out, more expensive</span> : null}{premiumOffer(game, p) ? <span style={{ color: TONE.warn }} title="Not for sale. A cash offer 60% over the asking price would tempt him.">{' · cash offer, +60%'}</span> : null}</div>
                 </div>;
               })}
-            </Section>
+            </Section></Page>
           </>}
 
           {rightTab === 'chronicle' && <Chronicle />}
@@ -661,10 +679,12 @@ export function Hud() {
           {rightTab === 'defense' && <DefenseTab />}
 
           {rightTab === 'outside' && <>
-            <TakenSection />
-            <ScavengeSection />
-            <RumorsSection />
-            {unscripted(game.disaster.mode) && !game.disaster.kind && <FreeBuild />}
+            {A && <Page id="camps">{campsBlock}</Page>}
+            <Page id="world"><TakenSection /></Page>
+            <Page id="world"><ScavengeSection /></Page>
+            {A ? <Page id="world"><RadioLink /></Page> : <RumorsSection />}
+            <Page id="world">{unscripted(game.disaster.mode) && !game.disaster.kind && <FreeBuild />}</Page>
+            <Page id="world">
             {!(game.disaster.phase === 'warning' || (game.disaster.kind && game.clock.t >= game.disaster.warnAt)) && !(unscripted(game.disaster.mode) && !game.disaster.kind) && <Hint more="Watch the news ticker, the prices and the neighbors: the warning signs show there first.">All quiet.</Hint>}
             {(game.disaster.phase === 'warning' || (game.disaster.kind && game.clock.t >= game.disaster.warnAt)) && (
               <Section title="Outside world">
@@ -688,6 +708,8 @@ export function Hud() {
                 ))}
               </Section>
             )}
+            </Page>
+            <Page id="security">
             {(game.gate.prisoners?.length ?? 0) > 0 && <Section title="Prisoners">
               {game.gate.prisoners!.map(p => (
                 <div key={p.id} style={{ marginBottom: 6 }}>
@@ -716,6 +738,8 @@ export function Hud() {
                 </div>
               </Section>;
             })()}
+            </Page>
+            <Page id="neighbors">
             {game.disaster.kind && game.clock.t >= game.disaster.warnAt && <NeighborsSection />}
             <MarketSection />
             {game.clock.t >= game.disaster.hitAt && !moneyWorks(game) && (() => {
@@ -726,14 +750,21 @@ export function Hud() {
                 {rows.map(([label, k]) => <Row key={k} label={label} value={`$${Math.round(p[k]).toLocaleString('en-US')}`} />)}
               </Section>;
             })()}
+            </Page>
           </>}
+          </MaybePages>
         </div>
       </div>
+
+      {A && <div data-drawer="board" style={frame('board')}>
+        <DrawerHeader id="board" />
+        <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}><BoardDrawer /></div>
+      </div>}
 
       {/* the tool hint stays up while the panels are hidden */}
       {!A && w.hudHidden && g.tool && <div style={{ ...panel, position: 'fixed', left: 10, top: 10, maxWidth: 300, fontSize: 12 }}>{g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks or unmarks · Esc stops' : 'Click to place · R rotates · Esc cancels')}</div>}
 
-      {boardOpen && <CompoundBoardPanel anchor={A ? 'left' : 'center'} top={Math.max(lay.panelTop, lay.switchTop)} bottom={A ? aboveBar : lay.bottomReserve} narrow={lay.narrow && !A} onClose={() => setBoardOpen(false)} onSide={setSide} />}
+      {boardOpen && !A && <CompoundBoardPanel anchor={A ? 'left' : 'center'} top={Math.max(lay.panelTop, lay.switchTop)} bottom={A ? aboveBar : lay.bottomReserve} narrow={lay.narrow && !A} onClose={() => setBoardOpen(false)} onSide={setSide} />}
 
       {/* Bottom right: cameras, building view */}
       {!A && <div ref={brRef} style={{ ...panel, position: 'fixed', right: EDGE, bottom: 34, padding: 4, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 'calc(100vw - 20px)', boxSizing: 'border-box' }}>
@@ -908,6 +939,17 @@ function TakenSection() {
 const cap = (x: string) => x[0].toUpperCase() + x.slice(1);
 const KIND_MARK: Record<string, string> = { era: '◆', birth: '✦', death: '✝', partner: '♥', coming: '▲', milestone: '★', retire: '·', home: '⌂', threat: '▼', bond: '✧', photo: '▣' };
 
+/** Layout A: the radio's rumors live in Board > Radio; Outside keeps a one-line pointer while any are open. */
+function RadioLink() {
+  const game = useGameStore(g => g.game);
+  const n = openRumors(game).length, out = !!game.radio?.scout;
+  if (!n && !out) return null;
+  return <Section title="Rumors">
+    <Note tone={out ? 'warn' : undefined}>{out ? 'Someone is out checking a rumor.' : `${n} ${n === 1 ? 'rumor is' : 'rumors are'} unchecked.`}</Note>
+    <button style={btn()} onClick={() => useDrawerStore.getState().showPage('board', 'radio')}>Open the radio (Board)</button>
+  </Section>;
+}
+
 /** The long game: the family over the years, the eras, milestones and the dynasty score. */
 function Chronicle() {
   const game = useGameStore(s => s.game);
@@ -919,7 +961,7 @@ function Chronicle() {
   const d = game.disaster;
   const now = L.settling ? 'the world settling' : d.kind && game.clock.t >= d.hitAt ? 'living through it' : d.kind && game.clock.t >= d.warnAt ? 'warning signs' : 'quiet';
   return <>
-    <Section title={`The ${L.family} family`}>
+    <Page id="family"><Section title={`The ${L.family} family`}>
       <Row label="On the place" value={years < 1 ? 'the first year' : `${years} year${years === 1 ? '' : 's'}`} />
       <Row label="Era" value={`${roman(L.era)} · ${now}`} />
       <Row label="Living here" value={`${living.length} · ${gens} generation${gens === 1 ? '' : 's'}`} />
@@ -935,6 +977,8 @@ function Chronicle() {
       {(L.wards ?? []).length > 0 && <div style={{ padding: '2px 0', color: '#d8c08a' }} title="With no grown person left, a neighbor household took the children in. The place is held for them and comes to the eldest at 18.">Away with {game.neighbors.find(n => n.id === L.wards[0].by)?.name ?? 'a neighbor'}: {L.wards.map(w => `${w.person.first} ${w.person.age}`).join(', ')}</div>}
       <Hint more="Gold are the place's own grown children: the heirs. Skills pass to the children when a parent dies; the house, land and supplies stay one household's.">Gold names are the heirs.</Hint>
     </Section>
+    </Page>
+    <Page id="eras">
     {L.eras.length > 0 && <Section title="Eras">
       {L.eras.map(e => <div key={e.n} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, padding: '2px 0' }}>
         <span title={e.headline}><span style={{ color: DIM }}>{roman(e.n)}</span> {e.name}</span>
@@ -944,14 +988,15 @@ function Chronicle() {
     <Section title={`Milestones ${L.milestones.length}/${MILESTONE_COUNT}`}>
       {L.milestones.length ? L.milestones.map(m => <div key={m} style={{ padding: '1px 0' }}><span style={{ color: '#d8c08a' }}>★</span> {MILESTONE_NAME[m]}</div>) : <Note>None yet. Get through the first winter.</Note>}
     </Section>
-    <Album />
-    <Section title="Chronicle">
+    </Page>
+    <Page id="album"><Album /></Page>
+    <Page id="chronicle"><Section title="Chronicle">
       {L.chronicle.length === 0 && <Note>Births, deaths, weddings, the eras: it all goes here.</Note>}
       {L.chronicle.slice(-40).reverse().map((e, i) => <div key={i} style={{ display: 'flex', gap: 6, padding: '3px 0', borderBottom: `1px solid ${LINE}` }}>
         <span style={{ color: DIM, width: 32, flex: 'none', fontVariantNumeric: 'tabular-nums' }}>{e.year}</span>
         <span style={{ color: e.kind === 'death' ? '#b8a8a0' : e.kind === 'era' ? '#d8c08a' : undefined }}>{KIND_MARK[e.kind]} {e.text}{e.photo && <Thumb id={e.photo} width={150} />}</span>
       </div>)}
-    </Section>
+    </Section></Page>
   </>;
 }
 
