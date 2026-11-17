@@ -13,7 +13,7 @@ import { DIM, FS, LINE, TONE, btn, miniBtn } from './hud/style';
 
 const PAPER = 'rgba(32,29,22,0.97)';
 
-export function CompoundBoardPanel({ top, bottom, narrow, onClose, onSide }: { top: number; bottom: number; narrow: boolean; onClose: () => void; /** On a phone only one side panel shows: a jump says which. */ onSide: (s: 'left' | 'right') => void }) {
+export function CompoundBoardPanel({ top, bottom, narrow, onClose, onSide, anchor = 'center' }: { /** Layout A keeps the middle of the map clear: the board sits at the left edge. */ anchor?: 'center' | 'left'; top: number; bottom: number; narrow: boolean; onClose: () => void; /** On a phone only one side panel shows: a jump says which. */ onSide: (s: 'left' | 'right') => void }) {
   const g = useGameStore();
   const drive = useWorldStore(w => w.siteGeo)?.drive;
   const [cache] = useState(boardCache);
@@ -53,7 +53,7 @@ export function CompoundBoardPanel({ top, bottom, narrow, onClose, onSide }: { t
     {x.act && <button style={{ ...btn(), ...miniBtn }} onClick={() => go(x.act!.act)}>{x.act.label}</button>}
   </div>;
 
-  return <div role="dialog" aria-label="Compound board" style={{ position: 'fixed', zIndex: 5, top, left: narrow ? 10 : '50%', transform: narrow ? 'none' : 'translateX(-50%)', width: narrow ? 'calc(100vw - 20px)' : 400, boxSizing: 'border-box', maxHeight: `calc(100vh - ${top + bottom}px)`, overflowY: 'auto', background: PAPER, border: '1px solid #d8c9a0', borderRadius: 8, padding: '8px 10px', color: '#eee', fontSize: FS.body, boxShadow: '0 6px 24px rgba(0,0,0,0.5)' }}>
+  return <div role="dialog" aria-label="Compound board" style={{ position: 'fixed', zIndex: 5, top, left: narrow ? 10 : anchor === 'left' ? 16 : '50%', transform: narrow || anchor === 'left' ? 'none' : 'translateX(-50%)', width: narrow ? 'calc(100vw - 20px)' : 400, boxSizing: 'border-box', maxHeight: `calc(100vh - ${top + bottom}px)`, overflowY: 'auto', background: PAPER, border: '1px solid #d8c9a0', borderRadius: 8, padding: '8px 10px', color: '#eee', fontSize: FS.body, boxShadow: '0 6px 24px rgba(0,0,0,0.5)' }}>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
       <b style={{ fontSize: 14, letterSpacing: 0.3 }}>Compound board</b>
       <span style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>

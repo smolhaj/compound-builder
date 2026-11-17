@@ -6,6 +6,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { EDGE, hudLayout, useBox } from './hudLayout';
 import { clock, dateLabel } from './hud/dateText';
 import { TopBar } from './hud/TopBar';
+import { ActionBar } from './hud/ActionBar';
+import { DrawerHeader } from './hud/DrawerHost';
+import { drawerFrame, useDrawerKeys, useHintBottom, useWindowSize } from './hud/drawerHooks';
+import { useDrawerStore } from '../store/drawerStore';
+import { BAR_H, barBottom, hostOf, type DrawerId } from './hud/drawerRegistry';
+import { CAMERAS, CAMERA_TIP, VIEWS } from './hud/viewOptions';
 import { unscripted } from '../sim/godMode';
 import { TERRAIN_LEGEND, type TerrainMode } from '../game/terrain/TerrainOverlay';
 import { stormOutage } from '../sim/weatherThreats';
@@ -15,7 +21,7 @@ import { DailySection } from './SchedulePanel';
 import { DAILY_TASK_TEXT } from './dailyText';
 import { HomeLine } from './HomeLine';
 import { useFeltStore } from '../store/feltStore';
-import { useWorldStore, type BuildingView, type CameraMode, type FrameCap } from '../store/worldStore';
+import { useWorldStore, type FrameCap } from '../store/worldStore';
 import { useGameStore } from '../store/gameStore';
 import type { Quality } from '../engine/world/WorldScene';
 import { SEASON_MODES, type SeasonMode } from '../engine/world/season/seasonState';
@@ -106,7 +112,7 @@ import { CursorHint, LineToolBar, ToastLine, WelcomeCard } from './hud/Feedback'
 import { getViolence, setViolence, type Violence } from '../game/battle/bloodFx';
 import { getNames, setNames, getPips, setPips } from '../game/battle/nameLabels';
 import { useFeelStore, saveRevealed, worldId } from '../store/feelStore';
-import { visibleTabs, type RightTab } from '../sim/tabReveal';
+import { RIGHT_TABS, visibleTabs, type RightTab } from '../sim/tabReveal';
 import { caloriesText, feetText, gallonsText, kmText, lengthText, remRateText, remText } from '../sim/units';
 
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
@@ -135,9 +141,6 @@ function NamesSelect() {
 const SIGHTS: Array<['off' | 'road' | 'ridge' | 'night' | 'viewshed', string, string]> = [
   ['off', 'Off', 'No sightline overlay'], ['road', 'Road', 'How exposed each spot is to people on the county road'], ['ridge', 'Ridge', 'Seen from the high ground to the west'],
   ['night', 'Night', 'Where your lit windows give you away after dark'], ['viewshed', 'View from…', 'Click a spot to see what can be seen from there (Shift-click: from a 33 ft tower)']];
-const CAMERAS: Array<[CameraMode, string]> = [['diorama', 'Diorama'], ['walk', 'Walk'], ['fly', 'Fly'], ['cinematic', 'Tour']];
-const CAMERA_TIP: Record<CameraMode, string> = { diorama: 'Orbit view from above: drag to turn, wheel to zoom, right-drag to pan', walk: 'Walk the place at eye level (WASD)', fly: 'Fly over it (WASD, Space / C for up and down)', cinematic: 'A slow tour of the buildings' };
-const VIEWS: Array<[BuildingView, string, string]> = [['full', 'Walls', 'Show buildings whole, roofs on (V cycles the three views)'], ['cutaway', 'Cutaway', 'Cut the walls at waist height and lift the roofs to see the rooms inside (V)'], ['xray', 'X-ray', 'See-through walls and roof: rooms, pipes and wiring (V)']];
 const SPEEDS: Array<[Speed, string]> = [[0, '❚❚'], [1, '▶'], [2, '▶▶'], [3, '▶▶▶'], [4, '⏩']];
 const TASK_TEXT: Record<string, string> = { build: 'Building', forestry: 'In the woods', chores: 'Chores', sleep: 'Asleep', school: 'School', leisure: 'Free time', idle: 'Idle', job: 'At work in town', gone: 'Died', shelter: 'Sheltering', away: 'Away from the place', town: 'At the town house', ...DAILY_TASK_TEXT };
 
@@ -150,28 +153,29 @@ const SIGHT_LEGEND: Record<'road' | 'ridge' | 'night', string> = {
 
 /** "Click a point" for the viewshed overlay, which draws nothing until a spot on the ground is picked (always on screen, whatever panels are open). */
 function SightHint() {
-  const on = useWorldStore(s => s.sightMode === 'viewshed' && !s.sightPicked);
+  const on = useWorldStore(s => s.sightMode === 'viewshed' && !s.sightPicked), bottom = useHintBottom(64);
   if (!on) return null;
-  return <div data-testid="sight-hint" style={{ position: 'fixed', left: '50%', bottom: 64, transform: 'translateX(-50%)', color: '#f2ecd8', background: 'rgba(20,22,18,0.86)', border: '1px solid rgba(240,230,190,0.4)', borderRadius: 6, padding: '6px 16px', fontSize: 14, pointerEvents: 'none', zIndex: 20, whiteSpace: 'nowrap' }}>Click a point on the ground to see what can be seen from there (Shift-click: from a 33 ft tower)</div>;
+  return <div data-testid="sight-hint" style={{ position: 'fixed', left: '50%', bottom, transform: 'translateX(-50%)', color: '#f2ecd8', background: 'rgba(20,22,18,0.86)', border: '1px solid rgba(240,230,190,0.4)', borderRadius: 6, padding: '6px 16px', fontSize: 14, pointerEvents: 'none', zIndex: 20, whiteSpace: 'nowrap' }}>Click a point on the ground to see what can be seen from there (Shift-click: from a 33 ft tower)</div>;
 }
 
 /** What the terrain colors mean (the Sun overlay was an unlabeled wash from above): one line, always on screen while a terrain overlay is up. Sun, shade, water and the rest need no click. */
 export function TerrainLegendChip() {
-  const mode = useWorldStore(s => s.terrainMode);
+  const mode = useWorldStore(s => s.terrainMode), bottom = useHintBottom(24);
   if (mode === 'off') return null;
-  return <div data-testid="terrain-legend" style={{ position: 'fixed', left: '50%', bottom: 24, transform: 'translateX(-50%)', maxWidth: 'min(640px, calc(100vw - 32px))', color: '#f2ecd8', background: 'rgba(20,22,18,0.86)', border: '1px solid rgba(240,230,190,0.3)', borderRadius: 6, padding: '4px 12px', fontSize: 12, textAlign: 'center', pointerEvents: 'none', zIndex: 20 }}>
+  return <div data-testid="terrain-legend" style={{ position: 'fixed', left: '50%', bottom, transform: 'translateX(-50%)', maxWidth: 'min(640px, calc(100vw - 32px))', color: '#f2ecd8', background: 'rgba(20,22,18,0.86)', border: '1px solid rgba(240,230,190,0.3)', borderRadius: 6, padding: '4px 12px', fontSize: 12, textAlign: 'center', pointerEvents: 'none', zIndex: 20 }}>
     <b>{TERRAIN_LEGEND[mode].label}:</b> {TERRAIN_LEGEND[mode].legend}
   </div>;
 }
 
 /** The weak-spot overlay draws a mark only where a climber can bypass a wall: say so when there is none (always on screen, whatever panels are open). */
 function WeakHint() {
+  const bottom = useHintBottom(64);
   const on = useWorldStore(s => s.weakView), trees = useWorldStore(s => s.wallTrees), game = useGameStore(s => s.game);
   if (!on) return null;
   const spots = weakSpots(game, trees?.() ?? []);
   if (spots.length > 0) return null;
   const walls = game.perimeter.filter(climbable).length;
-  return <div data-testid="weak-hint" style={{ position: 'fixed', left: '50%', bottom: 64, transform: 'translateX(-50%)', color: '#f2ecd8', background: 'rgba(20,22,18,0.86)', border: '1px solid rgba(240,230,190,0.4)', borderRadius: 6, padding: '6px 16px', fontSize: 14, pointerEvents: 'none', zIndex: 20, whiteSpace: 'nowrap' }}>
+  return <div data-testid="weak-hint" style={{ position: 'fixed', left: '50%', bottom, transform: 'translateX(-50%)', color: '#f2ecd8', background: 'rgba(20,22,18,0.86)', border: '1px solid rgba(240,230,190,0.4)', borderRadius: 6, padding: '6px 16px', fontSize: 14, pointerEvents: 'none', zIndex: 20, whiteSpace: 'nowrap' }}>
     {walls === 0 ? 'No weak spots to mark: there is no finished wall a climber could bypass yet.' : 'No weak spots: nothing stands within a step of a wall, no tree reaches over one and no brush is overgrown.'}
   </div>;
 }
@@ -246,6 +250,22 @@ export function Hud() {
     useFeelStore.setState({ revealed: all });
   }, [missingKey]);
   useEffect(() => { useFeelStore.getState().seeTab(rightTab); }, [rightTab]);
+  // layout A: one drawer at a time (hud/drawerRegistry.ts); the panel bodies below are the Classic tabs' bodies, so the open drawer picks the tab
+  const A = w.layout === 'a';
+  const dOpen = useDrawerStore(d => d.open);
+  const { vw: winW, vh: winH } = useWindowSize();
+  useDrawerKeys(A);
+  const wantTab = A ? dOpen : null, [lastWant, setLastWant] = useState(wantTab);
+  if (wantTab !== lastWant) { setLastWant(wantTab); if (wantTab) { if (hostOf(wantTab) === 'left') setLeftTab(wantTab as 'build' | 'projects' | 'log'); else setRightTab(wantTab as RightTab); } }
+  // a link elsewhere ("Show me", a chip, a board line) asked for a tab: open its drawer
+  const seenFocus = useRef(g.hudFocus);
+  useEffect(() => { const f = g.hudFocus; if (A && f && f !== seenFocus.current) useDrawerStore.getState().show(f.right); seenFocus.current = f; }, [A, g.hudFocus]);
+  // picking a building on the map opens Projects (not while a tool is armed)
+  useEffect(() => { if (A && g.selected && !g.tool) useDrawerStore.getState().show('projects'); }, [A, g.selected]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // the drawer steps aside while a placing tool is armed (so the ghost is visible) and returns when it is put away; picking a panel brings it back
+  const [park, setPark] = useState({ tool: g.tool, open: dOpen, parked: !!g.tool });
+  if (park.tool !== g.tool || park.open !== dOpen) setPark({ tool: g.tool, open: dOpen, parked: park.tool !== g.tool ? !!g.tool : false });
+  const parked = park.parked;
   if (new URLSearchParams(location.search).has('clean')) return null;
   const game = g.game;
   const cal = calendarOf(game.clock);
@@ -264,6 +284,31 @@ export function Hud() {
   const treating = game.stock.meds >= 0.1 || game.people.some((q, j) => !q.kid && game.personState[j]?.needs.died == null && q.skills.medic >= 3) || game.structures.some(st => st.kind === 'bunker_medical' && isFinished(st));
   const familyAlert: Tone | undefined = game.personState.some(ps => ps.needs.died == null && (ps.needs.health < 40 || ps.needs.hurt.length > 0)) ? 'bad' : game.personState.some(ps => ps.needs.died == null && ps.needs.hunger > 5000) ? 'warn' : undefined;
   const projectsAlert: Tone | undefined = game.structures.some(st => !isFinished(st) && holdReason(game, st)) || needsHookup(game).length > 0 ? 'warn' : undefined;
+
+  // layout A pieces: the drawer's frame, the action bar's alerts, and the footer that must stay visible when the drawer steps aside
+  const tickerOn = game.disaster.news.length > 0;
+  const drawerShown = A && !!dOpen && !w.hudHidden && !parked;
+  const frame = (host: 'left' | 'right') => drawerFrame(winW, winH, w.uiScale, tickerOn, drawerShown && !!dOpen && hostOf(dOpen) === host);
+  const barAlerts: Partial<Record<DrawerId, Tone>> = { family: familyAlert, supplies: worstTone(foodAlert, farmAlert(game)), utilities: utilAlert, defense: defenseAlert, outside: outsideAlert, projects: projectsAlert };
+  const dimTabs = new Set<DrawerId>(RIGHT_TABS.filter(t => !shownTabs.has(t)));
+  const freshTabs = new Set<DrawerId>(feel.fresh);
+  const aboveBar = barBottom(tickerOn) + BAR_H * w.uiScale + 8;
+  const toolText = g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks or unmarks · Esc stops' : g.tool?.startsWith('fence:') ? 'Click corners · Shift-click the line for a vehicle gate (Shift+Alt: a pedestrian gate) · Enter lays it out · Backspace undoes · Esc cancels' : 'Click to stake it out (Shift-click to keep going) · R rotates · Esc cancels');
+  const leftFooter = <>
+    {g.spendAsk && <div style={{ border: `1px solid ${TONE.warn}`, borderRadius: 6, padding: '4px 6px', marginTop: 6, fontSize: FS.small }}>
+      {g.spendAsk.cannot
+        ? <div>{g.spendAsk.cannot}</div>
+        : <div>The {g.spendAsk.kind.replace(/_/g, ' ')} books a {usd(g.spendAsk.cost)} county permit fee. That leaves {usd(Math.max(0, g.spendAsk.after))}, under the {usd(g.spendAsk.reserve)} to live on.</div>}
+      <div style={{ display: 'flex', gap: 4, marginTop: 3 }}>
+        {!g.spendAsk.cannot && <button style={btn(true)} onClick={() => g.answerSpend(true)}>Do it anyway</button>}
+        <button style={btn()} onClick={() => g.answerSpend(false)}>{g.spendAsk.cannot ? 'OK' : 'Keep a reserve'}</button>
+      </div>
+    </div>}
+    {!g.tool && g.stakedNote && <div style={{ borderTop: `1px solid ${LINE}`, marginTop: 6, paddingTop: 6 }}><Note tone="good">{g.stakedNote}</Note></div>}
+    {g.tool && <div style={{ borderTop: `1px solid ${LINE}`, marginTop: 6, paddingTop: 6 }}>
+      <Note tone={g.toolProblem ? 'warn' : undefined}>{toolText}</Note>
+    </div>}
+  </>;
 
   return (
     <>
@@ -300,12 +345,16 @@ export function Hud() {
       </>}
 
       {/* Left: build menu (groups) · projects under way · the log */}
-      {lay.narrow && !w.hudHidden && <div style={{ position: 'fixed', left: EDGE, top: lay.switchTop, display: 'flex', gap: 4, zIndex: 2 }}>
+      {A && <>
+        <ActionBar alerts={barAlerts} dim={dimTabs} fresh={freshTabs} tickerOn={tickerOn} />
+        {(!!g.spendAsk || !!g.tool || !!g.stakedNote) && <div data-testid="tool-card" style={{ position: 'fixed', left: 16, top: 10 + 44 * w.uiScale + 8, zIndex: 4, width: 280, boxSizing: 'border-box', transform: `scale(${w.uiScale})`, transformOrigin: 'top left', background: 'rgba(20,22,18,0.90)', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 8, padding: '4px 10px 8px', fontSize: 12.5, color: '#f2efe4', boxShadow: '0 6px 18px rgba(0,0,0,.5)' }}>{leftFooter}</div>}
+      </>}
+      {!A && lay.narrow && !w.hudHidden && <div style={{ position: 'fixed', left: EDGE, top: lay.switchTop, display: 'flex', gap: 4, zIndex: 2 }}>
         <button style={btn(side === 'left')} onClick={() => setSide('left')}>Build</button>
         <button style={btn(side === 'right')} onClick={() => setSide('right')}>Family</button>
       </div>}
-      <div style={{ ...panel, position: 'fixed', left: EDGE, top: lay.panelTop, width: lay.leftW, boxSizing: 'border-box', maxHeight: `calc(100vh - ${lay.panelTop + lay.bottomReserve}px)`, display: w.hudHidden || (lay.narrow && side !== 'left') ? 'none' : 'flex', flexDirection: 'column' }}>
-        <Tabs tabs={[['build', 'Build'], ['projects', 'Projects', projectsAlert], ['log', 'Log']]} value={leftTab} set={setLeftTab} />
+      <div data-drawer={A ? 'left' : undefined} style={A ? frame('left') : { ...panel, position: 'fixed', left: EDGE, top: lay.panelTop, width: lay.leftW, boxSizing: 'border-box', maxHeight: `calc(100vh - ${lay.panelTop + lay.bottomReserve}px)`, display: w.hudHidden || (lay.narrow && side !== 'left') ? 'none' : 'flex', flexDirection: 'column' }}>
+        {A ? <DrawerHeader id={leftTab} /> : <Tabs tabs={[['build', 'Build'], ['projects', 'Projects', projectsAlert], ['log', 'Log']]} value={leftTab} set={setLeftTab} />}
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
           {leftTab === 'build' && <BuildMenu showProjects={() => setLeftTab('projects')} />}
 
@@ -313,26 +362,14 @@ export function Hud() {
 
           {leftTab === 'log' && game.log.slice(-14).reverse().map((e, i) => <div key={i} style={{ padding: '3px 0', borderBottom: `1px solid ${LINE}`, opacity: 1 - i * 0.04 }}><Clamp text={e.text}><span style={{ color: i === 0 ? '#eee' : undefined }}>{e.text}</span></Clamp></div>)}
         </div>
-        {g.spendAsk && <div style={{ border: `1px solid ${TONE.warn}`, borderRadius: 6, padding: '4px 6px', marginTop: 6, fontSize: FS.small }}>
-          {g.spendAsk.cannot
-            ? <div>{g.spendAsk.cannot}</div>
-            : <div>The {g.spendAsk.kind.replace(/_/g, ' ')} books a {usd(g.spendAsk.cost)} county permit fee. That leaves {usd(Math.max(0, g.spendAsk.after))}, under the {usd(g.spendAsk.reserve)} to live on.</div>}
-          <div style={{ display: 'flex', gap: 4, marginTop: 3 }}>
-            {!g.spendAsk.cannot && <button style={btn(true)} onClick={() => g.answerSpend(true)}>Do it anyway</button>}
-            <button style={btn()} onClick={() => g.answerSpend(false)}>{g.spendAsk.cannot ? 'OK' : 'Keep a reserve'}</button>
-          </div>
-        </div>}
-        {!g.tool && g.stakedNote && <div style={{ borderTop: `1px solid ${LINE}`, marginTop: 6, paddingTop: 6 }}><Note tone="good">{g.stakedNote}</Note></div>}
-        {g.tool && <div style={{ borderTop: `1px solid ${LINE}`, marginTop: 6, paddingTop: 6 }}>
-          <Note tone={g.toolProblem ? 'warn' : undefined}>{g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks or unmarks · Esc stops' : g.tool.startsWith('fence:') ? 'Click corners · Shift-click the line for a vehicle gate (Shift+Alt: a pedestrian gate) · Enter lays it out · Backspace undoes · Esc cancels' : 'Click to stake it out (Shift-click to keep going) · R rotates · Esc cancels')}</Note>
-        </div>}
+        {!A && leftFooter}
       </div>
 
       {/* Right: the family, supplies, water & power, land, the outside world */}
-      <div style={{ ...panel, position: 'fixed', right: lay.narrow ? 'auto' : EDGE, left: lay.narrow ? EDGE : 'auto', top: lay.panelTop, width: lay.rightW, boxSizing: 'border-box', maxHeight: `calc(100vh - ${lay.panelTop + lay.bottomReserve}px)`, display: w.hudHidden || (lay.narrow && side !== 'right') ? 'none' : 'flex', flexDirection: 'column' }}>
-        <Tabs tabs={(([['family', 'Family', familyAlert], ['supplies', 'Supplies', worstTone(foodAlert, farmAlert(game))], ['utilities', 'Utilities', utilAlert], ['land', 'Land'], ['defense', 'Defense', defenseAlert], ['outside', 'Outside', outsideAlert], ['chronicle', 'Years']]) as Array<[RightTab, string, Tone?]>)
-          .filter(([id]) => shownTabs.has(id) || id === rightTab).map(([id, label, alert]): [RightTab, string, Tone?, boolean?] => [id, label, alert, feel.fresh.includes(id) && id !== rightTab])} value={rightTab} set={setRightTab} />
-        {feel.firstHourHud && <button data-testid="show-all-tabs" onClick={() => feel.setShowAll(!feel.showAll)} title={feel.showAll ? 'Hide the tabs that have nothing to show yet' : 'Tabs appear as they become useful. Show every tab now.'} style={{ alignSelf: 'flex-end', background: 'transparent', border: 0, color: DIM, cursor: 'pointer', fontSize: FS.fine, padding: '0 2px 4px', marginTop: -4, textDecoration: 'underline' }}>{feel.showAll ? 'Hide unused tabs' : 'Show all tabs'}</button>}
+      <div data-drawer={A ? 'right' : undefined} style={A ? frame('right') : { ...panel, position: 'fixed', right: lay.narrow ? 'auto' : EDGE, left: lay.narrow ? EDGE : 'auto', top: lay.panelTop, width: lay.rightW, boxSizing: 'border-box', maxHeight: `calc(100vh - ${lay.panelTop + lay.bottomReserve}px)`, display: w.hudHidden || (lay.narrow && side !== 'right') ? 'none' : 'flex', flexDirection: 'column' }}>
+        {A ? <DrawerHeader id={rightTab} /> : <Tabs tabs={(([['family', 'Family', familyAlert], ['supplies', 'Supplies', worstTone(foodAlert, farmAlert(game))], ['utilities', 'Utilities', utilAlert], ['land', 'Land'], ['defense', 'Defense', defenseAlert], ['outside', 'Outside', outsideAlert], ['chronicle', 'Years']]) as Array<[RightTab, string, Tone?]>)
+          .filter(([id]) => shownTabs.has(id) || id === rightTab).map(([id, label, alert]): [RightTab, string, Tone?, boolean?] => [id, label, alert, feel.fresh.includes(id) && id !== rightTab])} value={rightTab} set={setRightTab} />}
+        {!A && feel.firstHourHud && <button data-testid="show-all-tabs" onClick={() => feel.setShowAll(!feel.showAll)} title={feel.showAll ? 'Hide the tabs that have nothing to show yet' : 'Tabs appear as they become useful. Show every tab now.'} style={{ alignSelf: 'flex-end', background: 'transparent', border: 0, color: DIM, cursor: 'pointer', fontSize: FS.fine, padding: '0 2px 4px', marginTop: -4, textDecoration: 'underline' }}>{feel.showAll ? 'Hide unused tabs' : 'Show all tabs'}</button>}
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
           {rightTab === 'family' && <>
             {game.people.map((p, i) => {
@@ -687,12 +724,12 @@ export function Hud() {
       </div>
 
       {/* the tool hint stays up while the panels are hidden */}
-      {w.hudHidden && g.tool && <div style={{ ...panel, position: 'fixed', left: 10, top: 10, maxWidth: 300, fontSize: 12 }}>{g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks or unmarks · Esc stops' : 'Click to place · R rotates · Esc cancels')}</div>}
+      {!A && w.hudHidden && g.tool && <div style={{ ...panel, position: 'fixed', left: 10, top: 10, maxWidth: 300, fontSize: 12 }}>{g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks or unmarks · Esc stops' : 'Click to place · R rotates · Esc cancels')}</div>}
 
-      {boardOpen && <CompoundBoardPanel top={Math.max(lay.panelTop, lay.switchTop)} bottom={lay.bottomReserve} narrow={lay.narrow} onClose={() => setBoardOpen(false)} onSide={setSide} />}
+      {boardOpen && <CompoundBoardPanel anchor={A ? 'left' : 'center'} top={Math.max(lay.panelTop, lay.switchTop)} bottom={A ? aboveBar : lay.bottomReserve} narrow={lay.narrow && !A} onClose={() => setBoardOpen(false)} onSide={setSide} />}
 
       {/* Bottom right: cameras, building view */}
-      <div ref={brRef} style={{ ...panel, position: 'fixed', right: EDGE, bottom: 34, padding: 4, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 'calc(100vw - 20px)', boxSizing: 'border-box' }}>
+      {!A && <div ref={brRef} style={{ ...panel, position: 'fixed', right: EDGE, bottom: 34, padding: 4, display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end', maxWidth: 'calc(100vw - 20px)', boxSizing: 'border-box' }}>
         <button title="The clipboard in the safe room: power, water, food, defense, morale, threats and what waits on you, one page" style={btn(boardOpen)} onClick={() => setBoardOpen(!boardOpen)}>Board</button>
         <button data-testid="view-toggle" title="View options: season and weather look, graphics quality, frame rate, sightline and terrain overlays, blueprint, property line, photo mode" style={btn(w.viewOpen)} onClick={() => w.setViewOpen(!w.viewOpen)}>View{w.viewOpen ? ' ▾' : ' ▸'}</button>
         {VIEWS.map(([v, label, tip]) => <button key={v} title={tip} style={btn(w.buildingView === v)} onClick={() => w.setBuildingView(v)}>{label}</button>)}
@@ -700,7 +737,7 @@ export function Hud() {
         <button title="Hide or show the side panels to see the whole map (H)" style={btn(w.hudHidden)} onClick={() => w.setHudHidden(!w.hudHidden)}>{w.hudHidden ? 'Show panels' : 'Hide panels'} (H)</button>
         <span style={{ width: 1, height: 18, background: '#555', margin: '0 3px' }} />
         {CAMERAS.map(([m, label]) => <button key={m} title={CAMERA_TIP[m]} style={btn(w.cameraMode === m)} onClick={() => w.setCameraMode(m)}>{label}</button>)}
-      </div>
+      </div>}
       {w.cameraMode !== 'diorama' && (
         <div style={{ ...panel, position: 'fixed', top: w.layout === 'a' ? 10 + 44 * w.uiScale + 8 : 54, left: '50%', transform: 'translateX(-50%)', fontSize: 12 }}>
           {w.cameraMode === 'walk' ? 'WASD to walk · drag or click to look · Shift to run · Esc to leave'
@@ -710,14 +747,14 @@ export function Hud() {
       )}
       <HomeLine />
       {w.tourCaption && (
-        <div style={{ ...panel, position: 'fixed', left: '50%', bottom: 60, transform: 'translateX(-50%)', padding: '10px 16px' }}>
+        <div style={{ ...panel, position: 'fixed', left: '50%', bottom: A ? aboveBar : 60, transform: 'translateX(-50%)', padding: '10px 16px' }}>
           <div style={{ fontSize: 18, fontWeight: 600 }}>{w.tourCaption.title}</div>
           <div style={{ fontSize: 13, opacity: 0.8 }}>{w.tourCaption.subtitle}</div>
         </div>
       )}
 
       {/* Bottom left: view (season / weather / quality / photo mode); opened from the View button below */}
-      {w.viewOpen && <div ref={blRef} style={{ ...panel, position: 'fixed', left: EDGE, bottom: lay.viewBottom, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', maxWidth: 'min(560px, calc(100vw - 20px))', boxSizing: 'border-box' }}>
+      {w.viewOpen && <div ref={blRef} style={{ ...panel, position: 'fixed', left: EDGE, bottom: A ? aboveBar : lay.viewBottom, ...(A ? { zIndex: 4, maxHeight: `calc(100vh - ${aboveBar + 10 + 44 * w.uiScale + 16}px)`, overflowY: 'auto' as const } : {}), display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', maxWidth: 'min(560px, calc(100vw - 20px))', boxSizing: 'border-box' }}>
         <select data-testid="view-layout" value={w.layout} onChange={e => w.setLayout(e.target.value as 'a' | 'classic')} title="HUD layout: Classic (today's panels) or the new layout A (Alt+L switches)" aria-label="HUD layout">
           <option value="classic">Layout: Classic</option><option value="a">Layout: New (A)</option>
         </select>

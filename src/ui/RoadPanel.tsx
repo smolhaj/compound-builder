@@ -4,6 +4,7 @@
  * what shows from the road, what people say, and the roadblock.
  */
 import { useGameStore } from '../store/gameStore';
+import { useHintBottom } from './hud/drawerHooks';
 import { dayIndex } from '../sim/state';
 import { sightParts, sightUnits, warnMinutes, greeterCandidate, describeParty } from '../sim/roadWarn';
 import { blockProblem, hailable, describePass, lotsText, roadSummary, PASS } from '../sim/roadPassers';
@@ -19,6 +20,7 @@ const b = (primary = false, off = false) => ({ ...btn(primary), padding: '3px 8p
 
 export function RoadAlert() {
   const g = useGameStore();
+  const lift = useHintBottom(64);   // layout A: clear of the action bar
   const game = g.game, road = game.road, inc = game.gate.incoming;
   const [msg, setMsg] = useState('');
   const run = (f: () => string | null) => setMsg(f() ?? '');
@@ -28,7 +30,7 @@ export function RoadAlert() {
     const mins = Math.max(0, Math.round((inc.at - game.clock.t) * 1440));
     const prep = road?.prep;
     const greeter = greeterCandidate(game);
-    return <div data-testid="road-alert" style={card}>
+    return <div data-testid="road-alert" style={{ ...card, bottom: lift }}>
       <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>On the county road</div>
       <div style={{ margin: '2px 0 4px' }}>{describeParty(game, inc.e)}, about {mins >= 60 ? `${Math.round(mins / 6) / 10} hours` : `${mins} minutes`} out.</div>
       {prep ? <Note>{prep.kind === 'greeter' ? 'A greeter is at the drive.' : 'The gate is shut and manned.'}</Note> : <>
@@ -42,7 +44,7 @@ export function RoadAlert() {
   const h = road.hail;
   if (h) {
     const short = h.want.some(l => have(game, l.good) < l.qty);
-    return <div data-testid="road-hail" style={card}>
+    return <div data-testid="road-hail" style={{ ...card, bottom: lift }}>
       <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>At the line</div>
       <div style={{ margin: '2px 0 4px' }}>{h.text}</div>
       {short && <Note tone="warn">You are short of {lotsText(h.want)}.</Note>}
@@ -56,7 +58,7 @@ export function RoadAlert() {
   const hs = hailable(game);
   if (hs.length) {
     const p = hs[0];
-    return <div data-testid="road-wave" style={card}>
+    return <div data-testid="road-wave" style={{ ...card, bottom: lift }}>
       <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>On the county road</div>
       <div style={{ margin: '2px 0 4px' }}>{describePass(p.party)} just went by.</div>
       <button style={b()} title="Wave them down to swap across the fence; the gate stays shut" onClick={() => run(() => g.hailPasser(p.id))}>Wave them down</button>
