@@ -39,7 +39,7 @@ describe('felt checklist', () => {
     it('prints the matrix (kind x item) for the PR', () => {
       const text = matrixText(logs);
       expect(text.split('\n').length).toBe(FELT_KINDS.length + 2);
-      if (process.env.FELT_MATRIX) console.log(text);
+      if ((globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.FELT_MATRIX) console.log(text);
     });
   });
 });
