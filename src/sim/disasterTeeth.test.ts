@@ -10,8 +10,8 @@ import { describe, it, expect } from 'vitest';
 import { FX, FX_COLUMNS, columnsOf, type FxColumn } from './disasterFx';
 import { type DisasterKind } from './disaster';
 
-/** Kinds that must reach ENFORCE_MIN columns (0 until the packages land; WP10 sets 4). */
-export const ENFORCE_MIN = 0;
+/** Kinds that must reach ENFORCE_MIN columns (4 since WP10: every kind in the union covers at least four columns). */
+export const ENFORCE_MIN = 4;
 
 /** Baseline coverage at WP0 (hook columns plus legacy notes), from the audit matrix. Raise, never lower. */
 const BASELINE: Record<DisasterKind, FxColumn[]> = {
@@ -22,7 +22,7 @@ const BASELINE: Record<DisasterKind, FxColumn[]> = {
   drought: ['supplies', 'encounters', 'npcs', 'infrastructure'],
   pandemic: ['economy', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'medical', 'media'],
   solar_flare: ['economy', 'encounters', 'infrastructure', 'media'],
-  wildfire: ['npcs', 'atmosphere', 'buildings'],
+  wildfire: ['economy', 'encounters', 'npcs', 'atmosphere', 'buildings', 'media'],
   ash_winter: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'buildings', 'medical', 'media'],
   cyberattack: ['economy', 'encounters', 'atmosphere', 'infrastructure', 'media'],
   zombies: ['economy', 'encounters', 'npcs', 'atmosphere', 'medical', 'media'],
@@ -30,13 +30,21 @@ const BASELINE: Record<DisasterKind, FxColumn[]> = {
   invasion: ['economy', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'media'],
   civil_war: ['economy', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'media'],
   asteroid: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'buildings', 'medical', 'media'],
-  unknown: ['encounters', 'npcs'],
+  unknown: ['economy', 'encounters', 'npcs', 'atmosphere', 'media'],
   emp: ['economy', 'encounters', 'npcs', 'infrastructure', 'media'],
   mega_quake: ['economy', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'buildings', 'medical', 'media'],
   dam_flood: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'buildings', 'medical', 'media'],
   supervolcano: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'buildings', 'medical', 'media'],
   crop_blight: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'media'],
   livestock_plague: ['economy', 'encounters', 'atmosphere', 'medical', 'media'],
+  // WP10
+  satellite_loss: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'media'],
+  oil_shock: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'media'],
+  reactor_meltdown: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'medical', 'media'],
+  global_famine: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'media'],
+  water_war: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'medical', 'media'],
+  cult_takeover: ['economy', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'media'],
+  mass_exodus: ['economy', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'medical', 'media'],
 };
 
 describe('disaster teeth', () => {

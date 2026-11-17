@@ -10,7 +10,7 @@ const hit = (kind: DisasterKind) => { const g = newGame(1, 105, 2027, { mode: 's
 
 describe('the per-kind hook seam', () => {
   it('has a module for every kind, and every kind has a ruleset', () => {
-    expect(KINDS.length).toBe(22);
+    expect(KINDS.length).toBe(29);
     for (const k of KINDS) expect(FX[k], k).toBeDefined();
     expect(Object.keys(FX).sort()).toEqual([...KINDS].sort());
   });
@@ -45,9 +45,10 @@ describe('the per-kind hook seam', () => {
 });
 
 describe('the Surprise pool and regional odds', () => {
-  it('holds the six pulpy kinds at rare base odds; none of the placeholders yet', () => {
+  it('holds the six pulpy kinds at rare base odds; and the former placeholders and the WP10 kinds join it, rarer than the usual', () => {
     for (const k of ['zombies', 'invasion', 'civil_war', 'bioweapon', 'asteroid', 'unknown'] as DisasterKind[]) { expect(SURPRISE_POOL).toContain(k); expect(SURPRISE_BASE[k]!).toBeLessThan(0.25); }
-    for (const k of ['emp', 'mega_quake', 'crop_blight', 'dam_flood', 'supervolcano'] as DisasterKind[]) expect(SURPRISE_POOL).not.toContain(k);
+    for (const k of ['emp', 'mega_quake', 'crop_blight', 'dam_flood', 'supervolcano', 'satellite_loss', 'oil_shock', 'reactor_meltdown', 'global_famine', 'water_war', 'cult_takeover', 'mass_exodus'] as DisasterKind[]) { expect(SURPRISE_POOL).toContain(k); expect(SURPRISE_BASE[k]!).toBeLessThan(0.5); }
+    expect(SURPRISE_POOL.length).toBe(KINDS.length);
   });
 
   it('regions scale them: invasion likelier on coasts and borders, wildfire in the West', () => {

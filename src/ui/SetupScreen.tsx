@@ -8,6 +8,7 @@ import { fullName, HOUSEHOLD_NAME, JOB_POOL, jobDef, randomJobId, variedFamily }
 import { FUNDS_RANGE, startFunds } from '../sim/startFunds';
 import { BELT_UPKEEP, equityNet, mortgagePayment, rentFor, townHouseFor, townTaxHalf, townUpkeep, type TownPlan } from '../sim/weekender';
 import { difficultySummary } from '../sim/difficulty';
+import { BLURB } from '../sim/disasterBlurbs';
 import { DISASTERS, type Difficulty, type DisasterKind, type Mode, type PeaceLength } from '../sim/disaster';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
 import { affordable, ANY_WISH, builtFacts, LIFESTYLE, landPriceRange, listings, siteFacts, type Acres, type LandWish, type Lifestyle, type Site } from '../sim/site';
@@ -316,6 +317,7 @@ export function SetupScreen() {
                     {(Object.keys(DISASTERS) as DisasterKind[]).map(k => <option key={k} value={k} disabled={DISASTERS[k]!.pulpy && !unlocked}>{DISASTERS[k]!.name}{DISASTERS[k]!.pulpy && !unlocked ? ' (finish a run to unlock)' : ''}</option>)}
                   </select>
                 </div>
+                <div style={{ marginLeft: 68, marginBottom: 6, fontSize: 12, color: C.dim, lineHeight: 1.4 }}>{BLURB[kind]}</div>
                 <Chips label="Peace" value={peace} set={setPeace} opts={PEACE} />
               </>}
               <Chips label="Difficulty" value={diff} set={setDiff} opts={DIFFS.map(([d, l]) => [d, l] as [Difficulty, string])} />

@@ -197,14 +197,14 @@ export function financeDay(s: GameState): string[] {
     const c = CRASH[d.kind] ?? 0.2;
     if (f.brokerage > 0 && c > 0.05) { f.brokerage *= 1 - c; out.push(`The market fell ${Math.round(c * 100)}% the day it hit.`); }
   }
-  // the bail-in: a financial collapse that doesn't fully come back
-  if (d.kind === 'financial' && d.fate !== 'full' && s.clock.t >= d.hitAt + 30 && !f.bailedIn) {
+  // the bail-in: a financial collapse that doesn't fully come back (the bail_in variant always does, in three days, at a deeper cut)
+  if (d.kind === 'financial' && (d.fate !== 'full' || d.variant === 'bail_in') && s.clock.t >= d.hitAt + (d.variant === 'bail_in' ? 3 : 30) && !f.bailedIn) {
     f.bailedIn = true;
     const over = Math.max(0, s.money + f.savings - FDIC_LIMIT);
     if (over > 0) {
-      const cut = over * 0.3, share = s.money / Math.max(1, s.money + f.savings);
+      const cut = over * (d.variant === 'bail_in' ? 0.4 : 0.3), share = s.money / Math.max(1, s.money + f.savings);
       s.money -= cut * share; f.savings -= cut * (1 - share);
-      out.push(`Bail-in: the bank took 30% of everything over the insured $250,000 ($${Math.round(cut).toLocaleString('en-US')}).`);
+      out.push(`Bail-in: the bank took ${d.variant === 'bail_in' ? 40 : 30}% of everything over the insured $250,000 ($${Math.round(cut).toLocaleString('en-US')}).`);
     }
   }
   // the dealer's parcels arrive (if the post still runs)

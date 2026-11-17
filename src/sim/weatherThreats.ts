@@ -33,6 +33,7 @@
  * Which storms come where and how often is region data (regions.ts
  * `storms`); the seasons are here.
  */
+import { forecastLeadScale } from './forecastLoss';
 import { calendarOf, dayIndex, type GameState, type Structure } from './state';
 import { type RegionId, type StormKind } from './regions';
 import { blueprintOf, isFinished, knockBack } from './construction';
@@ -292,7 +293,7 @@ export function weatherDay(s: GameState): string[] {
   const { doy } = calendarOf(s.clock);
   for (const [kind, p] of Object.entries(odds(s, doy)) as Array<[WeatherKind, number]>) {
     if (r() >= p) continue;
-    const at = day + AHEAD[kind];
+    const at = day + Math.floor(AHEAD[kind] * forecastLeadScale(s));   // (a lost satellite sky: the forecast comes late, sim/forecastLoss.ts)
     const [lo, hi] = LASTS[kind];
     let until = at + lo + Math.floor(r() * (hi - lo + 1));
     // Cozy: the crews get the lines back up sooner (outages and storm days are halved)

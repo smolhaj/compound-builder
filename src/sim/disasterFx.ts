@@ -39,6 +39,13 @@ import { fx as cropBlight } from './disasters/crop_blight';
 import { fx as damFlood } from './disasters/dam_flood';
 import { fx as supervolcano } from './disasters/supervolcano';
 import { fx as livestockPlague } from './disasters/livestock_plague';
+import { fx as satelliteLoss } from './disasters/satellite_loss';
+import { fx as oilShock } from './disasters/oil_shock';
+import { fx as reactorMeltdown } from './disasters/reactor_meltdown';
+import { fx as globalFamine } from './disasters/global_famine';
+import { fx as waterWar } from './disasters/water_war';
+import { fx as cultTakeover } from './disasters/cult_takeover';
+import { fx as massExodus } from './disasters/mass_exodus';
 
 /** The ten places a disaster can be felt (docs/DISASTER_TEETH.md section 2; Raiders and NPC merged into encounters / npcs, Sky = atmosphere). */
 export type FxColumn = 'economy' | 'supplies' | 'encounters' | 'npcs' | 'atmosphere' | 'infrastructure' | 'buildings' | 'medical' | 'media';
@@ -131,6 +138,7 @@ export const HOOK_COLUMN: Partial<Record<keyof KindFx, FxColumn>> = {
 export const FX: Record<DisasterKind, KindFx> = {
   grid_down: gridDown, nuclear, lawless, financial, drought, pandemic, solar_flare: solarFlare, wildfire, ash_winter: ashWinter, cyberattack,
   zombies, invasion, civil_war: civilWar, bioweapon, asteroid, unknown, emp, mega_quake: megaQuake, crop_blight: cropBlight, dam_flood: damFlood, supervolcano, livestock_plague: livestockPlague,
+  satellite_loss: satelliteLoss, oil_shock: oilShock, reactor_meltdown: reactorMeltdown, global_famine: globalFamine, water_war: waterWar, cult_takeover: cultTakeover, mass_exodus: massExodus,
 };
 
 /** The columns a kind covers right now: by hook, plus the legacy notes. */

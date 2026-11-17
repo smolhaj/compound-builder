@@ -117,7 +117,7 @@ describe('the day-it-happened card and the chip', () => {
 });
 
 // WP0 placeholders have no look profile until WP9 adds them (then delete this filter and raise the count to 21)
-const PLACEHOLDERS: DisasterKind[] = ['emp', 'mega_quake', 'crop_blight', 'dam_flood', 'supervolcano', 'livestock_plague'];
+const PLACEHOLDERS: DisasterKind[] = ['emp', 'mega_quake', 'crop_blight', 'dam_flood', 'supervolcano', 'livestock_plague', 'satellite_loss', 'oil_shock', 'reactor_meltdown', 'global_famine', 'water_war', 'cult_takeover', 'mass_exodus'];
 const ALL_KINDS = (Object.keys(DISASTERS) as DisasterKind[]).filter(k => !PLACEHOLDERS.includes(k));
 
 describe('every disaster has a look of its own', () => {
