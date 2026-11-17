@@ -23,7 +23,7 @@ export const felt: FeltSpec = {
       text: 'A woman from a house on the other side of the front is at the back door with a baby. She says her husband is dead, and she does not want to be anyone\'s enemy.',
       options: [
         { id: 'take', label: 'Take her in, quietly', hint: 'A bed and a hidden guest. Both columns will want to know.', cost: s => ({ stock: { canned: N(s) } }), now: [{ k: 'humanity', n: 7 }, { k: 'morale', n: 2 }], risk: { p: 0.3, good: 'Nobody asked.', bad: 'A neighbor said who you had in the house.', lose: [{ k: 'raidDelay', days: -6 }, { k: 'standing', n: -5 }] }, line: 'You took her in.' },
-        { id: 'feed', label: 'Feed her at the door and send her on', hint: 'A meal, no promises.', cost: () => ({ stock: { canned: 2 } }), now: [{ k: 'humanity', n: 3 }], risk: { p: 0.15, good: 'She thanked you and left.', bad: 'She came back with others.', lose: [{ k: 'morale', n: -2 }] }, line: 'You fed her and sent her on.' },
+        { id: 'feed', label: 'Feed her at the door and send her on', hint: 'A meal, no promises.', cost: () => ({ hours: 1 }), now: [{ k: 'stock', id: 'canned', n: -2 }, { k: 'humanity', n: 3 }], risk: { p: 0.15, good: 'She thanked you and left.', bad: 'She came back with others.', lose: [{ k: 'morale', n: -2 }] }, line: 'You fed her and sent her on.' },
         { id: 'turn', label: 'Turn her away', hint: 'Safe, cold, ashamed.', cost: () => ({ humanity: 6 }), now: [{ k: 'raidDelay', days: 2 }], line: 'You turned her away.' },
       ] },
     { id: 'ceasefire', phase: 'season', title: 'A ceasefire, and what to do with it', fallback: 'plant',

@@ -18,7 +18,7 @@ export const felt: FeltSpec = {
         text: 'A woman is walking up the drive. She says her name and the street she lived on. She cannot say where she has been.',
         options: [
           { id: 'doc', label: 'Pay a nurse to check her and keep her a night', hint: 'A real exam and a bed, a steadying hand.', cost: s => ({ money: r25(350 + N(s) * 30) }), now: [{ k: 'humanity', n: 5 }], risk: { p: 0.2, good: 'She is hungry and cold, nothing more.', bad: 'She was gone before breakfast.', lose: [{ k: 'morale', n: -3 }] }, line: 'A nurse checked her.' },
-          { id: 'ask', label: 'Give her food and ask quiet questions', hint: 'A day, a meal, no promises.', cost: () => ({ stock: { canned: 2 }, hours: 2 }), now: [{ k: 'humanity', n: 3 }], risk: { p: 0.3, good: 'A piece of the story.', bad: 'She said nothing at all.', lose: [{ k: 'morale', n: -2 }] }, line: 'You fed her and asked.' },
+          { id: 'ask', label: 'Give her food and ask quiet questions', hint: 'A day, a meal, no promises.', cost: () => ({ hours: 2 }), now: [{ k: 'stock', id: 'canned', n: -2 }, { k: 'humanity', n: 3 }], risk: { p: 0.3, good: 'A piece of the story.', bad: 'She said nothing at all.', lose: [{ k: 'morale', n: -2 }] }, line: 'You fed her and asked.' },
           { id: 'close', label: 'Keep the gate shut and call to her from the porch', hint: 'Safe, and lonely.', cost: () => ({ humanity: 3 }), now: [{ k: 'raidDelay', days: 2 }], line: 'You called to her from the porch.' },
         ] },
       { id: 'maps', phase: 'season', title: 'The map of who is missing', fallback: 'list',

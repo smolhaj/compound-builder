@@ -7,7 +7,7 @@ import { ensureFelt, feltCardPending, feltOf } from './state';
 import type { DecisionCard, FeltKind, FeltPhase } from './types';
 import { answerCard, cardsFor, eligibleCards, feltCards, optionProblem, timeoutDays, PHASE_BUDGET } from './cards';
 import { feltDaily } from './daily';
-import { THEME, isSharedCardId } from './cardLibrary';
+import { THEME, genericCards, isSharedCardId } from './cardLibrary';
 import { decisionOpen } from '../clockResume';
 import { stealthOf } from '../stealthState';
 
@@ -107,6 +107,19 @@ describe('kind-specific cards', () => {
     expect(feltOf(g)!.cards.pending!.id).toBe('zombies:lights_out');
     answerCard(g, 'zombies:lights_out', 'dark');
     expect(stealthOf(g).full).toBeTruthy();
+  });
+});
+
+describe('fallbacks', () => {
+  it('every card\'s fallback can be taken by a broke household with nothing on the shelf', () => {
+    const bad: string[] = [];
+    for (const k of FELT_KINDS) for (const c of cardsFor(k, feltSpec(k)).filter(x => !isSharedCardId(x.id) && x.id.startsWith(`${k}:`) && x.id !== genericCards(k)[0].id)) {
+      const g = at(k, 20, 0); g.stock = {} as typeof g.stock;
+      const fb = c.options.find(o => o.id === c.fallback)!;
+      if (fb.off?.(g) && /neighbor|home to ask/i.test(fb.off(g)!)) continue;
+      if (optionProblem(g, fb)) bad.push(`${c.id}:${fb.id}`);
+    }
+    expect(bad).toEqual([]);
   });
 });
 
