@@ -41,7 +41,7 @@ import { HousingStyleCards } from './HousingStyles';
 /** The build menu's groups (kit pieces by what they are for). */
 /** Suggestions the operational checklist already shows as its own lines. */
 
-const BUILD_GROUPS: Array<[string, string, readonly string[]]> = [
+const BUILD_GROUPS: ReadonlyArray<readonly [string, string, readonly string[]]> = [
   ['home', 'Home & work', ['timber_cabin', 'log_house', 'cottage', 'guest_house', 'moms_house', 'modular_home', 'stilted_house', 'cabin_village', 'outhouse', 'workshop', 'forge', 'metal_garage', 'barn', 'equipment_yard', 'helipad', 'boat_dock', 'marina', ...TERRACE_ORDER]],
   ['food', 'Food', ['garden', 'greenhouse', 'polytunnel', 'high_tunnel', 'greenhouse_heated', 'aquaponics', 'orchard', 'orchard_grove', 'orchard_terraced', 'field', 'chicken_coop', 'sheep_barn', 'pond', 'root_cellar', 'wood_oven', 'apiary', 'sugar_shack', 'barnyard']],
   ['water', 'Water & power', UTILITY_ORDER],
@@ -55,7 +55,8 @@ const costOf = (kind: string) => orderCost(toBuy(totalBill(BLUEPRINTS[kind])));
 /** While the first-hour goals card is up, a Next-steps card shows only at or above this urgency. */
 const GUIDED_URGENT = 90;
 
-export function BuildMenu({ showProjects = () => undefined }: { showProjects?: () => void }) {
+/** `toolsOnly` (layout A): the catalog, checklist and Next steps are in the Build drawer and the What-to-do card; this draws only what the catalog does not list (the run-over and held notes, rigs, long-term goals, tree marking, housing styles, footpaths, the wall and ring helpers, the bunker plan). */
+export function BuildMenu({ showProjects = () => undefined, toolsOnly = false }: { showProjects?: () => void; toolsOnly?: boolean }) {
   const g = useGameStore();
   const { run, arm, note, guardNode } = useRunAct(showProjects);
   const markTrees = useWorldStore(w => w.markNearestTrees);
@@ -111,7 +112,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
       <div style={{ fontSize: FS.h, textTransform: 'uppercase', letterSpacing: 0.6, color: DIM, fontWeight: 600 }}>The place is held</div>
       <Note tone="warn">{foster.text}</Note>
     </div>}
-    {!g.tool && !foster && <div style={card(!fh.complete && (feltUp ? true : closed === null))}>
+    {!toolsOnly && !g.tool && !foster && <div style={card(!fh.complete && (feltUp ? true : closed === null))}>
       <GoalsCard fh={fh} run={run} {...(feltUp ? { felt: { onClose: () => setFeltOff(game.disaster.kind) } } : {})} ticks={ops.map(o => <Tick key={o.id} done={o.done} label={o.label} line={o.line}
         act={o.act ? { label: o.act.label, run: () => run(o.act!.act), off: o.act.act.type === 'order' ? (orderProblem(g.game, o.act.act.lines) ? 'Cannot order that now' : null) : null } : undefined} />)}>
         {note && <Note>{note}</Note>}
@@ -119,7 +120,7 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
         <StarterCompound wanted={starterWanted(game)} first={!game.structures.some(s => !s.unplaced)} guided={guidedOpen} />
       </GoalsCard>
     </div>}
-    {sug.length > 0 && !g.tool && <div style={card()}>
+    {!toolsOnly && sug.length > 0 && !g.tool && <div style={card()}>
       <div style={{ fontSize: FS.h, textTransform: 'uppercase', letterSpacing: 0.6, color: DIM, fontWeight: 600 }} title="Suggestions from what the place lacks; nothing is locked">Next steps</div>
       {sug.map(x => <div key={x.id} data-tone={x.tone} style={{ padding: '4px 0', borderTop: '1px solid rgba(255,255,255,0.06)', ...(x.tone === 'alarm' ? { borderLeft: `3px solid ${TONE.bad}`, paddingLeft: 6, background: 'rgba(160,40,30,0.18)', borderRadius: 4 } : {}) }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 6 }}>
@@ -149,14 +150,14 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
       <Hint more="A newcomer's travel trailer or RV waits at the gate for a pad of your choosing. Place it within about 230 ft of the house and the wells and it hooks up to the water and power on its own.">Their rig is waiting for a pad.</Hint>
       {game.joiners!.waiting.map(w => <Fragment key={w.id}>{(RIG_ORDER.includes(w.kind) ? [w.kind] : []).map(k => <Item key={k} name={`${KIT[k].name} (theirs)`} cost="free" sub="arrives finished" on={g.tool === k} title={KIT[k].blurb} click={() => arm(k)} />)}</Fragment>)}
     </Group>}
-    {BUILD_GROUPS.map(([gid, title, kinds]) => (
+    {(toolsOnly ? BUILD_GROUPS.filter(([gid]) => gid === 'home') : BUILD_GROUPS).map(([gid, title, kinds]) => (
       <Fragment key={gid}>
-        <Group id={gid} title={title} extra={gid === 'home' ? housingSummary(game) : undefined} defaultOpen={gid !== 'defense'}>
+        <Group id={toolsOnly ? 'trees' : gid} title={toolsOnly ? 'Trees and logs' : title} extra={!toolsOnly && gid === 'home' ? housingSummary(game) : undefined} defaultOpen={!toolsOnly && gid !== 'defense'}>
           {gid === 'home' && <>
             <Item name="Mark trees to fell" cost="" sub="logs and firewood" title="Logs for building (pines and aspens), firewood for the stove (green wood seasons for about nine months)" on={g.tool === 'fell'} click={() => g.setTool(g.tool === 'fell' ? null : 'fell')} />
             <button style={{ ...btn(), width: '100%', marginBottom: 2 }} disabled={!markTrees} title="Marks the ten standing trees nearest the yard on your land" onClick={() => run({ type: 'markTrees', n: 10 })}>Mark the 10 nearest trees</button>
           </>}
-          {kinds.map(kit)}
+          {!toolsOnly && kinds.map(kit)}
         </Group>
         {gid === 'home' && <Group id="housing" title="Housing styles" extra="by what is local" defaultOpen={false}>
           <Hint more="Each style is priced for this region: logs from your own timber, stone gathered or hauled, adobe only in dry country. The lodge needs a slope.">Styles are priced for this region.</Hint>
@@ -167,11 +168,11 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
     <Group id="paths" title="Footpaths" defaultOpen={false}>
       <PathsPanel />
     </Group>
-    <Group id="lines" title="Advanced: pipes & cables" extra="far outposts" defaultOpen={false}>
+    {!toolsOnly && <Group id="lines" title="Advanced: pipes & cables" extra="far outposts" defaultOpen={false}>
       <Hint more="Buildings join the water and power lines on their own. Draw a line by hand only to reach a far outpost or to choose the route.">Hooked up automatically.</Hint>
       {UTILITY_LINES.map(kind => lineItem(kind, 100 / FT_PER_M, '100 ft'))}
-    </Group>
-    <Group id="under" title="Underground" extra={shelters > 0 ? `shelters ${shelters}` : undefined} defaultOpen={false}>
+    </Group>}
+    <Group id="under" title={toolsOnly ? 'Bunker plan' : 'Underground'} extra={shelters > 0 ? `shelters ${shelters}` : undefined} defaultOpen={false}>
       <div style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: 6, padding: '5px 8px', marginBottom: 3 }}>
         <div style={{ fontSize: 11, color: DIM, textTransform: 'uppercase', letterSpacing: 0.6 }}>The bunker needs, in order</div>
         {bunker.map((c, i) => {
@@ -184,18 +185,18 @@ export function BuildMenu({ showProjects = () => undefined }: { showProjects?: (
         })}
         {!bunkerStarted && <Note>Start with a hatch or stairwell.</Note>}
       </div>
-      {BUNKER_ORDER.map(kit)}
-      {lineItem('escape_tunnel', 150 / FT_PER_M, '150 ft')}
-      {lineItem('underground_passage', 150 / FT_PER_M, '150 ft')}
+      {!toolsOnly && BUNKER_ORDER.map(kit)}
+      {!toolsOnly && lineItem('escape_tunnel', 150 / FT_PER_M, '150 ft')}
+      {!toolsOnly && lineItem('underground_passage', 150 / FT_PER_M, '150 ft')}
     </Group>
-    <Group id="perimeter" title="Perimeter" defaultOpen={false}>
+    <Group id="perimeter" title={toolsOnly ? 'Wall my property' : 'Perimeter'} defaultOpen={false}>
       <WallProperty />
       <FortifyRing />
-      <Hint more={`Fences upgrade in place, tier to tier (Defense tab, Upgrade the walls): ${chain}.`}>Fences upgrade in place.</Hint>
+      {!toolsOnly && <><Hint more={`Fences upgrade in place, tier to tier (Defense tab, Upgrade the walls): ${chain}.`}>Fences upgrade in place.</Hint>
       {perimeterTiers().map(t => <div key={t.id}>
         <div style={{ fontSize: 11, color: DIM, margin: '4px 2px 2px' }} title={t.hint}>{t.title} <span style={{ opacity: 0.7 }}>· {t.hint}</span></div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>{t.kinds.map(k => lineItem(k, 100 / FT_PER_M, '100 ft'))}</div>
-      </div>)}
+      </div>)}</>}
     </Group>
   </>;
 }

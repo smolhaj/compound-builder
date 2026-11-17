@@ -42,4 +42,12 @@ describe('Hud under layout A (server-rendered)', () => {
     const html = setup('a', 'build');
     expect(html).toContain('data-testid="drawer-head-build"'); expect(html.match(/data-drawer="left" style="[^"]*display:flex/)).not.toBeNull();
   });
+  it('the A Build drawer is the searchable catalog with chips and cards; Classic keeps the grouped list', () => {
+    const html = setup('a', 'build');
+    expect(html).toContain('data-testid="build-search"'); expect(html).toContain('data-testid="build-chips"'); expect(html).toContain('data-testid="build-ops"');
+    expect((html.match(/data-testid="build-card"/g) ?? []).length).toBeGreaterThan(40);
+    for (const c of ['Shelter', 'Water', 'Power', 'Food', 'Defense', 'Walls', 'Tools']) expect(html).toContain(`>${c}</button>`);
+    const classic = setup('classic');
+    expect(classic).not.toContain('build-card'); expect(classic).toContain('Home &amp; work');
+  });
 });

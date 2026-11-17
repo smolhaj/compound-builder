@@ -107,6 +107,7 @@ import { DIM, FS, LINE, TONE, btn, panel, usd, type Tone } from './hud/style';
 import { planningHold } from '../sim/clockResume';
 import { runOver } from '../sim/wipe';
 import { BuildMenu } from './hud/BuildMenu';
+import { BuildDrawer } from './hud/BuildDrawer';
 import { ProjectsTab } from './hud/ProjectsTab';
 import { DefenseTab } from './hud/DefenseTab';
 import { defenseTabAlert } from './hud/defenseAlert';
@@ -362,7 +363,7 @@ export function Hud() {
       <div data-drawer={A ? 'left' : undefined} style={A ? frame('left') : { ...panel, position: 'fixed', left: EDGE, top: lay.panelTop, width: lay.leftW, boxSizing: 'border-box', maxHeight: `calc(100vh - ${lay.panelTop + lay.bottomReserve}px)`, display: w.hudHidden || (lay.narrow && side !== 'left') ? 'none' : 'flex', flexDirection: 'column' }}>
         {A ? <DrawerHeader id={leftTab} /> : <Tabs tabs={[['build', 'Build'], ['projects', 'Projects', projectsAlert], ['log', 'Log']]} value={leftTab} set={setLeftTab} />}
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}>
-          {leftTab === 'build' && <BuildMenu showProjects={() => setLeftTab('projects')} />}
+          {leftTab === 'build' && (A ? <BuildDrawer /> : <BuildMenu showProjects={() => setLeftTab('projects')} />)}
 
           {leftTab === 'projects' && <ProjectsTab />}
 

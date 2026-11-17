@@ -110,6 +110,11 @@ function suggestionRow(x: Suggestion, s: GameState): TodoRow | null {
   return { id: `next:${x.id}`, kind: 'next', tone: x.tone === 'alarm' ? 'bad' : 'info', title, sub: x.why, act };
 }
 
+/** Day 0 and no collapse running: the first hour of a new game. A disaster that has hit (impact, survival) is never "opening". */
+export function openingHour(s: GameState): boolean {
+  return dayIndex(s.clock.t) < 1 && s.disaster.phase !== 'impact' && s.disaster.phase !== 'survival';
+}
+
 /** The card's rows for this state. */
 export function whatToDo(s: GameState, ctx: TodoCtx = {}): WhatToDo {
   const board = ctx.board ?? compoundBoard(s, ctx.drive);
@@ -137,7 +142,10 @@ export function whatToDo(s: GameState, ctx: TodoCtx = {}): WhatToDo {
   nextRows.sort((a, b) => b.urgency - a.urgency);
 
   // assemble: alarms (at most two, so the goal still shows), the goal, the rest; no two rows share a click or a title
-  const all: TodoRow[] = [...alarms.slice(0, 2), ...(goal ? [goal] : []), ...alarms.slice(2), ...nextRows.map(n => n.row)];
+  // day 0, before the clock has first run: the first-hour goal leads and a food alarm follows it, unless food is at 0 or a collapse is already running
+  const early = goal !== null && openingHour(s), soft = (a: TodoRow) => early && a.id === 'alarm:food' && (board.vitals.find(v => v.id === 'food')?.n ?? 0) >= 1;
+  const lead = alarms.filter(a => !soft(a)), later = alarms.filter(soft);
+  const all: TodoRow[] = [...lead.slice(0, 2), ...(goal ? [goal] : []), ...later, ...lead.slice(2), ...nextRows.map(n => n.row)];
   const seenAct = new Set<string>(), seenTitle = new Set<string>(), rows: TodoRow[] = [];
   let dropped = 0;
   for (const r of all) {
