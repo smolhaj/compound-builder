@@ -155,6 +155,18 @@ export class StreamRenderer {
     });
   }
 
+  /**
+   * Drought: lower the water surface by `k` (0 = as it runs, 1 = dry). The ribbon sits under the banks, so the terrain hides it where the bed
+   * rises above it; at 1 the surface is gone (the felt layer draws the cracked bed). The depth raster is left alone (reeds, the damp bank).
+   */
+  setDrop(k: number): void {
+    const m = this._mesh;
+    if (!m) return;
+    const c = Math.max(0, Math.min(1, k));
+    m.position.y = -0.7 * c;
+    m.visible = c < 0.97;
+  }
+
   /** The signed-depth raster and its world rect (x0, z0, 1/w, 1/h) for the terrain's damp bank band; null when there is no creek. */
   get wetBank(): { tex: THREE.Texture; rect: THREE.Vector4 } | null { return this._dtex ? { tex: this._dtex, rect: this._rect } : null; }
 

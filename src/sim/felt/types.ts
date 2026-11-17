@@ -39,7 +39,9 @@ export type MarkKind =
   'ash' | 'ash_drift' | 'smoke' | 'pyre' | 'ruin' | 'flood' | 'mud_line' | 'dry_bed' | 'crack' | 'road_cut' | 'slump' | 'red_tag' | 'tarp' | 'boarded'
   | 'dark_house' | 'open_door' | 'dead_field' | 'burn_scar' | 'checkpoint' | 'barricade' | 'camp' | 'column' | 'queue' | 'banner' | 'sign' | 'zone' | 'stalled'
   /** FL2: wreckage and drift left by water, wind or a quake (logs, planks, a toppled fence). */
-  | 'debris';
+  | 'debris'
+  /** A fallout or smoke plume standing on the sky (a stripe at a bearing). */
+  | 'plume';
 export type Anchor =
   | { at: 'compound' } | { at: 'structure'; id: string } | { at: 'neighbor'; i: number } | { at: 'town' }
   /** Meters along the county road window, as roadTraffic does. */
