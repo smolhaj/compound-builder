@@ -566,3 +566,14 @@ Each has a recommendation. Answers drive which work packages start.
    - A. **Grounded prepper realism now; keep a hidden pulpy "arcology" (Vault, Capitol) as a later optional unlock on the same system (recommended).**
    - B. Add the pulpy arcology tier now (a fourth tier of $400M+).
    - C. Strictly grounded forever.
+
+## Owner decisions (2026-11-17)
+1. **Tiers:** all three tiers ship together (T1 berm shell, T2 core dome, T3 glazed biosphere), plus the cheap small earthen dome rung.
+2. **Layer, not replacement:** the dome sits on top of the underground bunker, which keeps the fallout protection factor.
+3. **Atmosphere:** lockdown mode with a CO2 clock for every dome; advanced air filtering is a paid upgrade; a full closed ecology is a very expensive late option that makes the dome habitable permanently.
+4. **Visibility and defense:** a dome is a very visible target but can be well defended. The top tier is a sci-fi "Arcology" unlock: complex polycarbonate-type composite walls that are effectively impervious to firearms, missiles and other outside threats (lean into science fiction there). T1 and T2 stay grounded (real materials).
+5. **Money:** Founder ($5M to $25M) and Magnate ($60M+) start tiers gate T2 and T3; poor and middle families get the small dome and the berm shell.
+6. **Layout (free placement):** no zone slots. The dome simply goes over part of the property, inside the property boundary, and the player still builds whatever they like inside the compound. The dome has its own atmosphere, weather and climate inside. Needs a footprint tool (center and radius or ellipse, clipped to the property line) and a rule that existing buildings, walls and the creek are handled (inside, straddling, or blocked). Cost scales with footprint area, so covering a whole 40-acre parcel is a T3-scale or beyond project; the tier sets the maximum span.
+7. **Dug deep:** the dome wall has a deep buried skirt (footing) all the way round, so tunneler crews cannot dig under it. Reuse the existing tunneler counters (deep footings and buried skirt, ground sensors); a dome skirt is the strongest version, priced by depth. Tunnels and the escape route cross it only through an airlock or sally port.
+8. **Permits and discovery:** an Enclosure group in the Build menu. T1 is always shown; T2 and T3 unlock by wealth tier or a hint. T2 and T3 need real permits; building without one risks a county fine and a rumor.
+9. **Still open (recommended default in brackets):** contractor abstraction for T3 workforce (at most 24 instanced workers on screen); failure event difficulty scaling (gentle on Cozy, full on Standard and Hardcore); per-region cost and performance; tone for any later pulpy arcology tier is already covered by decision 4.
