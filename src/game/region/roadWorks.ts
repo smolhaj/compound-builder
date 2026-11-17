@@ -117,6 +117,19 @@ export function bankExtent(diffAt: (o: number) => number, reach: number, step = 
   return end === 0 ? 0 : Math.min(reach, end + step);
 }
 
+/**
+ * The tallest a stone facing stands: 0.2 u is 4 ft (SCALE v2: 1 u is 20 ft). A retaining face is a course or two of dry-laid stone at the foot of the bank, running along the
+ * road; a taller bank keeps its earth above the facing's top line. Without the cap a 10 ft cut was veneered 14 ft up the slope, a gray slab wider than the road itself.
+ */
+export const FACING_MAX_HEIGHT = 0.2;
+/** Facing stones are laid this much larger than the kit's fieldstone (0.4: blocks of about a foot, not pebbles that alias into a hatched pattern from above). */
+export const FACING_UV_SCALE = 0.4;
+
+/** The horizontal reach of a facing on a bank `heightU` tall: the capped height at the bank's batter, plus a hand's width. Pure, tested. */
+export function facingReachMax(heightU: number, ratio: number): number {
+  return Math.min(FACING_MAX_HEIGHT, heightU) * ratio + 0.1;
+}
+
 /** The narrowest a bank facing may be, as a share of the full reach the bank would have: a narrower band is a sliver (a thin diagonal strip of stone up the slope) and is not drawn. */
 export const FACING_MIN_SHARE = 0.45;
 
@@ -187,12 +200,16 @@ function bankStrip(fr: readonly Frame[], i0: number, i1: number, sg: number, rea
     // the facing starts a hair out from the bench edge and ends before the toe: it never lies on level ground
     const reach = drawn[r] === 0 ? 0 : Math.max(0, drawn[r] - 0.04);   // (a bank that is only a sliver wide is no facing: no thin strip of stone lying up the slope)
     if (reach > 0.06) any = true;
+    let arcRow = 0, prevO = 0;
     for (let k = 0; k <= across; k++) {
       const o = reach * k / across, [x, z] = at(r, o), q = r * (across + 1) + k;
       // laid on the highest ground within a terrain cell across the bank: the terrain mesh is coarser than the ground is sampled, and on a steep cut it rose through the stone
       const [x2, z2] = at(r, o + 0.09), [x3, z3] = at(r, Math.max(0, o - 0.09));
       pos[q * 3] = x; pos[q * 3 + 1] = Math.max(ground(x, z), ground(x2, z2), ground(x3, z3)) + lift; pos[q * 3 + 2] = z;
-      uv[q * 2] = sAcc; uv[q * 2 + 1] = o;
+      // texture coordinates along the road and up the slope (the length of the stone's face, not its plan), in the larger facing scale
+      const slope = k === 0 ? 0 : arcRow + Math.hypot(o - prevO, pos[q * 3 + 1] - pos[(q - 1) * 3 + 1]);
+      arcRow = slope; prevO = o;
+      uv[q * 2] = sAcc * FACING_UV_SCALE; uv[q * 2 + 1] = slope * FACING_UV_SCALE;
     }
   }
   if (!any) return null;
@@ -335,9 +352,9 @@ export function buildRoadWorks(plan: RoadPlan, ground: Ground, o: RoadWorksOpts)
   for (const wl of plan.walls) {
     const i0 = stationAt(wl.s0 - 1e-6), i1 = stationAt(wl.s1 + 1e-6);
     if (i1 <= i0) continue;
-    const sg = wl.side === 'L' ? 1 : -1, h = Math.min(0.5, wl.heightU), reach = h * (wl.kind === 'cut' ? BED.cutRatio : BED.fillRatio);
+    const sg = wl.side === 'L' ? 1 : -1, reach = facingReachMax(wl.heightU, wl.kind === 'cut' ? BED.cutRatio : BED.fillRatio);
     // (a few stations either side: the facing fades out along the slope where the bank dies away, never ends square on the grass)
-    const g = bankStrip(fr, Math.max(0, i0 - 6), Math.min(n - 1, i1 + 6), sg, reach + 0.1, ground, o.natural, 0.012);
+    const g = bankStrip(fr, Math.max(0, i0 - 6), Math.min(n - 1, i1 + 6), sg, reach, ground, o.natural, 0.014);
     if (!g) continue;
     const mesh = new THREE.Mesh(g, kitMaterial('fieldstone'));
     mesh.receiveShadow = true; mesh.castShadow = false;
