@@ -91,7 +91,104 @@ Totals: 3 permanent panels + 1 bar + 1 ticker, 7 right tabs and 3 left tabs, abo
 
 ## 2. Screenshots and annotated problems
 
-SHOTS_PLACEHOLDER
+Captured from the **real game** (live HUD, software GL, Low quality, `docs/ux/uxShots.mjs`) at 1512 x 860, 1280 x 720 and 1100 x 700. Full-size frames are in the gitignored `shots/ux/`; downscaled key frames are committed under `docs/shots/ux/`. Raw metrics: `docs/ux/metrics-real.json` (HUD coverage of the viewport, controls on screen, horizontal overflow).
+
+**Measured, today's HUD**
+
+| Frame | Panels cover | Center half covered | Controls on screen | Horizontal overflow |
+|---|---|---|---|---|
+| Day 0, 1512 x 860 | **41.8 %** | 12.2 % | 55 | none |
+| Day 0, 1280 x 720 | 47.2 % | 19.5 % | 48 | none |
+| Day 0, 1100 x 700 | **55.2 %** | 28.9 % | 48 | none |
+| Day 3 mid-build, 1512 x 860 | 39.3 % | 7.1 % | 52 | none |
+| Day 3, 1280 x 720 | 43.6 % | 12.3 % | 46 | none |
+| Day 3, 1100 x 700 | 50.6 % | 19.7 % | 45 | none |
+| All seven tabs shown, 1512 / 1280 / 1100 | 41.8 / 47.3 / 55.2 % | 12.2 / 19.5 / 28.9 % | 59 / 54 / 52 | none |
+
+The Classic HUD never overflows horizontally at any of the three sizes (the existing `hudLayout` works), so the problem is not breakage; it is **density**: more than half of a 1100 x 700 window is HUD, and about 40 percent of a 1512 x 860 window is HUD while the world gets the middle strip. Layout A's target is 15 percent at rest.
+
+### 2.1 First 30 seconds: day 0, 1512 x 860
+
+![Day 0, 1512 x 860](shots/ux/early-day0-1512x860.jpg)
+
+| # | Problem (as a player sees it) | Fix (section) |
+|---|---|---|
+| 1 | The top bar shows only date, time, cash and six buttons. **There is no food, water, power or threat anywhere on screen**; the first sign of trouble will arrive as a sentence in a panel | Vital chips and the threat chip (11.1) |
+| 2 | The **Welcome card** under the bar repeats the Get operational card in words ("follow the Get operational goals on the left") and covers the top of the world; it is also outside the overlay queue | First-run hint on the goal row (11.5) |
+| 3 | The left column is **the catalog**: nine rows of three lines each ("1400 h · crew adds ~$84,000 · permit $2,500") before the player has asked to build anything. The one thing to do (the goal card, "Lay out a starter compound") is a small card at the top | Build drawer (B), price chip per row, the rest on hover (11.3) |
+| 4 | The right column stacks **four people with three bars each plus a "how they are" button**, then Dogs, Relatives, Housing, Quarters and How everyone is, all open at day 0. It scrolls | People drawer with sub-page chips (11.2); people become one row each |
+| 5 | The panel tab strip shows two tabs and a "Show all tabs" link at 11 px | Action bar with all buttons dimmed, not hidden (11.2) |
+| 6 | **Nothing is the focal point**: every box is the same dark rectangle with 11 to 12.5 px text; the most alarming line ("Underactive thyroid, Asthma: 30 days of thyroid pills") is amber 12.5 px text in the middle of a stack | One loud element: the What-to-do-now alarm row (11.4) |
+| 7 | The world, top-down over snow, is the strongest thing on screen and the HUD adds no hierarchy to help read it | Tokens and a calmer top bar (11.8) |
+| 8 | Dim gray 11 px text over bright snow ("crew adds ~$54,000", "Beds 6 · couches 2 ...") is the measured 4.09:1 failure | Contrast tokens (8.2, 11.8) |
+
+![Day 0, 1100 x 700](shots/ux/early-day0-1100x700.jpg)
+
+At **1100 x 700** (floor): the Welcome card **covers the right panel's tab strip and the first person's name** (a real collision: z 15 over a panel, not in the queue); the panels are 55 percent of the window; the catalog shows five rows and no goal beyond the first.
+
+### 2.2 First hour: day 3, mid-build
+
+![Day 3, 1512 x 860](shots/ux/mid-day3-1512x860.jpg)
+
+| # | Problem | Fix |
+|---|---|---|
+| 1 | **Three cards for one idea** stacked in the left column: Get operational (title, 6-dot strip, button, "Why this matters", reward, "Hide goals", a green "Staked 8 pieces" note), then "ALSO OPEN: START ANY OF THESE NOW" with three more buttons, then NEXT STEPS, then LONG-TERM GOALS, then the catalog | One What-to-do-now card (11.4) |
+| 2 | **The same order is offered four times** in different words: "Order what the plans need (~$117,195)" in the goal, again under Water, again under Power, and "Order 51 pallets of fieldstone ($15,375)" under Next steps | One list, deduplicated by action (`sim/whatToDo.ts`, 11.4) |
+| 3 | A 5-line paragraph about the county permit ("at the family's pace: about 9 months ... A crew of four: about 5 weeks, ~$54,000") sits inside the card; it is useful, but it is prose where a chip ("permit 18 d · crew 5 wk") with a hover would do | Chip + hover card (section 4) |
+| 4 | The red line that matters most, "3 people have no bed, 3 out in the weather. Buy 1 tent $180", is the **fourth section** down the right panel under Dogs, Relatives and the Housing heading | Alarm row on top of What to do now (11.4) |
+| 5 | Tab alert dots are **color only** (red, orange, blue) and 6 px | Tone badge with glyph on the action-bar button (11.2) |
+| 6 | The tab strip shows Family, Supplies, Utilities, Land and Defense and is cut at the panel edge; the player cannot tell more tabs exist | Dimmed buttons (11.2) |
+
+![Day 3, 1100 x 700](shots/ux/mid-day3-1100x700.jpg)
+
+At **1100 x 700** the goal card alone fills the left column: **Next steps is below the fold** (only its heading peeks above the panel edge), so the second thing the game wants the player to do cannot be seen without scrolling. The right panel loses the tab strip's last tabs the same way.
+
+### 2.3 All tabs on, 1512 x 860
+
+![All seven tabs shown](shots/ux/tabs-alltabs-family-1512x860.jpg)
+
+With "Show all tabs" the seven tabs (Family, Supplies, Utilities, Land, Defense, Outside, Years) fit one row **only by shrinking to about 11 px with no padding**; each is well under the 28 px target floor; "Show all tabs" becomes "Hide unused tabs". The Family body is the same six stacked sections; the Housing section's fix text and button repeat what the red line above says. The left catalog's suggested row ("suggested: no roof over the family yet: a modular home ...") highlights a recommendation inside a list of nine, a third copy of the goal.
+
+### 2.4 Mid-crisis: a disaster, hit moment to week 1
+
+The scenario is the long blackout (grid down, a coordinated substation attack) started through the Free build route, then played with the real sim: the day card at the hit, a felt decision card on day 2, week 1 with the Board open. **Capture caveat:** the harness never pressed Start, so the Welcome card is still on screen in several frames; it is a script artifact, but it shows the layering problem (the Welcome card, z 15, draws over the day card, the Board and the Shop). In a real game it goes away when the clock first runs.
+
+![Day card](shots/ux/disaster-daycard-1512x860.jpg)
+
+The day card (the Valley Ledger front page) is the best-designed surface in the game: one headline, **What changed**, **What still works**, **Do first** with buttons, **Face it**; it fits 1512 x 860 and scrolls inside at 1100 x 700 (the 2026-11-17 fix). Problems: the **Welcome card draws over its masthead**; behind the 62 percent dim the top bar's collapse chip ("Impact: within a day") is the only warning the player had and it is a small outlined pill; the left goal card now reads "THE LONG BLACKOUT: THE FIRST WEEK, 3 of 5" with its sub-title **repeated twice side by side** ("Have a way to water without grid power (hand pump, solar pump, gravity)").
+
+![Week 1, 1512 x 860](shots/ux/disaster-week1-1512x860.jpg)
+
+| # | Problem in the crisis frame (day 8, nothing to eat) | Fix |
+|---|---|---|
+| 1 | **A cheerful milestone card ("Three generations under one roof +40 family points") sits in the middle of the map** while the family is out of food; the alarm is a small red "Out of food for 4 days" card at the lower left | Alarms are loud, milestones are corner toasts that wait (11.5) |
+| 2 | **Hunger is stated six or more times at once**: Next steps ("Out of food for 4 days"), the Family tab ("hungry" on three people), Newcomers ("People to feed 5 · 0 days of food"), the ticker, and with the Board open also its Food vital, the runway row and "Stock some food" | One alarm row and one food chip (11.1, 11.4; section 3) |
+| 3 | The ticker is a red full-width bar with a scrolling run of long sentences ("A station out of the city, faint: the weather: valley fog by dawn, the camp will be in it (sight 3,773 ft at first light); it should lift at ...") that cannot be read at a glance | Breaking news only, one short line (11.4) |
+| 4 | Both side panels are at full strength: 49 percent of the screen is HUD and the center strip (the compound) is where the milestone sits | Drawer closed at rest (15 percent) |
+| 5 | The collapse chip became a bordered "Day 8" pill; the top bar still says nothing about food, water or power, the three things that decide the week | Vital chips with ▲ / ✕ glyphs (11.1) |
+
+![Board open, 1100 x 700](shots/ux/disaster-week1-board-1100x700.jpg)
+
+The **Board** is a good page (tone dots, one row per vital with a fix button, runway, "Waiting on you") and the closest thing today to layout A's What-to-do-now content. Problems: at 1100 x 700 it is a 400 px column in the middle of a 1100 px window between two 244 and 320 px panels, so **the map is gone** (86 percent of the window is HUD, measured); the Welcome card covers its title and first rows; it does not pause the clock; and its content is the **fifth copy** of facts shown in the left card, the right tab, the ticker and the top bar. Felt decision cards and the Shop (below) have the same "HUD still at full strength around a card" property:
+
+![A felt decision card at 1100 x 700](shots/ux/disaster-felt-card-1100x700.jpg)
+
+The felt card (day 2, "Protect what still works") is well made: three options with a price chip, hours and odds in plain words, "The clock waits for you", and it fits the window. It is only crowded by two full panels, a red ticker and the top bar around it, with almost no dim, so the player's eye has no single place to land.
+
+Measured in the crisis frames (1512 / 1280 / 1100): week 1 panels cover **49 / 57 / 60 percent**, with the Board open **67 / 75 / 87 percent** (center half 59 / 70 / 86 percent), with a felt card up **61 / 74 / 84 percent**.
+
+### 2.5 Other surfaces (1512 x 860 unless noted)
+
+| Surface | Frame | Observations |
+|---|---|---|
+| **View panel** | ![View open at 1100 x 700](shots/ux/tabs-view-open-1100x700.jpg) | Nine controls with **no visible labels**: three selects reading "auto", "auto", "low" (season, weather, quality; the labels are tooltips only), "Graphic", "Names on", "Status pips on", "uncapped"; overlays (Sightlines, Terrain, Blueprint, Boundary, Photo) share the panel with graphics settings. It is a 560 px wide block above the toolbar that covers 40 percent of the center strip at 1100. Fix: Settings modal with labeled rows + one Overlays menu (11.2) |
+| **Shop & money** | ![Shop](shots/ux/tabs-shop-1512x860.jpg) | The strongest visual language in the HUD: icon cards, price at the right, a "have 0" count, steppers, kits on the right, one primary button. Gaps: 14 tabs wrap to two rows (the second row begins with "Kit & security"); the Welcome card draws over the header here too. **This is the look the rest of the HUD should match** (icon + number + one action) |
+| **Left Log, Projects** | `shots/ux/tabs-left-log-1512x860.png`, `tabs-left-projects-1512x860.png` | Plain lists; Log is the last 14 lines fading, so a week of history is unreachable here (it lives in Years) |
+| **Right tabs** (Supplies, Utilities, Land, Defense, Outside, Years) | `shots/ux/tabs-tab-*-1512x860.png` | Same "stack of small-caps sections" pattern; Land covers 41.8 percent, Outside 26.1 percent (a short tab leaves the panel small, so the HUD footprint changes from tab to tab) |
+
+**Overflow check.** Every capture at 1512 x 860, 1280 x 720 and 1100 x 700 has `hScroll: false` and no fixed element outside the window (`docs/ux/metrics-real.json`): the Classic HUD never overflows horizontally. Layout A keeps that guarantee by construction (11.1).
+
+
 
 ## 3. Duplicates and overlaps (one source of truth for each)
 
