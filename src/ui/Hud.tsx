@@ -203,6 +203,7 @@ function FreeBuild() {
       </select>
       <button style={btn(true)} onClick={() => g.trigger(kind, warn, variant || undefined)}>Trigger</button>
     </div>
+    <div style={{ marginTop: 4, fontSize: 11.5, opacity: 0.75, lineHeight: 1.35 }}>{choices.find(c => c.kind === kind)?.blurb}</div>
   </Section>;
 }
 
