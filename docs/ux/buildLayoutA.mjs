@@ -1,0 +1,71 @@
+/**
+ * Final layout-A mockups (docs/UX_AUDIT.md section 11): writes layoutA-*.html. Static HTML, no assets. The scene is a placeholder; the real 3D world sits behind the HUD.
+ * Chips and the overflow come from the reference algorithm in topBarPlan.mjs. Render with renderLayoutA.mjs.
+ */
+import { writeFileSync } from 'node:fs';
+import { CSS, SCENE, ic } from './buildMockups.mjs';
+import { topBarPlan } from './topBarPlan.mjs';
+const here = new URL('.', import.meta.url).pathname;
+const css = (W, H) => CSS.replace('width:1512px;height:860px;', `width:${W}px;height:${H}px;`) + `.card{background:var(--panel);border:1px solid var(--edge);border-radius:8px}.glyph{font-weight:700;margin-right:2px}.th{width:34px;height:34px;border-radius:6px;flex:none;display:flex;align-items:center;justify-content:center;background:#3a3d34;color:var(--accent)}.dis{opacity:.5}`;
+const page = (W, H, body) => `<!doctype html><html><head><meta charset="utf-8"><style>${css(W, H)}</style></head><body>${SCENE}${body}</body></html>`;
+
+// tone glyphs: color never carries meaning alone
+const G = { good: '✓', warn: '▲', bad: '✕' };
+const chip = (icon, val, tone = 'good', compact = false) => `<span class="chip ${tone}" style="padding:0 8px;gap:5px">${ic(icon)}${val ? `<span>${val}</span>` : ''}${tone === 'good' ? '' : `<span class="glyph ${tone}" style="font-size:11px">${G[tone]}</span>`}</span>`;
+export const VAL = {
+  threat: (c) => `<span class="chip warn" style="padding:0 8px;gap:5px">${ic('clock')}<span>${c ? '38 d' : 'Collapse ~38 d'}</span><span class="glyph warn" style="font-size:11px">▲</span></span>`,
+  cash: (c) => chip('coin', '$187k', 'good', c), food: (c) => chip('food', '41 d', 'good', c), water: (c) => chip('water', '6 d', 'warn', c), power: (c) => chip('power', c ? '2.1' : '2.1 kW', 'good', c),
+  needs: () => `<span class="btn" style="padding:0 8px;gap:4px">${ic('bell')}<b>3</b></span>`, defense: (c) => c ? chip('def', '', 'warn', c) : chip('def', 'Exposed', 'warn'), morale: (c) => c ? chip('heart', '', 'good', c) : chip('heart', 'Good', 'good'), fuel: (c) => chip('fuel', '12 d', 'good', c),
+};
+export const topBar = (W) => {
+  const p = topBarPlan(W), compact = p.mode === 'compact';
+  const sp = ['❚❚', '▶', '▶▶', '▶▶▶', '⏩'].slice(0, p.speedButtons + (p.speedButtons === 5 ? 0 : 0)).map((s, i) => `<span class="btn${i === 1 ? ' on' : ''}" style="padding:0 6px;min-width:30px;justify-content:center">${s}</span>`).join('');
+  const hidden = p.overflow.length ? `<span class="btn" style="padding:0 8px" title="more">⋯ <b>+${p.overflow.length}</b></span>` : '';
+  return `<div class="p row" style="left:50%;top:8px;transform:translateX(-50%);padding:5px 8px;gap:6px;white-space:nowrap;flex-wrap:nowrap;height:44px"><span style="font-weight:600;padding:0 4px">Apr 15 · 09:42</span><span class="row" style="gap:3px">${sp}</span><span style="width:1px;height:20px;background:var(--edge)"></span>${p.shown.map(id => VAL[id](compact)).join('')}${hidden}<span class="btn" style="padding:0 8px">${ic('menu')}</span></div>`;
+};
+const bottomBar = (W, labels, active) => {
+  const items = [['build', 'Build', 'B'], ['proj', 'Projects', ''], ['people', 'People', ''], ['box', 'Supplies', ''], ['power', 'Utilities', '!'], ['land', 'Land', ''], ['def', 'Defense', ''], ['out', 'Outside', ''], ['years', 'Years', '']];
+  const b = (n, l, tag) => `<span class="btn${l === active ? ' on' : ''}" style="${l === active ? '' : ''}${labels ? '' : 'padding:0 9px'}" title="${l}">${ic(n)}${labels ? l : ''}${tag === '!' ? ' <span class="tag" style="background:var(--warn);color:#222">!</span>' : ''}</span>`;
+  return `<div class="p row" style="left:50%;bottom:16px;transform:translateX(-50%);padding:5px 8px;gap:4px;white-space:nowrap;height:44px">${items.map(([n, l, t]) => b(n, l, t)).join('')}<span style="width:1px;height:20px;background:var(--edge)"></span>${b('board', 'Board', '')}${b('shop', 'Shop', '')}${b('log', 'Log', '')}<span style="width:1px;height:20px;background:var(--edge)"></span>${b('eye', 'Look ▾', '')}${b('cam', 'Camera ▾', '')}</div>`;
+};
+const wtdn = (compact = false) => compact
+  ? `<div class="p row" style="left:16px;top:60px;width:320px;padding:6px 10px"><span class="h">Now</span><b style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Drill or dig a well</b><span class="btn pri" style="height:24px">Order</span></div>`
+  : `<div class="p" style="left:16px;top:60px;width:320px;padding:8px 10px"><div class="row" style="margin-bottom:4px"><span class="h">What to do now</span><span class="sp"></span><span class="tag">3</span><span class="dim">▾</span></div>
+<div class="row" style="padding:4px 6px;margin:0 -6px;border-radius:6px;background:rgba(160,40,30,.22);border-left:3px solid var(--bad)"><span class="bad glyph">✕</span><b style="flex:1">Jo is hurt</b><span class="btn" style="height:24px">Treat</span></div>
+<div style="padding:6px 0 4px;border-bottom:1px solid var(--edge)"><div class="row"><span class="h" style="color:var(--accent)">Goal 2 of 6</span><span class="sp"></span><span style="letter-spacing:2px;font-size:12px"><b class="good">●●</b><b style="color:var(--accent)">◐</b><span class="dim">○○○</span></span></div><div style="font-weight:600;margin:2px 0 5px">Drill or dig a well</div><div class="row"><span class="btn pri">Order what the plans need</span><span class="dim" style="font-size:11.5px">about 4 days</span></div></div>
+<div class="row" style="padding:5px 0"><span class="dim">▸</span><span style="flex:1">Put in a gravel drive</span><span class="btn" style="height:24px">Stake it</span></div>
+<div class="row dim" style="font-size:12px;padding-top:2px"><span>▸ Later: long-term goals</span><span class="sp"></span><span>1/4 · 0/3</span></div></div>`;
+const feed = (top = 272) => `<div class="p" style="left:16px;top:${top}px;width:320px;padding:6px 10px;font-size:12.5px"><div class="row"><span class="h">Feed</span><span class="warn glyph">▲</span><span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600">Grid operator warns of outages</span><span class="tag">+2</span></div></div>`;
+const peopleDrawer = (W) => `<div class="p" style="right:16px;top:60px;width:${W >= 1280 ? 360 : 340}px;max-height:min(560px,calc(100% - 140px));padding:10px 12px;overflow:hidden"><div class="row" style="margin-bottom:6px"><b style="font-size:15px">${ic('people')} People</b><span class="sp"></span><span class="dim">4 here</span><span class="btn" style="height:28px">✕</span></div>
+${[['Dana', 92, 70, 'Building', 'good'], ['Marcus', 100, 84, 'Chores', 'good'], ['Ellie, 9', 88, 91, 'School', 'good'], ['Jo, 14', 34, 40, 'Hurt', 'bad']].map(([n, h, m, t, tone]) => `<div class="row" style="padding:4px 0"><b style="width:72px">${n}</b><div class="bar sp"><i style="width:${h}%;${tone === 'bad' ? 'background:var(--bad)' : ''}"></i></div><div class="bar" style="width:60px"><i style="width:${m}%;${tone === 'bad' ? 'background:var(--bad)' : ''}"></i></div><span class="${tone === 'bad' ? 'bad' : 'dim'}" style="width:64px;text-align:right">${tone === 'bad' ? '✕ ' : ''}${t}</span></div>`).join('')}
+<div class="sec"><div class="row" style="flex-wrap:wrap;gap:4px"><span class="tag" style="background:var(--accent);color:#222">People</span><span class="tag">Medical</span><span class="tag">Work and money</span><span class="tag">Daily</span><span class="tag">Kin</span><span class="tag">Dogs</span><span class="tag">Quarters</span><span class="tag">Classes</span><span class="tag">House rules</span></div></div>
+<div class="sec"><div class="h" style="margin-bottom:3px">Medical</div><div class="dim">Jo: bruised ribs. No medic on the place. Meds: 2 doses.</div><div class="row" style="margin-top:4px"><span class="btn pri" style="height:28px">Treat Jo</span><span class="btn" style="height:28px">Order meds</span></div></div></div>`;
+
+const hover = (l, t, body) => `<div class="hov" style="left:${l}px;top:${t}px"><b>${body[0]}</b><div class="dim">${body[1]}</div><div class="bar" style="margin:6px 0"><i style="width:${body[2]}%;${body[4] || ''}"></i></div><div class="row"><span class="btn pri" style="height:24px">${body[3]}</span></div></div>`;
+const note = (W, H, t) => `<div class="note" style="left:16px;bottom:${H < 760 ? 70 : 76}px">${t}</div>`;
+const out = {};
+
+// 1 default (drawer closed), 1512
+out['layoutA-closed'] = page(1512, 860, topBar(1512) + wtdn() + feed() + bottomBar(1512, true) + `<div class="note" style="left:16px;bottom:76px">A, default: world first (no drawer open)</div>`);
+// 2 People drawer + hover card on water, 1512
+out['layoutA'] = page(1512, 860, topBar(1512) + hover(640, 56, ['Water: 6 days stored', 'Hand pump works. The well gives 40 gal a day; the family uses 55. No cistern yet.', 30, 'Add a cistern', 'background:var(--warn)']) + wtdn() + feed() + peopleDrawer(1512) + bottomBar(1512, true, 'People') + `<div class="note" style="left:16px;bottom:76px">A, People drawer open (one drawer at a time)</div>`);
+// 3 and 4 degrade
+for (const [W, H] of [[1280, 720], [1100, 700]]) out[`layoutA-${W}`] = page(W, H, topBar(W) + wtdn() + feed() + peopleDrawer(W) + bottomBar(W, W >= 1360, 'People') + `<div class="note" style="left:16px;bottom:70px">A at ${W} x ${H}: compact chips, icon-only bar, drawer 340 px</div>`);
+// 5 Build drawer
+const row = (name, price, hrs, dis) => `<div class="row${dis ? ' dis' : ''}" style="padding:5px 0;border-top:1px solid var(--edge)"><div class="th">${ic('build')}</div><div style="flex:1;min-width:0"><b>${name}</b><div class="dim" style="font-size:12px">${dis || hrs}</div></div><span class="chip" style="height:24px">${price}</span></div>`;
+out['layoutA-build'] = page(1512, 860, topBar(1512) + wtdn(true) +
+  `<div class="p" style="left:16px;top:106px;width:340px;bottom:76px;padding:10px 12px;overflow:hidden"><div class="row" style="margin-bottom:6px"><b style="font-size:15px">${ic('build')} Build</b><span class="tag">B</span><span class="sp"></span><span class="btn" style="height:28px">✕</span></div>
+<div class="chip" style="width:100%;height:32px;border-radius:8px;font-weight:400">${ic('search')}<span class="dim">Search 120 pieces... ( / )</span></div>
+<div class="row" style="flex-wrap:wrap;gap:4px;margin:8px 0 4px"><span class="tag" style="background:var(--accent);color:#222">Recommended 3</span><span class="tag">Home</span><span class="tag">Food</span><span class="tag">Water &amp; power</span><span class="tag">Defense</span><span class="tag">Paths</span><span class="tag">Underground</span><span class="tag">Lines</span><span class="tag">Woods</span></div>
+<div class="h" style="margin:6px 0 2px">Needed now</div>${row('Hand-dug well', '$1,900', '24 h · 1 lumber, 40 fieldstone')}${row('Gravel drive', '$6,400', '24 h waiting at the road')}${row('Tool shed', '$2,900', '30 h')}
+<div class="h" style="margin:8px 0 2px">Also available</div>${row('Cistern, 1,500 gal', '$2,300', '', 'Needs a roof to collect from')}${row('Escape tunnel', '$18,000', '', 'Needs a bunker first')}</div>
+<div class="hov" style="left:370px;top:170px"><b>Hand-dug well</b><div class="dim">Water table is 65 ft down: slow, hard work, but it needs no power. 40 gal a day.</div><div class="sec dim" style="font-size:12px;margin-top:5px">Bill: 40 fieldstone, 1 lumber, 6 hardware<br>Time: 24 h of work (about 3 days for the family)</div><div class="row"><span class="btn pri" style="height:24px">Stake it</span><span class="dim" style="font-size:11px">R rotates, Esc cancels</span></div></div>` + bottomBar(1512, true, 'Build') + `<div class="note" style="right:16px;bottom:76px">A, Build drawer (B): categories, search, price chips, hover bill</div>`);
+// 6 crisis: modal over everything, drawer dimmed, banner, toasts in the corner
+out['layoutA-crisis'] = page(1512, 860, topBar(1512) + `<div class="p row" style="left:50%;top:60px;transform:translateX(-50%);padding:4px 12px;border-color:var(--bad);background:rgba(70,24,18,.92);gap:10px;white-space:nowrap"><b class="bad">BREAKING</b><span style="font-weight:600">Grid operator: rolling outages begin tonight</span><span class="btn" style="height:24px">Dismiss</span></div>` + wtdn() + peopleDrawer(1512).replace('class="p"', 'class="p" data-inert style="opacity:.55;') .replace('style="opacity:.55; style="', 'style="opacity:.55;') + bottomBar(1512, true, 'People') +
+  `<div style="position:absolute;inset:0;background:rgba(8,8,6,.38);z-index:6"></div>
+<div class="p" style="left:50%;top:50%;transform:translate(-50%,-50%);width:540px;padding:16px 18px;z-index:8;border-color:var(--accent);box-shadow:0 10px 30px rgba(0,0,0,.55)"><div class="h">Decision · the clock is paused</div><div style="font-size:19px;font-weight:700;margin:4px 0">Someone is at the gate</div><div class="dim" style="margin-bottom:10px">A truck and six people. One man holds a white cloth. They ask for water and a night under a roof.</div>
+${[['Open the gate', 'They come in and stay until morning. Risk: about 1 in 10 are not what they say.'], ['Talk through the fence', 'Learn who they are before you decide. Costs an hour, and a guard.'], ['Send them on', 'The gate stays shut. They will remember.']].map(([a, b], i) => `<div class="row" style="padding:7px 10px;margin-top:6px;border:1px solid ${i === 0 ? 'var(--accent)' : 'var(--edge)'};border-radius:8px;min-height:44px"><div style="flex:1"><b>${a}</b><div class="dim" style="font-size:12.5px">${b}</div></div><span class="btn${i === 0 ? ' pri' : ''}" style="height:32px">Choose</span></div>`).join('')}</div>
+<div style="position:absolute;left:16px;bottom:72px;width:300px;z-index:4;display:flex;flex-direction:column;gap:6px"><div class="p" style="position:static;padding:6px 10px;font-size:12.5px;opacity:.7">Ordered 30 lumber for $1,240. Cash left $8,760.</div><div class="p" style="position:static;padding:6px 10px;font-size:12.5px;opacity:.7"><b class="good">✓</b> First night under a roof</div></div>
+<div class="note" style="right:16px;bottom:76px;z-index:20">A, crisis: decision card over everything, drawer inert, toasts in the corner and non-blocking (they wait while a card is up)</div>`);
+if (process.argv[1]?.endsWith('buildLayoutA.mjs')) { for (const [k, v] of Object.entries(out)) writeFileSync(here + k + '.html', v);
+console.log(Object.keys(out).join(' ')); }
