@@ -51,9 +51,9 @@ Encounter mix: `patrol` 20 at the hit (4 to 8 soldiers, an officer and an interp
 
 ## 5. Factions, checkpoints, requisitions, collaboration vs resistance
 
-Factions: the Occupation Authority (a Kommandantur analog; fictional "the Eastern Union"? Use "the Occupying Force" with no real nation named), the Town Council (collaborators), the Free Valley Committee (resistance), the Black Market, the Church.
+Factions: the Occupation Authority (a real state, see section 12, Invaders), the Town Council (collaborators), the Free Valley Committee (resistance), the Black Market, the Church.
 
-Checkpoints: bridge and crossroads; papers (an ID `Ausweis`, 30 days), curfew passes. Stances: flag_pay (bribe 2 silver or a pack of cigarettes), flag_pass, flag_bluff (forged paper, success 40%), flag_shoot (reprisal on the village).
+Checkpoints: bridge and crossroads; papers (an ID document named by the invader, 30 days), curfew passes. Stances: flag_pay (bribe 2 silver or a pack of cigarettes), flag_pass, flag_bluff (forged paper, success 40%), flag_shoot (reprisal on the village).
 
 Requisitions: tier 1 takes up to 25% of visible stores (grain, meat, fuel, a truck) every 14 days; concealment quality (cellar, false wall, buried barrels) protects hidden stock. A search roll per visit: hidden stock found with p 0.1 baseline, 0.35 if an informant exists. Receipts in occupation money.
 
@@ -97,3 +97,19 @@ Hook seam: `src/sim/disasters/invasion.ts` and `src/sim/occupation.ts` (shared w
 ## 11. Chaining
 
 Into: `civil_war` (backing faction), `lawless` (when the occupier withdraws, 40%), `financial` (currency decree), `mass_exodus` (columns of refugees ahead of the front, 35%). Out of: `global_famine` (month 8 to 14, in the Dutch pattern, 20% if tier 3 and fate `never`), `lawless` at liberation (reprisals). Cyberattack or `grid_down` as the opener (30%).
+
+## 12. Invaders (owner decision, 2026-11-17)
+
+The occupier is a real state that could plausibly invade, chosen at the hit from the region (seeded on the run; most seeds follow the lean). Code: `src/sim/invaders.ts` (pure data and the region lean), wired through `sim/disasters/invasion.ts`, `sim/orderEncounters.ts` and `sim/dayCard.ts`. The chosen id is `disaster.fx.invasion.invader` (no save bump).
+
+| Invader | Regions (primary) | Force and authority | Papers and money | Style |
+|---|---|---|---|---|
+| China (Pacific side) | pnw, desert, mountain_west (by road) | the People's Liberation Army under the Pacific Military Administration; the State Security Bureau | household register card, travel permit; occupation yuan | Register posts: card scanned, face matched to photo, the clerk copies every name in the household; a "fee" to the clerk; procurement notices. |
+| Russia (northern front) | north_woods, upper_midwest, new_england, rust_belt, appalachia, plains | the Russian Army under the Northern Military Command; the Federal Security Service | occupation passport, propusk; occupation rubles | Filtration posts: phones scrolled, a man in a plain coat asks the same question three ways, a tent for those sent aside; the commandant's office issues requisition orders. |
+| Coalition (an axis of three: Russia, China, Iran) | ozarks, hill_country | the Combined Command; the Joint Security Directorate | joint registry card, joint pass; settlement notes | Joint checkpoints: three flags, a liaison officer for each partner, notices in three languages that do not always agree; nobody can say who took the envelope. |
+
+Lean (shares of China / Russia / coalition): pnw 90/10/0, desert 90/0/10, mountain_west 85/15/0, north_woods 5/95/0, upper_midwest 0/92/8, new_england 0/92/8, rust_belt 0/90/10, appalachia 0/60/40, plains 15/60/25, ozarks 0/20/80, hill_country 10/0/90. Interior regions (mountain_west, rust_belt, appalachia, plains, ozarks) get a hit headline that says the coasts fell first and the column came by road; the mechanics are the same.
+
+Forcing one: variants `pacific`, `northern` and `axis_coalition` (weight 0, never rolled) in Free build / God Mode and the Scenario picker "Invader" select; they play like the plain occupation. `soft` and `contested` still work and take the region's invader.
+
+Tone rule: the villain is the occupying state apparatus (officers, political officers, security services). Ordinary people of that nationality, conscripts and decent soldiers included, stay human; the lost-soldier card stays sympathetic. No ethnic caricature, slurs, stereotyped accents or mocking of languages; translated words are few and short (`Zhengjian`, `Dokumenty`, `Spasibo`). A blocklist test (`sim/invaders.test.ts`) guards it. Neighbors who collaborate or resist are the moral texture.

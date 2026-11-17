@@ -2,6 +2,7 @@
  * "The day it happened": the one-card front page shown when the collapse hits (the clock is paused until the player
  * continues). Pure: the headline is the disaster's own hit line, the rest is read from the state at the hit.
  */
+import { INVADERS, arrivesByRoad, pickInvader, type InvaderId } from './invaders';
 import { DISASTERS, TRACKS, TRACK_NAME, tracksAt, type DisasterKind } from './disaster';
 import { daysOfFood } from './needs';
 import { calendarOf, type GameState } from './state';
@@ -43,13 +44,15 @@ export function dayCard(s: GameState): DayCard | null {
   let m = 11;
   while (m > 0 && cal.doy <= MONTH_START[m]) m--;
   const cause = def.variants.find(v => v.id === d.variant)?.name ?? def.name;
-  const headline = def.hit[0].replace('{cause}', cause);
+  const inv = d.kind === 'invasion' ? INVADERS[(d.fx?.invasion as { invader?: InvaderId } | undefined)?.invader ?? pickInvader(s.site.region, d.variant, s.seed)] : null;
+  const headline = inv ? (arrivesByRoad(s.site.region) ? inv.hit.road : inv.hit.landing) : def.hit[0].replace('{cause}', cause);
   // what falls in the first three days
   const t3 = tracksAt(d, d.hitAt + 3);
   const gone = TRACKS.filter(k => t3[k] < 0.5).map(k => TRACK_NAME[k].toLowerCase());
   const lines = gone.length ? [`Within three days: ${gone.slice(0, 5).join(', ')}${gone.length > 5 ? ' and more' : ''} are gone or going.`] : ['The services are straining but still running.'];
   const back = Math.min(...Object.values(d.back).map(Number), Infinity);
   lines.push(Number.isFinite(back) ? `Nobody says when it comes back. The earliest hope is about ${back < 14 ? 'a couple of weeks' : back < 60 ? `${pluralize(Math.round(back / 7), 'week')}` : `${pluralize(Math.round(back / 30), 'month')}`}.` : 'Nobody says when it comes back, or if.');
+  if (inv) lines.push(inv.dayLine);
   const alive = s.personState.filter(p => p.needs.died == null).length;
   const food = daysOfFood(s);
   const stand = [

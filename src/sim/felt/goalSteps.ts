@@ -179,7 +179,7 @@ export const PRIMS: Record<PrimId, Prim> = {
   },
   water: {
     short: 'Water', title: 'Store a week of water', line: s => `${Math.floor(waterDaysStored(s))} days of water in storage (want 7)`,
-    why: s => `A person needs about 10 liters a day with washing. Pumps need power, and the county main is the first thing to fail. ${clockWords(s)}`,
+    why: s => `A person needs about 3 gallons a day with washing. Pumps need power, and the county main is the first thing to fail. ${clockWords(s)}`,
     done: s => waterDaysStored(s) >= 7,
     act: s => (fin(s, k => ['well_hand', 'well_drilled', 'cistern', 'water_tower'].includes(k)) || rich(s) ? shop('Buy water jugs and a tote', 'water') : stake(s, 'well_hand', 'Stake a hand-dug well')),
     pace: s => poorTail(s, 'a hand-dug well is the family\'s own work; jugs from the creek count in the meantime.'),

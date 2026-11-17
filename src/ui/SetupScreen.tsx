@@ -128,6 +128,7 @@ export function SetupScreen() {
   const lot = picked ? (affordable(picked, budget) ? picked : null) : lots.find(l => affordable(l, budget)) ?? null;
   const [mode, setMode] = useState<Mode>('surprise');
   const [kind, setKind] = useState<DisasterKind>('grid_down');
+  const [invader, setInvader] = useState('');   // '' = by region; else a variant that forces the occupier
   const [peace, setPeace] = useState<Exclude<PeaceLength, 'random'>>('medium');
   const [diff, setDiff] = useState<Difficulty>('standard');
   const [diffMore, setDiffMore] = useState(false);
@@ -138,7 +139,7 @@ export function SetupScreen() {
   try { unlocked = localStorage.getItem('cb.unlocked') === '1'; } catch { /* storage blocked */ }
   const start = () => {
     if (!lot) return;
-    const game = newGame(seed, NEW_GAME_START.doy, NEW_GAME_START.year, { site: lot, lifestyle: life, townPlan: plan, mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, dayJobs: LIFESTYLE[life].jobs, difficulty: diff, grid: true, family, funds, kinAway: pool.filter(p => !kinWith.includes(p.id)), kinOpen });
+    const game = newGame(seed, NEW_GAME_START.doy, NEW_GAME_START.year, { site: lot, lifestyle: life, townPlan: plan, mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, variant: mode === 'scenario' && kind === 'invasion' && invader ? invader : undefined, dayJobs: LIFESTYLE[life].jobs, difficulty: diff, grid: true, family, funds, kinAway: pool.filter(p => !kinWith.includes(p.id)), kinOpen });
     game.clock.speed = 0;   // a new game waits for the player: nothing happens until they press play
     g.load(game);
     g.setWelcome(true);
@@ -318,6 +319,12 @@ export function SetupScreen() {
                   </select>
                 </div>
                 <div style={{ marginLeft: 68, marginBottom: 6, fontSize: 12, color: C.dim, lineHeight: 1.4 }}>{BLURB[kind]}</div>
+                {kind === 'invasion' && <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                  <span style={{ width: 62, color: C.dim, fontSize: 12.5 }}>Invader</span>
+                  <select value={invader} onChange={e => setInvader(e.target.value)} style={{ background: '#2a2c26', color: '#eee', border: `1px solid ${C.line}`, borderRadius: 6, padding: '4px 8px' }}>
+                    <option value="">By region (default)</option><option value="pacific">China (Pacific side)</option><option value="northern">Russia (northern front)</option><option value="axis_coalition">Coalition (an axis of three states)</option>
+                  </select>
+                </div>}
                 <Chips label="Peace" value={peace} set={setPeace} opts={PEACE} />
               </>}
               <Chips label="Difficulty" value={diff} set={setDiff} opts={DIFFS.map(([d, l]) => [d, l] as [Difficulty, string])} />
