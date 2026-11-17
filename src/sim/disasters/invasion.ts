@@ -4,30 +4,34 @@ import { mulberry32 } from '../rng';
 import { fxOf, hasPass, labelsFor, makeCard, resolveCard, since } from '../orderEncounters';
 import { ambushWeek, curfewTick, returnees, shelterTick, tollOnRuns } from '../orderWorld';
 import { dayIndex } from '../state';
+import { INVADERS, arrivesByRoad, pickInvader, type InvaderDef } from '../invaders';
 
 type S = Parameters<NonNullable<KindFx['onHit']>>[0];
 const init = (s: S) => {
   const f = fxOf(s);
   if (!f.clock) {
     const r = mulberry32(s.seed * 6151 + 17);
+    f.invader = pickInvader(s.site.region, s.disaster.variant, s.seed);
     f.clock = rollTierClock(r, s.disaster.difficulty ?? 'standard'); f.maxTier = maxTier(s.disaster.difficulty ?? 'standard', s.disaster.variant, s.disaster.fate ?? 'partial'); f.tier = 1; f.post = true;
     if (s.disaster.variant === 'contested') f.front = newFront('alliance', 0);
   }
   return f;
 };
+/** The occupier of this run (chosen at the hit from the region, or forced by a variant). */
+export const invaderOf = (s: S): InvaderDef => INVADERS[init(s).invader ?? pickInvader(s.site.region, s.disaster.variant, s.seed)];
 const reqDue = (s: S) => { const f = init(s), d = since(s); return d >= 7 && requisitionDue(d, f.lastReq ?? -1, s.disaster.difficulty ?? 'standard', 7) && (!f.front || f.front.holder === 'alliance'); };
 const laborDue = (s: S) => { const f = init(s), d = since(s); return (f.tier ?? 1) >= 3 && (f.lastDraft === undefined || d - f.lastDraft >= 60); };
 
 /** Invasion (WP3, docs/scenarios/invasion.md): checkpoints and requisitions at once; curfew and papers from day 60-90; informants and forced labor from day 150-240; the currency decree; partisans and reprisals. */
 export const fx: KindFx = {
-  onHit(s) { init(s); return ['Proclamation No. 1: weapons are to be surrendered by Friday, papers are required on the county roads, requisition orders will be issued.']; },
+  onHit(s) { init(s); const v = invaderOf(s); return [arrivesByRoad(s.site.region) ? v.hit.road : v.hit.landing, v.proclamation]; },
   daily(s, ctx) {
     const f = init(s), out: string[] = [], d = ctx.day;
     const was = f.tier ?? 1, now = tierAt(d, f.clock!, f.maxTier ?? 1);
-    if (now !== was) { f.tier = now; out.push(`Tier ${now}: ${TIER_NAME[now]}.${now === 2 ? ' Curfew from eight to five. Identity cards. House searches.' : ' Informants are paid. One adult from each household for the labor detail. A notice on the church door lists hostages.'}`); }
+    if (now !== was) { f.tier = now; const v = invaderOf(s); out.push(`Tier ${now}: ${TIER_NAME[now]}.${now === 2 ? v.tier2 : v.tier3}`); }
     if (f.front) { const st = stepFront(f.front, d, ctx.r, 0.85); if (st === 'contest') out.push('Fighting on the river road: the occupiers are being pushed back, for now.'); if (st === 'flipped') out.push(f.front.holder === 'alliance' ? 'The occupiers are back in the town.' : 'The occupiers have withdrawn from the valley. For now.'); }
-    if (d === 10 && ctx.once('decree-50')) out.push('Decree: old dollars are accepted at half their value.');
-    if (d === 60 && ctx.once('decree-25')) out.push('Decree: old dollars are accepted at a quarter of their value. Occupation money only for the ration card.');
+    if (d === 10 && ctx.once('decree-50')) out.push(`Decree: ${invaderOf(s).decreeHalf}`);
+    if (d === 60 && ctx.once('decree-25')) out.push(`Decree: ${invaderOf(s).decreeQuarter}`);
     out.push(...tollOnRuns(s, ctx), ...returnees(s), ...shelterTick(s, ctx, 0.01 + (f.tier ?? 1) * 0.015 + (f.known ? 0.02 : 0)), ...ambushWeek(s, ctx, f.tier ?? 1), ...curfewTick(s, ctx));
     const g = s.gate;
     if ((reqDue(s) || laborDue(s)) && !g.pending && !g.incoming) g.next = Math.min(g.next < 0 ? dayIndex(s.clock.t) : g.next, dayIndex(s.clock.t));
@@ -53,13 +57,15 @@ export const fx: KindFx = {
   npcMods: () => 1.2,
   radioBulletins(s, ctx) {
     const f = init(s), d = ctx.day, r = ctx.r, tier = f.tier ?? 1;
+    const v = invaderOf(s);
     const lines: Array<[string, 0 | 1 | 2 | 3]> = [
-      ['the occupier\'s Proclamation No. 1, read in two languages: weapons surrendered by Friday, papers on every road.', 2],
-      [`ration notices: ${tier === 1 ? 'flour one sack a family' : 'bread by card on odd days'}; old dollars at ${Math.round(cashMultiplier(d) * 100)}%.`, 1],
+      [`${v.radio.proclamation}`, 2],
+      [`${v.radio.ration} Old dollars at ${Math.round(cashMultiplier(d) * 100)}%.`, 1],
       ['a quiet voice at night, the Free Valley: "the blue goat sleeps at noon." Nothing else.', 2],
-      [tier >= 2 ? 'the curfew: eight p.m. to five a.m., enforced.' : 'checkpoints on the bridge and the crossroads; papers required to cross the county line.', 2],
+      [tier >= 2 ? v.radio.curfew : v.radio.post, 2],
+      [v.propaganda[Math.floor(r() * v.propaganda.length)], 1],
     ];
-    if (tier >= 3) lines.push(['a list of hostages read in the town square, forty-one names.', 3]);
+    if (tier >= 3) lines.push([v.radio.hostages, 3]);
     if ((f.resistance ?? 0) > 0 && !f.radioSignal) f.radioSignal = true;
     const [text, tone] = lines[Math.floor(r() * lines.length)];
     return { text, tone };

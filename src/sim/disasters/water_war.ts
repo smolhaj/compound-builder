@@ -32,7 +32,7 @@ export const fx: KindFx = {
     // the ditch rider: every 30 days he takes a share of the stored water, more if you have a creek diversion
     if (s.disaster.variant !== 'contamination' && ctx.day >= 30 && ctx.day % 30 === 0) {
       const share = (s.site.creek ? 0.3 : 0.15) * sev(s), took = Math.round(s.utilities.storedL * share);
-      if (took > 0) { s.utilities.storedL -= took; W.riderTaken += took; out.push(`The ditch rider checked the headgate and took ${took.toLocaleString('en-US')} liters from the tank for the common ditch.`); }
+      if (took > 0) { s.utilities.storedL -= took; W.riderTaken += took; out.push(`The ditch rider checked the headgate and took ${Math.round(took / 3.785).toLocaleString('en-US')} gallons from the tank for the common ditch.`); }
     }
     // a poisoned supply or camp water: sickness for anyone who drinks it untreated
     if ((s.disaster.variant === 'contamination' ? ctx.day <= 60 : ctx.day <= 200) && !treated(s))

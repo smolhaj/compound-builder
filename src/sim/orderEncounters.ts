@@ -24,9 +24,10 @@ import { diffOf } from './difficulty';
 import { lifeOf, localsOf } from './neighborLife';
 import { barterOf } from './barter';
 import {
-  CHECKPOINT, DRAFT, FACTION, SCARED_LINES, OCCUPIER_LINES, DESERTER_LINES, TIER_NAME, draftPrice, draftable, informantFraction, isInformant, otherFaction, papersOdds, requisitionShare,
+  CHECKPOINT, DRAFT, FACTION, SCARED_LINES, DESERTER_LINES, TIER_NAME, draftPrice, draftable, informantFraction, isInformant, otherFaction, papersOdds, requisitionShare,
   quotaOf, reprisal, searchChance, shortWeightCaught, WAR_INFORM_P, REQ, type Faction, type Front, type TierClock, type WarKind,
 } from './occupation';
+import { INVADERS, pickInvader, type InvaderDef } from './invaders';
 import { TITHE, TOLL, SALVAGE, breakPosseOdds, salvageOwnersHiding, titheOf } from './lawlessMath';
 
 // ── state ──────────────────────────────────────────────────────────────────────────────────────
@@ -51,6 +52,8 @@ export interface OrderFx {
   salvaged?: Array<{ found: number; who: string }>;
   sniperUntil?: number; sniperFrom?: number;
   radioSignal?: boolean; known?: boolean;
+  /** The invasion's occupier (invaders.ts), chosen at the hit. */
+  invader?: 'china' | 'russia' | 'axis';
   last?: Record<string, number>;
 }
 
@@ -61,6 +64,8 @@ export const fxOf = (s: GameState): OrderFx => {
 };
 /** Days since the hit. */
 export const since = (s: GameState): number => Math.floor(s.clock.t - s.disaster.hitAt);
+/** The occupier of an invasion run (null in the civil war): its words, papers and money. */
+export const invaderIn = (s: GameState): InvaderDef | null => (s.disaster.kind === 'invasion' ? INVADERS[(fxOf(s).invader ??= pickInvader(s.site.region, s.disaster.variant, s.seed))] : null);
 const kindOf = (s: GameState): WarKind => (s.disaster.kind === 'invasion' ? 'invasion' : 'civil_war');
 const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
 const adults = (s: GameState): Person[] => s.people.filter((p, i) => !p.kid && s.personState[i]?.needs.died == null);
@@ -192,12 +197,12 @@ export function makeOrderCard(s: GameState, kind: ExtraEncounterKind, r: () => n
       });
     }
     case 'checkpoint_stop': {
-      const war = kindOf(s) === 'civil_war', tier = f.tier ?? 1, who = war ? FACTION[hold ?? 'alliance'].short : 'the Occupying Force';
+      const war = kindOf(s) === 'civil_war', tier = f.tier ?? 1, who = war ? FACTION[hold ?? 'alliance'].short : 'the Occupying Force', iv = invaderIn(s);
       const toll = war ? { canned: 2, fuel: 1 } : { canned: 2 };
       return base(s, kind, id, day, {
-        title: war ? `${who} post on the county road` : 'The checkpoint at the bridge', size: 6, armed: true, strength: 66, temper: 'hard', wants: toll,
+        title: war ? `${who} post on the county road` : iv!.checkpointTitle, size: 6, armed: true, strength: 66, temper: 'hard', wants: toll,
         dossier: war ? [`A truck across the road at the bridge and ${who} soldiers behind sandbags. A corporal walks up the drive with a clipboard. Papers, a toll, or the back roads.`, `The toll is 5% of what you carry (${goodsText(toll)} for a month's crossing). "${pickOf(r, SCARED_LINES.slice(0, 1))}" says the woman ahead of you in the line.`]
-          : [`A post at the bridge: barriers, floodlights, an armored car and a lieutenant with an interpreter. ${cap(TIER_NAME[tier as 1 | 2 | 3])} are the order of the day.`, `"${pickOf(r, OCCUPIER_LINES)}" An Ausweis lasts ${CHECKPOINT.PASS_DAYS} days and costs a morning in the line.`],
+          : [`${cap(iv!.post)}. ${cap(TIER_NAME[tier as 1 | 2 | 3])} are the order of the day. ${pickOf(r, iv!.habits)}`, `"${pickOf(r, iv!.voice)}" A ${iv!.passDoc} lasts ${CHECKPOINT.PASS_DAYS} days and costs a morning in the line.`],
         stances: ['flag_pass', 'flag_pay', 'flag_bluff', 'pay', 'confront', 'back_roads', 'flag_shoot'],
       });
     }
@@ -205,8 +210,8 @@ export function makeOrderCard(s: GameState, kind: ExtraEncounterKind, r: () => n
       const war = kindOf(s) === 'civil_war', tier = f.tier ?? 1, share = requisitionShare(kindOf(s), tier, s.disaster.difficulty ?? 'standard', r());
       const goods = quotaOf(s.stock, share) as Partial<Stock>;
       return base(s, kind, id, day, {
-        title: war ? 'A requisition order' : 'A quota note from the Kommandantur', size: 6, armed: true, strength: 72, temper: 'hard', wants: goods,
-        dossier: [war ? `A lieutenant of ${FACTION[hold ?? 'alliance'].name} and four soldiers with a truck. "Receipts are written. They are good when we win."` : `A polite lieutenant with an interpreter lists the farm. "${pickOf(r, OCCUPIER_LINES.slice(0, 1))}"`, `The order: ${goodsText(goods)} (${Math.round(share * 100)}% of what is in sight).`, `The next one comes in ${REQ.CADENCE} days${(s.disaster.difficulty ?? 'standard') === 'hardcore' ? ' (half that on Hardcore)' : ''}.`],
+        title: war ? 'A requisition order' : invaderIn(s)!.quotaTitle, size: 6, armed: true, strength: 72, temper: 'hard', wants: goods,
+        dossier: [war ? `A lieutenant of ${FACTION[hold ?? 'alliance'].name} and four soldiers with a truck. "Receipts are written. They are good when we win."` : `${invaderIn(s)!.quotaIntro} "${invaderIn(s)!.voice[0]}"`, `The order: ${goodsText(goods)} (${Math.round(share * 100)}% of what is in sight).`, `The next one comes in ${REQ.CADENCE} days${(s.disaster.difficulty ?? 'standard') === 'hardcore' ? ' (half that on Hardcore)' : ''}.`],
         stances: ['pay', 'flag_bluff', 'hide', 'flag_pay', 'defend'],
       });
     }
@@ -217,7 +222,7 @@ export function makeOrderCard(s: GameState, kind: ExtraEncounterKind, r: () => n
       const who = pickOf(r, cands), elder = s.people.find((p, i) => p.elder && s.personState[i]?.needs.died == null);
       return base(s, kind, id, day, {
         title: labor ? `A labor order for ${who.first}` : `A draft notice for ${who.first}`, size: 4, armed: true, strength: 52, temper: 'hard', people: [who],
-        dossier: [labor ? `A work detail needs one adult from every household for ${DRAFT.LABOR_DAYS} days. The notice has ${who.first} ${who.last}'s name, typed.` : `A recruiter at the gate. He knew ${who.first}'s name before he asked. The notice says report in three days.`, labor ? '"One per household. An elder may go in his place." A truck waits at the road.' : 'He is not unkind about it. He has a quota too.', ...(elder && labor ? [`${elder.first}, the family's elder, could go instead.`] : [])],
+        dossier: [labor ? `${cap(invaderIn(s)!.laborWord)} needs one adult from every household for ${DRAFT.LABOR_DAYS} days. The notice has ${who.first} ${who.last}'s name, typed, with the ${invaderIn(s)!.authority.replace(/^the /, '')} seal.` : `A recruiter at the gate. He knew ${who.first}'s name before he asked. The notice says report in three days.`, labor ? '"One per household. An elder may go in his place." A truck waits at the road.' : 'He is not unkind about it. He has a quota too.', ...(elder && labor ? [`${elder.first}, the family's elder, could go instead.`] : [])],
         stances: ['pay', 'hide', 'flag_pay', ...(labor && elder ? ['take_in' as Stance] : []), 'defend'],
       });
     }
@@ -225,7 +230,7 @@ export function makeOrderCard(s: GameState, kind: ExtraEncounterKind, r: () => n
       const size = 2 + Math.floor(r() * 3), war = kindOf(s) === 'civil_war';
       return base(s, kind, id, day, {
         title: war ? 'A family from the other side' : 'A hunted family', size, armed: false, strength: 0, brings: { canned: 1 },
-        dossier: [`"${pickOf(r, SCARED_LINES)}"`, war ? `They fled ${FACTION[otherFaction(hold ?? 'alliance')].short} country with what fit in a car. Anyone who shelters them is on a list if it comes out.` : 'The patrol is two roads over. They have no papers and a child with a fever.', 'Hiding them costs food, medicine and nerve for a month.'],
+        dossier: [`"${pickOf(r, SCARED_LINES)}"`, war ? `They fled ${FACTION[otherFaction(hold ?? 'alliance')].short} country with what fit in a car. Anyone who shelters them is on a list if it comes out.` : `The patrol is two roads over. They have no ${invaderIn(s)?.idDocPlural ?? 'papers'} and a child with a fever.`, 'Hiding them costs food, medicine and nerve for a month.'],
         stances: ['take_in', 'turn_away', 'confront'],
       });
     }
@@ -242,14 +247,14 @@ export function makeOrderCard(s: GameState, kind: ExtraEncounterKind, r: () => n
       if (!n) return null;
       return base(s, kind, id, day, {
         title: `${cap(n.name)} come to the fence`, size: n.members, neighbor: n.id,
-        dossier: [`They are asking, friendly enough, about your radio, how much you have put by, and who has been visiting. "Just so we know. Everybody is being asked."`, 'You know what happens to people the patrol asks about. You do not know who is being paid to ask.'],
+        dossier: [invaderIn(s)?.informantAsk ?? `They are asking, friendly enough, about your radio, how much you have put by, and who has been visiting. "Just so we know. Everybody is being asked."`, 'You know what happens to people the patrol asks about. You do not know who is being paid to ask.'],
         stances: ['pay', 'flag_bluff', 'refuse'],
       });
     }
     case 'lost_soldier': {
       return base(s, kind, id, day, {
         title: 'A lone soldier at the gate', size: 1, armed: true, strength: 8, temper: 'desperate',
-        dossier: ['A boy in a conscript\'s coat, rifle slung muzzle-down, a long way from wherever he is from. "Water, please. Just water."', 'If a patrol finds him here, you will answer for it. If he is found dead on your road, you will answer for that too.'],
+        dossier: invaderIn(s) ? [...invaderIn(s)!.lostSoldier] : ['A boy in a conscript\'s coat, rifle slung muzzle-down, a long way from wherever he is from. "Water, please. Just water."', 'If a patrol finds him here, you will answer for it. If he is found dead on your road, you will answer for that too.'],
         stances: ['trade', 'take_in', 'turn_away', 'defend'],
       });
     }
@@ -258,7 +263,7 @@ export function makeOrderCard(s: GameState, kind: ExtraEncounterKind, r: () => n
       f.reprisalDue = undefined;
       return base(s, kind, id, day, {
         title: 'The punitive column', size, armed: true, strength: size * 12, temper: 'savage', wants: { canned: 10, fuel: 6, meds: 2 },
-        dossier: [`${size} soldiers, three trucks, jerry cans in the back. They are not here for a quota.`, 'Somebody ambushed a patrol within three miles. This is the answer, and it falls on whoever is nearest.'],
+        dossier: [`${size} soldiers, three trucks, jerry cans in the back. They are not here for a quota.`, (invaderIn(s)?.reprisalLine ?? 'Somebody ambushed a patrol within three miles.') + ' This is the answer, and it falls on whoever is nearest.'],
         stances: ['hide', 'parley', 'defend'],
       });
     }
@@ -305,7 +310,7 @@ export function orderLabels(s: GameState, e: Encounter): Partial<Record<Stance, 
     case 'checkpoint_stop': {
       const pa = papersOddsNow(s), war = s.disaster.kind === 'civil_war', fp = forgedPrice(s);
       return {
-        flag_pass: L('Show your papers', `They pass you ${inTen(pa)}. A stamp is good for ${CHECKPOINT.PASS_DAYS} days. Turned back: the post has your name.`),
+        flag_pass: L(invaderIn(s)?.showPapers ?? 'Show your papers', `They pass you ${inTen(pa)}. A stamp is good for ${CHECKPOINT.PASS_DAYS} days. Turned back: the post has your name.`),
         flag_pay: L('Pay the toll', `${goodsText(e.wants ?? {})}: a month of crossing, no questions. Cost is the same whoever holds the road.`),
         flag_bluff: L('A forged paper (your own)', `Works ${inTen(war ? 0.5 : CHECKPOINT.SELF_FORGED_OK)}. Caught: a fine, a mark and a worse day.`),
         pay: L(`Buy good papers (${usd(fp)})`, `${payHow(s, fp) ? `Costs ${payLine(s, fp)}.` : 'You cannot cover it.'} They hold ${inTen(CHECKPOINT.FORGED_OK)}; a bad one is a mark and a loss.`),
@@ -319,10 +324,10 @@ export function orderLabels(s: GameState, e: Encounter): Partial<Record<Stance, 
       const known = informantActive(s), find = searchChance(known, conceal(s)), caught = shortWeightCaught(known, f.tier ?? 1);
       const bribe = s.disaster.kind === 'invasion' ? 1000 : 500;
       return {
-        pay: L('Comply in full', `Hand over ${goodsText(e.wants ?? {})} for a receipt. ${s.disaster.kind === 'civil_war' ? 'The receipt is good only if they win; whoever loses will remember.' : 'Occupation money, worth less each week.'}`),
+        pay: L('Comply in full', `Hand over ${goodsText(e.wants ?? {})} for a receipt. ${s.disaster.kind === 'civil_war' ? 'The receipt is good only if they win; whoever loses will remember.' : 'The receipt is in ' + (invaderIn(s)?.currency ?? 'occupation money') + ', worth less each week.'}`),
         flag_bluff: L('Short-weight it (60%)', `Hand over 60% of it. They catch it ${inTen(caught)}: then they take the rest and a quarter more, and the name is marked.`),
         hide: L('Hide it', `Bury it before they come. They find a cache ${inTen(find)} (${known ? 'someone is talking' : 'nobody is talking'}${conceal(s) > 0.3 ? '; the cellar helps' : ''}). Found: they take 1.5x and you are marked.`),
-        flag_pay: L(`Buy an exemption (${usd(bribe)})`, payHow(s, bribe) ? `A colonel's price: ${payLine(s, bribe)} and a case of whiskey on the shelf (nothing taken this time).` : `A colonel's price is ${usd(bribe)}. You cannot cover it.`),
+        flag_pay: L(`${invaderIn(s)?.id === 'china' ? 'Pay the administrative fee' : invaderIn(s)?.id === 'russia' ? 'Pay the commandant\'s clerk' : invaderIn(s)?.id === 'axis' ? 'Pay the liaison office' : 'Buy an exemption'} (${usd(bribe)})`, payHow(s, bribe) ? `${invaderIn(s)?.bribeBlurb ?? 'A colonel\'s price'}: ${payLine(s, bribe)} (nothing taken this time).` : `The price is ${usd(bribe)}. You cannot cover it.`),
         defend: fightK,
       };
     }
@@ -332,7 +337,7 @@ export function orderLabels(s: GameState, e: Encounter): Partial<Record<Stance, 
       return {
         pay: L(labor ? `Send ${who?.first ?? 'them'} to the detail` : `Let ${who?.first ?? 'him'} report`, labor ? `Gone ${DRAFT.LABOR_DAYS} days; the family is safe and the committee is not told. Back after.` : 'He goes to the line. Safe for the family, standing with whoever holds the road; he may come home on leave around day 60, or never.'),
         hide: L(`Hide ${who?.first ?? 'him'}`, `They search three times: found ${inTen(found)}. Found: he goes anyway, and the family pays a fine and is marked.`),
-        flag_pay: L('Pay the way out', `${pr.silver} oz of silver or ${usd(pr.usd)}${labor ? ' (an officer\'s price list)' : ''}. ${payHow(s, pr.usd) ? `You would pay ${payLine(s, pr.usd)}.` : 'You cannot cover it.'}`),
+        flag_pay: L('Pay the way out', `${pr.silver} oz of silver or ${usd(pr.usd)}${labor ? ` (${invaderIn(s)?.laborPrice ?? 'an officer'})` : ''}. ${payHow(s, pr.usd) ? `You would pay ${payLine(s, pr.usd)}.` : 'You cannot cover it.'}`),
         take_in: L('Send the elder instead', 'The elder goes in his place. The detail takes it, and the elder does not come back the same.'),
         defend: fightK,
       };
@@ -458,7 +463,7 @@ export function resolveOrderCard(s: GameState, e: Encounter, stance: Stance): Ou
     case 'draft_notice': return resolveDraft(s, e, stance, r);
     case 'fugitive': {
       if (stance === 'take_in') { const paid = takeGoods(s, { canned: 4, meds: 1 }); humanity(s, 8); f.shelter = { until: d + 30, count: e.size, kind: 'fugitive' }; return out('They are in the cellar', `You put ${e.size} of them down the cellar stairs and moved the shelves. "${pickOf(r, SCARED_LINES.slice(2, 3))}" The woman held your hand with both of hers.`, 'good', [`Spent: ${paid.join(', ')}`, 'Humanity +8. If it comes out the family is on a list.']); }
-      if (stance === 'confront') { humanity(s, -15); grantPass(s, 'papers', 30); markFamily(s, 0); return out('You gave them up', 'The corporal wrote it down and thanked you. You have a stamp that says you are loyal. You will not look at it often.', 'bad', ['Humanity -15', 'A pass for 30 days.']); }
+      if (stance === 'confront') { humanity(s, -15); grantPass(s, 'papers', 30); markFamily(s, 0); return out('You gave them up', invaderIn(s) ? `The clerk at ${invaderIn(s)!.informantPost} wrote it down and thanked you. You have a stamp that says you are loyal. You will not look at it often.` : 'The corporal wrote it down and thanked you. You have a stamp that says you are loyal. You will not look at it often.', 'bad', ['Humanity -15', 'A pass for 30 days.']); }
       humanity(s, -6); return out('The gate stays shut', 'They walked on. Nobody at supper said anything about the child.', 'bad', ['Humanity -6']);
     }
     case 'partisan': {
@@ -499,8 +504,8 @@ function resolveCheckpoint(s: GameState, e: Encounter, stance: Stance, r: () => 
   f.post = true;
   if (stance === 'flag_pass') {
     const ok = r() < papersOddsNow(s);
-    if (ok) { grantPass(s, 'papers', CHECKPOINT.PASS_DAYS); return out('Papers stamped', `The corporal turned the pages twice and stamped them. "${war ? 'Move along' : 'You will renew in thirty days'}."`, 'good', [`A pass for ${CHECKPOINT.PASS_DAYS} days.`]); }
-    markFamily(s, 30); return out('Turned back', 'No stamp. A soldier wrote your name in a book. "Come back with proper papers."', 'bad', ['You are marked for a month.']);
+    if (ok) { grantPass(s, 'papers', CHECKPOINT.PASS_DAYS); return out('Papers stamped', war ? 'The corporal turned the pages twice and stamped them. "Move along."' : invaderIn(s)!.stamped, 'good', [`A pass for ${CHECKPOINT.PASS_DAYS} days.`]); }
+    markFamily(s, 30); return out('Turned back', invaderIn(s)?.refused ?? 'No stamp. A soldier wrote your name in a book. "Come back with proper papers."', 'bad', ['You are marked for a month.']);
   }
   if (stance === 'flag_pay') { const paid = takeGoods(s, e.wants ?? {}); grantPass(s, 'toll', CHECKPOINT.PASS_DAYS); return out('The toll is paid', 'He pocketed it without looking at it. "That is a month." Nobody asked a question.', 'mixed', [`Paid: ${paid.join(', ') || 'nothing in stock'}`]); }
   if (stance === 'flag_bluff') {
@@ -539,7 +544,7 @@ function resolveQuota(s: GameState, e: Encounter, stance: Stance, r: () => numbe
     const paid = takeGoods(s, goods);
     if (war && holder) { const st = (f.standing ??= { compact: 50, alliance: 50 }); st[holder] = clamp(st[holder] + 3, 0, 100); (f.collab ??= { compact: 0, alliance: 0 })[holder]++; }
     else humanity(s, -1);
-    return out('Quota paid', `The lieutenant counted every sack and wrote a receipt. ${war ? 'It is worth what the side that wrote it is worth.' : 'It is in occupation money.'}`, 'mixed', [`Paid: ${paid.join(', ') || 'nothing'}`]);
+    return out('Quota paid', `The officer counted every sack and wrote a receipt. ${war ? 'It is worth what the side that wrote it is worth.' : invaderIn(s)!.receipt}`, 'mixed', [`Paid: ${paid.join(', ') || 'nothing'}`]);
   }
   if (stance === 'flag_bluff') {
     if (r() < shortWeightCaught(known, tier)) { const all = takeGoods(s, goods, 1.25); markFamily(s, 60); return out('The count was short', 'The quartermaster weighed a sack in his hand and set it down. They took the rest and a quarter more, and a soldier wrote the name in a book.', 'bad', [`Taken: ${all.join(', ')}`, 'Marked for two months.']); }
@@ -552,7 +557,7 @@ function resolveQuota(s: GameState, e: Encounter, stance: Stance, r: () => numbe
   if (stance === 'flag_pay') {
     const price = s.disaster.kind === 'invasion' ? 1000 : 500;
     if (!payHow(s, price)) return out('Not enough', `The lieutenant named his price: ${usd(price)}. You could not cover it, and he took the quota.`, 'bad', [`Taken: ${takeGoods(s, goods).join(', ')}`]);
-    const how = payUsd(s, price); return out('An exemption', 'The envelope went in the glove box. He signed a paper with a flourish. The truck turned round empty.', 'mixed', [`Paid ${usd(price)} ${PAY_WORD[how!]}`, 'Nothing taken this time.']);
+    const how = payUsd(s, price); return out('An exemption', invaderIn(s)?.exemptionNote ?? 'The envelope went in the glove box. He signed a paper with a flourish. The truck turned round empty.', 'mixed', [`Paid ${usd(price)} ${PAY_WORD[how!]}`, 'Nothing taken this time.']);
   }
   return fight(s, e);
 }
