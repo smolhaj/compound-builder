@@ -74,6 +74,23 @@ export function reception(s: GameState): { hear: number; truth: number } {
   return { hear: s.neighbors.some(n => n.status === 'home') ? 0.15 : 0.04, truth: 0.3 };
 }
 
+/**
+ * How often the set picks something up on a day `since` the hit: the first week everybody is listening and the air is busy, the next three
+ * weeks it settles, and after that it is the plain `reception` rate (kept calm). A hit-week day lifts a set a lot and the fence line some.
+ */
+export function hearToday(s: GameState, since: number): number {
+  const base = reception(s).hear, set = radioSet(s);
+  let lift = since < 8 ? (set === 'none' ? 0.3 : 0.4) : since < 30 ? 0.1 : 0;
+  // after a pulse nobody's set works: word of mouth (a neighbor's boxed set, walkers on the road) is the only wire, so it runs busier
+  if (s.disaster.kind === 'emp' && set === 'none' && since < 30) lift += 0.25;
+  return Math.min(0.95, base + lift);
+}
+
+/** Kinds where raiders working the county fit the story (anywhere else the "a group raiding farms" warning is the wrong disaster's talk). */
+const RAIDERS_FIT = new Set<string>(['lawless', 'financial', 'grid_down', 'cyberattack', 'solar_flare', 'emp', 'civil_war', 'invasion', 'oil_shock', 'global_famine', 'mass_exodus', 'water_war', 'unknown', 'satellite_loss']);
+const ARMY_FIT = new Set<string>(['lawless', 'civil_war', 'invasion', 'zombies', 'mass_exodus', 'cult_takeover', 'water_war', 'financial', 'unknown']);
+const FOUL_FIT = new Set<string>(['nuclear', 'bioweapon', 'reactor_meltdown', 'supervolcano', 'asteroid']);
+
 /** Detection bonus at the gate while a raider warning is fresh. */
 export function forewarned(s: GameState): number {
   const r = s.radio;
@@ -88,6 +105,9 @@ const SOURCE: Record<RadioSet, string[]> = {
   none: ['Over the fence:', 'Word from down the road:', 'Someone at the crossroads says'],
 };
 
+/** Is this ticker line something the radio said (so the feed leaves it out: only the radio can be wrong)? */
+export const isRadioNews = (text: string): boolean => text.startsWith('You have no working radio') || Object.values(SOURCE).some(xs => xs.some(p => text.startsWith(p)));
+
 /** One day of radio after the hit; returns lines for the log. */
 export function radioDay(s: GameState): string[] {
   const d = s.disaster;
@@ -96,8 +116,17 @@ export function radioDay(s: GameState): string[] {
   if (since < 1) return [];
   const st = radio(s);
   const r = rng(s.seed * 7919 + day * 31 + 5);
-  const set = radioSet(s), { hear, truth } = reception(s);
-  if (r() > hear) return [];
+  const set = radioSet(s), { truth } = reception(s);
+  // no set at all: one plain line says so, and from then on it is the fence line
+  const told = ((d.fx ??= {}).feltRadio ??= { recent: [] as string[] }) as { recent: string[]; noSet?: boolean };
+  if (set === 'none' && !told.noSet) {
+    told.noSet = true;
+    const text = d.kind === 'emp' ? 'You have no working radio: the pulse burned it out. A boxed, unplugged set would have survived. All you hear now is what the neighbors pass along.' : 'You have no working radio. All you hear now is what the neighbors pass along over the fence.';
+    d.news.push({ t, text, tone: 1 });
+    if (d.news.length > 40) d.news.splice(0, d.news.length - 40);
+    return [text];
+  }
+  if (r() > hearToday(s, since)) return [];
   const src = pick(r, SOURCE[set]);
   const say = (text: string, tone: 0 | 1 | 2 | 3, meta?: { kind: RumorKind; truth: boolean; claim?: Claim }) => {
     d.news.push({ t, text, tone });
@@ -116,7 +145,7 @@ export function radioDay(s: GameState): string[] {
   // the kind's own bulletin (sim/disasters/<kind>.ts radioBulletins); its own dice, so the rest of the day's news is unchanged
   const fb = fxRadio(s, fxCtxFor(s, 13));
   // the kind's bulletin takes about 6 days in 10, so the felt lines (rumors with a checkable claim) still get the other days
-  if (fb && fogHash(s.seed * 6011 + day, 19) < 0.6) return say(`${src} ${fb.text}`, fb.tone);
+  if (fb && fogHash(s.seed * 6011 + day, 19) < 0.6 && !(st.heard ?? []).some(h => h.text.endsWith(fb.text))) return say(`${src} ${fb.text}`, fb.tone, d.kind ? { kind: 'service', truth: true, claim: { id: 'kind_active', a: d.kind } } : undefined);
   const want = r() < truth;
   // FL3: a felt line for the active kind, tied to a checkable claim (sim/felt/feltRadio.ts); the rest of the day is the usual news
   const fl = feltRadioLine(s, set, want, fxCtxFor(s, 17));
@@ -124,7 +153,7 @@ export function radioDay(s: GameState): string[] {
   if (want) {
     st.truths++;
     // a raider warning, likelier the more the law has gone
-    if (r() < 0.15 + 0.4 * lawless) { warn(3); return say(`${src} a group raiding farms is working this side of the county. Keep a watch.`, 2, { kind: 'raiders', truth: true }); }
+    if (RAIDERS_FIT.has(d.kind ?? '') && r() < 0.15 + 0.4 * lawless) { warn(3); return say(`${src} a group raiding farms is working this side of the county. Keep a watch.`, 2, { kind: 'raiders', truth: true }); }
     // the fate, before it shows: something coming back soon …
     const soon = (Object.entries(d.back) as Array<[Track, number]>).filter(([, b]) => b > since && b - since <= 14);
     if (d.fate !== 'never' && soon.length) {
@@ -148,7 +177,8 @@ export function radioDay(s: GameState): string[] {
     ['raiders', `${src} raiders burned out a place near here last night.`],
     ['poison', `${src} the water's poisoned downstream; don't drink from the creek.`],
   ];
-  const [kind, text] = pick(r, RUMORS);
+  const fits = RUMORS.filter(([k]) => k === 'raiders' ? RAIDERS_FIT.has(d.kind ?? '') : k === 'checkpoint' ? ARMY_FIT.has(d.kind ?? '') : k === 'poison' ? !FOUL_FIT.has(d.kind ?? '') : true);
+  const [kind, text] = pick(r, fits);
   return say(text, 1, { kind, truth: false });
 }
 

@@ -22,7 +22,7 @@ export const CHANNELS: Record<RadioSet, readonly RadioChannel[]> = {
   none: ['local', 'rumor'],
 };
 /** The share of days a heard broadcast is a felt line (the rest stay the existing fate hints, raider warnings and service reports). */
-export const FELT_SHARE = 0.65;
+export const FELT_SHARE = 0.95;
 /** A shortwave set catches a ham exchange now and then. */
 const HAM_SLICE = 0.25;
 const RECENT = 6;
