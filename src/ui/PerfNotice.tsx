@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useHintBottom } from './hud/drawerHooks';
 import { useWorldStore } from '../store/worldStore';
 import { PERF_NOTICE_MS, perfNoticePlace } from './hudLayout';
 
@@ -21,10 +22,11 @@ export function PerfNotice() {
     const t = setTimeout(() => set(null), PERF_NOTICE_MS);
     return () => clearTimeout(t);
   }, [n, set]);
+  const lift = useHintBottom(perfNoticePlace(vw).bottom);
   if (!n) return null;
   const at = perfNoticePlace(vw);
   return (
-    <div role="alert" data-testid="perf-notice" style={{ position: 'fixed', bottom: at.bottom, left: at.left, zIndex: 20, width: at.width, boxSizing: 'border-box', padding: '7px 10px', background: 'rgba(30,34,36,0.96)', color: '#e9e2cf', border: '1px solid #c9a35a', borderRadius: 6, font: '12px/1.35 system-ui, sans-serif', boxShadow: '0 4px 14px rgba(0,0,0,0.45)', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+    <div role="alert" data-testid="perf-notice" style={{ position: 'fixed', bottom: lift, left: at.left, zIndex: 20, width: at.width, boxSizing: 'border-box', padding: '7px 10px', background: 'rgba(30,34,36,0.96)', color: '#e9e2cf', border: '1px solid #c9a35a', borderRadius: 6, font: '12px/1.35 system-ui, sans-serif', boxShadow: '0 4px 14px rgba(0,0,0,0.45)', display: 'flex', gap: 12, alignItems: 'flex-start' }}>
       <span style={{ flex: 1 }}>{n}</span>
       <button onClick={() => set(null)} aria-label="Dismiss" style={{ cursor: 'pointer' }}>OK</button>
     </div>

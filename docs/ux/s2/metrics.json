@@ -1,0 +1,362 @@
+{
+ "a-early-day0-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 8.2,
+  "centerCoveredPct": 11.1,
+  "controls": 35,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 2
+ },
+ "a-early-day0-family-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 29.9,
+  "centerCoveredPct": 12.9,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-early-day0-supplies-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 29.9,
+  "centerCoveredPct": 12.9,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-early-day0-1280x720": {
+  "bar": "labels 961x48 left 160",
+  "coveredPct": 11.4,
+  "centerCoveredPct": 14.4,
+  "controls": 35,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 2
+ },
+ "a-early-day0-family-1280x720": {
+  "bar": "labels 961x48 left 160",
+  "coveredPct": 36.4,
+  "centerCoveredPct": 24.9,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-early-day0-supplies-1280x720": {
+  "bar": "labels 961x48 left 160",
+  "coveredPct": 36.4,
+  "centerCoveredPct": 24.9,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-early-day0-1100x700": {
+  "bar": "labels 961x48 left 70",
+  "coveredPct": 12.3,
+  "centerCoveredPct": 13.6,
+  "controls": 34,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 2
+ },
+ "a-early-day0-family-1100x700": {
+  "bar": "labels 961x48 left 70",
+  "coveredPct": 39.6,
+  "centerCoveredPct": 29.1,
+  "controls": 42,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-early-day0-supplies-1100x700": {
+  "bar": "labels 961x48 left 70",
+  "coveredPct": 39.6,
+  "centerCoveredPct": 29.1,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-early-hover-bar-defense-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 8.2,
+  "centerCoveredPct": 11.1,
+  "controls": 35,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 2
+ },
+ "a-early-build-open-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 29.9,
+  "centerCoveredPct": 12.9,
+  "controls": 55,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-mid-day3-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 17.9,
+  "centerCoveredPct": 26.6,
+  "controls": 36,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 5
+ },
+ "a-mid-day3-family-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 33.6,
+  "centerCoveredPct": 17.5,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-mid-day3-supplies-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 33.6,
+  "centerCoveredPct": 17.5,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-mid-day3-1280x720": {
+  "bar": "labels 961x48 left 160",
+  "coveredPct": 15.8,
+  "centerCoveredPct": 18.9,
+  "controls": 35,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-mid-day3-family-1280x720": {
+  "bar": "labels 961x48 left 160",
+  "coveredPct": 39.8,
+  "centerCoveredPct": 28.9,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-mid-day3-supplies-1280x720": {
+  "bar": "labels 961x48 left 160",
+  "coveredPct": 39.8,
+  "centerCoveredPct": 28.9,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-mid-day3-1100x700": {
+  "bar": "labels 961x48 left 70",
+  "coveredPct": 17.7,
+  "centerCoveredPct": 19.3,
+  "controls": 34,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-mid-day3-family-1100x700": {
+  "bar": "labels 961x48 left 70",
+  "coveredPct": 44.3,
+  "centerCoveredPct": 34.3,
+  "controls": 42,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-mid-day3-supplies-1100x700": {
+  "bar": "labels 961x48 left 70",
+  "coveredPct": 44.3,
+  "centerCoveredPct": 34.3,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-mid-day3-projects-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 31,
+  "centerCoveredPct": 17.3,
+  "controls": 43,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-disaster-daycard-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 8.7,
+  "centerCoveredPct": 11.1,
+  "controls": 39,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 2
+ },
+ "a-disaster-week1-or-card-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 28.1,
+  "centerCoveredPct": 46.5,
+  "controls": 38,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-disaster-week1-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 12.6,
+  "centerCoveredPct": 15.7,
+  "controls": 35,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-disaster-week1-family-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 33.8,
+  "centerCoveredPct": 17.5,
+  "controls": 47,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-disaster-week1-supplies-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 33.8,
+  "centerCoveredPct": 17.5,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-disaster-week1-1280x720": {
+  "bar": "labels 961x48 left 160",
+  "coveredPct": 16.1,
+  "centerCoveredPct": 18.9,
+  "controls": 35,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-disaster-week1-family-1280x720": {
+  "bar": "labels 961x48 left 160",
+  "coveredPct": 40.1,
+  "centerCoveredPct": 28.9,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-disaster-week1-supplies-1280x720": {
+  "bar": "labels 961x48 left 160",
+  "coveredPct": 40.1,
+  "centerCoveredPct": 28.9,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-disaster-week1-1100x700": {
+  "bar": "labels 961x48 left 70",
+  "coveredPct": 18.1,
+  "centerCoveredPct": 19.3,
+  "controls": 34,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-disaster-week1-family-1100x700": {
+  "bar": "labels 961x48 left 70",
+  "coveredPct": 44.6,
+  "centerCoveredPct": 34.3,
+  "controls": 42,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-disaster-week1-supplies-1100x700": {
+  "bar": "labels 961x48 left 70",
+  "coveredPct": 44.6,
+  "centerCoveredPct": 34.3,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-disaster-hover-food-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 12.6,
+  "centerCoveredPct": 15.7,
+  "controls": 36,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-disaster-hover-bar-family-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 12.6,
+  "centerCoveredPct": 15.7,
+  "controls": 35,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-disaster-defense-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 33.8,
+  "centerCoveredPct": 17.5,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-disaster-utilities-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 31.5,
+  "centerCoveredPct": 17.3,
+  "controls": 41,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-disaster-view-open-1512x860": {
+  "bar": "labels 961x48 left 276",
+  "coveredPct": 19.9,
+  "centerCoveredPct": 20.9,
+  "controls": 63,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-disaster-hidden-1512x860": {
+  "bar": "labels 386x48 left 563",
+  "coveredPct": 10.2,
+  "centerCoveredPct": 12.6,
+  "controls": 25,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-disaster-w900-900x700": {
+  "bar": "icons 781x48 left 60",
+  "coveredPct": 18,
+  "centerCoveredPct": 19.3,
+  "controls": 31,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-disaster-w900-land-900x700": {
+  "bar": "icons 781x48 left 60",
+  "coveredPct": 50.4,
+  "centerCoveredPct": 46.3,
+  "controls": 40,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ }
+}

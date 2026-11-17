@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { CARD_W, cardShift, cardStyle } from './cardLayout';
 
-export function HoverHost({ card, children, delay = 140, scale = 1, align = 'center' }: { card: ReactNode; children: ReactNode; delay?: number; scale?: number; align?: 'center' | 'start' | 'end' }) {
+export function HoverHost({ card, children, delay = 140, scale = 1, align = 'center', up = false }: { card: ReactNode; children: ReactNode; delay?: number; scale?: number; align?: 'center' | 'start' | 'end'; /** Open above the host (for the bottom bar). */ up?: boolean }) {
   const [open, setOpen] = useState(false), [shift, setShift] = useState(0);
   const on = useRef<ReturnType<typeof setTimeout>>(undefined), off = useRef<ReturnType<typeof setTimeout>>(undefined);
   const host = useRef<HTMLSpanElement>(null), box = useRef<HTMLDivElement>(null);
@@ -23,7 +23,7 @@ export function HoverHost({ card, children, delay = 140, scale = 1, align = 'cen
     <span ref={host} style={{ position: 'relative', display: 'inline-flex' }} onPointerEnter={show} onPointerLeave={() => hide()} onFocus={show} onBlur={e => { if (!host.current?.contains(e.relatedTarget as Node)) hide(true); }}
       onKeyDown={e => { if (e.key === 'Escape' && open) { e.stopPropagation(); hide(true); } }}>
       {children}
-      {open && <div ref={box} role="tooltip" data-hover-card style={{ ...cardStyle, position: 'absolute', top: 'calc(100% + 8px)', left, transform: `translateX(${shift}px)`, zIndex: 5 }}>{card}</div>}
+      {open && <div ref={box} role="tooltip" data-hover-card style={{ ...cardStyle, position: 'absolute', ...(up ? { bottom: 'calc(100% + 8px)' } : { top: 'calc(100% + 8px)' }), left, transform: `translateX(${shift}px)`, zIndex: 5 }}>{card}</div>}
     </span>
   );
 }

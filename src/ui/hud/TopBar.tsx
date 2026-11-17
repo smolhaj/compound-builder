@@ -179,7 +179,7 @@ export function TopBar({ barRef, onBoard, onSide }: { barRef: RefObject<HTMLDivE
           <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ flex: 1 }}>UI size</span>
             <input data-testid="ui-scale" type="range" aria-label="UI size" min={UI_SCALE.min * 100} max={UI_SCALE.max * 100} step={UI_SCALE.step * 100} value={Math.round(scale * 100)} onChange={e => w.setUiScale(Number(e.target.value) / 100)} style={{ width: 96 }} />
             <span style={{ width: 40, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{Math.round(scale * 100)}%</span></label>
-          <div style={{ color: tv.color('dim'), fontSize: tv.font('fine') }}>Alt+L switches layout. UI size scales this bar; the panels follow in a later step.</div>
+          <div style={{ color: tv.color('dim'), fontSize: tv.font('fine') }}>Alt+L switches layout. UI size scales the bars and the drawer.</div>
         </div>}
       </span>
       {/* measurer: every chip in both modes, invisible, so widths come from the real DOM */}
