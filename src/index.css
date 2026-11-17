@@ -12,3 +12,10 @@ canvas { display: block; }
 @media (prefers-reduced-motion: reduce) {
   [data-flash="1"], .cb-rise, .cb-slide { animation: none; }
 }
+
+/* Layout A (docs/UX_AUDIT.md 11.8): a click leaves no focus ring on a button, the keyboard still gets one; the View settings box wears the tokens. */
+.cb-a button:focus:not(:focus-visible), .cb-a select:focus:not(:focus-visible) { outline: none; }
+.cb-a button:focus-visible, .cb-a select:focus-visible { outline: 2px solid var(--cb-color-accent); outline-offset: 2px; }
+.cb-a [data-view-box] select, .cb-a [data-view-box] button { font: inherit; font-size: var(--cb-font-sm); color: var(--cb-color-text); background: var(--cb-color-control); border: 1px solid var(--cb-color-line); border-radius: var(--cb-radius-control); padding: 3px 9px; cursor: pointer; }
+.cb-a [data-view-box] button:disabled { cursor: default; }
+.cb-a [data-view-box] > span { color: var(--cb-color-dim); font-size: var(--cb-font-fine); text-transform: uppercase; letter-spacing: 0.6px; opacity: 1 !important; }

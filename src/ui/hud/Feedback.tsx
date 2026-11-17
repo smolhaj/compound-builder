@@ -5,7 +5,10 @@
 import { useEffect, useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { KIT } from '../../game/buildkit/kit';
+import { useWorldStore } from '../../store/worldStore';
 import { panel } from './style';
+import { T, tv } from './tokens';
+import { TOP_BAR } from './drawerRegistry';
 
 /** The refusal reason beside the pointer while a build tool is armed and the spot under it is not allowed. */
 export function CursorHint() {
@@ -41,10 +44,22 @@ export function ToastLine() {
   return <div key={t.id} role="status" data-testid="toast" style={{ ...panel, position: 'fixed', top: welcome ? 118 : 62, left: '50%', transform: 'translateX(-50%)', zIndex: 25, pointerEvents: 'none', border: '1px solid #c8603f', maxWidth: 'min(520px, calc(100vw - 40px))', textAlign: 'center' }}>{t.text}</div>;
 }
 
-/** The new game starts paused: one line says what to do first. */
-export function WelcomeCard() {
+/**
+ * The new game starts paused: one line says what to do first. Classic floats it over everything; layout A (`queued`) draws it as a
+ * card in the overlay queue (sim/overlayQueue.ts: it waits for any decision, the recap and the new-game screen) under the top bar.
+ */
+export function WelcomeCard({ queued = false }: { queued?: boolean }) {
   const on = useGameStore(g => g.welcome), setWelcome = useGameStore(g => g.setWelcome), setSpeed = useGameStore(g => g.setSpeed);
+  const scale = useWorldStore(w => w.uiScale);
   if (!on) return null;
+  if (queued) return <div data-testid="welcome" style={{ position: 'fixed', left: '50%', top: TOP_BAR.top + T.size.bar * scale + TOP_BAR.gap, transform: `translateX(-50%) scale(${scale})`, transformOrigin: 'top center', zIndex: 6, display: 'flex', gap: 12, alignItems: 'center',
+    background: tv.color('panel'), border: `1px solid ${tv.color('accent')}`, borderRadius: tv.radius('panel'), boxShadow: tv.shadow(2), padding: '10px 12px', color: tv.color('text'), fontFamily: tv.font('family'), fontSize: tv.font('body'), width: 'max-content', maxWidth: 'min(520px, calc(100vw - 720px))', minWidth: 300 }}>
+    <span>Welcome. The clock is paused: look around, then follow <b>What to do now</b> on the left, one step at a time. Press play when you are ready.</span>
+    <span style={{ display: 'flex', gap: 6, flex: 'none' }}>
+      <button type="button" onMouseDown={e => e.preventDefault()} style={{ cursor: 'pointer', font: 'inherit', fontWeight: T.weight.semi, padding: '5px 12px', borderRadius: tv.radius('control'), border: 0, background: tv.color('accent'), color: tv.color('onAccent') }} onClick={() => setSpeed(1)}>Start</button>
+      <button type="button" aria-label="Close" title="Close this and keep the clock paused (Esc)" onMouseDown={e => e.preventDefault()} style={{ cursor: 'pointer', font: 'inherit', padding: '5px 9px', borderRadius: tv.radius('control'), border: `1px solid ${T.color.lineStrong}`, background: tv.color('control'), color: tv.color('text') }} onClick={() => setWelcome(false)}>{'\u00D7'}</button>
+    </span>
+  </div>;
   return <div data-testid="welcome" style={{ ...panel, position: 'fixed', left: '50%', ...(typeof window !== 'undefined' && window.innerWidth < 800 ? { bottom: 70 } : { top: 62 }), transform: 'translateX(-50%)', zIndex: 15, display: 'flex', gap: 10, alignItems: 'center', border: '1px solid #b9a36a', maxWidth: 'min(560px, calc(100vw - 40px))' }}>
     <span>Welcome. The clock is paused: look around, then follow the <b>Get operational</b> goals on the left, one at a time. Press play when you are ready.</span>
     <button style={{ cursor: 'pointer' }} onClick={() => setSpeed(1)}>Start</button>

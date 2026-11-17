@@ -7,6 +7,11 @@ import { SetupScreen } from './ui/SetupScreen';
 import { ShopWindow } from './ui/ShopWindow';
 import { SchedulePanel } from './ui/SchedulePanel';
 import { Ticker } from './ui/Ticker';
+import { BreakingBanner } from './ui/hud/BreakingBanner';
+import { ToastStack } from './ui/hud/ToastStack';
+import { CrisisDim } from './ui/hud/CrisisDim';
+import { WelcomeCard } from './ui/hud/Feedback';
+import { topTier } from './sim/overlayQueue';
 import { BattleOverlay } from './ui/BattleOverlay';
 import { GateCard } from './ui/GateCard';
 import { RoadAlert } from './ui/RoadPanel';
@@ -72,6 +77,8 @@ export default function App() {
   const raid = useGameStore(s => s.cutscene !== null);
   const title = useFeelStore(s => s.title);
   const plan = useOverlayPlan();
+  const A = useWorldStore(w => w.layout) === 'a';
+  const dim = A && !raid && (plan.feltCard || plan.hitMoment || plan.gate);
   // a new place (another seed or listing) is a new world
   const worldKey = useGameStore(s => `${s.game.seed}:${s.game.site.id}:${s.game.site.creek}:${s.game.site.lot?.kind ?? ''}${s.game.site.lot?.seed ?? ''}`);
   const clean = new URLSearchParams(location.search).has('clean');
@@ -80,11 +87,17 @@ export default function App() {
     <>
       <GameCanvas key={worldKey} />
       <LoadingScreen />
-      <PerfNotice />
+      {!A && <PerfNotice />}
       {!raid && !title && <Hud />}
-      {!clean && !raid && <PurchaseToast />}
+      {!clean && !raid && !A && <PurchaseToast />}
       {!clean && !raid && plan.milestone && <MilestoneCard />}
-      {!clean && !raid && <Ticker />}
+      {!clean && !raid && !A && <Ticker />}
+      {!clean && !raid && !title && A && <>
+        <BreakingBanner blocked={topTier(plan) !== null} />
+        <ToastStack blocked={topTier(plan) !== null} />
+        {plan.welcome && <WelcomeCard queued />}
+        <CrisisDim on={dim} />
+      </>}
       {!clean && !raid && <BattleOverlay />}
       {!clean && <CutsceneOverlay />}
       {!clean && plan.gate && <GateCard />}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { overlayPlan, type OverlayInputs } from './overlayQueue';
+import { overlayPlan, topTier, type OverlayInputs } from './overlayQueue';
 
 const none: OverlayInputs = { title: false, setup: false, ending: false, cutscene: 'none', decision: false, dayCard: false, recap: false, milestones: 0 };
 const up = (p: ReturnType<typeof overlayPlan>) => Object.entries(p).filter(([k, v]) => k !== 'decisionWaiting' && v).map(([k]) => k);
@@ -58,5 +58,15 @@ describe('overlay queue', () => {
   it('a milestone card waits while the Board is open', () => {
     expect(overlayPlan({ ...none, milestones: 1, board: true }).milestone).toBe(false);
     expect(overlayPlan({ ...none, milestones: 1 }).milestone).toBe(true);
+  });
+  it('layout A: the welcome card is a queue entry that waits for every decision, the recap and the new-game screen', () => {
+    expect(overlayPlan({ ...none, welcome: true }).welcome).toBe(true);
+    expect(overlayPlan({ ...none }).welcome).toBe(false);   // Classic never sets it
+    for (const over of [{ decision: true }, { hitMoment: true }, { dayCard: true }, { feltCard: true }, { recap: true }, { setup: true }, { planning: true }]) expect(overlayPlan({ ...none, welcome: true, ...over }).welcome).toBe(false);
+  });
+  it('tiers: decisions block, cards wait under them, a clear map has no tier', () => {
+    expect(topTier(overlayPlan({ ...none, feltCard: true }))).toBe('blocking');
+    expect(topTier(overlayPlan({ ...none, welcome: true }))).toBe('card');
+    expect(topTier(overlayPlan({ ...none }))).toBeNull();
   });
 });

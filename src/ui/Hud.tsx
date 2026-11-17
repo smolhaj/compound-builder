@@ -7,6 +7,8 @@ import { EDGE, hudLayout, useBox } from './hudLayout';
 import { clock, dateLabel } from './hud/dateText';
 import { TopBar } from './hud/TopBar';
 import { ActionBar } from './hud/ActionBar';
+import { T, tv } from './hud/tokens';
+import { WhatToDoCard } from './hud/WhatToDoCard';
 import { DrawerHeader } from './hud/DrawerHost';
 import { drawerFrame, useDrawerKeys, useHintBottom, useWindowSize } from './hud/drawerHooks';
 import { useDrawerStore } from '../store/drawerStore';
@@ -116,6 +118,8 @@ import { RIGHT_TABS, visibleTabs, type RightTab } from '../sim/tabReveal';
 import { caloriesText, feetText, gallonsText, kmText, lengthText, remRateText, remText } from '../sim/units';
 
 const QUALITIES: Quality[] = ['high', 'medium', 'low'];
+/** Layout A: the View settings box wears the tokens (surface, border, radius, shadow, type); its buttons and selects follow in index.css. */
+const VIEW_BOX_A: React.CSSProperties = { background: tv.color('panel'), border: `1px solid ${T.color.line}`, borderRadius: tv.radius('panel'), boxShadow: tv.shadow(2), padding: '10px 12px', fontSize: tv.font('sm'), color: tv.color('text'), fontFamily: tv.font('family') };
 
 /** Raid cutscenes: blood and wounds shown (Graphic, the default) or left out (Restrained). Remembered on this device; the fall and the grief stay either way. */
 function ViolenceSelect() {
@@ -224,8 +228,9 @@ export function Hud() {
   // layout: the top bar's size and the window's width decide where the panels sit (hudLayout)
   const barRef = useRef<HTMLDivElement>(null), brRef = useRef<HTMLDivElement>(null), blRef = useRef<HTMLDivElement>(null);
   const [side, setSide] = useState<'left' | 'right'>('left');
-  const [boardOpen, setBoardOpen] = useState(false);
-  useEffect(() => { useWorldStore.getState().setBoardOpen(boardOpen); return () => { useWorldStore.getState().setBoardOpen(false); }; }, [boardOpen]);
+  // the Compound board's open flag lives in the world store (so the N key can open it too)
+  const boardOpen = useWorldStore(s => s.boardOpen), setBoardOpen = useWorldStore.getState().setBoardOpen;
+  useEffect(() => () => { useWorldStore.getState().setBoardOpen(false); }, []);
   const bar = useBox(barRef), br = useBox(brRef), blBox = useBox(blRef, w.viewOpen);
   const bl = w.viewOpen ? blBox : { w: 0, h: 0 };
   const lay = hudLayout(bar.vw, bar.w, bar.h, br, bl);
@@ -286,7 +291,7 @@ export function Hud() {
   const projectsAlert: Tone | undefined = game.structures.some(st => !isFinished(st) && holdReason(game, st)) || needsHookup(game).length > 0 ? 'warn' : undefined;
 
   // layout A pieces: the drawer's frame, the action bar's alerts, and the footer that must stay visible when the drawer steps aside
-  const tickerOn = game.disaster.news.length > 0;
+  const tickerOn = !A && game.disaster.news.length > 0;
   const drawerShown = A && !!dOpen && !w.hudHidden && !parked;
   const frame = (host: 'left' | 'right') => drawerFrame(winW, winH, w.uiScale, tickerOn, drawerShown && !!dOpen && hostOf(dOpen) === host);
   const barAlerts: Partial<Record<DrawerId, Tone>> = { family: familyAlert, supplies: worstTone(foodAlert, farmAlert(game)), utilities: utilAlert, defense: defenseAlert, outside: outsideAlert, projects: projectsAlert };
@@ -312,13 +317,13 @@ export function Hud() {
 
   return (
     <>
-      <ToastLine />
+      {!A && <ToastLine />}
       <CursorHint />
       <SightHint />
       <WeakHint />
       <TerrainLegendChip />
       <LineToolBar />
-      <WelcomeCard />
+      {!A && <WelcomeCard />}
       {/* Layout A: the new top bar (docs/UX_AUDIT.md 11.1); Classic keeps the bar below */}
       {w.layout === 'a' && <>
         <TopBar barRef={barRef} onBoard={() => setBoardOpen(true)} onSide={setSide} />
@@ -346,6 +351,7 @@ export function Hud() {
 
       {/* Left: build menu (groups) · projects under way · the log */}
       {A && <>
+        {!w.hudHidden && !g.tool && !g.spendAsk && !boardOpen && <WhatToDoCard />}
         <ActionBar alerts={barAlerts} dim={dimTabs} fresh={freshTabs} tickerOn={tickerOn} />
         {(!!g.spendAsk || !!g.tool || !!g.stakedNote) && <div data-testid="tool-card" style={{ position: 'fixed', left: 16, top: 10 + 44 * w.uiScale + 8, zIndex: 4, width: 280, boxSizing: 'border-box', transform: `scale(${w.uiScale})`, transformOrigin: 'top left', background: 'rgba(20,22,18,0.90)', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 8, padding: '4px 10px 8px', fontSize: 12.5, color: '#f2efe4', boxShadow: '0 6px 18px rgba(0,0,0,.5)' }}>{leftFooter}</div>}
       </>}
@@ -745,7 +751,7 @@ export function Hud() {
             : 'Cinematic tour · Esc to leave'}
         </div>
       )}
-      <HomeLine />
+      {!A && <HomeLine />}
       {w.tourCaption && (
         <div style={{ ...panel, position: 'fixed', left: '50%', bottom: A ? aboveBar : 60, transform: 'translateX(-50%)', padding: '10px 16px' }}>
           <div style={{ fontSize: 18, fontWeight: 600 }}>{w.tourCaption.title}</div>
@@ -754,7 +760,7 @@ export function Hud() {
       )}
 
       {/* Bottom left: view (season / weather / quality / photo mode); opened from the View button below */}
-      {w.viewOpen && <div ref={blRef} style={{ ...panel, position: 'fixed', left: EDGE, bottom: A ? aboveBar : lay.viewBottom, ...(A ? { zIndex: 4, maxHeight: `calc(100vh - ${aboveBar + 10 + 44 * w.uiScale + 16}px)`, overflowY: 'auto' as const } : {}), display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', maxWidth: 'min(560px, calc(100vw - 20px))', boxSizing: 'border-box' }}>
+      {w.viewOpen && <div ref={blRef} data-view-box={A ? '1' : undefined} style={{ ...(A ? VIEW_BOX_A : panel), position: 'fixed', left: EDGE, bottom: A ? aboveBar : lay.viewBottom, ...(A ? { zIndex: 4, maxHeight: `calc(100vh - ${aboveBar + 10 + 44 * w.uiScale + 16}px)`, overflowY: 'auto' as const } : {}), display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', maxWidth: 'min(560px, calc(100vw - 20px))', boxSizing: 'border-box' }}>
         <select data-testid="view-layout" value={w.layout} onChange={e => w.setLayout(e.target.value as 'a' | 'classic')} title="HUD layout: Classic (today's panels) or the new layout A (Alt+L switches)" aria-label="HUD layout">
           <option value="classic">Layout: Classic</option><option value="a">Layout: New (A)</option>
         </select>
