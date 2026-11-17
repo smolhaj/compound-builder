@@ -6,6 +6,9 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { useWorldStore } from '../../store/worldStore';
 import { useGameStore } from '../../store/gameStore';
 import { useDrawerStore } from '../../store/drawerStore';
+import { useFeelStore } from '../../store/feelStore';
+import { feltCardPending } from '../../sim/felt/state';
+import { escTop, type EscSnapshot } from './escStack';
 import { drawerBox, drawerForCode, barBottom, hintBottom } from './drawerRegistry';
 import { T, tv } from './tokens';
 
@@ -25,10 +28,25 @@ const typing = (t: EventTarget | null): boolean => {
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
 };
 
+/** What is up right now, as the Esc stack reads it (ui/hud/escStack.ts). */
+export function escSnapshot(): EscSnapshot {
+  const g = useGameStore.getState(), w = useWorldStore.getState(), ds = useDrawerStore.getState();
+  const blocking = feltCardPending(g.game) || !!(g.game.gate.pending || g.game.gate.card || g.game.gate.aftermath) || g.dayCard !== null || useFeelStore.getState().recap !== null;
+  const welcome = g.welcome && !blocking && !g.setupOpen;
+  return {
+    tool: !!g.tool || g.planOpen,
+    overlay: blocking || welcome,
+    window: w.boardOpen || g.shopOpen || g.setupOpen || g.scheduleOpen || !!document.querySelector('[data-testid="top-menu-panel"],[data-testid="top-overflow-menu"],[data-testid="bar-popover"]'),
+    camera: w.cameraMode !== 'diorama',
+    view: w.viewOpen,
+    drawer: ds.open !== null,
+  };
+}
+
 /**
- * Hotkeys while layout A is on: a panel letter toggles that drawer (B P F S T L D O Y G), Tab brings the last one back, Esc
- * closes it. Letters only work in the Diorama camera and not while a tool is armed or a window is up (the Walk / Fly camera
- * uses WASD; placing uses R and S). Esc closes only when nothing above the drawer wants it (a tool, the Board, the Shop, a menu).
+ * Hotkeys while layout A is on: a panel letter toggles that drawer (B P F S T L D O Y G), N the Compound board, M the Shop & money,
+ * Tab brings the last drawer back, Esc closes the top layer of the Esc stack (one press, one thing). Letters only work in the
+ * Diorama camera and not while a tool is armed or a window is up (the Walk / Fly camera uses WASD; placing uses R and S).
  */
 export function useDrawerKeys(active: boolean): void {
   useEffect(() => {
@@ -38,15 +56,23 @@ export function useDrawerKeys(active: boolean): void {
       if (e.ctrlKey || e.metaKey || e.altKey || typing(e.target)) return;
       const w = useWorldStore.getState(), ds = useDrawerStore.getState();
       if (e.code === 'Escape') {
-        if (ds.open === null || busy() || w.boardOpen || w.cameraMode !== 'diorama') return;
-        if (document.querySelector('[data-testid="top-menu-panel"],[data-testid="top-overflow-menu"],[data-testid="bar-popover"]')) return;
-        ds.close(); (document.activeElement as HTMLElement | null)?.blur?.(); return;   // (and drop the focus ring left on the bar button that opened it)
+        const top = escTop(escSnapshot());
+        if (top === 'drawer') { ds.close(); (document.activeElement as HTMLElement | null)?.blur?.(); }   // (and drop the focus ring left on the bar button that opened it)
+        else if (top === 'view') w.setViewOpen(false);
+        else if (top === 'overlay' && useGameStore.getState().welcome) useGameStore.getState().setWelcome(false);
+        return;   // every other layer closes itself, and nothing underneath it closes on this press
       }
       if (e.repeat || e.shiftKey || w.cameraMode !== 'diorama' || busy()) return;
       if (e.code === 'Tab') {
         const t = e.target as HTMLElement | null;
         if (t && t !== document.body && t.tagName !== 'CANVAS') return;   // Tab keeps moving focus anywhere else
         e.preventDefault(); ds.reopen(); return;
+      }
+      if (e.code === 'KeyN' || e.code === 'KeyM') {   // the Board and the Shop live in the action bar, not in a drawer
+        if (escTop(escSnapshot()) === 'overlay' || w.boardOpen) return;
+        e.preventDefault();
+        if (e.code === 'KeyN') w.setBoardOpen(true); else useGameStore.getState().openShop(!useGameStore.getState().shopOpen);
+        return;
       }
       const id = drawerForCode(e.code);
       if (id) { e.preventDefault(); ds.toggle(id); }
@@ -70,6 +96,6 @@ export function useWindowSize(): { vw: number; vh: number } {
  */
 export function useHintBottom(classic: number): number {
   const layout = useWorldStore(w => w.layout), scale = useWorldStore(w => w.uiScale);
-  const ticker = useGameStore(s => s.game.disaster.news.length > 0);
-  return layout === 'a' ? Math.max(classic, hintBottom(scale, ticker)) : classic;
+  // (layout A has no bottom strip: breaking news is a banner under the top bar)
+  return layout === 'a' ? Math.max(classic, hintBottom(scale, false)) : classic;
 }

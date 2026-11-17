@@ -20,5 +20,6 @@ export function useOverlayPlan(): OverlayPlan {
   const board = useWorldStore(w => w.boardOpen);
   const { hitShown, skipHit } = useFeltStore();
   const hitMoment = hitMomentUp(useGameStore(s => s.dayCard), hitShown, skipHit, hasHit);
-  return overlayPlan({ title, setup, ending, cutscene: cutscene ? (cutscene.phase === 'prompt' ? 'prompt' : 'playing') : 'none', decision, dayCard, recap, milestones, planning, hitMoment, feltCard, board });
+  const welcome = useGameStore(s => s.welcome && useWorldStore.getState().layout === 'a');
+  return overlayPlan({ title, setup, ending, cutscene: cutscene ? (cutscene.phase === 'prompt' ? 'prompt' : 'playing') : 'none', decision, dayCard, recap, milestones, planning, hitMoment, feltCard, board, welcome });
 }

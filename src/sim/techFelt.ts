@@ -39,6 +39,6 @@ export function toFeltCards(cards: readonly TechCard[]): DecisionCard[] {
 export function toFeltGoals(id: string, title: string, startsAt: 'warning' | 'hit', goals: readonly Goal[]): GoalChain {
   return {
     id, title, startsAt,
-    steps: goals.map(g => ({ id: g.id, short: g.text.split(' ').slice(0, 3).join(' '), title: g.text, line: () => g.text, why: () => `Aim to have this done by day ${g.by}.`, done: g.done, reward: { title: 'Done', line: g.text } })),
+    steps: goals.map(g => ({ id: g.id, short: g.text.split(' ').slice(0, 3).join(' '), title: g.text, line: () => (g.by <= 1 ? 'Do this first' : `Aim for day ${g.by}`), why: () => `Aim to have this done by day ${g.by}. Nothing is locked: it is the order that matters.`, done: g.done, reward: { title: 'Done', line: g.text } })),
   };
 }

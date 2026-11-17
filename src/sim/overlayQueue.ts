@@ -29,7 +29,15 @@ export interface OverlayInputs {
   planning?: boolean;
   /** The Compound Board is open: a milestone card would cover it, so it waits (and goes by itself later). */
   board?: boolean;
+  /** Layout A: the new-game welcome card is waiting (it is a queue entry, not a layer over everything). Classic leaves this unset. */
+  welcome?: boolean;
 }
+
+/** Tiers (docs/UX_AUDIT.md 11.5): a higher tier is on top, a lower one waits. 'blocking' needs an answer and holds the clock; 'card' is a one-time notice; 'toast' is a corner line. */
+export type OverlayTier = 'blocking' | 'card' | 'toast';
+export const TIER_OF: Record<'gate' | 'ending' | 'hitMoment' | 'dayCard' | 'feltCard' | 'recap' | 'milestone' | 'welcome', OverlayTier> = {
+  ending: 'blocking', gate: 'blocking', hitMoment: 'blocking', dayCard: 'blocking', feltCard: 'blocking', recap: 'card', milestone: 'card', welcome: 'card',
+};
 
 export interface OverlayPlan {
   gate: boolean;
@@ -40,12 +48,14 @@ export interface OverlayPlan {
   recap: boolean;
   /** One milestone card at a time. */
   milestone: boolean;
+  /** Layout A: the welcome card is up. */
+  welcome: boolean;
   /** The title screen is covering something that needs an answer. */
   decisionWaiting: boolean;
 }
 
 export function overlayPlan(i: OverlayInputs): OverlayPlan {
-  const off = { gate: false, ending: false, hitMoment: false, dayCard: false, feltCard: false, recap: false, milestone: false, decisionWaiting: i.decision };
+  const off = { gate: false, ending: false, hitMoment: false, dayCard: false, feltCard: false, recap: false, milestone: false, decisionWaiting: i.decision, welcome: false };
   if (i.title) return off;
   if (i.ending) return { ...off, ending: true };
   if (i.cutscene !== 'none') return { ...off, gate: true };
@@ -56,5 +66,13 @@ export function overlayPlan(i: OverlayInputs): OverlayPlan {
   const feltCard = !gate && !hitMoment && !dayCard && !i.setup && !i.planning && !!i.feltCard;
   const recap = !gate && !hitMoment && !dayCard && !feltCard && !i.setup && i.recap;
   const milestone = !gate && !hitMoment && !dayCard && !feltCard && !recap && !i.setup && !i.planning && !i.board && i.milestones > 0;
-  return { gate, ending: false, hitMoment, dayCard, feltCard, recap, milestone, decisionWaiting: gate };
+  const welcome = !!i.welcome && !gate && !hitMoment && !dayCard && !feltCard && !recap && !i.setup && !i.planning;
+  return { gate, ending: false, hitMoment, dayCard, feltCard, recap, milestone, decisionWaiting: gate, welcome };
+}
+
+/** The tier on top right now, or null when the map is clear: toasts wait while it is not. */
+export function topTier(p: OverlayPlan): OverlayTier | null {
+  if (p.ending || p.gate || p.hitMoment || p.dayCard || p.feltCard) return 'blocking';
+  if (p.recap || p.milestone || p.welcome) return 'card';
+  return null;
 }
