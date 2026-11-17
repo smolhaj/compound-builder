@@ -11,16 +11,36 @@ import { blockProblem, hailable, describePass, lotsText, roadSummary, PASS } fro
 import { have } from '../sim/barter';
 import { Note, Row, Section } from './hud/common';
 import { DIM, btn } from './hud/style';
-import { useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
+import { useWorldStore } from '../store/worldStore';
+import { TOP_BAR } from './hud/drawerRegistry';
+import { T, tv } from './hud/tokens';
 import { toFeet } from '../sim/units';
 
 const card = { position: 'fixed', left: 12, bottom: 64, width: 'min(330px, calc(100vw - 24px))', zIndex: 20, background: 'rgba(20,22,18,0.92)', color: '#eee', borderRadius: 8, padding: '8px 10px', fontSize: 12.5, boxShadow: '0 4px 18px rgba(0,0,0,0.45)', pointerEvents: 'auto' } as const;
 const ft = (units: number): number => Math.round(toFeet(units * 6) / 10) * 10;
 const b = (primary = false, off = false) => ({ ...btn(primary), padding: '3px 8px', fontSize: 12, opacity: off ? 0.4 : 1, marginRight: 4, marginTop: 4 });
 
+/** Layout A: the road alert is a banner under the top bar (below the breaking-news banner when one is up), not a card over the map. */
+function useBannerBox(): CSSProperties | null {
+  const A = useWorldStore(w => w.layout === 'a'), scale = useWorldStore(w => w.uiScale);
+  const [below, setBelow] = useState(0);
+  useEffect(() => {
+    if (!A) return;
+    const read = () => { const el = document.querySelector('[data-testid="breaking-banner"]'); setBelow(el ? el.getBoundingClientRect().bottom + 6 : 0); };
+    read(); const id = setInterval(read, 400); return () => clearInterval(id);
+  }, [A]);
+  if (!A) return null;
+  const top = Math.max(TOP_BAR.top + T.size.bar * scale + TOP_BAR.gap, below);
+  return { position: 'fixed', top, left: '50%', transform: `translateX(-50%) scale(${scale})`, transformOrigin: 'top center', zIndex: 3, boxSizing: 'border-box', width: 'max-content', maxWidth: `min(620px, calc((100vw - 32px) / ${scale}))`,
+    display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 10, rowGap: 2, background: tv.color('panel'), color: tv.color('text'), border: `1px solid ${T.color.line}`, borderLeft: `3px solid ${tv.color('warn')}`, borderRadius: tv.radius('panel'), boxShadow: tv.shadow(2), padding: '6px 12px', fontFamily: tv.font('family'), fontSize: tv.font('sm'), pointerEvents: 'auto' };
+}
+
 export function RoadAlert() {
   const g = useGameStore();
   const lift = useHintBottom(64);   // layout A: clear of the action bar
+  const banner = useBannerBox();
+  const boxOf = (extra: CSSProperties = {}): CSSProperties => banner ?? { ...card, bottom: lift, ...extra };
   const game = g.game, road = game.road, inc = game.gate.incoming;
   const [msg, setMsg] = useState('');
   const run = (f: () => string | null) => setMsg(f() ?? '');
@@ -30,7 +50,7 @@ export function RoadAlert() {
     const mins = Math.max(0, Math.round((inc.at - game.clock.t) * 1440));
     const prep = road?.prep;
     const greeter = greeterCandidate(game);
-    return <div data-testid="road-alert" style={{ ...card, bottom: lift }}>
+    return <div data-testid="road-alert" style={boxOf()}>
       <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>On the county road</div>
       <div style={{ margin: '2px 0 4px' }}>{describeParty(game, inc.e)}, about {mins >= 60 ? `${Math.round(mins / 6) / 10} hours` : `${mins} minutes`} out.</div>
       {prep ? <Note>{prep.kind === 'greeter' ? 'A greeter is at the drive.' : 'The gate is shut and manned.'}</Note> : <>
@@ -44,7 +64,7 @@ export function RoadAlert() {
   const h = road.hail;
   if (h) {
     const short = h.want.some(l => have(game, l.good) < l.qty);
-    return <div data-testid="road-hail" style={{ ...card, bottom: lift }}>
+    return <div data-testid="road-hail" style={boxOf()}>
       <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>At the line</div>
       <div style={{ margin: '2px 0 4px' }}>{h.text}</div>
       {short && <Note tone="warn">You are short of {lotsText(h.want)}.</Note>}
@@ -58,7 +78,7 @@ export function RoadAlert() {
   const hs = hailable(game);
   if (hs.length) {
     const p = hs[0];
-    return <div data-testid="road-wave" style={{ ...card, bottom: lift }}>
+    return <div data-testid="road-wave" style={boxOf()}>
       <div style={{ fontSize: 11, letterSpacing: 1, opacity: 0.6, textTransform: 'uppercase' }}>On the county road</div>
       <div style={{ margin: '2px 0 4px' }}>{describePass(p.party)} just went by.</div>
       <button style={b()} title="Wave them down to swap across the fence; the gate stays shut" onClick={() => run(() => g.hailPasser(p.id))}>Wave them down</button>

@@ -27,8 +27,8 @@ describe('Hud under layout A (server-rendered)', () => {
     const html = setup('a');
     expect(html).toContain('data-testid="action-bar"'); expect(html).toContain('data-testid="top-bar-a"');
     expect(html).not.toContain('data-tab="family"'); expect(html).not.toContain('show-all-tabs');
-    expect((html.match(/data-drawer="/g) ?? []).length).toBe(2);
-    expect(html.match(/data-drawer="[a-z]+" style="[^"]*display:none/g)?.length).toBe(2);
+    expect((html.match(/data-drawer="/g) ?? []).length).toBe(3);   // left, right and the Board
+    expect(html.match(/data-drawer="[a-z]+" style="[^"]*display:none/g)?.length).toBe(3);
     expect((html.match(/data-testid="view-toggle"/g) ?? []).length).toBe(1);
   });
   it('A with People open shows the Family body in one visible drawer with a header and close button', () => {

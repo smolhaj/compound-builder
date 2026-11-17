@@ -26,7 +26,7 @@ const sep = <span aria-hidden style={{ width: 1, height: 26, background: T.color
 
 export function ActionBar({ alerts, dim, fresh, tickerOn }: { alerts: Partial<Record<DrawerId, Tone>>; dim: ReadonlySet<DrawerId>; fresh: ReadonlySet<DrawerId>; tickerOn: boolean }) {
   const w = useWorldStore();
-  const open = useDrawerStore(s => s.open), toggle = useDrawerStore(s => s.toggle);
+  const open = useDrawerStore(s => s.open), toggle = useDrawerStore(s => s.toggle), boardPage = useDrawerStore(s => s.pages.board);
   const scale = w.uiScale;
   const [vw, setVw] = useState(() => (typeof window === 'undefined' ? 1512 : window.innerWidth));
   useEffect(() => { const f = () => setVw(window.innerWidth); window.addEventListener('resize', f); return () => window.removeEventListener('resize', f); }, []);
@@ -43,7 +43,7 @@ export function ActionBar({ alerts, dim, fresh, tickerOn }: { alerts: Partial<Re
 
   const labels = mode === 'labels';
   const panelBtn = (d: DrawerDef) => {
-    const on = open === d.id, alert = alerts[d.id], isNew = fresh.has(d.id) && !on, faded = dim.has(d.id) && !on && !alert;
+    const on = d.id === 'log' ? open === 'board' && boardPage === 'log' : d.id === 'board' ? open === 'board' && boardPage !== 'log' : open === d.id, alert = alerts[d.id], isNew = fresh.has(d.id) && !on, faded = dim.has(d.id) && !on && !alert;
     return <HoverHost key={d.id} up scale={scale} align="center" delay={200} card={<>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: tv.font('title'), fontWeight: T.weight.semi }}>
         <BarIcon id={d.id} /><span>{d.title}</span>

@@ -14,6 +14,7 @@ const P: Record<BarIconId, ReactNode> = {
   outside: <><circle cx="8" cy="8" r="6" /><path d="M2 8h12M8 2c2 1.8 3 3.8 3 6s-1 4.2-3 6c-2-1.8-3-3.8-3-6s1-4.2 3-6z" /></>,
   projects: <><rect x="3" y="3" width="10" height="11" rx="1.4" /><path d="M6 3V2h4v1M5.6 7.4h4.8M5.6 10.2h3" /></>,
   chronicle: <><rect x="2.4" y="3.2" width="11.2" height="10.4" rx="1.4" /><path d="M2.4 6.6h11.2M5.4 1.8v2.8M10.6 1.8v2.8" /><circle cx="8" cy="10" r=".8" fill="currentColor" /></>,
+  board: <><rect x="3" y="3" width="10" height="11" rx="1.4" /><path d="M6 3V2h4v1M5.4 7.2l1 1 1.8-2M5.4 11h5" /></>,
   log: <><path d="M3 4h10M3 8h10M3 12h6" /></>,
   walls: <><path d="M2 7.8 8 2.4l6 5.4z" fill="currentColor" /><path d="M3.8 7.8v5.8h8.4V7.8" /><path d="M7 13.6v-3h2v3" /></>,
   cutaway: <><path d="M2.6 4.4 8 1.8l5.4 2.6" /><path d="M3.8 8.6v5h8.4v-5" /><path d="M3.8 8.6h2.6M9.6 8.6h2.6" /><path d="M5.6 11.8h4.8" /></>,

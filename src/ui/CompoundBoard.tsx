@@ -13,11 +13,14 @@ import { DIM, FS, LINE, TONE, btn, miniBtn } from './hud/style';
 
 const PAPER = 'rgba(32,29,22,0.97)';
 
-export function CompoundBoardPanel({ top, bottom, narrow, onClose, onSide, anchor = 'center' }: { /** Layout A keeps the middle of the map clear: the board sits at the left edge. */ anchor?: 'center' | 'left'; top: number; bottom: number; narrow: boolean; onClose: () => void; /** On a phone only one side panel shows: a jump says which. */ onSide: (s: 'left' | 'right') => void }) {
+/** What the board shows in a drawer: one page, or (Classic's floating clipboard) all of it. */
+export type BoardPage = 'all' | 'status' | 'feed' | 'radio';
+
+/** The board's lines and buttons, shared by Classic's floating clipboard and layout A's Board drawer. */
+export function BoardBody({ page = 'all', onClose, onSide }: { page?: BoardPage; onClose: () => void; /** On a phone only one side panel shows: a jump says which. */ onSide: (s: 'left' | 'right') => void }) {
   const g = useGameStore();
   const drive = useWorldStore(w => w.siteGeo)?.drive;
   const [cache] = useState(boardCache);
-  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [onClose]);
   const b = cache(g.game, drive);
   const tightest = shortestRunway(b.runway);
   const { guard, node: guardNode } = useSpendGuard();
@@ -53,16 +56,12 @@ export function CompoundBoardPanel({ top, bottom, narrow, onClose, onSide, ancho
     {x.act && <button style={{ ...btn(), ...miniBtn }} onClick={() => go(x.act!.act)}>{x.act.label}</button>}
   </div>;
 
-  return <div role="dialog" aria-label="Compound board" style={{ position: 'fixed', zIndex: 5, top, left: narrow ? 10 : anchor === 'left' ? 16 : '50%', transform: narrow || anchor === 'left' ? 'none' : 'translateX(-50%)', width: narrow ? 'calc(100vw - 20px)' : 400, boxSizing: 'border-box', maxHeight: `calc(100vh - ${top + bottom}px)`, overflowY: 'auto', background: PAPER, border: '1px solid #d8c9a0', borderRadius: 8, padding: '8px 10px', color: '#eee', fontSize: FS.body, boxShadow: '0 6px 24px rgba(0,0,0,0.5)' }}>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
-      <b style={{ fontSize: 14, letterSpacing: 0.3 }}>Compound board</b>
-      <span style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
-        <span title="The Get operational checklist (Build tab)" style={{ color: b.operational.done === b.operational.total ? TONE.good : DIM, fontSize: FS.small }}>{b.operational.done === b.operational.total ? 'Operational' : `Operational ${b.operational.done} of ${b.operational.total}`}</span>
-        <button aria-label="Put the clipboard down" title="Close (Esc)" style={{ ...btn(), ...miniBtn }} onClick={onClose}>Close</button>
-      </span>
-    </div>
+  const all = page === 'all', status = all || page === 'status';
+  return <>
     {guardNode}
-    <FeedCard />
+    {(all || page === 'feed') && <FeedCard part={all ? 'all' : 'feed'} />}
+    {page === 'radio' && <FeedCard part="radio" />}
+    {status && <>
     {b.vitals.map(vital)}
     <WaveCard />
     <Group id="board.runway" title="Days with no resupply" extra={tightest && tightest.tone !== 'good' ? `${tightest.label}: ${tightest.value}` : undefined}>
@@ -74,5 +73,25 @@ export function CompoundBoardPanel({ top, bottom, narrow, onClose, onSide, ancho
     {b.decisions.length > 0 && <Group id="board.decisions" title="Waiting on you" extra={String(b.decisions.length)}>{b.decisions.map(item)}</Group>}
     {b.gaps.length > 0 && <Group id="board.gaps" title="Defense gaps" defaultOpen={false} extra={String(b.gaps.length)}>{b.gaps.map(item)}</Group>}
     <div style={{ fontSize: FS.fine, color: DIM, marginTop: 4 }}>Read-only. Every line jumps to the tab that changes it.</div>
+    </>}
+  </>;
+}
+
+/** Classic's floating clipboard: the board's lines under a title and a Close button. */
+export function CompoundBoardPanel({ top, bottom, narrow, onClose, onSide, anchor = 'center' }: { /** Layout A keeps the middle of the map clear: the board sits at the left edge. */ anchor?: 'center' | 'left'; top: number; bottom: number; narrow: boolean; onClose: () => void; onSide: (s: 'left' | 'right') => void }) {
+  const g = useGameStore();
+  const drive = useWorldStore(w => w.siteGeo)?.drive;
+  const [cache] = useState(boardCache);
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k); }, [onClose]);
+  const b = cache(g.game, drive);
+  return <div role="dialog" aria-label="Compound board" style={{ position: 'fixed', zIndex: 5, top, left: narrow ? 10 : anchor === 'left' ? 16 : '50%', transform: narrow || anchor === 'left' ? 'none' : 'translateX(-50%)', width: narrow ? 'calc(100vw - 20px)' : 400, boxSizing: 'border-box', maxHeight: `calc(100vh - ${top + bottom}px)`, overflowY: 'auto', background: PAPER, border: '1px solid #d8c9a0', borderRadius: 8, padding: '8px 10px', color: '#eee', fontSize: FS.body, boxShadow: '0 6px 24px rgba(0,0,0,0.5)' }}>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+      <b style={{ fontSize: 14, letterSpacing: 0.3 }}>Compound board</b>
+      <span style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+        <span title="The Get operational checklist (Build tab)" style={{ color: b.operational.done === b.operational.total ? TONE.good : DIM, fontSize: FS.small }}>{b.operational.done === b.operational.total ? 'Operational' : `Operational ${b.operational.done} of ${b.operational.total}`}</span>
+        <button aria-label="Put the clipboard down" title="Close (Esc)" style={{ ...btn(), ...miniBtn }} onClick={onClose}>Close</button>
+      </span>
+    </div>
+    <BoardBody page="all" onClose={onClose} onSide={onSide} />
   </div>;
 }

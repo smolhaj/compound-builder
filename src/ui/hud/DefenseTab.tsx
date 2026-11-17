@@ -39,6 +39,8 @@ import { HouseHardening } from './HouseHardening';
 import { WallTopsPanel } from './WallTopsPanel';
 import { GateSecurityPanel } from './GateSecurityPanel';
 import { CommunityPanel } from './CommunityPanel';
+import { Page } from './SubPages';
+import { RoadSection } from '../RoadPanel';
 import { pluralize } from '../../sim/words';
 import { lengthText } from '../../sim/units';
 
@@ -125,8 +127,9 @@ export function DefenseTab() {
   const exposed = d.homes.filter(h => !h.covered);
   const hardcore = game.disaster.difficulty === 'hardcore';   // (the crews adapt a little on every difficulty; the notes about it are Hardcore's)
   const terrain = terrainDefense(game);
+  const layoutA = w.layout === 'a';   // (layout A files the road section here; Classic keeps it in Family)
   return <>
-    <Section title="Defense">
+    <Page id="score"><Section title="Defense">
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
         <span style={{ fontSize: 30, fontWeight: 700, color: TONE[d.tone] }}>{d.score}</span>
         <span style={{ fontSize: 15, color: TONE[d.tone] }}>{d.label}</span>
@@ -137,10 +140,10 @@ export function DefenseTab() {
       {game.armory.guns.length > 0 && <Row label="Drilled for the alarm" value={`${Math.round(100 * readiness(game))}%${game.courses?.drills.perWeek ? ` · ${DRILL_NAME[game.courses.drills.perWeek]}` : ' · no drills'}`} tone={readiness(game) >= 0.5 ? 'good' : readiness(game) >= 0.2 ? 'warn' : undefined} title="How practiced the household is at the alarm: fewer seconds frozen when it sounds. Set the drill schedule on the Family tab (Classes and drills)." />}
       <button style={{ ...btn(w.showBoundary), marginTop: 4 }} onClick={() => w.setShowBoundary(!w.showBoundary)} title="Draw the property line on the ground">{w.showBoundary ? 'Hide' : 'Show'} property line</button>
       {hardcore && <HardcoreNotes />}
-    </Section>
-    <GuardsSection />
-    <ReputationSection />
-    <Section title="The property line">
+    </Section></Page>
+    <Page id="staff"><GuardsSection /></Page>
+    <Page id="staff"><ReputationSection /></Page>
+    <Page id="walls"><Section title="The property line">
       {d.walls.map(c => <CheckRow key={c.id} c={c} />)}
       {missingGate > 0 && <div style={{ border: '1px solid #c9a24a', borderRadius: 6, padding: 6, margin: '4px 0' }}>
         <Note tone="warn">The road comes through here: {missingGate} wall{missingGate > 1 ? 's' : ''} cross{missingGate > 1 ? '' : 'es'} the driveway with no gate, so the trucks and the family's vehicles cannot get in.</Note>
@@ -163,6 +166,8 @@ export function DefenseTab() {
         </div>;
       })}
     </Section>
+    </Page>
+    <Page id="ground">
     <Group id="def-ground" title="The ground and the tunnels" defaultOpen={false}>
       {terrain.lines.length > 0 ? terrain.lines.map(l => <Note key={l}>{l}</Note>) : <Note>The ground here gives a crew no particular way in (Terrain overlay: Lanes).</Note>}
       {drainageLines(game).map(l => <Note key={l}>{l}</Note>)}
@@ -189,6 +194,8 @@ export function DefenseTab() {
         </div>
       </Section>;
     })()}
+    </Page>
+    <Page id="walls">
     <Group id="def-walkway" title="Wall-top walkway" defaultOpen={false}>
       <Hint more="A steel patrol deck along the top of a container, steel or concrete wall (4 ft wide, a handrail, stairs at the gates and about every 260 ft). Guards on watch walk it and see farther; a post on it fights from above and fewer crews get over. It stays on through a wall upgrade.">Guards see farther from the wall top.</Hint>
       {game.perimeter.filter(r => canHostWalkway(r.kind) && !r.replaces).length === 0 && <Note>No wall that can take one yet: container, steel or concrete.</Note>}
@@ -215,8 +222,9 @@ export function DefenseTab() {
     </Group>
     <WallTopsPanel />
     <GateSecurityPanel />
-    <CommunityPanel />
-    <LightDiscipline />
+    </Page>
+    <Page id="staff"><CommunityPanel /><LightDiscipline /></Page>
+    <Page id="walls">
     <Group id="def-lights" title="Floodlights" defaultOpen={false}>
       <Hint more="Part of the night-time suite: lights that stay on draw the road's eyes to the camp. Always on costs power and is seen from the road; a motion sensor lights up when a threat is detected near and for a little after; off keeps the place dark. Light discipline (above) can turn every light off.">Lights that stay on draw eyes to the camp.</Hint>
       <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', padding: '3px 0' }}>
@@ -257,12 +265,16 @@ export function DefenseTab() {
         </div>;
       })}
     </Group>
+    </Page>
+    <Page id="houses">
     <HouseHardening />
     <Group id="def-houses" title="The houses" extra={exposed.length ? `${exposed.length} exposed` : undefined} defaultOpen={false}>
       {d.homes.length === 0 && <Note>No house finished yet.</Note>}
       {d.homes.map(h => <CheckRow key={h.id} c={{ id: h.id, label: h.name, ok: h.covered, tone: h.covered ? 'good' : 'bad', detail: h.how }} />)}
       {exposed.length > 0 && <Note tone="bad">{exposed.length} home{exposed.length > 1 ? 's are' : ' is'} exposed: close the property line (and bar the creek) or wall a ring round {exposed.length > 1 ? 'them' : 'it'}.</Note>}
     </Group>
+    </Page>
+    <Page id="ground">
     {d.linked.length > 0 && <Section title="Linked yards">
       {d.linked.map(c => <CheckRow key={c.id} c={c} />)}
       {d.linkList.filter(l => l.kind === 'passage').map(l => {
@@ -283,6 +295,9 @@ export function DefenseTab() {
       </div>)}
       <Hint more={<>Organized crews dig under walls over a week or more, late in the collapse. A skirt stops them; a ditch floods the tunnel; sensors, dogs and a watch give you days of warning. Then you can wait for them at the breakout with the party.</>}>A skirt stops diggers.</Hint>
     </Section>}
+    </Page>
+    <Page id="road">{layoutA && <RoadSection />}</Page>
+    <Page id="checks">
     <Group id="def-watch" title="Watching" extra={`${d.watch.filter(c => c.ok).length}/${d.watch.length}`} defaultOpen={false}>{d.watch.map(c => <CheckRow key={c.id} c={c} />)}</Group>
     <Group id="def-fight" title="Fighting" extra={`${d.fight.filter(c => c.ok).length}/${d.fight.length}`} defaultOpen={false}>{d.fight.map(c => <CheckRow key={c.id} c={c} />)}</Group>
     <Group id="def-shelter" title="Shelter" extra={`${d.shelter.filter(c => c.ok).length}/${d.shelter.length}`} defaultOpen={false}>{d.shelter.map(c => <CheckRow key={c.id} c={c} />)}</Group>
@@ -290,6 +305,7 @@ export function DefenseTab() {
     <Section title="Built for defense">
       {d.improvements.length ? <div style={{ color: DIM, lineHeight: 1.5 }}>{d.improvements.join(' · ')}</div> : <Note>Nothing yet. Fences, walls, a tower, a dog and cameras all count.</Note>}
     </Section>
+    </Page>
   </>;
 }
 
