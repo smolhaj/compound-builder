@@ -106,6 +106,9 @@ export interface WorldState {
   setUnderground: (on: boolean) => void;
   /** The side panels hidden (H) so the map shows. */
   hudHidden: boolean;
+  /** The Compound Board panel is open (mirrors Hud's local state): milestone cards wait while it is. */
+  boardOpen: boolean;
+  setBoardOpen: (v: boolean) => void;
   setHudHidden: (on: boolean) => void;
   /** Marks the n nearest trees to the yard for felling (set by the canvas; returns how many were marked). */
   markNearestTrees: ((n: number, logs?: number) => number) | null;
@@ -205,6 +208,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   // a phone-sized window starts with the side panels folded away (they would cover the whole map); "Show panels" brings them back
   hudHidden: typeof window !== 'undefined' && window.innerWidth < 760,
   setHudHidden: (hudHidden) => set({ hudHidden }),
+  boardOpen: false,
+  setBoardOpen: (boardOpen) => set({ boardOpen }),
   markNearestTrees: null,
   siteQuery: null,
   setSiteQuery: (siteQuery) => set({ siteQuery }),

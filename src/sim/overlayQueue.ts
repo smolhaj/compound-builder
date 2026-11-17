@@ -27,6 +27,8 @@ export interface OverlayInputs {
   feltCard?: boolean;
   /** A placing tool or the starter proposal is open (the planning pause): a card would cover the ghosts, so it waits. */
   planning?: boolean;
+  /** The Compound Board is open: a milestone card would cover it, so it waits (and goes by itself later). */
+  board?: boolean;
 }
 
 export interface OverlayPlan {
@@ -53,6 +55,6 @@ export function overlayPlan(i: OverlayInputs): OverlayPlan {
   // a felt card, like the recap, waits for the new-game screen and for a placing tool (it would cover the ghosts)
   const feltCard = !gate && !hitMoment && !dayCard && !i.setup && !i.planning && !!i.feltCard;
   const recap = !gate && !hitMoment && !dayCard && !feltCard && !i.setup && i.recap;
-  const milestone = !gate && !hitMoment && !dayCard && !feltCard && !recap && !i.setup && !i.planning && i.milestones > 0;
+  const milestone = !gate && !hitMoment && !dayCard && !feltCard && !recap && !i.setup && !i.planning && !i.board && i.milestones > 0;
   return { gate, ending: false, hitMoment, dayCard, feltCard, recap, milestone, decisionWaiting: gate };
 }

@@ -55,4 +55,8 @@ describe('overlay queue', () => {
     expect(up(overlayPlan({ ...none, title: true, hitMoment: true, feltCard: true }))).toEqual([]);
     expect(up(overlayPlan({ ...none, cutscene: 'playing', hitMoment: true, feltCard: true }))).toEqual(['gate']);
   });
+  it('a milestone card waits while the Board is open', () => {
+    expect(overlayPlan({ ...none, milestones: 1, board: true }).milestone).toBe(false);
+    expect(overlayPlan({ ...none, milestones: 1 }).milestone).toBe(true);
+  });
 });

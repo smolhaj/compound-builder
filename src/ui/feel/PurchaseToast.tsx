@@ -25,11 +25,11 @@ export function MilestoneCard() {
     return () => clearTimeout(id);
   }, [c, dismiss, compact, more]);
   if (!c) return null;
-  if (compact) return <div key={c.id} className="cb-rise" role="status" aria-live="polite" data-testid="milestone-card" style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 108, zIndex: 26, maxWidth: 'min(560px, calc(100vw - 40px))', background: '#ece4d0', color: '#1d1b16', borderRadius: 6, padding: '6px 12px', border: '1px solid #8a7a52', boxShadow: '0 4px 16px rgba(0,0,0,0.5)', fontSize: 13, display: 'flex', gap: 10, alignItems: 'center' }}>
+  if (compact) return <div key={c.id} className="cb-rise" role="dialog" aria-modal="false" aria-label={`${c.kicker ?? 'A milestone'}: ${c.title}`} aria-live="polite" data-testid="milestone-card" style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 108, zIndex: 26, maxWidth: 'min(560px, calc(100vw - 40px))', background: '#ece4d0', color: '#1d1b16', borderRadius: 6, padding: '6px 12px', border: '1px solid #8a7a52', boxShadow: '0 4px 16px rgba(0,0,0,0.5)', fontSize: 13, display: 'flex', gap: 10, alignItems: 'center' }}>
     <span><b>{c.kicker}:</b> {c.title}{late ? ` (${late})` : ''}. {c.footer ?? ''}{more > 0 ? ` (${more} more)` : ''}</span>
     <button style={{ padding: '2px 10px', border: 0, borderRadius: 5, background: '#1d1b16', color: '#ece4d0', cursor: 'pointer' }} onClick={dismiss}>OK</button>
   </div>;
-  return <div key={c.id} className="cb-rise" role="status" aria-live="polite" data-testid="milestone-card" style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', top: 124, zIndex: 26, width: 320, background: '#ece4d0', color: '#1d1b16', borderRadius: 4, padding: '10px 14px 10px', boxShadow: '0 8px 30px rgba(0,0,0,0.55)', border: '1px solid #8a7a52', fontFamily: 'Georgia, "Times New Roman", serif' }}>
+  return <div key={c.id} className="cb-rise" role="dialog" aria-modal="false" aria-label={`${c.kicker ?? 'A milestone'}: ${c.title}`} aria-live="polite" data-testid="milestone-card" style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', top: 124, zIndex: 26, width: 320, background: '#ece4d0', color: '#1d1b16', borderRadius: 4, padding: '10px 14px 10px', boxShadow: '0 8px 30px rgba(0,0,0,0.55)', border: '1px solid #8a7a52', fontFamily: 'Georgia, "Times New Roman", serif' }}>
     <div style={{ fontSize: 10.5, letterSpacing: 2, textTransform: 'uppercase', opacity: 0.65, fontFamily: 'system-ui, sans-serif' }}>{c.kicker ?? 'A milestone'}</div>
     <div style={{ fontSize: 20, fontWeight: 700, lineHeight: 1.15, margin: '3px 0 4px' }}>{c.title}</div>
     <div style={{ fontSize: 13.5, lineHeight: 1.35 }}>{c.line}</div>

@@ -196,7 +196,11 @@ export function placeMarks(s: GameState, marks: readonly WorldMark[], h: PlaceHo
         if (a.at !== 'structure') break;
         const b = h.boxOf(a.id);
         if (!b) { out.dropped++; break; }
-        if (m.kind === 'tarp') prop(m, 'tarp', b.cx, b.cz, r() * 0.4, Math.max(b.w, b.d) * 0.7, r() < 0.5 ? 0x3d6fb0 : 0x8a8f94, b.y0 + b.h * 0.92 - h.groundAt(b.cx, b.cz));
+        // a tarp lies on a roof: not on a tower, a long wall or a mast (their box is tall or long, which hung a slab in the air), and never bigger than a roof
+        if (m.kind === 'tarp') {
+          if (b.h > 1.6 || Math.max(b.w, b.d) > 3.5) { out.dropped++; break; }
+          prop(m, 'tarp', b.cx, b.cz, r() * 0.4, Math.min(1.3, Math.max(b.w, b.d) * 0.7), r() < 0.5 ? 0x3d6fb0 : 0x8a8f94, b.y0 + Math.min(b.h * 0.92, 1.1) - h.groundAt(b.cx, b.cz));
+        }
         else prop(m, 'tag', b.cx, b.cz + b.d / 2 + 0.06, 0, 1, 0xd8432b, b.y0 + 0.28 - h.groundAt(b.cx, b.cz));
         break;
       }
