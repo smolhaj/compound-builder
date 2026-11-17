@@ -407,7 +407,12 @@ export function feltMarks(s: GameState, day: number, spec: FeltSpec | null, tier
   (RECIPES[kind] ?? generic)(c);
   // a recipe the curves drove to nothing still leaves the generic trace
   if (c.out.length === 0) generic(c);
-  return c.out.slice(0, cap);
+  // over the cap (Low): keep the marks that read first (things you can see from the yard), drop the thin ones (drifts, smoke columns, scars)
+  if (c.out.length > cap) {
+    const rank = (k: MarkKind): number => (['checkpoint', 'barricade', 'zone', 'column', 'camp', 'flood', 'crack', 'red_tag', 'tarp', 'banner', 'queue'].includes(k) ? 0 : ['sign', 'dry_bed', 'mud_line', 'dead_field', 'ruin', 'road_cut', 'plume'].includes(k) ? 1 : 2);
+    return c.out.map((m, i) => ({ m, i })).sort((p, q) => rank(p.m.kind) - rank(q.m.kind) || p.i - q.i).slice(0, cap).map(x => x.m);
+  }
+  return c.out;
 }
 
 /** A signature of a mark list: it changes when a mark appears, goes, or moves a tenth in severity. The world rebuilds only when this changes. */
