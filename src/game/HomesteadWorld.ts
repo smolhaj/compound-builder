@@ -235,6 +235,8 @@ const SEE_THROUGH_FLOOR: ReadonlySet<string> = new Set(['lodge', 'lodge_solar'])
 const PADDOCK = /^(barn|barnyard|sheep_barn|chicken_coop)$/;
 const ICE_COVER = { open: 0, skim: 0.32, ice: 1 } as const;
 
+/** What a blighted or parched crop looks like (straw yellow, going brown). */
+const CROP_DEAD = new THREE.Color(0x9a8a45);
 export class HomesteadWorld {
   readonly center = new THREE.Vector3(PARCEL_SIZE / 2, 0, PARCEL_SIZE / 2);
   readonly parcel: ParcelTerrain;
@@ -2659,10 +2661,27 @@ export class HomesteadWorld {
       if (b.placed.kind !== 'garden' && b.placed.kind !== 'field') continue;
       for (const o of b.group.children) {
         const name = ((o as THREE.Mesh).userData.baseMat as THREE.Material | undefined)?.name ?? ((o as THREE.Mesh).material as THREE.Material | undefined)?.name;
-        if (name === 'kit_crop' || name === 'kit_grain' || (b.placed.kind === 'field' && name === 'kit_straw')) o.visible = growing && (o.userData.layer !== 'interior' || b.finished);
+        if (name === 'kit_crop' || name === 'kit_grain' || (b.placed.kind === 'field' && name === 'kit_straw')) {
+          o.visible = growing && (o.userData.layer !== 'interior' || b.finished) && !this._cropEmpty;
+          this._tintCrop(o as THREE.Mesh);
+        }
       }
     }
     // the fire pit (camp cookfire, evenings sat out) is lit by the atmosphere (atmosphere/nightLife.firePitLit)
+  }
+
+  /** The home fields' felt-layer look (game/felt `cropLook`): 0 green .. 1 dead and yellow; `empty` takes the crop off the field (famine, a burn). */
+  setCropLook(dead: number, empty: boolean): void { this._cropDead = Math.max(0, Math.min(1, dead)); this._cropEmpty = empty; }
+  private _cropDead = 0;
+  private _cropEmpty = false;
+  private _tintCrop(o: THREE.Mesh): void {
+    const m = o.material as THREE.MeshStandardMaterial | undefined;
+    if (!m || !m.color) return;
+    const ud = m.userData as { cropBase?: number; cropK?: number };
+    if (ud.cropBase === undefined) ud.cropBase = m.color.getHex();
+    if (ud.cropK === this._cropDead) return;
+    ud.cropK = this._cropDead;
+    m.color.setHex(ud.cropBase).lerp(CROP_DEAD, this._cropDead * 0.85);
   }
 
   /** The boats at a dock: the stockpile's boats in the slips, nearest dock first, hidden when the water is skimmed over (the family hauls them out). */

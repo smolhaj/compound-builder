@@ -178,6 +178,10 @@ try {
     const cb = window.__cb, sp = window.__spot, gr = cb.world.groundAt;
     cb.store.setState({ hudHidden: true });
     if (mode === 'eye') { const x = sp[0] + 2, z = sp[1] + 7; cb.qa.pose = { x, y: gr(x, z) + 0.34, z, lx: sp[0] - 1, ly: gr(sp[0], sp[1]) + 0.9, lz: sp[1] - 8, fov: 66 }; }
+    else if (mode === 'road') { // from the yard looking up the county road past the gate (where the felt marks stand)
+      const x = sp[0] + 3, z = sp[1] + 6, tz = sp[1] - 4, tx = cb.world.county.x(tz) - 4;
+      cb.qa.pose = { x, y: gr(x, z) + 0.8, z, lx: tx, ly: gr(tx, tz) + 0.2, lz: tz, fov: 66 };
+    }
     else { cb.qa.pose = null; cb.cam.target.set(sp[0], gr(sp[0], sp[1]), sp[1]); cb.cam.radius = 30; cb.cam.pitch = 0.62; cb.cam.yaw = 0.7; }
   }, mode);
   /** The milestone popup ("First wave survived") is not a role=dialog; it counts as a modal over the view (reported once, then dismissed). */
@@ -234,7 +238,7 @@ try {
   const peaceDir = `${outRoot}/_peace`; mkdirSync(peaceDir, { recursive: true });
   const peace = {};
   await page.evaluate(() => { const g = structuredClone(window.__pristine); for (const st of g.structures) { st.stage = 5; st.done = 0; st.finishedAt = 0; } g.disaster.kind = null; g.disaster.phase = 'peace'; g.clock.t = 30.25 + Math.floor(g.clock.t); g.clock.speed = 0; window.__cb.game.setState({ game: g, dayCard: null, resumeTo: null }); window.__cb.feltSync(true); });
-  for (const v of ['eye', 'aerial']) { await view(v); peace[v] = await save(`${peaceDir}/peace-${v}.png`, true); }
+  for (const v of ['eye', 'road', 'aerial']) { await view(v); peace[v] = await save(`${peaceDir}/peace-${v}.png`, true); }
 
   for (const kind of kinds.filter(k => triggerable.includes(k))) {
     problems = [];
@@ -388,7 +392,7 @@ try {
       for (const x of rows) if (x.status === 'confirmed' && x.truth === false) note(kind, `a scouted line was confirmed but is marked false: "${x.text.slice(0, 60)}"`); else if (x.status === 'false' && x.truth === true) note(kind, `a scouted line was marked false but is true: "${x.text.slice(0, 60)}"`);
       // the world at week 1 (HUD hidden, no modal)
       await page.evaluate(() => { window.__cb.store.setState({ hudHidden: true }); window.__fx.noon(); });
-      for (const v of ['eye', 'aerial']) {
+      for (const v of ['eye', 'road', 'aerial']) {
         await view(v);
         const bad = await insideGeometry(); if (v === 'eye' && bad) note(kind, `the eye-level camera is inside geometry (${bad.join(', ')})`);
         const ms = await milestone(); if (ms) { note(kind, `a milestone popup covered the week-1 ${v} view (${ms.trim()}); dismissed`); await page.waitForTimeout(300); }

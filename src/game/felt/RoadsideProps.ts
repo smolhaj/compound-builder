@@ -16,22 +16,22 @@ const shade = (c: number, k: number): number => tmpC.setHex(c).multiplyScalar(k)
 
 /** The parts of one prop in its local frame (+z is its front); `k` is the prop's scale. */
 function partsOf(p: Prop): Part[] {
-  // roadside pieces are drawn a half again as large as true scale (a jersey barrier is 0.13 units) so they read from the diorama's distance
-  const c = p.color, k = p.scale * (['barrier', 'sandbags', 'sign', 'flag', 'tent', 'post', 'cone'].includes(p.type) ? 1.5 : 1);
+  // roadside pieces are drawn about twice true scale (a jersey barrier is 0.1 units, a person 0.28) so they read from the diorama's distance; people stay true size
+  const c = p.color, k = p.scale * (['barrier', 'sandbags', 'sign', 'flag', 'tent', 'post', 'cone'].includes(p.type) ? 1.8 : 1);
   switch (p.type) {
     case 'barrier': return [box(0.9 * k, 0.12 * k, 0.1 * k, 0, 0, 0, c), box(0.9 * k, 0.07 * k, 0.16 * k, 0, 0, 0, shade(c, 0.85)), box(0.9 * k, 0.03 * k, 0.11 * k, 0, 0.1 * k, 0, 0xc8482a)];
     case 'sandbags': return [box(0.5 * k, 0.05 * k, 0.16 * k, 0, 0, 0, c), box(0.44 * k, 0.05 * k, 0.15 * k, 0.03, 0.05 * k, 0, shade(c, 0.92)), box(0.36 * k, 0.05 * k, 0.14 * k, 0, 0.1 * k, 0, shade(c, 0.85))];
-    case 'sign': return [cyl(0.012, 0.012, 0.32 * k, 5, 0, 0, 0, 0x5a4a3a), box(0.26 * k, 0.16 * k, 0.02, 0, 0.3 * k, 0, c), box(0.2 * k, 0.015, 0.025, 0, 0.35 * k, 0, 0x2a2622), box(0.15 * k, 0.015, 0.025, 0, 0.31 * k, 0, 0x2a2622)];
-    case 'flag': return [cyl(0.008, 0.008, 0.85 * k, 5, 0, 0, 0, 0x8a8e92), box(0.26 * k, 0.15 * k, 0.012, 0.13 * k, 0.68 * k, 0, c)];
-    case 'tent': return [{ geo: new THREE.CylinderGeometry(0.2, 0.2, 0.46, 3).rotateZ(Math.PI / 2).rotateY(Math.PI / 2), x: 0, y: 0.17, z: 0, color: c, rx: 0 }, box(0.4, 0.015, 0.5, 0, 0, 0, shade(c, 0.6))];
-    case 'post': return [cyl(0.014, 0.014, 0.26, 5, 0, 0, 0, c)];
+    case 'sign': return [cyl(0.02, 0.02, 0.26 * k, 5, 0, 0, 0, 0x5a4a3a), box(0.2 * k, 0.12 * k, 0.03, 0, 0.24 * k, 0, c), box(0.15 * k, 0.012, 0.035, 0, 0.29 * k, 0, 0x2a2622), box(0.11 * k, 0.012, 0.035, 0, 0.26 * k, 0, 0x2a2622)];
+    case 'flag': return [cyl(0.014, 0.014, 0.5 * k, 5, 0, 0, 0, 0x8a8e92), box(0.2 * k, 0.12 * k, 0.02, 0.1 * k, 0.4 * k, 0, c)];
+    case 'tent': return [{ geo: new THREE.CylinderGeometry(0.28, 0.28, 0.62, 3).rotateZ(Math.PI / 2).rotateY(Math.PI / 2), x: 0, y: 0.24, z: 0, color: c, rx: 0 }, box(0.56, 0.015, 0.7, 0, 0, 0, shade(c, 0.6))];
+    case 'post': return [cyl(0.03, 0.03, 0.42, 5, 0, 0, 0, c)];
     case 'figure': return [box(0.08 * k, 0.15 * k, 0.05 * k, 0, 0.0, 0, c), box(0.036 * k, 0.1 * k, 0.04 * k, -0.02 * k, 0, 0, shade(c, 0.7)), box(0.036 * k, 0.1 * k, 0.04 * k, 0.02 * k, 0, 0, shade(c, 0.7)), box(0.06 * k, 0.065 * k, 0.06 * k, 0, 0.17 * k, 0, 0xc9a284)].map((q, i) => (i === 0 ? { ...q, y: q.y + 0.1 * k } : i === 3 ? { ...q, y: q.y + 0.1 * k } : q));
     case 'tarp': return [box(0.9 * k, 0.012, 0.7 * k, 0, 0, 0, c, 0, 0.12)];
     case 'tag': return [box(0.07, 0.09, 0.012, 0, 0, 0, c), box(0.045, 0.01, 0.014, 0, 0.04, 0, 0xf2e6c8)];
     case 'plank': return [box(0.5 * k, 0.015, 0.06, 0, 0.005, 0, c)];
     case 'cone': return [cyl(0.06, 0.012, 0.12 * k, 6, 0, 0, 0, c)];
     case 'log': return [cyl(0.035 * k, 0.03 * k, 0.7 * k, 6, 0, 0.03, 0, c, 0, Math.PI / 2)];
-    case 'tape': return [box(0.012, 0.02, p.scale, 0, 0, 0, c)];  // (length is the scale)
+    case 'tape': return [box(0.03, 0.05, p.scale, 0, 0, 0, c)];  // (length is the scale)
     case 'slot': return [];
   }
 }
@@ -47,7 +47,8 @@ export class RoadsideProps {
   }
   get triangles(): number { const g = this.mesh.geometry; return g.index ? g.index.count / 3 : 0; }
   get count(): number { return this._count; }
-  set(props: readonly Prop[]): void {
+  /** `zoom` scales every prop about its own origin: the felt world makes the set bigger the farther the camera is (a map marker from the air, true size up close). */
+  set(props: readonly Prop[], zoom = 1): void {
     this.mesh.geometry.dispose();
     this._count = props.length;
     if (!props.length) { this.mesh.geometry = new THREE.BufferGeometry(); this.mesh.visible = false; return; }
@@ -58,7 +59,8 @@ export class RoadsideProps {
         tmpE.set(part.rx ?? 0, 0, part.rz ?? 0);
         tmpQ.setFromEuler(tmpE);
         // local (part) -> prop frame (rotate about y by the prop's rot) -> world
-        tmpM.compose(tmpV.set(part.x, part.y, part.z), tmpQ, tmpS);
+        tmpS.set(zoom, zoom, p.type === 'tape' ? 1 : zoom);
+        tmpM.compose(tmpV.set(part.x * zoom, part.y * zoom, part.z * zoom), tmpQ, tmpS);
         g.applyMatrix4(tmpM);
         tmpM.makeRotationY(p.rot); g.applyMatrix4(tmpM);
         g.translate(p.x, p.y, p.z);

@@ -38,6 +38,12 @@ export interface Placed { flood: { feet: number; sev: number } | null; decals: D
 
 const clamp01 = (v: number): number => Math.max(0, Math.min(1, v));
 const ROAD_FAR = 128;
+/**
+ * The county road is 15 to 35 units off the camp, so a mark 40 units down it is a speck. Recipes speak in road distances (so they stay
+ * comparable to the traffic); the placement draws them closer: the nearest sit about 12 units up the road from the gate (in the eye shot's
+ * view, which looks north from the cabin) and the far ones are halved.
+ */
+export const near = (s: number): number => (s < 0 ? -8 + s * 0.5 : s * 0.5);
 
 /** Cells of the decal atlas used by each decal kind, with its tint and size range (world units). */
 const DECAL: Record<string, { cell: DecalCell; rgb: [number, number, number]; size: [number, number]; a: number }> = {
@@ -45,9 +51,9 @@ const DECAL: Record<string, { cell: DecalCell; rgb: [number, number, number]; si
   slump: { cell: 1, rgb: [0.16, 0.12, 0.09], size: [1.4, 2.8], a: 0.85 },
   ash_drift: { cell: 2, rgb: [0.66, 0.65, 0.63], size: [1.6, 4.2], a: 0.85 },
   burn_scar: { cell: 1, rgb: [0.05, 0.045, 0.04], size: [1.5, 4.5], a: 0.9 },
-  mud_line: { cell: 1, rgb: [0.26, 0.19, 0.11], size: [2, 5], a: 0.8 },
-  dead_field: { cell: 1, rgb: [0.42, 0.35, 0.19], size: [3, 8], a: 0.7 },
-  dry_bed: { cell: 3, rgb: [0.72, 0.62, 0.45], size: [1.6, 4], a: 0.9 },
+  mud_line: { cell: 1, rgb: [0.26, 0.19, 0.11], size: [3, 7], a: 0.85 },
+  dead_field: { cell: 1, rgb: [0.5, 0.4, 0.17], size: [3, 8], a: 0.6 },
+  dry_bed: { cell: 3, rgb: [0.72, 0.62, 0.45], size: [3, 6.5], a: 0.95 },
 };
 
 export function placeMarks(s: GameState, marks: readonly WorldMark[], h: PlaceHost, flat = false): Placed {
@@ -92,7 +98,7 @@ export function placeMarks(s: GameState, marks: readonly WorldMark[], h: PlaceHo
       case 'compound': return [h.camp.x, h.camp.z];
       case 'structure': { const b = h.boxOf(a.id); return b ? [b.cx, b.cz] : null; }
       case 'neighbor': case 'field': { const f = h.farms[a.at === 'neighbor' ? a.i : a.i % Math.max(1, h.farms.length)]; return f ? [f.x, f.z] : null; }
-      case 'road': return onRoad(a.s, 0);
+      case 'road': return onRoad(near(a.s), 0);
       case 'creek': { const x = 8 + r() * (h.size - 16); return [x, h.creekZ(x)]; }
       case 'town': return onRoad(-ROAD_FAR + 8, 0);
       case 'lowland': return [h.camp.x, h.creekZ(h.camp.x)];
@@ -110,6 +116,11 @@ export function placeMarks(s: GameState, marks: readonly WorldMark[], h: PlaceHo
         let p: [number, number] | null = null;
         const c = center(a, r);
         if (!c) { out.dropped++; break; }
+        if (m.kind === 'dead_field' && a.at === 'structure') {   // a home field or garden: the whole plot goes yellow and bare
+          const b = h.boxOf(a.id)!, size = Math.max(b.w, b.d) * 1.15;
+          out.decals.push({ x: b.cx, y: topOf(b.cx, b.cz, size) + 0.04, z: b.cz, rot: r() * 3, size, cell: 1, r: 0.62, g: 0.5, b: 0.22, a: 0.92 * (0.6 + 0.4 * m.sev), markId: m.id });
+          break;
+        }
         if (a.at === 'structure') {
           const b = h.boxOf(a.id)!; const side = Math.floor(r() * 4), t = r() - 0.5;
           const x = side < 2 ? b.cx + (side === 0 ? -1 : 1) * (b.w / 2 + 0.3) : b.cx + t * b.w, z = side < 2 ? b.cz + t * b.d : b.cz + (side === 2 ? -1 : 1) * (b.d / 2 + 0.3);
@@ -125,7 +136,7 @@ export function placeMarks(s: GameState, marks: readonly WorldMark[], h: PlaceHo
       }
       case 'road_cut': {
         if (a.at !== 'road') break;
-        const [x, z] = onRoad(a.s, 0);
+        const [x, z] = onRoad(near(a.s), 0);
         out.decals.push({ x, y: topOf(x, z, h.roadHalf * 2.6) + 0.035, z, rot: Math.PI / 2 + (r() - 0.5) * 0.3, size: h.roadHalf * 2.6, cell: 0, r: 0.09, g: 0.075, b: 0.065, a: 0.95, markId: m.id });
         out.decals.push({ x: x + 0.2, y: topOf(x, z, h.roadHalf * 1.6) + 0.034, z: z + 0.1, rot: r() * 3, size: h.roadHalf * 1.6, cell: 1, r: 0.14, g: 0.11, b: 0.08, a: 0.85, markId: m.id });
         break;
@@ -133,7 +144,7 @@ export function placeMarks(s: GameState, marks: readonly WorldMark[], h: PlaceHo
       case 'barricade': {
         if (a.at === 'road') {
           const side: 1 | -1 = r() < 0.5 ? 1 : -1;
-          const [x, z] = onRoad(a.s + (r() - 0.5) * 2, side * h.roadHalf * 0.45);
+          const [x, z] = onRoad(near(a.s) + (r() - 0.5) * 2, side * h.roadHalf * 0.45);
           prop(m, 'barrier', x, z, Math.PI / 2 + (r() - 0.5) * 0.25, 1, 0xd9d4c6);
           prop(m, 'cone', x + side * 0.3, z - 0.5, 0, 1, 0xe5651c); prop(m, 'cone', x + side * 0.3, z + 0.5, 0, 1, 0xe5651c);
           if (m.sev > 0.6) prop(m, 'sandbags', x - side * 0.25, z, Math.PI / 2, 1, 0xb59a6a);
@@ -142,11 +153,11 @@ export function placeMarks(s: GameState, marks: readonly WorldMark[], h: PlaceHo
       }
       case 'checkpoint': {
         if (a.at !== 'road') break;
-        for (const side of [1, -1] as const) { const [x, z] = onRoad(a.s, side * h.roadHalf * 0.5); prop(m, 'barrier', x, z, Math.PI / 2, 1.1, 0xc9c3b2); }
-        const [px, pz] = shoulder(a.s, 1);
+        for (const side of [1, -1] as const) { const [x, z] = onRoad(near(a.s), side * h.roadHalf * 0.5); prop(m, 'barrier', x, z, Math.PI / 2, 1.1, 0xc9c3b2); }
+        const [px, pz] = shoulder(near(a.s), 1);
         prop(m, 'sandbags', px, pz, 0, 1.2, 0xa8935f); prop(m, 'sandbags', px + 0.1, pz + 0.7, 0.4, 1, 0xa8935f);
         prop(m, 'flag', px + 0.4, pz - 0.6, 0, 1, 0x3c5a85);
-        prop(m, 'sign', ...shoulder(a.s + 3, -1), Math.PI, 1, 0xc0392b);
+        prop(m, 'sign', ...shoulder(near(a.s) + 3, -1), Math.PI, 1, 0xc0392b);
         people(m, px - 0.3, pz + 0.3, 0.9, 3, r, 0x4c5640);
         break;
       }
@@ -154,29 +165,36 @@ export function placeMarks(s: GameState, marks: readonly WorldMark[], h: PlaceHo
         if (a.at !== 'road') break;
         const side: 1 | -1 = r() < 0.5 ? 1 : -1;
         const n = Math.round(4 + 6 * m.sev);
-        for (let i = 0; i < n; i++) { const [x, z] = shoulder(a.s + i * 0.55, side); prop(m, 'figure', x + (r() - 0.5) * 0.12, z, side * 1.57, 0.8 + 0.12 * r(), [0x6a5f52, 0x44503f, 0x5a4a44, 0x4a5568][i % 4]); if (i % 3 === 0) prop(m, 'post', x - side * 0.3, z, 0, 1, 0x8a7f6c); }
+        for (let i = 0; i < n; i++) { const [x, z] = shoulder(near(a.s) + i * 0.55, side); prop(m, 'figure', x + (r() - 0.5) * 0.12, z, side * 1.57, 0.8 + 0.12 * r(), [0x6a5f52, 0x44503f, 0x5a4a44, 0x4a5568][i % 4]); if (i % 3 === 0) prop(m, 'post', x - side * 0.3, z, 0, 1, 0x8a7f6c); }
         break;
       }
       case 'column': {
+        if (a.at === 'compound') {   // a crowd at the wall: figures shuffling about 9 to 14 units from the camp, all facing in
+          const c0 = around(h.camp.x, h.camp.z, 9, 14, r, false, 12);
+          if (!c0) { out.dropped++; break; }
+          const n = Math.round(8 + 8 * m.sev);
+          for (let i = 0; i < n; i++) { const x = c0[0] + (r() - 0.5) * 3.2, z = c0[1] + (r() - 0.5) * 3.2; if (ok(x, z) && !nearRoad(x, z)) prop(m, 'figure', x, z, Math.atan2(h.camp.x - x, h.camp.z - z), 0.82 + 0.14 * r(), [0x4a5240, 0x3f4650, 0x5b5148, 0x4a4238][i % 4]); }
+          break;
+        }
         if (a.at !== 'road') break;
         const n = Math.round(6 + 10 * m.sev), dir = r() < 0.5 ? 1 : -1;
-        for (let i = 0; i < n; i++) { const [x, z] = onRoad(a.s + dir * i * 0.7 + (r() - 0.5) * 0.3, (r() < 0.5 ? -1 : 1) * h.roadHalf * 0.3 + (r() - 0.5) * 0.15); prop(m, 'figure', x, z, dir > 0 ? 0 : Math.PI, 0.78 + 0.14 * r(), [0x5b5148, 0x3f4650, 0x6b5b4a, 0x4a4238][i % 4]); }
+        for (let i = 0; i < n; i++) { const [x, z] = onRoad(near(a.s) + dir * i * 0.7 + (r() - 0.5) * 0.3, (r() < 0.5 ? -1 : 1) * h.roadHalf * 0.3 + (r() - 0.5) * 0.15); prop(m, 'figure', x, z, dir > 0 ? 0 : Math.PI, 0.78 + 0.14 * r(), [0x5b5148, 0x3f4650, 0x6b5b4a, 0x4a4238][i % 4]); }
         break;
       }
       case 'camp': {
         let c: [number, number] | null = null;
-        if (a.at === 'road') c = shoulder(a.s, 1);
+        if (a.at === 'road') c = shoulder(near(a.s), 1);
         else { const f = center(a, r); c = f ? around(f[0], f[1], 7, 14, r) : null; }
         if (!c) { out.dropped++; break; }
         for (let i = 0; i < 3; i++) prop(m, 'tent', c[0] + (i % 2) * 1.0 - 0.5, c[1] + i * 0.8, r() * 3, 1, [0x6f7a4c, 0x8a6a3a, 0x47627a][i]);
         people(m, c[0] + 1, c[1] + 0.4, 1.2, 2, r);
         break;
       }
-      case 'banner': { if (a.at === 'road') { const [x, z] = shoulder(a.s + 1.5 * (m.id.endsWith('.1') ? -1 : 1), m.id.endsWith('.1') ? -1 : 1); prop(m, 'flag', x, z, 0, 1.3, m.id.endsWith('.1') ? 0x2f4f8f : 0x9b2d2d); } break; }
-      case 'sign': { if (a.at === 'road') { const [x, z] = shoulder(a.s, 1); prop(m, 'sign', x, z, Math.PI * 0.5 + (r() - 0.5) * 0.4, 1, 0xd8d2c0); } break; }
+      case 'banner': { if (a.at === 'road') { const [x, z] = shoulder(near(a.s) + 1.5 * (m.id.endsWith('.1') ? -1 : 1), m.id.endsWith('.1') ? -1 : 1); prop(m, 'flag', x, z, 0, 1.3, m.id.endsWith('.1') ? 0x2f4f8f : 0x9b2d2d); } break; }
+      case 'sign': { if (a.at === 'road') { const [x, z] = shoulder(near(a.s), 1); prop(m, 'sign', x, z, Math.PI * 0.5 + (r() - 0.5) * 0.4, 1, 0xd8d2c0); } break; }
       case 'zone': {
         if (a.at !== 'road') break;
-        const [x0, z0] = onRoad(a.s, -h.roadHalf - 0.15), [x1, z1] = onRoad(a.s, h.roadHalf + 0.15);
+        const [x0, z0] = onRoad(near(a.s), -h.roadHalf - 0.15), [x1, z1] = onRoad(near(a.s), h.roadHalf + 0.15);
         prop(m, 'post', x0, z0, 0, 1, 0xe8e2d0); prop(m, 'post', x1, z1, 0, 1, 0xe8e2d0);
         prop(m, 'tape', (x0 + x1) / 2, (z0 + z1) / 2, Math.atan2(z1 - z0, x1 - x0), Math.hypot(x1 - x0, z1 - z0), 0xe0b030, 0.38);
         break;
@@ -187,7 +205,7 @@ export function placeMarks(s: GameState, marks: readonly WorldMark[], h: PlaceHo
         const n = a.at === 'compound' ? 1 : 1;
         for (let k = 0; k < n; k++) {
           const p = a.at === 'creek' ? ((): [number, number] | null => { const x = 6 + r() * (h.size - 12), z = h.creekZ(x) + (r() - 0.5) * 8; return ok(x, z, true) && !farmBlock(x, z) ? [x, z] : null; })()
-            : a.at === 'road' ? onRoad(a.s + (r() - 0.5) * 4, (r() - 0.5) * h.roadHalf * 1.4) : around(c[0], c[1], 3, 15, r);
+            : a.at === 'road' ? onRoad(near(a.s) + (r() - 0.5) * 4, (r() - 0.5) * h.roadHalf * 1.4) : around(c[0], c[1], 3, 15, r);
           if (p) { prop(m, r() < 0.5 ? 'log' : 'plank', p[0], p[1], r() * 3.14, 0.8 + 0.6 * r(), r() < 0.5 ? 0x6e5238 : 0x8a7452); } else out.dropped++;
         }
         break;

@@ -3,13 +3,13 @@
  * whether anything needs rebuilding: the marks for today are a pure function of the sim (`sim/felt/marks.ts`); only when their signature changes
  * does it place them (`markPlacement.ts`) and refill the instance and merge buffers. Per frame it moves uniforms only.
  *
- * Draw calls: flood plane 1, decals 1, roadside props 1, lit farm windows 1 = 4 (limit 6); fire and smoke ride on FireFx (already counted).
+ * Draw calls: flood plane 1, decals 1, roadside props 1, lit farm windows 1, fallout plume 1 = 5 (limit 6); fire and smoke ride on FireFx (already counted).
  * No lights, no post passes, no shadow casters. Hidden (`visible = false`) when a layer has nothing to show.
  */
 import * as THREE from 'three';
 import type { FireSource } from '../../engine/world/fx/FireFx';
 import { feltSpec } from '../../sim/felt/registry';
-import { FT_PER_UNIT, feltMarks, farmLooks, markDay, marksActive, marksSignature, type FarmLook, type MarkTier } from '../../sim/felt/marks';
+import { FT_PER_UNIT, cropLook, feltMarks, streamDrop, farmLooks, markDay, marksActive, marksSignature, type FarmLook, type MarkTier } from '../../sim/felt/marks';
 import type { GameState } from '../../sim/state';
 import { setFeltFires } from '../atmosphere/fireSources';
 import { CrackDecals } from './CrackDecals';
@@ -25,6 +25,22 @@ function glowSprite(): THREE.CanvasTexture {
   return new THREE.CanvasTexture(c);
 }
 
+/** A fallout plume standing on the sky: one soft grey stripe at a bearing, leaning with the wind. One draw call, no lights, drawn over the sky only. */
+function plumeTexture(): THREE.CanvasTexture {
+  const W = 128, H = 256, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d')!;
+  for (let y = 0; y < H; y++) {
+    const v = y / H;                       // 0 top .. 1 bottom
+    const half = 0.12 + 0.34 * (1 - v) ** 0.6;   // wide at the top, a column at the foot
+    for (let x = 0; x < W; x++) {
+      const u = Math.abs(x / W - 0.5) / half;
+      const a = Math.max(0, 1 - u * u) * (v < 0.08 ? v / 0.08 : 1) * (0.35 + 0.65 * (1 - v * 0.4));
+      g.fillStyle = `rgba(${96 + Math.round(30 * v)},${90 + Math.round(24 * v)},${82 + Math.round(18 * v)},${a.toFixed(3)})`; g.fillRect(x, y, 1, 1);
+    }
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+
 export interface FeltStats { marks: number; decals: number; props: number; fires: number; flood: number; rebuilds: number; draws: number; triangles: number }
 
 export class FeltWorld {
@@ -32,6 +48,10 @@ export class FeltWorld {
   readonly decals: CrackDecals;
   readonly props: RoadsideProps;
   private readonly _glow: THREE.Points;
+  private readonly _plume: THREE.Mesh;
+  /** The home fields' look and the creek's drop, read by HomesteadWorld and the stream (GameCanvas wires them). */
+  crop = { dead: 0, empty: false };
+  streamDrop = 0;
   private _sig = '';
   private _farmKey = '';
   private _last: Placed | null = null;
@@ -46,6 +66,21 @@ export class FeltWorld {
     this._glow = new THREE.Points(g, new THREE.PointsMaterial({ map: glowSprite(), size: 1.1, sizeAttenuation: true, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending, color: 0xffc36a }));
     this._glow.name = 'felt_farm_glow'; this._glow.visible = false; this._glow.frustumCulled = false; this._glow.userData = { type: 'feltGlow', noSSAO: true };
     scene.add(this._glow);
+    this._plume = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: plumeTexture(), transparent: true, opacity: 0, depthWrite: false, fog: false, color: 0xffffff }));
+    this._plume.name = 'felt_plume'; this._plume.visible = false; this._plume.frustumCulled = false; this._plume.renderOrder = -1; this._plume.userData = { type: 'feltPlume', noSSAO: true };
+    scene.add(this._plume);
+  }
+  private _plumeSev = 0;
+  private _zoom = 1;
+  /**
+   * The camera's distance to the camp sets how big the roadside set is drawn: 1 up close, up to 6 from the diorama's orbit (a prop is 2 px at the default
+   * zoom otherwise). Bucketed to halves so the merged mesh is rebuilt only when the view really changes.
+   */
+  setViewDistance(d: number): void {
+    const k = Math.round(Math.max(1, Math.min(6, d / 6)) * 2) / 2;
+    if (k === this._zoom) return;
+    this._zoom = k;
+    if (this._last) this.props.set(this._last.props, k);
   }
 
   /** Recompute the marks and rebuild what changed. `now` skips the rise and the fade (a loaded game, a QA jump). */
@@ -59,13 +94,24 @@ export class FeltWorld {
       placed = placeMarks(game, marks, host);
       this._last = placed;
       this.stats.rebuilds++;
-      this.decals.set(tier === 'low' ? [] : placed.decals, !now);
-      this.props.set(placed.props);
+      // Low keeps the decals (one instanced draw call, no shadows): the cracks, scars and dry mud are the cheapest readable cue; fewer of them
+      this.decals.set(tier === 'low' ? placed.decals.slice(0, 48) : placed.decals, !now);
+      this.props.set(placed.props, this._zoom);
       setFeltFires(placed.fires as FireSource[]);
     }
     // the flood follows the marks every time (it rises and drains between rebuilds); feet to units
     const fl = marks.find(m => m.kind === 'flood');
     this.flood.set(fl && fl.anchor.at === 'lowland' ? fl.anchor.level / FT_PER_UNIT : 0, host, { flat: tier === 'low', now });
+    // the fields, the creek and the plume (read from the kind and the day, not from a rebuild)
+    const kind = active ? game.disaster.kind as import('../../sim/felt/types').FeltKind : null, day = markDay(game);
+    this.crop = cropLook(kind, day); this.streamDrop = streamDrop(kind, day);
+    const pl = marks.find(m => m.kind === 'plume');
+    this._plumeSev = pl ? pl.sev : 0;
+    if (pl && pl.anchor.at === 'sky') {
+      const d = 210, p = this._plume;
+      p.position.set(host.camp.x + Math.sin(pl.anchor.bearing) * d, host.groundAt(host.camp.x, host.camp.z) + 34, host.camp.z + Math.cos(pl.anchor.bearing) * d);
+      p.scale.set(95, 80, 1); p.lookAt(host.camp.x, p.position.y, host.camp.z);
+    }
     // the neighbor farms: look and lit windows
     const looks = farmLooks(game, marks, host.farms.length || 3);
     const key = looks.map(l => l.variant).join(',');
@@ -93,6 +139,10 @@ export class FeltWorld {
   /** Per frame: uniforms only. `night` is 0 (day) to 1 (dark). */
   frame(dt: number, night: number): void {
     this.flood.frame(dt); this.decals.frame(dt);
+    const pm = this._plume.material as THREE.MeshBasicMaterial;
+    pm.opacity += (0.62 * this._plumeSev - pm.opacity) * Math.min(1, dt * 2);
+    pm.color.setScalar(1 - 0.85 * night);
+    this._plume.visible = pm.opacity > 0.01;
     this._nightK += (night - this._nightK) * Math.min(1, dt * 2);
     const n = this._glow.userData.count as number | undefined ?? 0;
     const op = Math.max(0, Math.min(1, (this._nightK - 0.15) / 0.5)) * 0.95;
@@ -100,7 +150,7 @@ export class FeltWorld {
     this._glow.visible = n > 0 && op > 0.01;
   }
 
-  drawCalls(): number { return [this.flood.mesh, this.decals.mesh, this.props.mesh, this._glow].filter(m => m.visible).length; }
+  drawCalls(): number { return [this.flood.mesh, this.decals.mesh, this.props.mesh, this._glow, this._plume].filter(m => m.visible).length; }
   triangles(): number { return (this.flood.mesh.visible ? (this.flood.mesh.geometry.index?.count ?? 0) / 3 : 0) + this.decals.count * 2 + this.props.triangles; }
   /** The placement last made (QA and the audit). */
   get placed(): Placed | null { return this._last; }
@@ -108,6 +158,7 @@ export class FeltWorld {
   dispose(): void {
     setFeltFires([]);
     this.flood.dispose(); this.decals.dispose(); this.props.dispose();
+    this._plume.geometry.dispose(); (this._plume.material as THREE.MeshBasicMaterial).map?.dispose(); (this._plume.material as THREE.Material).dispose(); this._plume.removeFromParent();
     this._glow.geometry.dispose(); (this._glow.material as THREE.PointsMaterial).map?.dispose(); (this._glow.material as THREE.Material).dispose(); this._glow.removeFromParent();
   }
 }

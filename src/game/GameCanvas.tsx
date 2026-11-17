@@ -297,7 +297,11 @@ export function GameCanvas() {
     const felt = new FeltWorld(ws.scene);
     felt.onFarms = looks => world.setFarmLooks(looks);
     const feltTier = (): 'low' | 'medium' | 'high' => (renderReq.quality ?? useWorldStore.getState().quality) as 'low' | 'medium' | 'high';
-    const feltSync = (now: boolean): void => felt.update(useGameStore.getState().game, world.feltHost(), feltTier(), now);
+    const feltSync = (now: boolean): void => {
+      { const c = ws.camera.position, k = world.camp; felt.setViewDistance(Math.hypot(c.x - k.x, c.y - world.groundAt(k.x, k.z), c.z - k.z)); }
+      felt.update(useGameStore.getState().game, world.feltHost(), feltTier(), now);
+      world.setCropLook(felt.crop.dead, felt.crop.empty); world.stream.setDrop(felt.streamDrop);
+    };
     let feltAcc = 9, hitOff = 0, hitBase = 0, hitHeld = false;
     const terrainOv = new TerrainOverlay(ws.scene, world.groundAt);
     const showTerrain = () => {

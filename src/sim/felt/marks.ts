@@ -101,13 +101,18 @@ function trackBase(c: Ctx, o: { skipDark?: boolean } = {}): void {
 function structureMarks(c: Ctx): void {
   const dmg = damageOf(c.s);
   for (const st of c.s.structures) {
-    if (st.unplaced || st.stage <= 0) continue;
+    if (st.unplaced || (st.stage <= 0 && !st.lost)) continue;
     const d = dmg[st.id]?.level ?? 0, a: Anchor = { at: 'structure', id: st.id };
     if (d >= 3 || st.lost) { put(c, 'ruin', a, 1); put(c, 'red_tag', a, 1); continue; }
     if (d >= 2) { put(c, 'red_tag', a, 0.9); put(c, 'tarp', a, 0.8); put(c, 'crack', a, 0.9, 2); continue; }
     if (d >= 1) put(c, 'crack', a, 0.6, 1);
     if (st.roofLost) put(c, 'tarp', a, 0.7);
   }
+}
+
+/** The home fields and gardens (structures): the dead, yellow or bare look sits on each (a `dead_field` decal on the plot, the crop tint). */
+function fieldBlight(c: Ctx, sev: number): void {
+  for (const st of c.s.structures) if (!st.unplaced && (st.kind === 'field' || st.kind === 'garden')) put(c, 'dead_field', { at: 'structure', id: st.id }, sev, 1);
 }
 
 const skyFire = (c: Ctx): number => skylineAz(c.s.seed).fire;
@@ -123,11 +128,15 @@ const wildfire: Recipe = c => {
   put(c, 'pyre', { at: 'field', i: 3 }, k * decay(c.day, 2, 6));
   put(c, 'burn_scar', { at: 'compound' }, 0.6 + 0.4 * ramp(c.day, 3), Math.round(6 + 10 * ramp(c.day, 5)));
   put(c, 'dead_field', { at: 'field', i: 0 }, ramp(c.day, 3), 6);
+  fieldBlight(c, 0.8 * ramp(c.day, 3));
   put(c, 'ash', { at: 'compound' }, k * 0.9);
   put(c, 'ash_drift', { at: 'compound' }, k * 0.8, Math.round(4 + 8 * k));
   neighborBase(c, { dark: () => 0.4 * k, empty: i => (i === 1 ? 0.6 * ramp(c.day, 2) : 0) });
-  put(c, 'barricade', { at: 'road', s: -18 }, 0.5 * decay(c.day, 6, 20));   // the county's road closure
-  put(c, 'sign', { at: 'road', s: -9 }, 0.6);
+  put(c, 'barricade', { at: 'road', s: -18 }, 0.85 * decay(c.day, 14, 30), 2);   // the county's road closure (sandbags, cones, a sign)
+  put(c, 'zone', { at: 'road', s: -14 }, 0.8 * decay(c.day, 14, 30));
+  put(c, 'column', { at: 'road', s: -26 }, 0.6 * decay(c.day, 6, 14));              // evacuees walking out
+  put(c, 'burn_scar', { at: 'compound' }, 0.9 * decay(c.day, 60, 120), 6);           // a black scar that stays into month 1
+  put(c, 'sign', { at: 'road', s: -9 }, 0.8);
 };
 
 const megaQuake: Recipe = c => {
@@ -151,11 +160,15 @@ const damFlood: Recipe = c => {
   const stage = f?.stage ?? (variant === 'levee_flood' ? 10 : 12);
   const hold = f?.hold ?? (variant === 'levee_flood' ? 20 : 2), roadOut = f?.roadOut ?? 30;
   const drain = Math.max(4, hold * 0.8);
-  const level = stage * (c.day < 0.5 ? c.day / 0.5 : c.day <= hold ? 1 : clamp01(1 - (c.day - hold) / drain));
+  // it rises in half a day, stands, drains, and leaves standing pools in the low ground for weeks (the high-water line is the mud and debris)
+  const drained = stage * (c.day < 0.5 ? c.day / 0.5 : c.day <= hold ? 1 : clamp01(1 - (c.day - hold) / drain));
+  const level = c.day <= hold ? drained : Math.max(drained, stage * 0.16 * decay(c.day, 18, 30));
   if (level > 0.05) put(c, 'flood', { at: 'lowland', level: Math.round(level * 10) / 10 }, clamp01(level / Math.max(1, stage)));
   const after = c.day > hold ? 1 : 0.3 * ramp(c.day, hold);
-  put(c, 'mud_line', { at: 'creek' }, clamp01(after) * decay(c.day, 70, 60), Math.round(10 + 14 * clamp01(stage / 20)));
+  put(c, 'mud_line', { at: 'creek' }, clamp01(after) * decay(c.day, 70, 60), Math.round(14 + 14 * clamp01(stage / 20)));
+  put(c, 'mud_line', { at: 'compound' }, 0.9 * clamp01(after) * decay(c.day, 45, 60), 5);   // silt on the yard
   put(c, 'debris', { at: 'creek' }, 0.9 * decay(c.day, 40, 60), 8);
+  put(c, 'debris', { at: 'compound' }, 0.8 * clamp01(after) * decay(c.day, 40, 60), 4);
   if (c.day < roadOut) { put(c, 'road_cut', { at: 'road', s: 14 }, 1); put(c, 'barricade', { at: 'road', s: 6 }, 1, 2); put(c, 'sign', { at: 'road', s: 3 }, 1); }
   put(c, 'dead_field', { at: 'field', i: 1 }, 0.6 * clamp01(after), 4);
   structureMarks(c);
@@ -169,6 +182,7 @@ const ashfall = (plume: boolean, pace: number): Recipe => c => {
   put(c, 'ash', { at: 'compound' }, k);
   put(c, 'ash_drift', { at: 'compound' }, k, Math.round(8 + 22 * k));
   put(c, 'dead_field', { at: 'field', i: 0 }, k, Math.round(4 + 8 * k));
+  fieldBlight(c, 0.4 + 0.6 * k);
   if (plume) put(c, 'smoke', { at: 'sky', bearing: skyFire(c) }, decay(c.day, 20, 60) * 0.9, 2);
   structureMarks(c);
   for (const st of c.s.structures) if (!st.unplaced && st.stage > 0 && c.day > 5 && c.r() < 0.5 * k) put(c, 'tarp', { at: 'structure', id: st.id }, 0.5 * k);
@@ -184,7 +198,8 @@ const zombies: Recipe = c => {
   put(c, 'pyre', { at: 'field', i: 0 }, k * decay(c.day, 5, 25));
   put(c, 'pyre', { at: 'field', i: 2 }, k * decay(c.day, 2, 20));
   put(c, 'smoke', { at: 'sky', bearing: skyTown(c) }, k);
-  put(c, 'column', { at: 'road', s: -44 }, 0.6 + 0.4 * c.r());   // the shambling ones, far down the road
+  put(c, 'column', { at: 'compound' }, k * 0.9, 2);              // a crowd at the wall
+  put(c, 'column', { at: 'road', s: -30 }, 0.6 + 0.4 * c.r());   // the shambling ones, down the road
   put(c, 'column', { at: 'road', s: 54 }, 0.5);
   put(c, 'sign', { at: 'road', s: -9 }, 0.8);
   put(c, 'zone', { at: 'road', s: -15 }, 0.7);
@@ -238,17 +253,27 @@ const barren = (c: Ctx): void => {
   const k = ramp(c.day, 20) * decay(c.day, 250, 300);
   put(c, 'dead_field', { at: 'field', i: 0 }, k, 6);
   put(c, 'dead_field', { at: 'field', i: 1 }, k, 4);
-  put(c, 'dead_field', { at: 'compound' }, 0.6 * k, 5);
-  put(c, 'dry_bed', { at: 'creek' }, k, 6);
+  put(c, 'dead_field', { at: 'compound' }, 0.8 * k, 10);
+  fieldBlight(c, c.kind === 'crop_blight' ? ramp(c.day, 6) : 0.5 + 0.5 * k);
+  if (c.kind !== 'crop_blight') put(c, 'dry_bed', { at: 'creek' }, 0.7 + 0.3 * k, Math.round(6 + 14 * k));   // cracked mud where the creek ran (the water layer is lowered too: `streamDrop`)
   put(c, 'mud_line', { at: 'creek' }, 0.8 * k, 8);
   put(c, 'queue', { at: 'road', s: 24 }, 0.6 * k);
   neighborBase(c, { boarded: () => 0.3 * k, empty: i => (i === 2 ? 0.7 * k : 0), dark: () => 0.2 });
   trackBase(c, { skipDark: true });
 };
 
-/** A blast, a falling rock or a reactor: smoke on the horizon, ash on the ground, glass and cracks. */
-const blast: Recipe = c => {
+/** A blast, a falling rock or a reactor: smoke on the horizon, ash on the ground, glass and cracks; a fallout kind adds a plume and dead ground. */
+const blastOf = (fallout: boolean): Recipe => c => {
   const k = decay(c.day, 6, 60);
+  if (fallout) {
+    const f = ramp(c.day, 2) * decay(c.day, 120, 200);
+    put(c, 'plume', { at: 'sky', bearing: skyTown(c) }, f);
+    put(c, 'dead_field', { at: 'compound' }, 0.9 * f, 12);
+    fieldBlight(c, f);      // scorched, grey ground
+    put(c, 'zone', { at: 'road', s: -12 }, 0.9 * f, 2);          // an exclusion line
+    put(c, 'barricade', { at: 'road', s: -14 }, 0.9 * f, 1);
+    put(c, 'column', { at: 'road', s: -26 }, 0.7 * decay(c.day, 14, 30));
+  }
   put(c, 'smoke', { at: 'sky', bearing: skyTown(c) }, k, 2);
   put(c, 'smoke', { at: 'field', i: 1 }, 0.7 * k);
   put(c, 'ash', { at: 'compound' }, 0.8 * decay(c.day, 20, 120));
@@ -275,8 +300,9 @@ const supply: Recipe = c => {
 /** The roads fill with people on foot. */
 const exodus: Recipe = c => {
   const k = decay(c.day, 40, 160);
-  put(c, 'column', { at: 'road', s: -44 }, k, 2);
-  put(c, 'column', { at: 'road', s: 42 }, 0.8 * k, 1);
+  put(c, 'column', { at: 'road', s: -14 }, k, 2);
+  put(c, 'column', { at: 'road', s: 30 }, 0.8 * k, 1);
+  put(c, 'camp', { at: 'road', s: -26 }, 0.8 * k);
   put(c, 'camp', { at: 'road', s: 34 }, 0.7 * k);
   put(c, 'sign', { at: 'road', s: -9 }, 0.8);
   neighborBase(c, { empty: i => (i === 1 ? 0.9 : 0.5) * ramp(c.day, 14), boarded: () => 0.4, dark: () => 0.4 });
@@ -293,6 +319,15 @@ const unrest: Recipe = c => {
   put(c, 'smoke', { at: 'sky', bearing: skyTown(c) }, 0.6 * k);
   neighborBase(c, { boarded: () => 0.5 * k, dark: () => 0.4, empty: i => (i === 1 ? 0.5 * k : 0) });
   trackBase(c, { skipDark: true });
+};
+
+/** The Order: banners at the road, tithe boxes (posts and signs) at the gate, a banner at every farm gate it holds. */
+const cult: Recipe = c => {
+  unrest(c);
+  const k = ramp(c.day, 14);
+  put(c, 'banner', { at: 'road', s: -12 }, 0.9 * k, 2);
+  put(c, 'sign', { at: 'road', s: -16 }, 0.9 * k, 1);     // "tithe here"
+  put(c, 'camp', { at: 'road', s: -22 }, 0.6 * k);         // the faithful camped at the gate
 };
 
 /** Anything without a recipe: what the tracks say. A sign at the gate, dark houses as the grid fails, dead cars as fuel fails, a barrier as law fails. */
@@ -313,12 +348,43 @@ export const RECIPES: Partial<Record<FeltKind, Recipe>> = {
   grid_down: gridOut(30), solar_flare: gridOut(6), emp: gridOut(180), cyberattack: gridOut(40),
   pandemic: quarantine(false), bioweapon: quarantine(false), livestock_plague: quarantine(true),
   drought: barren, crop_blight: barren, global_famine: barren,
-  nuclear: blast, asteroid: blast, reactor_meltdown: blast,
+  nuclear: blastOf(true), asteroid: blastOf(false), reactor_meltdown: blastOf(true),
   financial: supply, oil_shock: supply, satellite_loss: supply,
-  mass_exodus: exodus, lawless: unrest, cult_takeover: unrest,
-  water_war: c => { barren(c); put(c, 'barricade', { at: 'creek' }, 0.8, 2); },
+  mass_exodus: exodus, lawless: unrest, cult_takeover: cult,
+  water_war: c => { barren(c); put(c, 'barricade', { at: 'creek' }, 0.85, 3); put(c, 'debris', { at: 'creek' }, 0.8, 4); },
   unknown: generic,
 };
+
+// ── the fields and the water: the world reads them directly (HomesteadWorld.setCropLook, StreamRenderer.setDrop) ─────────────────────────
+
+/** How the home fields look: `dead` 0 (green) to 1 (dead and yellow), `empty` (nothing standing: famine, a burn). Pure; by kind and day since the hit. */
+export function cropLook(kind: FeltKind | null, day: number): { dead: number; empty: boolean } {
+  if (!kind || day < 0) return { dead: 0, empty: false };
+  switch (kind) {
+    case 'crop_blight': return { dead: ramp(day, 6) * decay(day, 260, 300), empty: day > 45 };
+    case 'drought': return { dead: 0.85 * ramp(day, 20) * decay(day, 250, 300), empty: false };
+    case 'global_famine': return { dead: 0.85 * ramp(day, 8), empty: day > 24 };
+    case 'wildfire': return { dead: 0.6 * ramp(day, 3), empty: day > 6 };
+    case 'ash_winter': case 'supervolcano': return { dead: 0.9 * ramp(day, 10), empty: day > 40 };
+    case 'nuclear': case 'reactor_meltdown': return { dead: 0.8 * ramp(day, 4), empty: day > 30 };
+    case 'dam_flood': return { dead: 0.6 * ramp(day, 3) * decay(day, 60, 60), empty: day < 20 };
+    case 'water_war': return { dead: 0.5 * ramp(day, 20), empty: false };
+    case 'solar_flare': case 'asteroid': return { dead: 0.3 * ramp(day, 10), empty: false };
+    default: return { dead: 0, empty: false };
+  }
+}
+
+/** How far the creek's water is lowered, 0 (as it runs) to 1 (a dry bed). Drought and water war; a dust-bowl famine half. */
+export function streamDrop(kind: FeltKind | null, day: number): number {
+  if (!kind || day < 0) return 0;
+  switch (kind) {
+    case 'drought': return ramp(day, 14) * decay(day, 250, 300);
+    case 'water_war': return 0.75 * ramp(day, 10);
+    case 'global_famine': return 0.5 * ramp(day, 30);
+    case 'crop_blight': return 0.15 * ramp(day, 20);
+    default: return 0;
+  }
+}
 
 // ── the entry points ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
