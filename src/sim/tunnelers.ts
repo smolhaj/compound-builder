@@ -33,6 +33,8 @@ import { dayIndex, type GameState } from './state';
 import { daysOfFood } from './needs';
 import { adaptation, adaptedHeads, adaptLevel, digFactor, sinceHit } from './adaptive';
 import { pluralize } from './words';
+import { domesOf, type Dome } from './dome/standing';
+import { digStops, nearestAirlock, sideOfDome, skirtOf } from './dome/crossing';
 
 export type Counter = 'sensors' | 'dogs' | 'watch' | 'tower';
 
@@ -71,6 +73,8 @@ export interface DigState {
   flooded: number;
   ambushed: number;
   surfaced: number;
+  /** Crews turned at a dome's skirt that went on to the airlocks (optional, so no save bump). */
+  turnedToAirlock?: number;
 }
 
 export const newDigs = (): DigState => ({ active: null, party: null, started: 0, turnedBySkirt: 0, flooded: 0, ambushed: 0, surfaced: 0 });
@@ -156,9 +160,10 @@ export function digChancePerDay(s: GameState): number {
   if (!d.kind || s.clock.t < d.hitAt + 1) return 0;
   if (d.tracks.law >= 0.6) return 0;
   const walls = s.perimeter.filter(isTarget);
+  const domes = domesOf(s);   // a dome is the best wall there is, and a very visible one: its skirt is what stands in the way (sim/dome/crossing.ts)
   // how strong the wall they would have to go under is: the property line, or the best wall round a yard
-  const strength = Math.max(enclosure(s).barrier, ...walls.map(w => PERIMETER[w.kind].blocks.people * 100));
-  if (!walls.length || strength < 35) return 0;
+  const strength = Math.max(enclosure(s).barrier, ...walls.map(w => PERIMETER[w.kind].blocks.people * 100), ...domes.map(d => 70 + 6 * ['earthen', 'geodesic', 'glass', 'arcology'].indexOf(d.tier)));
+  if ((!walls.length && !domes.length) || strength < 35) return 0;
   const late = Math.max(0, Math.min(1, (s.clock.t - d.hitAt - 120) / 360));
   if (late <= 0) return 0;
   const hard = d.difficulty === 'hardcore' ? 1.5 : d.difficulty === 'cozy' ? 0.4 : 1;
@@ -190,6 +195,15 @@ function along(pts: readonly Pt[], u: number): Pt {
 /** Start a dig: they choose a wall without a skirt or a ditch by it (a scouting crew looks). Returns null if there is nothing worth digging under. */
 export function startDig(s: GameState, r: () => number, day: number): Dig | null {
   const runs = s.perimeter.filter(isTarget);
+  const domes = domesOf(s);
+  if (!runs.length && !domes.length) return null;
+  // a dome is a target like a wall, weighed by its girth and by how little skirt it has: a crew scouting a dome looks for the shallow footing
+  if (domes.length && (!runs.length || r() < domes.length / (domes.length + runs.length))) {
+    const d = domes[Math.floor(r() * domes.length) % domes.length], a = r() * Math.PI * 2;
+    const size = adaptedHeads(4 + Math.floor(r() * 5), adaptNow(s));
+    return { id: `d${s.nextId++}`, run: `dome:${d.id}`, at: [d.x + Math.sin(a) * d.r, d.z + Math.cos(a) * d.r], startDay: day, days: 6 + Math.floor(r() * 8), size,
+      temper: raiderTemper(s, 'gang', r), detectedDay: null, by: null, skirtChecked: false, floodChecked: false, warned: false, ignored: false, passage: null };
+  }
   if (!runs.length) return null;
   const cand = runs.map(run => {
     const at = along(run.pts, 0.15 + 0.7 * r());
@@ -204,6 +218,9 @@ export function startDig(s: GameState, r: () => number, day: number): Dig | null
     temper: raiderTemper(s, 'gang', r), detectedDay: null, by: null, skirtChecked: false, floodChecked: false, warned: false, ignored: false, passage: passage?.id ?? null,
   };
 }
+
+/** The dome a dig is under, or null (a wall). */
+const domeOfDig = (s: GameState, d: Pick<Dig, 'run'>): Dome | null => (d.run.startsWith('dome:') ? domesOf(s).find(x => x.id === d.run.slice(5)) ?? null : null);
 
 /** The wall's compass side, for a line of text. */
 export function sideOf(s: GameState, at: Pt): string {
@@ -230,7 +247,7 @@ export function warningEncounter(s: GameState, d: Dig, day: number, r: () => num
   stances.push('ignore');
   const sign = (SIGN[d.by ?? 'watch'][Math.floor(r() * SIGN[d.by ?? 'watch'].length) % SIGN[d.by ?? 'watch'].length]).replace('{side}', sideOf(s, d.at));
   return {
-    id: `e${s.nextId++}`, kind: 'tunnelers', day, title: `Someone is digging under the ${sideOf(s, d.at)} wall`,
+    id: `e${s.nextId++}`, kind: 'tunnelers', day, title: `Someone is digging under the ${sideOf(s, d.at)} ${domeOfDig(s, d) ? 'side of the dome' : 'wall'}`,
     dossier: [sign, `About ${d.size} of them, by the spoil. They are ${left <= 1 ? 'almost through' : `${pluralize(left, 'day')} from coming up`}${party.length ? ', and you have time to be waiting where they surface' : ''}.`, 'Organized crews dig under a wall when they can\'t get over it. Where they come up is inside it.'],
     size: d.size, armed: true, strength: 0, temper: d.temper, stances,
     dig: { phase: 'warning', id: d.id, lead: left, by: d.by ?? undefined },
@@ -256,8 +273,8 @@ export function chosenParty(s: GameState): string[] {
 export function insideEncounter(s: GameState, d: Dig, day: number, warned: boolean): Encounter {
   const size = Math.max(2, Math.min(d.size, 3 + Math.floor(d.size / 3)));
   return {
-    id: `e${s.nextId++}`, kind: 'tunnelers', day, title: warned ? 'They have come up inside the wall' : 'Somebody is in the yard',
-    dossier: [warned ? `The tunnel you were told about has opened. ${size} of them, up out of a hole behind the ${sideOf(s, d.at)} wall.` : `A hole opens in the yard behind the ${sideOf(s, d.at)} wall and ${size} armed men climb out of it, past the wall that was supposed to stop them.`,
+    id: `e${s.nextId++}`, kind: 'tunnelers', day, title: warned ? `They have come up inside the ${domeOfDig(s, d) ? 'dome' : 'wall'}` : 'Somebody is in the yard',
+    dossier: [warned ? `The tunnel you were told about has opened. ${size} of them, up out of a hole behind the ${sideOf(s, d.at)} ${domeOfDig(s, d) ? 'skirt' : 'wall'}.` : `A hole opens in the yard behind the ${sideOf(s, d.at)} ${domeOfDig(s, d) ? 'skirt' : 'wall'} and ${size} armed men climb out of it, past the ${domeOfDig(s, d) ? 'shell' : 'wall'} that was supposed to stop them.`,
       'Nothing between them and the house but the family.'],
     size, armed: true, strength: size * 12, temper: d.temper, wants: { canned: 8, staples: 1, fuel: 4, meds: 1 }, stances: ['defend', 'hide'],
     dig: { phase: 'inside', id: d.id, lead: 0 },
@@ -278,12 +295,29 @@ export function digDay(s: GameState): string[] {
     if (r() < digChancePerDay(s)) { d = ds.active = startDig(s, r, day); if (d) ds.started++; }
     return lines;   // (a new dig has no effect on its first day)
   }
-  const run = s.perimeter.find(x => x.id === d!.run);
-  if (!run || !runFinished(run)) { ds.active = null; return lines; }   // the wall they meant to go under is gone
+  const dome = domeOfDig(s, d);
+  const run = dome ? ({ kind: 'concrete_wall', skirtAt: 0, finishedAt: 0 } as Pick<PerimeterRun, 'kind' | 'skirtAt' | 'finishedAt'>) : s.perimeter.find(x => x.id === d!.run);
+  if (!run || (!dome && !runFinished(run as PerimeterRun))) { ds.active = null; return lines; }   // the wall they meant to go under is gone
   const age = day - d.startDay;
   const def = digDefense(s, run, d.at);
+  // the skirt of a dome (owner decision 7): they reach it about halfway; how many turn round is the skirt's depth against how deep they can dig
+  if (dome && !d.skirtChecked && age >= Math.floor(d.days * 0.4)) {
+    d.skirtChecked = true;
+    if (r() < digStops(skirtOf(dome.tier), adaptNow(s))) {
+      ds.turnedBySkirt++;
+      ds.active = null;
+      const lock = nearestAirlock(dome, d.at[0], d.at[1]);
+      if (lock) {
+        ds.turnedToAirlock = (ds.turnedToAirlock ?? 0) + 1;
+        s.gate.next = Math.min(s.gate.next, day + 2 + Math.floor(r() * 3));   // they work along the footing toward the only way in: the airlock
+        lines.push(`Scratches and a fresh hole against the buried skirt on the ${sideOfDome(dome, d.at[0], d.at[1])} side of the dome: somebody dug down ${skirtOf(dome.tier)} ft, found concrete, and followed it along toward the ${sideOfDome(dome, lock.airlock.x, lock.airlock.z)} airlock.`);
+      } else lines.push(`Scratches and a fresh hole against the buried skirt on the ${sideOfDome(dome, d.at[0], d.at[1])} side of the dome: somebody dug down to it, found concrete, and gave up.`);
+      return lines;
+    }
+    d.days = Math.round(d.days * 1.3);   // under the footing at last, slower than they thought
+  }
   // the skirt: they reach it about halfway and most turn round
-  if (!d.skirtChecked && age >= Math.floor(d.days * 0.4)) {
+  if (!dome && !d.skirtChecked && age >= Math.floor(d.days * 0.4)) {
     d.skirtChecked = true;
     if (def.skirt) {
       if (r() < SKIRT_STOPS) { ds.turnedBySkirt++; ds.active = null; lines.push(`Scratches and a fresh hole against the buried skirt under the ${sideOf(s, d.at)} wall: somebody dug down to it, found steel and concrete, and gave up.`); return lines; }

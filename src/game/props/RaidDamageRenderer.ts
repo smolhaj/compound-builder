@@ -42,6 +42,16 @@ export function damagePieces(d: Pick<RaidDamage, 'kind' | 'id'>): THREE.BufferGe
     out.push(part(box(0.38, 0.014, 0.014), 0x55585c, 0.0, 0.2, 0.13, 0.2, 0.25, 0.95));
     out.push(part(box(0.2, 0.004, 0.004), 0x77797c, 0.18, 0.012, -0.1, 0, 0.9, 0));                                 // the chain on the ground
     out.push(part(box(0.05, 0.03, 0.03), 0x2a2c2e, 0.3, 0.015, 0.05));                                              // the padlock
+  } else if (d.kind === 'panel') {
+    // a hole cut or blown in a dome's shell at its foot (the shell is near vertical there): the dark opening, bent struts across it, panes on the ground on both sides
+    const pane = [0xcfe0e8, 0xaec6d2, 0xdcebf0], frame = [0x8d949a, 0x6f767c];
+    out.push(part(box(0.016, 0.3, 0.38), 0x0b0d0f, 0, 0.17, 0));                                                    // the opening (the dome's inside is dark)
+    out.push(part(box(0.03, 0.34, 0.03), frame[0], 0, 0.17, -0.2, 0, 0, 0.1));                                       // the frame either side, bent
+    out.push(part(box(0.03, 0.34, 0.03), frame[1], 0, 0.17, 0.2, 0, 0, -0.08));
+    out.push(part(box(0.03, 0.03, 0.42), frame[0], 0, 0.33, 0.01, 0.06, 0, 0));
+    out.push(part(box(0.022, 0.22, 0.022), frame[1], 0.02, 0.2, 0.05, 0.9, 0, 0.3));                                 // a strut hanging across it
+    for (let i = 0; i < 7; i++) out.push(part(box(0.1 + r() * 0.1, 0.004, 0.06 + r() * 0.08), pane[i % 3], (i % 2 ? 1 : -1) * (0.06 + r() * 0.2), 0.006 + i * 0.001, (r() - 0.5) * 0.7, 0, r() * 3, 0));   // panes on the ground, both sides
+    out.push(part(new THREE.CylinderGeometry(0.3, 0.36, 0.01, 9), 0x3a2f24, 0, 0.005, 0));                          // trampled ground
   } else {
     out.push(part(new THREE.CylinderGeometry(0.5, 0.56, 0.01, 11), char[0], 0, 0.006, 0));                          // scorched ground
     out.push(part(new THREE.CylinderGeometry(0.28, 0.32, 0.016, 9), 0x3b3835, 0.04, 0.012, -0.04));                // ash
@@ -84,14 +94,27 @@ export function buildDamageGeometry(items: readonly RaidDamage[], ground: Ground
 export class RaidDamageRenderer {
   private _mesh: THREE.Mesh | null = null;
   private _key = '';
+  private _live: readonly RaidDamage[] = [];
+  private _liveKey = '';
+  private _items: readonly RaidDamage[] | undefined;
+  private _glass: readonly GlassHome[] = [];
   private readonly _mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0.05 });
   private readonly _scene: THREE.Scene;
   private readonly _ground: Ground;
   private readonly _heading: (d: RaidDamage) => number;
   constructor(scene: THREE.Scene, ground: Ground, heading: (d: RaidDamage) => number) { this._scene = scene; this._ground = ground; this._heading = heading; }
 
+  /** The holes a cutscene cuts in a dome's shell while it plays (never saved): drawn with the rest, dropped when the list empties. */
+  setLive(list: readonly RaidDamage[]): void {
+    const key = list.map(d => d.id).join();
+    if (key === this._liveKey) return;
+    this._liveKey = key; this._live = list; this._key = '';
+    this.sync(this._items, this._glass);
+  }
+
   sync(items: readonly RaidDamage[] | undefined, glass: readonly GlassHome[] = []): void {
-    const open = (items ?? []).filter(d => d.done < d.hours);
+    this._items = items; this._glass = glass;
+    const open = [...(items ?? []).filter(d => d.done < d.hours), ...this._live];
     const key = open.map(d => d.id).join() + '|' + glass.map(h => h.id).join();
     if (key === this._key) return;
     this._key = key;

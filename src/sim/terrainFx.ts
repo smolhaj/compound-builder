@@ -22,6 +22,7 @@
  *    defensive-strength figure, never a second scaling system.
  * Pure.
  */
+import { domeRouteProblem } from './dome/crossing';
 import { bridgeOff, bridgeProblem } from './waterWorks';
 import { calendarOf, type GameState, type Structure } from './state';
 import { BORE, bestLane, boreProblem, floodplainAt, hasHillside, hasRockFace, localSun, riseAboveCreek, slopeTunnelProblem, spanProblem, type BoreStats, type Choke, type Lane } from './terrain';
@@ -247,6 +248,7 @@ export const doorDelay = (night: boolean, detection: number): number => doorsLoc
 
 /** Why a run of this kind can't be laid along `pts` on this ground (null = it can). Only the span kinds have a rule. */
 export function routeProblem(s: GameState, kind: PerimeterKind, pts: readonly Pt[]): string | null {
+  const dome = domeRouteProblem(s, kind, pts as Pt[]); if (dome) return dome;   // a tunnel crosses a dome only through an airlock (sim/dome/crossing.ts)
   if (kind !== 'escape_tunnel') { const off = offLotProblem(s, pts); if (off) return off; }   // (an escape tunnel may run on under the neighbors' land: its own reach rule)
   const d = PERIMETER[kind];
   if (d.bridge) return bridgeProblem(s, pts);

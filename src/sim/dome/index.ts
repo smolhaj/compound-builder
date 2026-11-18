@@ -7,3 +7,7 @@ export * from './air';
 export * from './exposure';
 export * from './siting';
 export * from './facts';
+export * from './standing';
+export * from './crossing';
+export * from './siege';
+export * from './watched';

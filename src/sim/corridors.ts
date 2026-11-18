@@ -23,6 +23,9 @@ import { towerPosts } from './towers';
 import { powered } from './gear';
 import { wallMetres } from './tunnelers';
 import { pluralize } from './words';
+import { domesOf } from './dome/standing';
+import { airlockOfCorridor } from './dome/crossing';
+import { AIRLOCK_CYCLE_S } from './dome/siege';
 import { lengthText } from './units';
 
 /** World units per metre. */
@@ -99,8 +102,18 @@ export function crossing(c: Pick<Corridor, 'lenM' | 'collapsed'>, who: Goer, nig
 }
 
 /** Game minutes a trip through the corridor takes (family on foot or in a vehicle). */
-export function crossingMinutes(c: Pick<Corridor, 'lenM' | 'collapsed'>, who: Goer, hour: number, detection = 0): number {
-  return Math.round(crossing(c, who, isNightHour(hour), detection).seconds / 6) / 10;
+export function crossingMinutes(c: Pick<Corridor, 'lenM' | 'collapsed'>, who: Goer, hour: number, detection = 0, extraS = 0): number {
+  return Math.round((crossing(c, who, isNightHour(hour), detection).seconds + extraS) / 6) / 10;
+}
+
+/**
+ * Seconds a trip through this corridor spends cycling the airlock where it crosses a dome's shell (sim/dome/siege.ts `AIRLOCK_CYCLE_S`): two interlocked
+ * doors, one shut before the other opens. The same cycle for a vehicle (the chamber is a service lock).
+ */
+export function corridorAirlockS(s: Pick<GameState, 'structures' | 'raidDamage'>, c: Pick<Corridor, 'pts'>): number {
+  let t = 0;
+  for (const d of domesOf(s)) if (airlockOfCorridor(d, c.pts as Array<[number, number]>)) t += AIRLOCK_CYCLE_S[d.tier];
+  return t;
 }
 
 /**
@@ -111,7 +124,7 @@ export function crossingMinutes(c: Pick<Corridor, 'lenM' | 'collapsed'>, who: Go
 export function wayInMinutes(s: GameState, who: Goer = 'vehicle'): number {
   const hr = hourOf(s.clock.t);
   let m = 0;
-  for (const c of standingCorridors(s, true)) m += crossingMinutes(c, who, hr, 0);
+  for (const c of standingCorridors(s, true)) m += crossingMinutes(c, who, hr, 0, corridorAirlockS(s, c));
   return Math.round(m * 10) / 10;
 }
 

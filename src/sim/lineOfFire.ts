@@ -34,7 +34,7 @@ export const OWN_BOX = 0.3;
 export const WALL_POST = 4.5;
 
 /** Walls and berms that stop a round. Chain-link, wire, pickets and bars, split-rail and a thorn hedge do not (they hide a man, they do not stop a bullet). */
-export const FIRE_SOLID: ReadonlySet<PerimeterKind> = new Set<PerimeterKind>(['log_palisade', 'container_wall', 'container_stack', 'earth_berm', 'steel_wall', 'electric_steel', 'concrete_wall', 'stone_wall']);
+export const FIRE_SOLID: ReadonlySet<PerimeterKind> = new Set<PerimeterKind>(['log_palisade', 'container_wall', 'container_stack', 'earth_berm', 'steel_wall', 'electric_steel', 'concrete_wall', 'stone_wall', 'shell_earthen', 'shell_arcology']);   // (the arcology's panels and the earthen dome's thick earth stop rifle fire; glass and polycarbonate do not: sim/dome/protection.ts)
 
 /**
  * Solid walls a rifle round goes through some of the time (balance pass "wall quality"): sharpened logs stop a pistol round and slow a rifle's, they do not

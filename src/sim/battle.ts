@@ -46,6 +46,7 @@ import { moatFx } from './waterWorks';
 import { lureOf, raidYardLosses } from './vehicleYard';
 import { doorTierOf, planBreach, type DoorPlan } from './doorBreach';
 import { sapperBreach } from './corridors';
+import { SALLY_HOLD, isShellKind, tierOfShell, withDomeShell } from './dome/siege';
 import { roadStart } from './roadFx';
 import { WALK_CLIMB_FACTOR, WALK_POST, deckSpots, walkLength, walkRuns } from './walkway';
 import { TURRET_JAM, battleTowerPosts, highBonus, litTowerIds, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
@@ -340,7 +341,10 @@ export function hitRoll(r: () => number, covered: boolean, rifle: boolean, armor
 }
 
 export function planBattle(state: GameState, raiders: number, seed: number, opts: BattleOptions = {}): PlannedBattle {
-  const s = withKnownWalls(state);   // a run of a wall kind this build does not know reads as the weakest known one: odd data never throws
+  const s0 = withKnownWalls(state);   // a run of a wall kind this build does not know reads as the weakest known one: odd data never throws
+  // a dome standing over the home is the outermost wall, its airlocks the gates (sim/dome/siege.ts): laid into a copy for this fight, never saved
+  const home0 = s0.structures.filter(isFinished).find(st => isHome(st.kind)) ?? s0.structures.filter(isFinished)[0] ?? { x: 0, z: 0 };
+  const s = withDomeShell(s0, home0);
   // no crew, or nonsense for one: nobody came (a plain, harmless result rather than a throw)
   if (!Number.isFinite(raiders) || raiders < 1) return { night: false, units: [], events: [{ t: 0, kind: 'end', result: 'repelled' }], duration: 1, spent: {}, minesUsed: 0, dropped: { grenades: 0, rpg_rounds: 0 }, result: 'repelled', leftBehind: { wounded: 0, dead: 0, surrendered: 0 } };
   raiders = Math.min(400, Math.floor(raiders));
@@ -450,7 +454,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   const solidSegs: Array<{ ax: number; az: number; bx: number; bz: number; h: number }> = [];
   for (const run of s.perimeter) {
     if (!runFinished(run) || !FIRE_SOLID.has(run.kind)) continue;
-    for (let i = 1; i < run.pts.length; i++) solidSegs.push({ ax: run.pts[i - 1][0], az: run.pts[i - 1][1], bx: run.pts[i][0], bz: run.pts[i][1], h: PERIMETER[run.kind].height });
+    for (let i = 1; i < run.pts.length; i++) solidSegs.push({ ax: run.pts[i - 1][0], az: run.pts[i - 1][1], bx: run.pts[i][0], bz: run.pts[i][1], h: PERIMETER[run.kind].shell ? 0 : PERIMETER[run.kind].height });   // (a dome's shell is not a wall a man stands on top of)
   }
   /** The nearest point on a solid wall within `maxD` of (x, z), the wall's height, and the unit vector from it toward the compound. */
   const snapWall = (x: number, z: number, maxD: number): { x: number; z: number; h: number; ix: number; iz: number } | null => {
@@ -504,7 +508,9 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   posts.sort((a, b) => rankOf(b) - rankOf(a));
   // (lineR moves in as the defenders fall back ring by ring: sim/ringFallback.ts)
   // manned inner rings (sim/rings.ts, sim/ringFallback.ts): the defenders fall back to each in turn; the crew has to take every wall under fire before the house is breached
-  const ringHold = opts.insideBreach ? 0 : wallHoldSeconds(s);   // the tall retaining walls a crew has to climb or go round at the outer line (sim/retaining.ts)
+  // an airlock is a sally port: a crew through the outer door is still in the chamber with the defenders at the inner one (sim/dome/siege.ts)
+  const chamberHold = target && target.gate && isShellKind(target.kind) ? SALLY_HOLD[tierOfShell(target.kind)!] : 0;
+  const ringHold = (opts.insideBreach ? 0 : wallHoldSeconds(s)) + chamberHold;   // the tall retaining walls a crew has to climb or go round at the outer line (sim/retaining.ts)
   const ringRs = opts.insideBreach || opts.peacetime ? [] : ringRadii(s, C, lineR);
   const ringStay = ringDelay(s, ringRs.length);
   let ringK = 0;
@@ -779,7 +785,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       hurt(u, (60 + r() * 50) * (1 - d / radius * 0.6) * (u.side === 'home' && u.shelter ? 0.35 : 1) * (u.post === wreck ? 1 : Math.max(0.4, u.cover)) * (u.armor.plate || u.armor.soft ? 0.7 : 1) * (u.armor.helmet ? 0.85 : 1), t);   // armor takes some of the fragments
     }
     let wrecks: 'post' | 'wall' | undefined;
-    if (wreck && wreck.kind !== 'open') { wreck.wrecked = true; smokeFrom = Math.min(smokeFrom, t); wrecks = wreck.kind === 'wall' ? 'wall' : 'post'; if (wreck.kind === 'wall') wallDown = true; }
+    if (wreck && wreck.kind !== 'open') { wreck.wrecked = true; smokeFrom = Math.min(smokeFrom, t); wrecks = wreck.kind === 'wall' ? 'wall' : 'post'; if (wreck.kind === 'wall' && !(wallKind in PERIMETER && PERIMETER[wallKind as PerimeterKind].impervious)) wallDown = true; }   // (an arcology's panels are not a wall a rocket brings down)
     ev.push({ t: r2(t), kind: 'explosion', x: r2(x), z: r2(z), radius, hits, ...(wrecks ? { wrecks } : {}) });
   };
   // how organized they are: later in the collapse, armored, more of them carry rifles
@@ -926,6 +932,8 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     const p = w ? { x: w.x, z: w.z } : at(lineR, 0);
     breachInfo = { method: hw, where: w, t };
     ev.push({ t, kind: 'breach', x: r2(p.x), z: r2(p.z), method: hw, ...(w ? { where: { ...w, x: r2(w.x), z: r2(w.z) } } : {}) });
+    // a crew that cut its way through a dome's shell (saws and axes, no truck, no charge) leaves the hole the scene draws: a panel gap (sim/dome/siege.ts)
+    if (w && hw === 'climb' && isShellKind(w.kind) && !w.gate) ev.push({ t, kind: 'gap', runId: w.runId, at: w.at, w: w.w, x: r2(w.x), z: r2(w.z) });
     reachedStage = 'yard';
     // arson, first half: hostile crews burn what they can reach in the yard (sheds, coops, barns); the smoke is in the fight
     if (!peace && crewKind !== 'horde') {
