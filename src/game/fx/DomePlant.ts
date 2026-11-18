@@ -66,7 +66,7 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
     const c = hurt[u.id]; if (!c || c === 'ok') continue;
     const s = plant.scale, fl = (dx: number, dz: number, h: number, rad: number, col: number, y0 = 0): THREE.BufferGeometry => partGeometry({ shape: 'cyl', x: u.x + dx * s, z: u.z + dz * s, y0, w: 0, h: h * s, d: 0, r: rad * s, rot: 0, color: col }, ground, stem);
     if (c === 'down') { geos.push(fl(0.1, 0, 0.3, 0.07, 0xe8601a, 0.45 * s), fl(-0.12, 0.08, 0.2, 0.05, 0xf2a21f, 0.5 * s), fl(0.02, -0.1, 0.24, 0.05, 0xd9461a, 0.45 * s)); }
-    geos.push(fl(0.05, 0, c === 'down' ? 1.0 : 0.6, c === 'down' ? 0.1 : 0.06, 0x3c3a38, 0.7 * s), fl(0.07, 0.03, c === 'down' ? 0.7 : 0.4, c === 'down' ? 0.16 : 0.09, 0x57534f, 1.5 * s));
+    geos.push(fl(0.05, 0, c === 'down' ? 0.45 : 0.25, c === 'down' ? 0.045 : 0.03, 0x4a4643, 0.7 * s), fl(0.07, 0.03, c === 'down' ? 0.35 : 0.2, c === 'down' ? 0.07 : 0.045, 0x6a655f, 1.1 * s));
   }
   // the lamp posts ride the machinery's own merged mesh (thin cylinders, one color)
   for (const l of plant.lamps) geos.push(partGeometry({ shape: 'cyl', x: l.x, z: l.z, y0: 0, w: 0, h: l.y, d: 0, r: 0.014, rot: 0, color: 0x30343a }, ground, stem));

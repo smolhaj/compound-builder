@@ -61,7 +61,7 @@ try {
     await pose([D.x + Y[0] * (R + 7.5) + Y[1] * 3.2, ground + 0.45, D.z + Y[1] * (R + 7.5) - Y[0] * 3.2], [D.x + Y[0] * (R + 1.2), ground + 0.5, D.z + Y[1] * (R + 1.2)], 52); await shot('yard-eye-outside');
   }
   if (want('inside')) {
-    await pose([D.x + Y[0] * R * 0.35, ground + 0.5, D.z + Y[1] * R * 0.35], [D.x + Y[0] * R * 0.95, ground + 0.3, D.z + Y[1] * R * 0.95], 66); await shot('plant-interior-A');
+    await pose([D.x + Y[0] * R * 0.62 + Y[1] * 1.6, ground + 0.5, D.z + Y[1] * R * 0.62 - Y[0] * 1.6], [D.x + Y[0] * R * 0.95, ground + 0.3, D.z + Y[1] * R * 0.95], 62); await shot('plant-interior-A');
     await pose([D.x + Z[0] * R * 0.35, ground + 0.5, D.z + Z[1] * R * 0.35], [D.x + Z[0] * R * 0.95, ground + 0.3, D.z + Z[1] * R * 0.95], 66); await shot('plant-interior-B');
     await pose([D.x + Y[0] * R * 0.6 - Y[1] * 3, ground + 1.5, D.z + Y[1] * R * 0.6 + Y[0] * 3], [D.x + Y[0] * R * 0.93, ground + 0.3, D.z + Y[1] * R * 0.93], 58); await shot('plant-interior-high');
   }
@@ -70,7 +70,7 @@ try {
     await pose([yardC[0] + Y[0] * 4 + Y[1] * 3, ground + 5, yardC[1] + Y[1] * 4 - Y[0] * 3], [D.x + Y[0] * R * 0.8, ground - 0.1, D.z + Y[1] * R * 0.8], 55); await shot('underground-lines');
     await set(`cb.world.setUnderground(false)`);
   }
-  if (want('damaged') || want('panel')) {
+  if (want('damaged') || want('panel') || want('dark')) {
     await page.evaluate(async () => {
       const cb = window.__cb, G = cb.game, live = await import('/src/sim/dome/live.ts'), pl = await import('/src/sim/dome/plantLive.ts');
       G.setState(s => { const g = structuredClone(s.game); const d = live.domeOf(g), st = live.stateOf(g, d);
@@ -84,6 +84,8 @@ try {
   if (want('damaged')) {
     await pose([D.x + Y[0] * R * 1.9 + 3, ground + R * 0.75, D.z + Y[1] * R * 1.9], [D.x + Y[0] * R * 0.7, ground + R * 0.1, D.z + Y[1] * R * 0.7], 48); await shot('damaged-aerial');
     await pose([yardC[0] + Y[0] * 3.2 + Y[1] * 2.2, ground + 3.4, yardC[1] + Y[1] * 3.2 - Y[0] * 2.2], [yardC[0], ground + 0.2, yardC[1]], 50); await shot('damaged-yard');
+  }
+  if (want('dark')) {
     await set(`cb.store.getState().setTimeOfDay(21.5)`);
     await pose([D.x + Y[0] * R * 2.1 + 3, ground + R * 0.5, D.z + Y[1] * R * 2.1], [D.x + Y[0] * R * 0.6, ground + R * 0.15, D.z + Y[1] * R * 0.6], 46); await shot('damaged-night-dark');
     await set(`cb.store.getState().setTimeOfDay(16.8)`);
