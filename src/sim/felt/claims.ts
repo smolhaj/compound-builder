@@ -9,6 +9,7 @@ import { prices } from '../economy';
 import type { RumorKind } from '../radio';
 import { dayIndex, type GameState } from '../state';
 import { ashDepth, ashOptsOf } from '../ashState';
+import { domesOf, stateOf } from '../dome/live';
 
 /** The services' bands, shared by the feed and the radio: out (under a quarter, the line `canOrder` uses), patchy, working. */
 export const OUT_BELOW = 0.25, WORKING_FROM = 0.65;
@@ -17,7 +18,9 @@ export type ClaimId =
   | 'svc_out' | 'svc_up' | 'law_low' | 'neighbor_away' | 'neighbors_away' | 'price_ge' | 'ordering' | 'relief_none' | 'relief_partial' | 'relief_here'
   | 'city_open' | 'no_deliveries' | 'requisition' | 'creek_unsafe' | 'alert_lifted' | 'kind_active'
   /** Kind talk (radioKinds.ts): a service under n percent, n or more days since the hit, ash n inches deep, n percent of the county sick. */
-  | 'track_lt' | 'days_ge' | 'ash_ge' | 'sick_ge';
+  | 'track_lt' | 'days_ge' | 'ash_ge' | 'sick_ge'
+  /** A finished dome stands on the place; one is sealed (sim/dome/live.ts). */
+  | 'dome_stands' | 'dome_sealed';
 /** `a` is a track, a neighbor id or a kind; `n` a count, a percent or a price level. */
 export interface Claim { id: ClaimId; a?: string; n?: number }
 
@@ -75,6 +78,8 @@ export function evalClaim(s: GameState, c: Claim): boolean {
     case 'days_ge': return since(s) >= (c.n ?? 0);
     case 'ash_ge': { const o = ashOptsOf(d.kind); return !!o && ashDepth(s, o) >= (c.n ?? 1); }
     case 'sick_ge': return sickPercent(s) >= (c.n ?? 1);
+    case 'dome_stands': return domesOf(s).length > 0;
+    case 'dome_sealed': return domesOf(s).some(d => stateOf(s, d).lockdown);
   }
 }
 

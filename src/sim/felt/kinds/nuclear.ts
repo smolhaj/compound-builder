@@ -1,10 +1,12 @@
 import type { FeltSpec } from '../types';
 import { genericCards, kindCards, noNeighbors } from '../cardLibrary';
+import { domeFalloutCards } from '../domeFelt';
 import { householdSize as N, r25 } from '../cardFx';
 
 /** Felt layer for nuclear: keeps the generic fallout "How long to stay sealed" card (its own wording), then a bomb-specific second hit, the month and the season. Reactor_meltdown has its own cards. */
 export const felt: FeltSpec = {
   cards: [
+    ...domeFalloutCards('nuclear'),
     genericCards('nuclear')[0],
     ...kindCards('nuclear', [
       { id: 'water', phase: 'hit', from: 1, to: 7, title: 'The creek, the well, and the rain', fallback: 'boil',

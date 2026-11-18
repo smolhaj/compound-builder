@@ -47,7 +47,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 99;
+export const SAVE_VERSION = 100;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -271,6 +271,8 @@ export interface GameState {
   weather?: WeatherState;
   /** The dome: lockdown, air filtering, closed ecology and the gauges (sim/dome/live.ts; absent until the player touches it; save v99). */
   dome?: import('./dome/live').DomeState;
+  /** Every finished dome's own state by structure id (each runs its own air, climate and water loop; save v100). `dome` mirrors the biggest one's. */
+  domes?: Record<string, import('./dome/live').DomeState>;
   /** How old the stores are, rotation, traps. */
   shelf: Shelf;
   /** What the food stores are made of, item by item, and the diet's running averages (sim/pantry.ts; save v39). */

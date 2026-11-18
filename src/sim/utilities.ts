@@ -36,7 +36,7 @@ import { intakeCare, renewablesDay, type RenewDay } from './renewables';
 import { bestLevel } from './skills';
 import { regionFor } from './climate';
 import { gallonsText } from './units';
-import { domeKwhDay, domeLoadPriority } from './dome/live';
+import { domeKwhDay, domeLoadPriority, domeWaterFlows } from './dome/live';
 import { tierOfKind } from './dome/tiers';
 
 /** What utility buildings provide. */
@@ -427,7 +427,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   for (const [key, members] of groups) {
     // a building on no network of its own: the grid or nothing (dark, no shortage to report)
     if (typeof key === 'string' && !gridUp) continue;
-    const loads = members.filter(o => loadOf(o) > 0).sort((a, b) => (domeLoadPriority(s, a.kind) ?? LOAD_PRIORITY[a.kind] ?? 2) - (domeLoadPriority(s, b.kind) ?? LOAD_PRIORITY[b.kind] ?? 2));
+    const loads = members.filter(o => loadOf(o) > 0).sort((a, b) => (domeLoadPriority(s, a.kind, a.id) ?? LOAD_PRIORITY[a.kind] ?? 2) - (domeLoadPriority(s, b.kind, b.id) ?? LOAD_PRIORITY[b.kind] ?? 2));
     const d = loads.reduce((a, o) => a + loadOf(o), 0);
     const cap = members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.batteryKwh ?? 0), 0) * (1 - u.batteryFade);
     const genKw = members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.genKw ?? 0), 0);
@@ -506,7 +506,10 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   // the ponds (and a reservoir nobody filters) fill their own pool; a filtered reservoir fills the drinking store
   const toPool = (ponds + (drinkOk ? 0 : reservoirs)) * perBasin, toStore = (drinkOk ? reservoirs : 0) * perBasin;
   u.pondL = Math.max(0, Math.min(irrigCap, (u.pondL ?? 0) + toPool));
-  const rainL = roof * rainMm(doy) * regionFor(s.site).rainMm / 400 * 0.8 + toStore;
+  // a dome's shell is a roof too (sim/dome/waterLoop.ts): rain and melt to the cistern; a greywater or recycle loop and the beds' condensate give water back, the cooling pads drink some
+  const domeMm = rainMm(doy) * regionFor(s.site).rainMm / 400;
+  const domeW = domeWaterFlows(s, domeMm, WATER_PLUMBED, id => p.water.has(id) && p.nodes.some(o => p.water.get(o.id) === p.water.get(id) && !!UTILITY[o.kind]?.store));
+  const rainL = roof * rainMm(doy) * regionFor(s.site).rainMm / 400 * 0.8 + toStore + domeW.rainL;
   // the living drink and wash (playtest round 3: the dead and the taken were still counted, doubling a long game's water use)
   const people = s.personState.filter(ps => ps.needs?.died == null).length;
   const homePlumbed = fin.some(st => fitted(s, st.id, 'plumb') && (DRAW_KWH[st.kind] ?? 0) >= 5);
@@ -518,7 +521,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   u.pondL = (u.pondL ?? 0) - fromPond;
   // a dock's intake line pumps the lake for what the pond did not cover (sim/waterfront.ts)
   const fromLake = Math.min(lakeIntakeL(s), gardenUse + orchardUse - fromPond);
-  const use = people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (gardenUse + orchardUse - fromPond - fromLake) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0);
+  const use = Math.max(0, people * (homePlumbed ? WATER_PLUMBED : WATER_CARRIED) + (gardenUse + orchardUse - fromPond - fromLake) + (fin.some(st => st.kind === 'chicken_coop') ? 10 : 0) + domeW.coolL - domeW.reuseL - domeW.condL);
   // no power for the well pump (or it's dead): the hand pump down the same casing, as much as the day needs and arms allow
   let handL = 0, handH = 0;
   if (supply < use && handPumpReady(s)) {

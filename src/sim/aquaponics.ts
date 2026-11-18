@@ -29,6 +29,7 @@ import { heatNeed } from './greenhouse';
 import { waterTempC } from './pond';
 import { logGate } from './nag';
 import { caloriesText, gramsText, poundsText } from './units';
+import { underHeldDome, domeAirF, domeYieldK } from './dome/agro';
 
 export const AQUA = {
   FRY: 100, FRY_G: 5, TABLE_G: 450, TANK_KG: 60,
@@ -48,13 +49,16 @@ const idHash = (id: string): number => { let h = 0; for (let i = 0; i < id.lengt
 
 /** The bay's power draw today (kWh): pumps, and the heater against the cold outside. */
 export function aquaKwh(s: GameState, _st?: Structure): number {
-  return AQUA.BASE_KWH + AQUA.HEAT_KWH * Math.min(1, heatNeed(s));
+  // under a powered dome the bay's air is already held frost-free: the heater only tops up
+  const held = _st && underHeldDome(s, _st);
+  return AQUA.BASE_KWH + AQUA.HEAT_KWH * Math.min(1, heatNeed(s)) * (held ? 0.4 : 1);
 }
 
 /** Water temperature the fish see: the heater's target while it runs, else easing toward the air in a glass house a few degrees warmer than outside. */
-export function nextTemp(s: GameState, a: AquaState, on: boolean): number {
+export function nextTemp(s: GameState, a: AquaState, on: boolean, st?: Pick<Structure, 'x' | 'z'>): number {
   if (on) return AQUA.TARGET_C;
-  const ambient = waterTempC(s) + 5;
+  const airF = st ? domeAirF(s, st) : null;   // a powered dome's air, not the winter's
+  const ambient = airF !== null ? (airF - 32) * 5 / 9 : waterTempC(s) + 5;
   return a.tempC + (ambient - a.tempC) * 0.3;
 }
 
@@ -115,7 +119,7 @@ export function aquaDay(s: GameState): string[] {
   const day = Math.floor(s.clock.t);
   for (const st of aquas(s)) {
     const a = aquaOf(s, st.id), on = powered(s, st);
-    a.tempC = nextTemp(s, a, on);
+    a.tempC = nextTemp(s, a, on, st);
     a.offDays = on ? 0 : a.offDays + 1;
     if (a.fish <= 0) { a.fed = 1; continue; }
     const r = mulberry32(s.seed * 7121 + day * 29 + idHash(st.id));
@@ -140,7 +144,7 @@ export function aquaDay(s: GameState): string[] {
     // growth, slowed by crowding
     const crowd = Math.min(1.4, biomassKg(a) / AQUA.TANK_KG);
     const care = careYield(s, 'pond');
-    a.fishG += growthG(a.tempC) * (0.3 + 0.7 * a.fed) * care * (crowd > 0.9 ? Math.max(0.3, 1 - (crowd - 0.9) * 2) : 1);
+    a.fishG += growthG(a.tempC) * (0.3 + 0.7 * a.fed) * care * domeYieldK(s, st) * (crowd > 0.9 ? Math.max(0.3, 1 - (crowd - 0.9) * 2) : 1);
     // disease in crowded or cold, unkept water
     const stress = (crowd > 0.9 ? 0.5 : 0) + (a.tempC < AQUA.STOP_C ? 0.5 : 0) + (care < 0.8 ? 0.4 : 0);
     if (stress > 0 && r() < 0.01 * stress) {

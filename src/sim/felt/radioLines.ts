@@ -10,6 +10,7 @@ import { awayCount, recoveredTrack, worstTrack, type Claim } from './claims';
 import { AFTER_WEEK, THEME, dayN, days, genLine, trackWord, type GenLine } from './lineKit';
 import { kindLines } from './radioKinds';
 import { rumorLines } from './rumors';
+import { domeLines } from './domeFelt';
 import type { FeltKind, RadioLine } from './types';
 
 /** A price level rounded down to a tenth, so "2.3 times normal" is true whenever the claim `price_ge 2.3` is checked. */
@@ -47,6 +48,6 @@ export function radioFor(kind: FeltKind): RadioLine[] {
     genLine(kind, { id: 'trade_banks', channel: 'trade', truth: 'false', tone: 0, when: s => s.disaster.tracks.banks < 0.25, claim: () => ({ id: 'svc_up', a: 'banks' }),
       text: () => `A trader swears the banks reopen Monday, ${T.noun} or not. Cards honored, he says. Cash first, just in case.` }),
   ];
-  return [...lines, ...kindLines(kind), ...rumorLines(kind)];
+  return [...lines, ...kindLines(kind), ...rumorLines(kind), ...domeLines(kind)];
 }
 
