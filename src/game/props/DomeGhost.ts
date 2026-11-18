@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 
 type Ground = (x: number, z: number) => number;
-const OK = new THREE.Color(0x7fe28a), BAD = new THREE.Color(0xe8604e), TREE = new THREE.Color(0xf0a64a);
+const OK = new THREE.Color(0x7fe28a), BAD = new THREE.Color(0xe8604e), WARN = new THREE.Color(0xf2c14e), TREE = new THREE.Color(0xf0a64a);
 
 /** A flat ribbon of width `w` along a polyline (closed or not), draped on the ground `lift` above it, with a color per segment. */
 function ribbon(pts: Array<[number, number]>, w: number, ground: Ground, color: (i: number) => THREE.Color, closed: boolean, lift = 0.03): { pos: number[]; col: number[] } {
@@ -41,7 +41,7 @@ export class DomeGhost {
   private readonly _ribbonMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.95, depthWrite: false, depthTest: false, side: THREE.DoubleSide });
   private readonly _discMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
   private readonly _capOk = new THREE.MeshBasicMaterial({ color: OK, transparent: true, opacity: 0.2, depthWrite: false, side: THREE.DoubleSide });
-  private readonly _capBad = new THREE.MeshBasicMaterial({ color: BAD, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide });
+  private readonly _capBad = new THREE.MeshBasicMaterial({ color: WARN, transparent: true, opacity: 0.18, depthWrite: false, side: THREE.DoubleSide });
   private _cap: THREE.Mesh | null = null;
   private _ground: Ground;
   constructor(ground: Ground) { this._ground = ground; this.group.visible = false; this.group.renderOrder = 6; }
@@ -54,7 +54,7 @@ export class DomeGhost {
     if (key === this._key) return;
     this._key = key;
     this._clear();
-    const g = this._ground, w = Math.max(0.09, Math.min(0.6, s.footR * 0.03)), base = s.ok ? OK : BAD;
+    const g = this._ground, w = Math.max(0.09, Math.min(0.6, s.footR * 0.03)), base = s.ok ? OK : WARN;   // (amber: something is wrong; the red is only where the ring is off the land, and on the buildings the wall would cut)
     const rib = (pts: Array<[number, number]>, width: number, color: (i: number) => THREE.Color, closed = true, lift = 0.03) => {
       const r = ribbon(pts, width, g, color, closed, lift), geo = new THREE.BufferGeometry();
       geo.setAttribute('position', new THREE.Float32BufferAttribute(r.pos, 3)); geo.setAttribute('color', new THREE.Float32BufferAttribute(r.col, 3));

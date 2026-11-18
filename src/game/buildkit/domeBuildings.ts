@@ -156,10 +156,12 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
   const place = (g: THREE.BufferGeometry): THREE.BufferGeometry => g.rotateY(a);
   const wall = tier === 'arcology' ? 'steel' : 'concrete', half = v.cw / 2 + v.t / 2, stubW = v.cw / 2 + v.t - v.dw / 2;
   p.layer = 'walls';
-  p.add(wall, place(box(v.cw + 2 * v.t, 0.012, outer - inner + v.t, 0, y0 - 0.008, mid)));                                    // the chamber's floor slab
-  for (const s of [-1, 1]) p.add(wall, place(box(v.t, v.h, outer - inner + v.t, s * half, y0, mid)));                           // the side walls
+  // (the dome's floor is the natural ground, below the stem wall's top at y0: the chamber's walls reach down to it and its floor slab lies on it)
+  const foot = y0 - 0.1;
+  p.add(wall, place(box(v.cw + 2 * v.t, 0.01, outer - inner + v.t, 0, foot + 0.02, mid)));                                    // the chamber's floor slab
+  for (const s of [-1, 1]) p.add(wall, place(box(v.t, v.h + y0 - foot, outer - inner + v.t, s * half, foot, mid)));              // the side walls
   for (const rho of [inner, outer]) {
-    for (const s of [-1, 1]) p.add(wall, place(box(stubW, v.h, v.t, s * (v.dw / 2 + stubW / 2), y0, rho)));                       // the door jambs
+    for (const s of [-1, 1]) p.add(wall, place(box(stubW, v.h + y0 - foot, v.t, s * (v.dw / 2 + stubW / 2), foot, rho)));         // the door jambs
     p.add(wall, place(box(v.dw, v.h - v.dh, v.t, 0, y0 + v.dh, rho)));                                                         // the lintel
   }
   // the surround: steel plates in the shell's plane round the outer door, as wide as the hole the doorway took out of the lattice
@@ -197,7 +199,8 @@ function shellColliders(p: Parts, R: number, ring: number, doors: Doorways): voi
     const x = R * Math.sin(a), z = R * Math.cos(a);
     p.collide({ x0: x - h * Math.abs(Math.cos(a)) - 0.03, z0: z - h * Math.abs(Math.sin(a)) - 0.03, x1: x + h * Math.abs(Math.cos(a)) + 0.03, z1: z + h * Math.abs(Math.sin(a)) + 0.03 });
   }
-  for (const g of gaps) p.collide(...chamberColliders(R, g.a, g.v));
+  // (the shell ring leaves out every box that reaches the door's window, so the outer door's stubs run as far as those boxes did)
+  for (const g of gaps) p.collide(...chamberColliders(R, g.a, g.v, 2 * Math.PI * R / ring + 0.02));
 }
 
 // ── the four builders ──

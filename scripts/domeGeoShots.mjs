@@ -8,7 +8,10 @@ import { mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 let chromium; try { ({ chromium } = require('playwright')); } catch { ({ chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs')); }
-const out = process.argv[2], mode = process.argv[3] || 'ghost', tiers = (process.argv[4] || 'geodesic,glass,arcology').split(','), port = Number(process.argv[5] || 5991);
+const out = process.argv[2], mode = process.argv[3] || 'ghost', tiers = (process.argv[4] || 'geodesic,glass,arcology').split(','), port = Number(process.argv[5] || 5991), cellsArg = process.argv[6] ? Number(process.argv[6]) : null;   // cellsArg: a size in cells (10 ft each) for every tier of the run
+const BERM = { geodesic: 5 }, DEFAULT_CELLS = { earthen: 2, geodesic: 7, glass: 15, arcology: 36 };
+// the radius the builder lays the airlocks on: a quarter unit per cell, less the berm and a hair
+const radiusOf = tier => (cellsArg ?? DEFAULT_CELLS[tier]) * 0.25 - 0.03 - (BERM[tier] ?? 0) / 20;
 mkdirSync(out, { recursive: true });
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise((ok, fail) => { vite.stdout.on('data', d => { if (/localhost:\d+/.test(String(d).replace(/\x1b\[[0-9;]*m/g, ''))) ok(); }); vite.on('exit', c => fail(new Error('vite ' + c))); });
@@ -49,10 +52,12 @@ try {
     // invalid: over the property line
     if (info.edge) { await page.evaluate(([x, z]) => { const cam = window.__cb.cam; cam.target.set(x, 0, z); cam.radius = 22; cam.pitch = 0.95; }, info.edge); await set('geodesic', 9, info.edge[0] + 1, info.edge[1]); await shot('ghost-over-property-line'); }
     // the glass and arcology ghosts, wide
-    await page.evaluate(([x, z]) => { const cam = window.__cb.cam; cam.target.set(x, 0, z); cam.radius = 48; cam.pitch = 0.9; }, [cx - 8, cz - 8]);
-    await set('glass', 15, cx - 8, cz - 8); await shot('ghost-glass-150ft');
-    await page.evaluate(() => { window.__cb.cam.radius = 90; });
-    await set('arcology', 30, cx - 8, cz - 8); await shot('ghost-arcology-300ft');
+    const spot = (k) => page.evaluate(([k, x, z]) => window.__cb.tool.findSpot(k, x, z, 0, 40), [k, cx - 8, cz - 8]);
+    const g = await spot('dome_glass'), ar = await spot('dome_arcology_30');
+    await page.evaluate(([x, z]) => { const cam = window.__cb.cam; cam.target.set(x, 0, z); cam.radius = 48; cam.pitch = 0.9; }, g);
+    await set('glass', 15, g[0], g[1]); await shot('ghost-glass-150ft');
+    await page.evaluate(([x, z]) => { const cam = window.__cb.cam; cam.target.set(x, 0, z); cam.radius = 90; cam.pitch = 0.9; }, ar);
+    await set('arcology', 30, ar[0], ar[1]); await shot('ghost-arcology-300ft');
   } else {
     for (const tier of tiers) {
       const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
@@ -61,15 +66,15 @@ try {
       await page.goto(`http://localhost:${port}/?seed=7&clean&lowrender=0.75&region=${region}&acres=40&lotseed=8`);
       await page.waitForFunction(() => window.__cb?.qa?.lowrender, null, { timeout: 300000 });
       const frames = async (n = 1) => { for (let i = 0; i < n; i++) await page.evaluate(() => window.__cb.qa.renderNow()); };
-      const shot = async (name) => { await frames(3); await page.screenshot({ path: `${out}/${tier}-${name}.png` }); lap(`${tier} ${name}`); };
-      const info = await page.evaluate(async ([tier]) => {
+      const shot = async (name) => { await frames(3); await page.screenshot({ path: `${out}/${tier}${cellsArg ? '-' + cellsArg : ''}-${name}.png` }); lap(`${tier} ${name}`); };
+      const info = await page.evaluate(async ([tier, cellsArg, R]) => {
         const cb = window.__cb, G = cb.game, c = cb.world.camp; G.getState().setSpeed(0);
         G.setState(s => ({ game: { ...s.game, money: 500_000_000 } }));
         const kinds = { earthen: 'dome_earthen', geodesic: 'dome_geodesic', glass: 'dome_glass', arcology: 'dome_arcology' };
         const put = (kind, x, z, rot = 0, r = 8) => { const sp = cb.tool.findSpot(kind, x, z, rot, r); if (!sp) return null; G.getState().plan(kind, sp[0], sp[1], rot); return { id: G.getState().game.structures.at(-1).id, x: sp[0], z: sp[1] }; };
         const big = tier === 'arcology' || tier === 'glass';
-        const dome = put(kinds[tier], c.x - 1, c.z - 1, 0, big ? 30 : 12);
-        const R = { earthen: 0.5, geodesic: 1.25, glass: 3.75, arcology: 9 }[tier];
+        const kind = cellsArg ? `${kinds[tier]}_${cellsArg}` : kinds[tier];
+        const dome = put(kind, c.x - 1, c.z - 1, 0, big ? 30 : 12);
         G.setState(s => { const g = structuredClone(s.game); for (const st of g.structures) { st.stage = 99; st.done = 0; st.finishedAt = 0; st.supplied = true; } g.utilities.lit = ['x']; return { game: g }; });
         let dmg = null;
         if (dome && tier !== 'earthen') {
@@ -84,11 +89,11 @@ try {
         const m = await import('/src/game/HomesteadWorld.ts');
         if (dome) { for (const [dx, dz] of [[0.0, R * 0.55], [0.0, R * 1.18]]) { const f = m.scaleFigure(dome.x + dx, dome.z + dz, cb.world.groundAt(dome.x + dx, dome.z + dz)); cb.ws.scene.add(f); } }
         return { dome, dmg };
-      }, [tier]);
+      }, [tier, cellsArg, radiusOf(tier)]);
       lap(JSON.stringify(info));
       if (!info.dome) { await page.close(); continue; }
       await frames(2);
-      const R = { earthen: 0.5, geodesic: 1.25, glass: 3.75, arcology: 9 }[tier];
+      const R = radiusOf(tier);
       const pose = (e, l, fov = 60) => page.evaluate(([e, l, fov]) => { window.__cb.qa.pose = { x: e[0], y: e[1], z: e[2], lx: l[0], ly: l[1], lz: l[2], fov }; }, [e, l, fov]);
       const D = info.dome, ground = await page.evaluate(([x, z]) => window.__cb.world.groundAt(x, z), [D.x, D.z]);
       await page.evaluate(() => { const s = window.__cb.store.getState(); s.setTimeOfDay(12); s.setBuildingView('full'); });
@@ -96,7 +101,10 @@ try {
       await pose([D.x + R * 0.12, ground + R * 0.7 + 0.9, D.z + R * 0.35], [D.x, ground, D.z + R * 0.9], 60); await shot('airlock-above-inside');
       await pose([D.x + R * 0.18, ground + 0.3, D.z + R + Math.min(2.0, R * 0.5 + 0.5)], [D.x, ground + 0.15, D.z + R * 0.9], 62); await shot('airlock-eye-outside');
       await pose([D.x + R * 0.12, ground + 0.4, D.z + R * 0.55], [D.x, ground + 0.15, D.z + R * 1.05], 70); await shot('airlock-eye-inside');
-      await pose([D.x + 0.35, ground + 0.25, D.z + R - 0.3 + 0.0], [D.x, ground + 0.15, D.z + R * 1.2], 70); await shot('chamber-eye');
+      // inside the chamber on its axis, looking out through the outer door (the room is the width between its side walls)
+      const LEN = Math.min({ geodesic: 0.5, glass: 0.7, arcology: 1.4 }[tier] ?? 0.2, R * 0.34), rin = R - LEN * 0.7;
+      await pose([D.x, ground + 0.22, D.z + rin], [D.x, ground + 0.18, D.z + R + 1.5], 68); await shot('chamber-eye-looking-out');
+      await pose([D.x, ground + 0.22, D.z + R + 0.9], [D.x, ground + 0.12, D.z + R - LEN], 62); await shot('chamber-eye-looking-in');
       await pose([D.x + R * 0.9 + 1.2, ground + R * 0.5 + 0.7, D.z + R * 0.2 + 3 ], [D.x, ground, D.z + R * 0.85], 50); await shot('tunnel-line-above');
       if (info.dmg) { const hx = info.dmg.x, hz = info.dmg.z, ux = (hx - D.x) / R, uz = (hz - D.z) / R;
         await pose([hx + ux * 1.6 - uz * 0.6, ground + 0.3, hz + uz * 1.6 + ux * 0.6], [hx, ground + 0.15, hz], 62); await shot('breached-panel-eye');

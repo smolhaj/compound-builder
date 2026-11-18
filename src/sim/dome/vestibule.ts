@@ -31,8 +31,8 @@ export interface Vestibule {
 /** Outside width and the nominal run of each tier's chamber (as sized for the default dome; a smaller dome shortens it). */
 const BASE: Record<DomeTier, { w: number; len: number; t: number; h: number; dh: number; door: number }> = {
   earthen: { w: 0.24, len: 0.2, t: 0.03, h: 0.2, dh: 0.18, door: 0.55 },
-  geodesic: { w: 0.42, len: 0.5, t: 0.03, h: 0.42, dh: 0.34, door: 0.58 },
-  glass: { w: 0.55, len: 0.7, t: 0.03, h: 0.5, dh: 0.4, door: 0.58 },
+  geodesic: { w: 0.42, len: 0.5, t: 0.03, h: 0.42, dh: 0.34, door: 0.74 },
+  glass: { w: 0.55, len: 0.7, t: 0.03, h: 0.5, dh: 0.4, door: 0.68 },
   arcology: { w: 1.1, len: 1.4, t: 0.05, h: 0.9, dh: 0.72, door: 0.6 },
 };
 
@@ -69,16 +69,16 @@ export function wallBoxes(ax: number, az: number, bx: number, bz: number, thick:
 }
 
 /** The walls of one chamber as nav colliders: two side walls, the inner door's two stubs, and the outer door's two stubs flanking the opening. The doors themselves and the room between them are open. */
-export function chamberColliders(r: number, angle: number, v: Vestibule): Box[] {
+export function chamberColliders(r: number, angle: number, v: Vestibule, reach = SURROUND_PAD): Box[] {
   const { outer, inner } = chamberRho(r, v), half = v.cw / 2 + v.t / 2, out: Box[] = [];
   const P = (rho: number, lam: number) => chamberPoint(angle, rho, lam);
   for (const s of [-1, 1]) {
     const a = P(inner, s * half), b = P(outer, s * half);
     out.push(...wallBoxes(a[0], a[1], b[0], b[1], v.t));
     // the two stubs of the inner door and of the outer door, from the door's edge to the side wall
-    // (the outer ones run on past the side wall under the surround plate, into the shell ring's first boxes, so no seam is open)
+    // (the outer ones run on past the side wall under the surround plate to `reach`, as far as the shell ring's skipped boxes did, so no seam is open)
     for (const rho of [inner, outer]) {
-      const c = P(rho, s * v.dw / 2), d = P(rho, s * (v.cw / 2 + v.t + (rho === outer ? SURROUND_PAD : 0)));
+      const c = P(rho, s * v.dw / 2), d = P(rho, s * (v.cw / 2 + v.t + (rho === outer ? reach : 0)));
       out.push(...wallBoxes(c[0], c[1], d[0], d[1], v.t));
     }
   }

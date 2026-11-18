@@ -28,7 +28,7 @@ function part(geo: THREE.BufferGeometry, color: number, x: number, y: number, z:
 export class DomePortals {
   private _mesh: THREE.Mesh | null = null;
   private _key = '';
-  private readonly _mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0.1 });
+  private readonly _mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0.05, side: THREE.DoubleSide });
   private readonly _scene: THREE.Scene;
   private readonly _ground: Ground;
   constructor(scene: THREE.Scene, ground: Ground) { this._scene = scene; this._ground = ground; }
@@ -57,24 +57,30 @@ export class DomePortals {
         all.push(part(new THREE.BoxGeometry(0.012, 0.05, 0.012), 0xffe9a8, hx - c * 0.1, hy + 0.06, hz + s * 0.1, a.angle)); // a lamp on its post
       }
       // outside: the line of the buried corridor, a low turfed ridge of backfill with a crest of fresh soil that greens over, marker posts along it, a pile of spoil beside
-      const L0 = r + 0.1, L1 = r + 3.2, N = 14, wMax = Math.max(0.2, v.cw * 0.55);
-      const rows: Array<Array<[number, number, number]>> = [];
+      const L0 = r + 0.1, L1 = r + 3.2, N = 16, wMax = Math.max(0.26, v.cw * 0.7);
+      const Q = [-1, -0.78, -0.42, 0, 0.42, 0.78, 1], PROFILE = [0, 0.4, 0.82, 1, 0.82, 0.4, 0];
+      const soil = new THREE.Color(0x4f3f2c), grass = new THREE.Color(0x6b7b3c), dry = new THREE.Color(0x7a7a48);
+      const hAt = (t: number) => 0.1 * (1 - 0.5 * t) * Math.min(1, (1 - t) * 6 + 0.15);
+      const rows: Array<Array<{ p: [number, number, number]; c: THREE.Color }>> = [];
       for (let k = 0; k <= N; k++) {
-        const t = k / N, rho = L0 + (L1 - L0) * t, w = wMax * (1 - 0.35 * t), h = 0.045 * (1 - 0.5 * t);
-        rows.push([-1, -0.55, 0, 0.55, 1].map((q, j) => { const [x, z] = W(rho, q * w); return [x, y(x, z) + (j === 0 || j === 4 ? 0.002 : j === 2 ? h : h * 0.62), z]; }));
+        const t = k / N, rho = L0 + (L1 - L0) * t, w = wMax * (1 - 0.3 * t), h = hAt(t);
+        rows.push(Q.map((q, j) => {
+          const [x, z] = W(rho, q * w);
+          // fresh soil down the crest line, greening toward the flanks and along the run
+          const along = Math.min(1, t * 1.3), edge = Math.abs(q), c = soil.clone().lerp(grass, Math.min(1, 0.25 + edge * 0.9) * (0.5 + 0.5 * along)).lerp(dry, 0.15 * t);
+          return { p: [x, y(x, z) + (j === 0 || j === 6 ? 0.003 : h * PROFILE[j]), z], c };
+        }));
       }
-      const pos: number[] = [], col: number[] = [], fresh = new THREE.Color(0x5b4a37), old = new THREE.Color(0x6f7a45), side = new THREE.Color(0x66603f);
-      for (let k = 0; k < N; k++) for (let j = 0; j < 4; j++) {
+      const pos: number[] = [], col: number[] = [];
+      for (let k = 0; k < N; k++) for (let j = 0; j < Q.length - 1; j++) {
         const A = rows[k][j], B = rows[k][j + 1], C = rows[k + 1][j + 1], D = rows[k + 1][j];
-        pos.push(...A, ...B, ...C, ...A, ...C, ...D);
-        const crest = j === 1 || j === 2, t = (k + 0.5) / N, cc = (crest ? fresh.clone().lerp(old, Math.min(1, t * 1.4)) : side.clone().lerp(old, t * 0.6));
-        for (let q = 0; q < 6; q++) col.push(cc.r, cc.g, cc.b);
+        for (const q of [A, B, C, A, C, D]) { pos.push(...q.p); col.push(q.c.r, q.c.g, q.c.b); }
       }
       const ridge = new THREE.BufferGeometry();
       ridge.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); ridge.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); ridge.computeVertexNormals();
       all.push(ridge);
       for (let k = 0; k < 4; k++) {   // marker posts: a concrete stub with a yellow cap, on the crest every few steps
-        const [mx, mz] = W(L0 + 0.45 + k * 0.78, 0), my = y(mx, mz) + 0.045 * (1 - 0.5 * (0.45 + k * 0.78) / 3.1);
+        const [mx, mz] = W(L0 + 0.45 + k * 0.78, 0), my = y(mx, mz) + hAt((0.35 + k * 0.78) / 3.1);
         all.push(part(new THREE.BoxGeometry(0.022, 0.09, 0.022), 0xb9b9b1, mx, my + 0.045, mz, a.angle));
         all.push(part(new THREE.BoxGeometry(0.026, 0.014, 0.026), 0xe9b72b, mx, my + 0.097, mz, a.angle));
       }

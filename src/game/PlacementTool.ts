@@ -252,14 +252,14 @@ export class PlacementTool {
     g.position.set(x, y, z);
     g.rotation.y = this._turn * Math.PI / 2;
     g.visible = true;
-    this._showDome(def, x, z, problem === null && !clash, placed);
+    this._showDome(def, x, z, problem === null && !clash, placed, problem ? PROBLEM_TEXT[problem] : clashMsg);
     const m = this._ok ? this._okMat : this._badMat;
     g.traverse(o => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).material = m; });
     useGameStore.getState().setToolProblem(problem ? PROBLEM_TEXT[problem] : clashMsg ?? (this._yardRefused ? NO_LEVEL_SITE : null));
   }
 
   /** The circle ghost for a dome: the footprint against the land, the buildings and the trees (sim/dome/siting `domeSiteReport`), and its line on the placing card. */
-  private _showDome(def: (typeof KIT)[string], x: number, z: number, ok: boolean, placed: readonly { id: string; kind: string; x: number; z: number; rot: number }[]): void {
+  private _showDome(def: (typeof KIT)[string], x: number, z: number, ok: boolean, placed: readonly { id: string; kind: string; x: number; z: number; rot: number }[], why: string | null): void {
     const tier = this._domeTier(), st = useGameStore.getState();
     if (!tier) { this._dome.hide(); if (st.domeSite) st.setDomeSite(null); return; }
     const footR = def.cellsX * CELL_HALF, cells = def.cellsX, shellR = shellFt(tier, cells) / 2 / (CELL_FT * 2);
@@ -267,7 +267,7 @@ export class PlacementTool {
     const near = this._world.treeSpecs.filter(t => Math.abs(t.x - x) < footR + 2 && Math.abs(t.z - z) < footR + 2).map(t => [t.x, t.z] as const);
     const rep = domeSiteReport({ x, z, r: footR }, (px, pz) => ownsAt(st.game, px, pz), items, near);
     this._dome.set({ x, z, shellR, footR, height: shellR * 2 * TIER[tier].heightRatio, ok, ringOwned: rep.ringOwned, straddles: rep.straddles.map(id => { const r = items.find(i => i.id === id)!.rect; return [r.x0, r.z0, r.x1, r.z1] as [number, number, number, number]; }), trees: rep.cleared as Array<[number, number]> });
-    const summary = siteSummary(rep, { diameterFt: Math.round(shellFt(tier, cells)) }), cur = st.domeSite;
+    const summary = !ok && why && !rep.off && !rep.straddles.length ? why : siteSummary(rep, { diameterFt: Math.round(shellFt(tier, cells)) }), cur = st.domeSite;
     if (!cur || cur.cells !== cells || cur.ok !== ok || cur.summary !== summary) st.setDomeSite({ tier, cells, ok, summary });
   }
 
