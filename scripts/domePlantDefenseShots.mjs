@@ -19,7 +19,7 @@ try {
   page.setDefaultTimeout(900000);
   page.on('pageerror', e => console.error('pageerror:', e.message));
   page.on('console', m => { if (m.type() === 'error') console.error('console:', m.text().slice(0, 200)); });
-  await page.goto(`http://localhost:${port}/?seed=7&clean&lowrender=${PR}&region=${process.env.REGION ?? 'mountain_west'}&acres=20&relief=${process.env.RELIEF ?? 2}&lotseed=${process.env.LOTSEED ?? 8}`);
+  await page.goto(`http://localhost:${port}/?seed=7${process.env.PANEL ? "&layout=a" : "&clean"}&lowrender=${PR}&region=${process.env.REGION ?? 'mountain_west'}&acres=20&relief=${process.env.RELIEF ?? 2}&lotseed=${process.env.LOTSEED ?? 8}`);
   await page.waitForFunction(() => window.__cb?.qa?.lowrender, null, { timeout: 300000 });
   const frames = async (n = 1) => { for (let i = 0; i < n; i++) await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(250); };
   const shot = async (name, q = process.env.QUAL || 'high') => { await frames(2); if (q && q !== 'none') await page.evaluate(q => window.__cb.qa.renderFull(q), q); await page.screenshot({ path: `${out}/${tier}-${name}.png` }); lap(name); };
