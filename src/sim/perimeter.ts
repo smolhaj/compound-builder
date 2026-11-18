@@ -21,7 +21,9 @@ import { topBonus } from './wallTops';
 import { pluralize } from './words';
 import { cuYdText, lengthText } from './units';
 
-export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall' | 'wall_walk' | 'stone_wall' | 'container_stack' | 'tunnel_bridge' | 'slope_tunnel' | 'rock_tunnel' | 'bar_fence' | 'drain_channel' | 'moat' | 'covered_bridge';
+export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall' | 'wall_walk' | 'stone_wall' | 'container_stack' | 'tunnel_bridge' | 'slope_tunnel' | 'rock_tunnel' | 'bar_fence' | 'drain_channel' | 'moat' | 'covered_bridge'
+  /** The shell of a dome as the raid sim sees it (sim/dome/siege.ts `withDomeShell`): never drawn as a run, never in the Build menu, never saved. */
+  | 'shell_earthen' | 'shell_geodesic' | 'shell_glass' | 'shell_arcology';
 
 export interface PerimeterDef {
   id: PerimeterKind;
@@ -64,6 +66,10 @@ export interface PerimeterDef {
   bore?: boolean;
   /** A timber bridge over water (a creek or a moat): a gated way across, not a wall (sim/waterWorks.ts). */
   bridge?: boolean;
+  /** A dome's shell stands in the raid sim as a closed ring with its airlocks as gates (sim/dome/siege.ts): not a plantable wall. */
+  shell?: boolean;
+  /** Firearms and missiles do not get through it (the arcology's panels, owner decision 4): nothing is climbed, rammed or shot through. */
+  impervious?: boolean;
   /** Footing poured deep enough that a tunnel can't go under it (concrete and steel tiers); cheaper fences need a buried skirt. */
   deepFooting?: boolean;
 }
@@ -99,6 +105,11 @@ export const PERIMETER: Record<PerimeterKind, PerimeterDef> = {
   moat: { id: 'moat', name: 'Moat (water ditch)', blurb: 'A dug ditch 10 ft deep and 20 ft wide, filled from the creek or a pond through a channel. No truck crosses; a man wades or swims it in the cold, under fire.', hours: 56, materials: { fieldstone: 0.15 }, height: -0.4, blocks: { people: 0.45, animals: 0.85, vehicles: 1 }, sight: 0, growYears: 0 },
   covered_bridge: { id: 'covered_bridge', name: 'Covered bridge (timber)', blurb: 'A roofed timber truss bridge over a creek or your moat, with a plank gate at each end: the one way across. Wood burns and gives way to a ram sooner than steel, but it is cheap, and a crew has to come single file.', hours: 24, materials: { lumber: 2.4, roofing: 1.2, hardware: 0.5 }, height: 0.4, blocks: { people: 0, animals: 0, vehicles: 0 }, sight: 0, growYears: 0, bridge: true },
   ditch: { id: 'ditch', name: 'Ditch / dry moat', blurb: 'A 6.5 ft deep, 10 ft wide ditch. No vehicle crosses; the spoil can build a berm.', hours: 40, materials: {}, height: -0.33, blocks: { people: 0.45, animals: 0.3, vehicles: 1 }, sight: 0, growYears: 0 },
+  // the shells of the domes (sim/dome/): the raid sim lays a ring of one of these where a dome stands, with the airlocks as its gates. Hours and materials are nominal (never planted).
+  shell_earthen: { id: 'shell_earthen', name: 'Earthen dome shell', blurb: 'Plastered earthbag courses on a stem wall.', hours: 0, materials: {}, height: 0.5, blocks: { people: 0.95, animals: 1, vehicles: 1 }, sight: 0.9, growYears: 0, shell: true },
+  shell_geodesic: { id: 'shell_geodesic', name: 'Geodesic dome shell', blurb: 'Twin-wall polycarbonate in an aluminum frame.', hours: 0, materials: {}, height: 1.4, blocks: { people: 0.7, animals: 1, vehicles: 0.8 }, sight: 0.1, growYears: 0, shell: true },
+  shell_glass: { id: 'shell_glass', name: 'Glass dome shell', blurb: 'Laminated glass in a steel gridshell on a concrete ring beam.', hours: 0, materials: {}, height: 3.2, blocks: { people: 0.9, animals: 1, vehicles: 1 }, sight: 0.1, growYears: 0, shell: true },
+  shell_arcology: { id: 'shell_arcology', name: 'Arcology dome shell', blurb: 'Armored polycarbonate-composite panels on a space frame.', hours: 0, materials: {}, height: 9, blocks: { people: 1, animals: 1, vehicles: 1 }, sight: 0.1, growYears: 0, shell: true, impervious: true },
 };
 
 export const PERIMETER_ORDER: readonly PerimeterKind[] = ['split_rail', 'barbed_wire', 'woven_wire', 'thorn_hedge', 'log_palisade', 'container_wall', 'earth_berm', 'ditch', 'creek_bars', 'chain_link', 'wrought_iron', 'iron_barbed', 'steel_wall', 'electric_steel', 'concrete_wall', 'covered_walkway', 'stone_wall', 'container_stack', 'tunnel_bridge', 'slope_tunnel', 'rock_tunnel', 'bar_fence', 'moat', 'covered_bridge'];
@@ -183,7 +194,7 @@ export interface PerimeterRun {
  */
 export const PREDATOR_BLOCK: Record<PerimeterKind, number> = {
   split_rail: 0.02, barbed_wire: 0.1, woven_wire: 0.35, thorn_hedge: 0.75, log_palisade: 0.97, container_wall: 1, earth_berm: 0.2, ditch: 0.2,
-  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0, covered_walkway: 1, underground_passage: 0, concrete_wall: 1, wall_walk: 0, stone_wall: 1, container_stack: 1, tunnel_bridge: 1, slope_tunnel: 1, rock_tunnel: 1, bar_fence: 0.97, drain_channel: 0, moat: 0.5, covered_bridge: 0,
+  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0, covered_walkway: 1, underground_passage: 0, concrete_wall: 1, wall_walk: 0, stone_wall: 1, container_stack: 1, tunnel_bridge: 1, slope_tunnel: 1, rock_tunnel: 1, bar_fence: 0.97, drain_channel: 0, moat: 0.5, covered_bridge: 0, shell_earthen: 1, shell_geodesic: 1, shell_glass: 1, shell_arcology: 1,
 };
 
 /** The next tier up, where there is one (upgraded in place: sim `upgradeRun`). */
@@ -241,6 +252,8 @@ export const WALL_HP: Partial<Record<PerimeterKind, number>> = {
   split_rail: 10, barbed_wire: 25, woven_wire: 40, thorn_hedge: 45, chain_link: 55, earth_berm: 60, log_palisade: 70, creek_bars: 85,
   bar_fence: 90, wrought_iron: 90, covered_walkway: 90, iron_barbed: 105, container_wall: 140, container_stack: 190, stone_wall: 200,
   steel_wall: 210, electric_steel: 220, concrete_wall: 250,
+  // a dome's shell: twin-wall polycarbonate is cut with snips, laminated glass takes a crew with axes and a long while, the arcology's panels are not a wall a crew can work
+  shell_earthen: 150, shell_geodesic: 45, shell_glass: 120, shell_arcology: 1000,
 };
 /** The toughest wall in the table (concrete): the top of the scale. */
 export const WALL_HP_TOP = 250;
@@ -260,7 +273,7 @@ export const needsMeans = (kind: PerimeterKind): boolean => wallHp(kind) >= 190;
  * Multiplier on how fast a crew at the line gets over a wall kind (1 = the old flat rate; the sim's climb chance per second is 0.02 per raider at the line
  * times this). Tougher walls hold much longer; a wall that needs means is almost never climbed. `growth` is a hedge's grown share.
  */
-export const climbRateK = (kind: PerimeterKind, growth = 1): number => (needsMeans(kind) ? 0.12 : Math.max(0.35, Math.min(1.6, 60 / Math.max(10, wallHp(kind) * Math.max(0.2, growth)))));
+export const climbRateK = (kind: PerimeterKind, growth = 1): number => (PERIMETER[kind].impervious ? 0 : needsMeans(kind) ? 0.12 : Math.max(0.35, Math.min(1.6, 60 / Math.max(10, wallHp(kind) * Math.max(0.2, growth)))));
 /** Extra seconds a crew spends at a wall before the first can be across (ladders, cutters): longer for a tougher wall. */
 export const climbHoldS = (kind: PerimeterKind, growth = 1): number => Math.min(8, wallHp(kind) * growth / 30);
 

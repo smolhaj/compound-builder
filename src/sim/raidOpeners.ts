@@ -33,11 +33,11 @@ const KINDS: OpenerKind[] = ['scouts', 'demand', 'worker_ambush', 'diversion'];
 export const OPENER_DIFF: Record<Difficulty, number> = { cozy: 0.6, standard: 1, hardcore: 1.5 };
 
 /** Roll the opener for a raid (null: it begins the plain way). `armed: false` crews (clubs, the dead) never plan. */
-export function planOpener(c: { kind: CrewKind; temper: 'desperate' | 'hard' | 'savage'; size: number; armed: boolean; difficulty: Difficulty }, r: () => number): Opener | null {
+export function planOpener(c: { kind: CrewKind; temper: 'desperate' | 'hard' | 'savage'; size: number; armed: boolean; difficulty: Difficulty; /** A dome on the place draws scouts: a multiplier on the chance a crew looks the place over first (sim/dome/watched.ts). */ scoutK?: number }, r: () => number): Opener | null {
   if (!c.armed || c.size < 3) return null;
   const w = WEIGHTS[c.kind] ?? WEIGHTS.other, k = OPENER_DIFF[c.difficulty] ?? 1;
   // a savage crew does not wave a flag; a desperate one does not plan a diversion
-  const adj = w.map((x, i) => x * (i === 1 && c.temper === 'savage' ? 0 : i === 3 && c.temper === 'desperate' ? 0.3 : 1) * (i === 1 ? 1 : k));
+  const adj = w.map((x, i) => x * (i === 1 && c.temper === 'savage' ? 0 : i === 3 && c.temper === 'desperate' ? 0.3 : 1) * (i === 1 ? 1 : k) * (i === 0 ? Math.max(1, c.scoutK ?? 1) : 1));
   const total = adj.reduce((a, b) => a + b, 0);
   let u = r();
   if (u >= Math.min(0.9, total)) return null;

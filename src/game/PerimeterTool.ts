@@ -6,6 +6,7 @@
  * length, cost and hours as you draw.
  */
 import { routeProblem } from '../sim/terrainFx';
+import { domeRouteProblem } from '../sim/dome/crossing';
 import { ownsAt } from '../sim/land';
 import * as THREE from 'three';
 import type { HomesteadWorld } from './HomesteadWorld';
@@ -154,7 +155,7 @@ export class PerimeterTool {
 
   finish(): void {
     if (!this._kind || this._pts.length < 2) return;
-    const why = this._kind === 'escape_tunnel' ? this._world.tunnelRouteProblem(this._pts) : routeProblem(useGameStore.getState().game, this._kind, this._pts);
+    const why = this._kind === 'escape_tunnel' ? (this._world.tunnelRouteProblem(this._pts) ?? domeRouteProblem(useGameStore.getState().game, this._kind, this._pts)) : routeProblem(useGameStore.getState().game, this._kind, this._pts);
     if (why) { useGameStore.getState().showToast(why); return; }   // a tunnel-bridge needs real low ground, a slope tunnel a hillside
     useGameStore.getState().planRun(this._kind, this._pts.map(p => [p[0], p[1]] as Pt), this._gatesFor(this._pts).gates.map(g => ({ ...g })), this._kind === 'escape_tunnel' ? offParcel(this._pts) : 0);
     this._pts = []; this._gates = [];
@@ -193,7 +194,7 @@ export class PerimeterTool {
     const lines = Object.entries(bill).map(([k, q]) => ({ material: k as MaterialId, qty: q as number }));
     const buyable = lines.filter(l => MATERIALS[l.material].price !== null);
     const own = [billText(Object.fromEntries(lines.filter(l => MATERIALS[l.material].price === null).map(l => [l.material, l.qty])))].filter(Boolean);
-    const tunnelWhy = this._kind === 'escape_tunnel' ? this._world.tunnelRouteProblem(pts as Pt[]) : pts.length >= 2 ? routeProblem(useGameStore.getState().game, this._kind, pts as Pt[]) : null;
+    const tunnelWhy = this._kind === 'escape_tunnel' ? (this._world.tunnelRouteProblem(pts as Pt[]) ?? (pts.length >= 2 ? domeRouteProblem(useGameStore.getState().game, this._kind, pts as Pt[]) : null)) : pts.length >= 2 ? routeProblem(useGameStore.getState().game, this._kind, pts as Pt[]) : null;
     (this._line.material as THREE.LineBasicMaterial).color.set(tunnelWhy ? 0xe36a5a : 0xffd27a);
     const txt = tunnelWhy ? tunnelWhy
       : this._pts.length === 0 ? (this._kind === 'escape_tunnel' ? 'Escape tunnel: click a bunker room to start at its wall, then out to the exit'

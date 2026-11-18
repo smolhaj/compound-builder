@@ -14,6 +14,7 @@ import { CELL, type KitPieceDef } from './kit';
 import { pipe } from './interior';
 import { box, Parts, type BuildOpts } from './shell';
 import { CELL_FT, TIER, tierOfKind, type DomeTier } from '../../sim/dome/tiers';
+import { airlockAngles } from '../../sim/dome/standing';
 
 /** World units of berm banked round a dome's shell inside its footprint (the footprint is shell plus berm). */
 const bermU = (t: DomeTier): number => TIER[t].bermFt / (CELL_FT / CELL);
@@ -30,7 +31,7 @@ const LOOK: Record<DomeTier, { strut: number; stem: number; vestW: number; vestH
 };
 
 /** Airlock angles (radians from +z, the side the family arrives on): evenly spread, the first at the front. */
-export function airlockAngles(n: number): number[] { return Array.from({ length: n }, (_, i) => i * TAU / Math.max(1, n)); }
+export { airlockAngles };
 const at = (r: number, a: number, y: number): Pt3 => [r * Math.sin(a), y, r * Math.cos(a)];
 
 /** A ring wall (annulus between r0 and r1) from `lo(a)` up to `top`, as one geometry; the bottom follows the ground. */
@@ -205,7 +206,7 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
   const ring = Math.max(24, Math.min(72, Math.round(R * 8))), gaps = airlockAngles(airlocks);
   for (let i = 0; i < ring; i++) {
     const a = (i + 0.5) * TAU / ring;
-    if (gaps.some(ga => Math.abs(Math.atan2(Math.sin(a - ga), Math.cos(a - ga))) < (L.vestW * 0.8) / R)) continue;
+    if (gaps.some(ga => Math.abs(Math.atan2(Math.sin(a - ga), Math.cos(a - ga))) < (L.vestW * 0.62) / R)) continue;
     const x = R * Math.sin(a), z = R * Math.cos(a), h = Math.PI * R / ring;
     p.collide({ x0: x - h * Math.abs(Math.cos(a)) - 0.03, z0: z - h * Math.abs(Math.sin(a)) - 0.03, x1: x + h * Math.abs(Math.cos(a)) + 0.03, z1: z + h * Math.abs(Math.sin(a)) + 0.03 });
   }
@@ -244,7 +245,7 @@ function glass(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   const ring = 56, gaps = airlockAngles(3);
   for (let i = 0; i < ring; i++) {
     const a = (i + 0.5) * TAU / ring;
-    if (gaps.some(ga => Math.abs(Math.atan2(Math.sin(a - ga), Math.cos(a - ga))) < (L.vestW * 0.8) / R)) continue;
+    if (gaps.some(ga => Math.abs(Math.atan2(Math.sin(a - ga), Math.cos(a - ga))) < (L.vestW * 0.62) / R)) continue;
     const x = R * Math.sin(a), z = R * Math.cos(a), h = Math.PI * R / ring;
     p.collide({ x0: x - h * Math.abs(Math.cos(a)) - 0.03, z0: z - h * Math.abs(Math.sin(a)) - 0.03, x1: x + h * Math.abs(Math.cos(a)) + 0.03, z1: z + h * Math.abs(Math.sin(a)) + 0.03 });
   }

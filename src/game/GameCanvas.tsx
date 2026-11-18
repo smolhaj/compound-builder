@@ -1,4 +1,7 @@
 import { moatStates } from '../sim/waterWorks';
+import { domesOf } from '../sim/dome/standing';
+import { DomePortals } from './props/DomePortals';
+import { shellPointAt } from '../sim/dome/siege';
 import { fireMarks, fireOverlayNote } from '../sim/fireRisk';
 import { litTowerIds } from '../sim/towers';
 import { encodePhoto, setPhotoCapturer } from './photoCapture';
@@ -397,6 +400,10 @@ export function GameCanvas() {
     /** QA hooks: frame counter, and an exact camera pose (eye → look) for interior shots. */
     // what a raid broke stays broken until it is mended (sim/raidDamage.ts)
     const damageView = new RaidDamageRenderer(ws.scene, world.groundAt, d => {
+      if (d.kind === 'panel') {   // a hole in a dome's shell: the wall runs along the shell, at right angles to the radius
+        const dome = domesOf(useGameStore.getState().game).find(x => x.id === d.structure);
+        return dome ? -Math.atan2(d.x - dome.x, -(d.z - dome.z)) : 0;
+      }
       const run = useGameStore.getState().game.perimeter.find(r => r.id === d.runId);
       if (!run) return 0;
       let best = 0, bd = Infinity;
@@ -407,8 +414,19 @@ export function GameCanvas() {
       return best;
     });
     const glassHomes = (): GlassHome[] => useGameStore.getState().game.structures.filter(st => isFinished(st) && isHome(st.kind) && st.fixes?.some(f => f.part === 'glass' && f.done < f.hours) && KIT[st.kind]).map(st => ({ id: st.id, ...footprint(KIT[st.kind], st.x, st.z, st.rot, false) }));
+    // the holes a cutscene cuts in a dome (its `gap` events name the shell run `dome:<structure>`): drawn while it plays
+    const syncLiveDome = () => {
+      const g = useGameStore.getState().game, open = liveBreach.open.filter(x => x.runId.startsWith('dome:'));
+      if (!open.length) { damageView.setLive([]); return; }
+      const domes = domesOf(g);
+      damageView.setLive(open.flatMap(x => { const d = domes.find(q => q.id === x.runId.slice(5)); if (!d) return []; const p = shellPointAt(d, x.at); if (d.airlocks.some(a => Math.hypot(a.x - p.x, a.z - p.z) < 0.4)) return []; return [{ id: `live:${x.runId}:${x.at.toFixed(2)}`, kind: 'panel' as const, x: p.x, z: p.z, structure: d.id, day: 0, hours: 1, done: 0, supplied: true, bill: {} }]; }));
+    };
     const syncDamage = () => damageView.sync(useGameStore.getState().game.raidDamage, glassHomes());
     syncDamage();
+    const portals = new DomePortals(ws.scene, world.groundAt);
+    const syncPortals = () => { const g = useGameStore.getState().game; portals.sync(domesOf(g), g.perimeter); };
+    syncPortals();
+    const unsubPortals = useGameStore.subscribe(s => `${s.game.perimeter.length}|${s.game.perimeter.filter(r => r.finishedAt !== null).length}|${s.game.structures.filter(st => st.kind.startsWith('dome_')).map(st => `${st.id}${st.finishedAt}`).join()}`, syncPortals);
     const unsubDamage = useGameStore.subscribe(s => `${(s.game.raidDamage ?? []).filter(d => d.done < d.hours).map(d => d.id).join()}|${s.game.structures.filter(st => st.fixes?.some(f => f.part === 'glass' && f.done < f.hours)).map(st => st.id).join()}`, syncDamage);
     const battle = new BattleRenderer(ws.scene, world.groundAt, () => useGameStore.getState().game.people);
     battle.coverSource = () => world.lowCover;
@@ -558,6 +576,7 @@ export function GameCanvas() {
       world.syncTents(game);
       world.syncForestry(game.forestry);
       world.simTime = game.clock.t;
+      syncLiveDome();
       world.syncPerimeter(liveBreach.apply(game.perimeter), game.clock.t, { lit: fenceLive(game) && !blackoutNow(game), sensors: (game.stock.ground_sensor ?? 0) > 0, gateKit: { sally: hasSallyGate(game), intercom: hasIntercom(game), motor: hasGateMotor(game), signs: responseActive(game) }, moats: Object.fromEntries(moatStates(game).map(m => [m.run.id, { level: m.level, frozen: m.frozen }])) });
       const svKey = `${game.structures.filter(x => x.stage >= 5).length}|${game.perimeter.filter(r => r.finishedAt !== null).length}|${game.utilities.fittings.filter(f => f.finishedAt !== null).length}|${goodsKey(houseGoods(game))}`;
       if (svKey !== servicesKey) { servicesKey = svKey; world.syncServices(game); }
@@ -839,7 +858,7 @@ export function GameCanvas() {
       window.removeEventListener('keyup', onShift);
       player.stop();
       unCamReq();
-      nameLayer.dispose(); battle.dispose(); unsubDamage(); damageView.dispose();
+      nameLayer.dispose(); battle.dispose(); unsubDamage(); damageView.dispose(); unsubPortals(); portals.dispose();
       tour.dispose();
       tool.dispose();
       marker.dispose();
