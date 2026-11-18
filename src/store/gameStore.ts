@@ -5,6 +5,7 @@ import { planProblem } from '../sim/construction';
 import { unscripted } from '../sim/godMode';
 import { dropBridge, routeProblem } from '../sim/terrainFx';
 import { routeThroughDomes } from '../sim/dome/crossing';
+import { clampCells, type DomeTier } from '../sim/dome/tiers';
 import { clearCollapse, strandAway } from '../sim/corridors';
 import { dropRoadBridge, rebuildRoadBridge } from '../sim/roadFx';
 import { interrogate, type Approach, type Question } from '../sim/interrogation';
@@ -138,6 +139,12 @@ export interface GameStore {
   setPlanOpen: (on: boolean) => void;
   /** Placement feedback for the HUD (null = valid or no tool). */
   toolProblem: string | null;
+  /** The dome diameter the player picked, per tier (footprint cells across; absent = the tier's default). The wheel, +/- keys and the placing card's slider set it. Not saved. */
+  domeCells: Partial<Record<DomeTier, number>>;
+  setDomeCells: (tier: DomeTier, cells: number) => void;
+  /** What the circle ghost says about the spot under the cursor (the placing card shows it). Not saved. */
+  domeSite: { tier: DomeTier; cells: number; ok: boolean; summary: string } | null;
+  setDomeSite: (s: { tier: DomeTier; cells: number; ok: boolean; summary: string } | null) => void;
   /** A one-line notice that fades by itself (a refused click: why). Not saved. */
   toast: { text: string; id: number } | null;
   showToast: (text: string) => void;
@@ -367,6 +374,10 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   planOpen: false,
   setPlanOpen: (planOpen) => set({ planOpen }),
   toolProblem: null,
+  domeCells: {},
+  setDomeCells: (tier, cells) => set(st => ({ domeCells: { ...st.domeCells, [tier]: clampCells(tier, cells) } })),
+  domeSite: null,
+  setDomeSite: (domeSite) => set({ domeSite }),
   toast: null,
   showToast: (text) => {
     const id = (get().toast?.id ?? 0) + 1;
@@ -745,7 +756,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const changed = isMarked(g, t.id) ? unmarkTree(g, t.id) : markTree(g, t, haulDist) !== null;
     if (changed) set({ game: g });
   },
-  setTool: (tool) => { if (!locked()) set({ tool, toolProblem: null, spendAsk: null, ...(tool ? { stakedNote: null } : {}) }); },
+  setTool: (tool) => { if (!locked()) set({ tool, toolProblem: null, domeSite: null, spendAsk: null, ...(tool ? { stakedNote: null } : {}) }); },
   setToolProblem: (toolProblem) => set({ toolProblem }),
   flashStaked: (text) => {
     set({ stakedNote: text });

@@ -49,3 +49,37 @@ export const skirtStopsDig = (skirtFt: number, digFt: number): boolean => skirtF
 export function skirtStops(skirtFt: number): number { const [lo, hi] = DIG_DEPTH_FT; return Math.max(0, Math.min(0.995, (skirtFt - SKIRT_MARGIN_FT - lo) / (hi - lo))); }
 /** Tunnels and the escape route cross the shell only through an airlock or sally port. */
 export const TUNNEL_CROSSES_AT = 'airlock';
+
+// ── the circle ghost: what a dome of this size would sit on, straddle and clear ──
+
+export interface SiteItem { id: string; kind: string; rect: Rect }
+export interface SiteReport {
+  /** The first sample of the footprint that lies off the family's land, or null. */
+  off: [number, number] | null;
+  /** For each of `ring` evenly spaced points round the footprint (from +z toward +x): is it on the family's land? */
+  ringOwned: boolean[];
+  /** Buildings the wall would cut through, and the ones wholly under the shell. */
+  straddles: string[];
+  inside: string[];
+  /** Trees inside the footprint plus the clearing margin (they come down with the site work). */
+  cleared: Array<[number, number]>;
+}
+
+/** The footprint circle against the land, the buildings and the trees. `owned` is the parcel test; `treePad` is the clearing margin round the footprint (world units). Exact for rectangles, sampled for the land. */
+export function domeSiteReport(c: Circle, owned: (x: number, z: number) => boolean, items: readonly SiteItem[], trees: ReadonlyArray<readonly [number, number]>, treePad = 0.6, ring = 72): SiteReport {
+  const ringOwned = Array.from({ length: ring }, (_, i) => { const a = i * 2 * Math.PI / ring; return owned(c.x + Math.sin(a) * c.r, c.z + Math.cos(a) * c.r); });
+  const straddles: string[] = [], inside: string[] = [];
+  for (const it of items) { const v = rectVsCircle(c, it.rect); if (v === 'straddles') straddles.push(it.id); else if (v === 'inside') inside.push(it.id); }
+  const cleared = trees.filter(([x, z]) => Math.hypot(x - c.x, z - c.z) < c.r + treePad).map(([x, z]) => [x, z] as [number, number]);
+  return { off: offParcel(c, owned), ringOwned, straddles, inside, cleared };
+}
+
+/** The ghost's one-line verdict for the card: what is wrong, or what it covers. */
+export function siteSummary(r: SiteReport, extra?: { diameterFt: number }): string {
+  if (r.off) return 'Part of the circle is outside your land';
+  if (r.straddles.length) return `The wall would cut through ${r.straddles.length === 1 ? 'a building' : r.straddles.length + ' buildings'}`;
+  const bits: string[] = [];
+  if (r.inside.length) bits.push(`covers ${r.inside.length} building${r.inside.length === 1 ? '' : 's'}`);
+  if (r.cleared.length) bits.push(`clears ${r.cleared.length} tree${r.cleared.length === 1 ? '' : 's'}`);
+  return (extra ? `${extra.diameterFt} ft: ` : '') + (bits.length ? bits.join(', ') : 'open ground');
+}

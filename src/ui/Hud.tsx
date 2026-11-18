@@ -2,6 +2,7 @@ import { interrogationScene, raiderFace, type Exchange, type Face } from '../sim
 import { MAX_QUESTIONS, QUESTIONS, QUESTION_NAME, type Question } from '../sim/interrogation';
 import { flowLine } from '../sim/flow';
 import { PlansOrderButton } from './hud/SpendConfirm';
+import { DomeSizeCard } from './hud/DomeSizeCard';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { EDGE, hudLayout, useBox } from './hudLayout';
 import { clock, dateLabel } from './hud/dateText';
@@ -338,6 +339,7 @@ export function Hud() {
     <>
       {!A && <ToastLine />}
       <CursorHint />
+      <DomeSizeCard />
       <SightHint />
       <WeakHint />
       <TerrainLegendChip />

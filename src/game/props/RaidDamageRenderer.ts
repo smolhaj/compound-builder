@@ -45,7 +45,7 @@ export function damagePieces(d: Pick<RaidDamage, 'kind' | 'id'>): THREE.BufferGe
   } else if (d.kind === 'panel') {
     // a hole cut or blown in a dome's shell at its foot (the shell is near vertical there): the dark opening, bent struts across it, panes on the ground on both sides
     const pane = [0xcfe0e8, 0xaec6d2, 0xdcebf0], frame = [0x8d949a, 0x6f767c];
-    out.push(part(box(0.016, 0.3, 0.38), 0x0b0d0f, 0, 0.17, 0));                                                    // the opening (the dome's inside is dark)
+    out.push(part(box(0.016, 0.3, 0.38), 0x1f282e, 0, 0.17, 0));                                                    // the opening (the dome's inside is dark)
     out.push(part(box(0.03, 0.34, 0.03), frame[0], 0, 0.17, -0.2, 0, 0, 0.1));                                       // the frame either side, bent
     out.push(part(box(0.03, 0.34, 0.03), frame[1], 0, 0.17, 0.2, 0, 0, -0.08));
     out.push(part(box(0.03, 0.03, 0.42), frame[0], 0, 0.33, 0.01, 0.06, 0, 0));

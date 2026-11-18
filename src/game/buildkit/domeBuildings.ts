@@ -15,6 +15,7 @@ import { pipe } from './interior';
 import { box, Parts, type BuildOpts } from './shell';
 import { CELL_FT, TIER, tierOfKind, type DomeTier } from '../../sim/dome/tiers';
 import { airlockAngles } from '../../sim/dome/standing';
+import { SHELL_INSET, SURROUND_PAD, axisOf, chamberColliders, chamberRho, ringSkipped, vestibuleOf, type Vestibule } from '../../sim/dome/vestibule';
 
 /** World units of berm banked round a dome's shell inside its footprint (the footprint is shell plus berm). */
 const bermU = (t: DomeTier): number => TIER[t].bermFt / (CELL_FT / CELL);
@@ -111,20 +112,95 @@ function quad(a: Pt3, b: Pt3, c: Pt3, d: Pt3, center: Pt3, inset = 0): THREE.Buf
 /** A strut: a pipe with `seg` sides between two points. */
 const strut = (a: Pt3, b: Pt3, r: number, seg: number): THREE.BufferGeometry => pipe(a, b, r, seg);
 
-/** An airlock vestibule at angle `a` on a shell of radius R: a concrete box through the wall with a door on the outside and a lamp over it. */
-function airlock(p: Parts, tier: DomeTier, R: number, a: number, y0: number): void {
-  // the vestibule stands inside the shell, its outer door in the wall (so everything stays inside the footprint)
-  const L = LOOK[tier], len = L.vestL, rc = R - len / 2 + 0.02, w = L.vestW, h = L.vestH;
+/**
+ * Where each airlock's doorway is cut in the shell. A shell is a lattice of panels, so a door cannot be cut along its own edge: every panel whose center falls in
+ * the doorway window is left out and the hole's bounds grow to take in what was removed, then the airlock's surround plate (below) closes the gap round the
+ * door. The struts along the removed edges go too. One `Doorways` per dome.
+ */
+class Doorways {
+  readonly holes: Array<{ a: number; v: Vestibule; lam0: number; lam1: number; y1: number }> = [];
+  private readonly R: number;
+  private readonly y0: number;
+  constructor(angles: number[], tier: DomeTier, R: number, y0: number) {
+    this.R = R; this.y0 = y0;
+    for (const a of angles) { const v = vestibuleOf(tier, R); this.holes.push({ a, v, lam0: -(v.cw / 2 + v.t), lam1: v.cw / 2 + v.t, y1: y0 + v.dh }); }
+  }
+  private at(h: Doorways['holes'][number], x: number, z: number): [number, number] { const k = axisOf(h.a); return [x * k.ux + z * k.uz, x * k.vx + z * k.vz]; }
+  /** Does this panel (its corners) sit in a doorway window? Grows the hole to cover it when it does. */
+  takes(pts: Pt3[]): boolean {
+    const cx = pts.reduce((q, c) => q + c[0], 0) / pts.length, cy = pts.reduce((q, c) => q + c[1], 0) / pts.length, cz = pts.reduce((q, c) => q + c[2], 0) / pts.length;
+    for (const h of this.holes) {
+      const [rho, lam] = this.at(h, cx, cz);
+      if (rho < this.R * 0.5 || Math.abs(lam) > h.v.cw / 2 + h.v.t + 0.06 || cy - this.y0 > h.v.dh + 0.12) continue;
+      for (const c of pts) { const [, l] = this.at(h, c[0], c[2]); h.lam0 = Math.min(h.lam0, l); h.lam1 = Math.max(h.lam1, l); h.y1 = Math.max(h.y1, c[1]); }
+      return true;
+    }
+    return false;
+  }
+  /** A strut whose midpoint is inside a hole's bounds (the panel beside it was taken). */
+  cuts(a: Pt3, b: Pt3): boolean {
+    const m: Pt3 = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+    return this.holes.some(h => { const [rho, lam] = this.at(h, m[0], m[2]); return rho > this.R * 0.5 && lam > h.lam0 - 0.01 && lam < h.lam1 + 0.01 && m[1] < h.y1 + 0.01; });
+  }
+  /** The shell's own radius at a distance `lam` off an airlock's axis (the surround plate follows the curve in short strips). */
+  shellRho(lam: number): number { return Math.sqrt(Math.max(0.01, (this.R - SHELL_INSET) ** 2 - lam * lam)); }
+}
+
+/**
+ * An airlock at angle `a` on a shell of radius R: a real two-door chamber inside the shell (sim/dome/vestibule.ts): an outer door in the shell's plane, a
+ * hollow room between a pair of side walls with a lit, glazed ceiling, an inner door at its far end, the two doors standing ajar so the room reads from
+ * outside and from above. A surround plate closes the ragged shell lattice around the outer door. The nav colliders are the same walls (`chamberColliders`).
+ */
+function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][number], doors: Doorways, y0: number): void {
+  const a = hole.a, v = hole.v, { outer, inner } = chamberRho(R, v), mid = (outer + inner) / 2, L = LOOK[tier];
   const place = (g: THREE.BufferGeometry): THREE.BufferGeometry => g.rotateY(a);
+  const wall = tier === 'arcology' ? 'steel' : 'concrete', half = v.cw / 2 + v.t / 2, stubW = v.cw / 2 + v.t - v.dw / 2;
   p.layer = 'walls';
-  const body = place(box(w, h, len, 0, y0, rc));
-  p.add(tier === 'arcology' ? 'steel' : 'concrete', body);
-  p.add('trim', place(box(w + 0.02, 0.02, len + 0.02, 0, y0 + h, rc)));
+  // (the dome's floor is the natural ground, below the stem wall's top at y0: the chamber's walls reach down to it and its floor slab lies on it)
+  const foot = y0 - 0.1;
+  p.add(wall, place(box(v.cw + 2 * v.t, 0.01, outer - inner + v.t, 0, foot + 0.02, mid)));                                    // the chamber's floor slab
+  for (const s of [-1, 1]) p.add(wall, place(box(v.t, v.h + y0 - foot, outer - inner + v.t, s * half, foot, mid)));              // the side walls
+  for (const rho of [inner, outer]) {
+    for (const s of [-1, 1]) p.add(wall, place(box(stubW, v.h + y0 - foot, v.t, s * (v.dw / 2 + stubW / 2), foot, rho)));         // the door jambs
+    p.add(wall, place(box(v.dw, v.h - v.dh, v.t, 0, y0 + v.dh, rho)));                                                         // the lintel
+  }
+  // the surround: steel plates in the shell's plane round the outer door, as wide as the hole the doorway took out of the lattice
+  const lam0 = Math.min(hole.lam0, -(v.cw / 2 + v.t + SURROUND_PAD)), lam1 = Math.max(hole.lam1, v.cw / 2 + v.t + SURROUND_PAD), top = Math.max(hole.y1, y0 + v.h) + 0.02;
+  const n = Math.max(2, Math.ceil((lam1 - lam0) / 0.11)), skin = tier === 'geodesic' ? 'aluminum' : 'steel', glaze = tier === 'geodesic' ? 'polycarb' : tier === 'glass' ? 'glass' : 'arcology', capY = y0 + v.h + 0.02;
+  for (let i = 0; i < n; i++) {
+    const l = lam0 + (lam1 - lam0) * (i + 0.5) / n, w = (lam1 - lam0) / n + 0.004, rho = doors.shellRho(l) + 0.017, lo = Math.abs(l) < v.dw / 2 ? y0 + v.dh + 0.004 : y0;
+    p.add(skin, place(box(w, capY - lo, 0.026, l, lo, rho)));                                                                    // the plate, up to the chamber's roof line
+    if (top > capY) p.add(glaze, place(box(w, top - capY, 0.008, l, capY, rho - 0.008)));                                        // above it the hole the lattice lost is glazed again
+  }
+  p.add('trim', place(box(lam1 - lam0, 0.016, 0.03, (lam0 + lam1) / 2, capY, doors.shellRho(0) + 0.017)));                       // the cap along the roof line
+  p.layer = 'roof';
+  p.add(tier === 'geodesic' ? 'polycarb' : tier === 'glass' ? 'glass' : 'arcology', place(box(v.cw + 2 * v.t, 0.012, outer - inner + v.t, 0, y0 + v.h, mid)));   // a glazed ceiling: the chamber reads from above
+  for (const k of [0.1, 0.5, 0.9]) p.add('trim', place(box(v.cw + 2 * v.t + 0.01, 0.016, 0.02, 0, y0 + v.h, inner + (outer - inner) * k)));
   p.layer = 'openings';
-  p.add('door', place(box(w * 0.62, h * 0.82, 0.012, 0, y0, rc + len / 2 + 0.006)));
-  p.add('lamp', place(box(w * 0.3, 0.012, 0.012, 0, y0 + h * 0.88, rc + len / 2 + 0.008)));
+  // each door leaf stands ajar, swung into the chamber about the jamb on the right as you face it
+  const swing = (rho: number, into: 1 | -1) => {
+    const sh = 1, len = v.dw * 0.96, phi = into * sh * 1.35;
+    const g = box(len, v.dh * 0.97, 0.012, -sh * len / 2, 0, 0).rotateY(phi).translate(sh * v.dw / 2, y0, rho);
+    p.add('door', place(g));
+  };
+  swing(outer, -1); swing(inner, 1);
+  p.add('lamp', place(box(v.cw * 0.5, 0.012, 0.04, 0, y0 + v.h - 0.014, mid)));                                                // a lamp down the middle of the ceiling
+  p.add('lamp', place(box(v.dw * 0.4, 0.012, 0.012, 0, y0 + v.dh + 0.02, outer + 0.022)));                                      // and one over the outer door
   p.layer = 'interior';
-  p.add('gravel', place(box(w * 1.1, 0.006, 0.5, 0, y0 - L.stem * 0.2 + 0.001, rc - len / 2 - 0.3)));
+  p.add('gravel', place(box(v.cw * 1.1, 0.006, 0.5, 0, y0 - L.stem * 0.2 + 0.001, inner - 0.3)));
+}
+
+/** The shell's colliders: the ring as short boxes with the airlocks' gaps left out, and each chamber's walls (so the chamber is a room and the doors are the only ways in). */
+function shellColliders(p: Parts, R: number, ring: number, doors: Doorways): void {
+  const gaps = doors.holes;
+  for (let i = 0; i < ring; i++) {
+    const a = (i + 0.5) * TAU / ring, h = Math.PI * R / ring;
+    if (gaps.some(g => ringSkipped(a, R, g.a, g.v, h / R))) continue;
+    const x = R * Math.sin(a), z = R * Math.cos(a);
+    p.collide({ x0: x - h * Math.abs(Math.cos(a)) - 0.03, z0: z - h * Math.abs(Math.sin(a)) - 0.03, x1: x + h * Math.abs(Math.cos(a)) + 0.03, z1: z + h * Math.abs(Math.sin(a)) + 0.03 });
+  }
+  // (the shell ring leaves out every box that reaches the door's window, so the outer door's stubs run as far as those boxes did)
+  for (const g of gaps) p.collide(...chamberColliders(R, g.a, g.v, 2 * Math.PI * R / ring + 0.02));
 }
 
 // ── the four builders ──
@@ -180,36 +256,35 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
   const band = tier === 'arcology' ? 0.8 : 0;
   p.layer = 'frame';
   const seen = new Set<string>(), seg = tier === 'arcology' ? 4 : 5;
+  const doors = new Doorways(airlockAngles(airlocks), tier, R, y0);
+  // the panels that sit in a doorway window are left out first (the holes grow to cover them), then the struts that run along the hole
+  const kept = tris.filter(([A, B, C]) => !doors.takes([V(...A), V(...B), V(...C)]));
   const edge = (A: [number, number], B: [number, number]) => {
     const k = [A, B].map(([r, j]) => `${r}:${j}`).sort().join('|');
     if (seen.has(k)) return; seen.add(k);
+    if (doors.cuts(V(...A), V(...B))) return;
     p.add(frameMat, strut(V(...A), V(...B), L.strut, seg));
   };
   for (const [A, B, C] of tris) { edge(A, B); edge(B, C); edge(C, A); }
   p.layer = 'roof';
-  for (const [A, B, C] of tris) p.add(panelMat, tri(V(...A), V(...B), V(...C), centre, 0.07));
+  for (const [A, B, C] of kept) p.add(panelMat, tri(V(...A), V(...B), V(...C), centre, 0.07));
   if (band) {
     p.layer = 'walls';
     const lowN = rings[N].length;
     for (let j = 0; j < lowN; j++) {
       const a0 = phi(N, j), a1 = phi(N, j + 1), r = R - 0.02;
+      if (doors.takes([at(r, a0, y0), at(r, a1, y0), at(r, a1, y0 + band), at(r, a0, y0 + band)])) continue;     // (the airlock's own surround closes the band there)
       p.add('steel', quad(at(r + 0.012, a0, y0), at(r + 0.012, a1, y0), at(r + 0.012, a1, y0 + band), at(r + 0.012, a0, y0 + band), centre));
+      const rl = R + 0.002; p.add('lamp', quad(at(rl + 0.014, a0, y0 + band - 0.07), at(rl + 0.014, a1, y0 + band - 0.07), at(rl + 0.014, a1, y0 + band), at(rl + 0.014, a0, y0 + band), centre));
     }
-    for (let j = 0; j < lowN; j++) { const a0 = phi(N, j), a1 = phi(N, j + 1), r = R + 0.002; p.add('lamp', quad(at(r + 0.014, a0, y0 + band - 0.07), at(r + 0.014, a1, y0 + band - 0.07), at(r + 0.014, a1, y0 + band), at(r + 0.014, a0, y0 + band), centre)); }
     // the crown spire: a mast with a lit tip
     p.layer = 'frame';
     p.add('steel', pipe([0, y0 + R * 0.98, 0], [0, y0 + R * 1.18, 0], 0.025, 6));
     p.add('lamp', new THREE.SphereGeometry(0.05, 8, 6).translate(0, y0 + R * 1.18 + 0.03, 0));
   }
-  for (const a of airlockAngles(airlocks)) airlock(p, tier, R, a, y0);
-  // colliders: the shell ring as short boxes, none at the airlocks (people cross only through them)
-  const ring = Math.max(24, Math.min(72, Math.round(R * 8))), gaps = airlockAngles(airlocks);
-  for (let i = 0; i < ring; i++) {
-    const a = (i + 0.5) * TAU / ring;
-    if (gaps.some(ga => Math.abs(Math.atan2(Math.sin(a - ga), Math.cos(a - ga))) < (L.vestW * 0.62) / R)) continue;
-    const x = R * Math.sin(a), z = R * Math.cos(a), h = Math.PI * R / ring;
-    p.collide({ x0: x - h * Math.abs(Math.cos(a)) - 0.03, z0: z - h * Math.abs(Math.sin(a)) - 0.03, x1: x + h * Math.abs(Math.cos(a)) + 0.03, z1: z + h * Math.abs(Math.sin(a)) + 0.03 });
-  }
+  for (const h of doors.holes) airlock(p, tier, R, h, doors, y0);
+  // colliders: the shell ring as short boxes, none at the airlocks (people cross only through them), and the chamber walls
+  shellColliders(p, R, Math.max(24, Math.min(72, Math.round(R * 8))), doors);
   const out = p.finish();
   out.userData.chimneyTop = null; out.userData.keep = ['frame', 'roof'];
   return out;
@@ -229,26 +304,28 @@ function glass(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   p.add('concrete', ringWall(R - 0.08, R + 0.06, y0, a => Math.min(y0 - 0.03, rim(a) - 0.1), 72));
   const th = (i: number) => i / P * Math.PI / 2 * 0.985;             // parallels from the crown (i = 0 is the oculus ring) down to the foot
   const V = (i: number, m: number): Pt3 => dir(R - 0.03, i === P ? Math.PI / 2 : th(i), m * TAU / M, y0);
+  const doors = new Doorways(airlockAngles(3), 'glass', R, y0);
+  // panes in a doorway window first (the hole grows to cover them), then the members along it
+  const cell = (i: number, m: number): Pt3[] => [V(i, m), V(i, m + 1), V(i + 1, m + 1), V(i + 1, m)];
+  const keptCells: Array<[number, number]> = [];
+  for (let i = 1; i < P; i++) for (let m = 0; m < M; m++) if (!doors.takes(cell(i, m))) keptCells.push([i, m]);
+  const kerb: number[] = [];
+  for (let m = 0; m < M; m++) { const c = V(P, m), d = V(P, m + 1); if (!doors.takes([c, d, [d[0], y0 + 0.07, d[2]], [c[0], y0 + 0.07, c[2]]])) kerb.push(m); }
   p.layer = 'frame';
-  for (let i = 1; i <= P; i++) for (let m = 0; m < M; m++) p.add('steel', strut(V(i, m), V(i, m + 1), L.strut, 4));         // the parallels
-  for (let i = 1; i < P; i++) for (let m = 0; m < M; m++) p.add('steel', strut(V(i, m), V(i + 1, m), L.strut, 4));          // the meridians
+  const bar = (A: Pt3, B: Pt3, sides: number) => { if (!doors.cuts(A, B)) p.add('steel', strut(A, B, L.strut, sides)); };
+  for (let i = 1; i <= P; i++) for (let m = 0; m < M; m++) bar(V(i, m), V(i, m + 1), 4);                // the parallels
+  for (let i = 1; i < P; i++) for (let m = 0; m < M; m++) bar(V(i, m), V(i + 1, m), 4);                 // the meridians
   const top = dir(R - 0.03, th(1) * 0.0, 0, y0);
-  for (let m = 0; m < M; m += 2) p.add('steel', strut(top, V(1, m), L.strut, 4));                                              // the oculus spokes
+  for (let m = 0; m < M; m += 2) p.add('steel', strut(top, V(1, m), L.strut, 4));                       // the oculus spokes
   p.add('steel', new THREE.TorusGeometry(0.1, 0.012, 5, 16).rotateX(Math.PI / 2).translate(0, y0 + R - 0.03 - 0.01, 0));      // the crown ring
   p.layer = 'roof';
-  for (let i = 1; i < P; i++) for (let m = 0; m < M; m++) p.add('glass', quad(V(i, m), V(i, m + 1), V(i + 1, m + 1), V(i + 1, m), centre, 0.06));
+  for (const [i, m] of keptCells) p.add('glass', quad(...(cell(i, m) as [Pt3, Pt3, Pt3, Pt3]), centre, 0.06));
   for (let m = 0; m < M; m++) p.add('glass', tri(top, V(1, m), V(1, m + 1), centre, 0.06));
   p.layer = 'walls';
   // the ring beam's glazed kerb: a low opaque band so the foot of the glass reads
-  for (let m = 0; m < M; m++) p.add('steel', quad(V(P, m), V(P, m + 1), [V(P, m + 1)[0], y0 + 0.07, V(P, m + 1)[2]], [V(P, m)[0], y0 + 0.07, V(P, m)[2]], centre));
-  for (const a of airlockAngles(3)) airlock(p, 'glass', R, a, y0);
-  const ring = 56, gaps = airlockAngles(3);
-  for (let i = 0; i < ring; i++) {
-    const a = (i + 0.5) * TAU / ring;
-    if (gaps.some(ga => Math.abs(Math.atan2(Math.sin(a - ga), Math.cos(a - ga))) < (L.vestW * 0.62) / R)) continue;
-    const x = R * Math.sin(a), z = R * Math.cos(a), h = Math.PI * R / ring;
-    p.collide({ x0: x - h * Math.abs(Math.cos(a)) - 0.03, z0: z - h * Math.abs(Math.sin(a)) - 0.03, x1: x + h * Math.abs(Math.cos(a)) + 0.03, z1: z + h * Math.abs(Math.sin(a)) + 0.03 });
-  }
+  for (const m of kerb) p.add('steel', quad(V(P, m), V(P, m + 1), [V(P, m + 1)[0], y0 + 0.07, V(P, m + 1)[2]], [V(P, m)[0], y0 + 0.07, V(P, m)[2]], centre));
+  for (const h of doors.holes) airlock(p, 'glass', R, h, doors, y0);
+  shellColliders(p, R, 56, doors);
   const out = p.finish();
   out.userData.chimneyTop = null; out.userData.keep = ['frame', 'roof'];
   return out;

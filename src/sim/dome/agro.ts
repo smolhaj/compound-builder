@@ -7,7 +7,7 @@
  */
 import type { GameState, Structure } from '../state';
 import { isFinished } from '../construction';
-import { DOME_KINDS, TIER, shellFt, tierOfKind, tierRank } from './tiers';
+import { TIER, shellFt, tierOfKind, tierRank } from './tiers';
 import { comfortAt } from './climate';
 
 /** Days the garden's season stretches at each end under a powered, frost-free dome: a full 60 when the air is held at 50 F or more, 30 when it is only held above freezing (cold-hardy greens). */
@@ -31,7 +31,7 @@ function gauge(s: GameState, id: string): { indoorF: number; powered: boolean } 
 export function coverAt(s: GameState, x: number, z: number): Cover | null {
   let best: { st: Structure; r: number } | null = null;
   for (const st of s.structures) {
-    if (!DOME_KINDS.includes(st.kind) || !isFinished(st)) continue;
+    if (!tierOfKind(st.kind) || !isFinished(st)) continue;
     const tier = tierOfKind(st.kind)!, r = shellFt(tier, TIER[tier].cells) / 2 / 20;
     if (Math.hypot(x - st.x, z - st.z) <= r && (!best || r < best.r)) best = { st, r };
   }

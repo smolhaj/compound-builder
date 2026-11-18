@@ -70,6 +70,7 @@ export class DioramaCamera {
     this._off.push(() => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp); window.removeEventListener('blur', onBlur); });
     on('wheel', e => {
       if (!this.enabled) return;
+      if (this.wheelHook?.(e)) { e.preventDefault(); return; }
       this._glide = null;
       e.preventDefault();
       this.radius = Math.min(this.maxRadius, Math.max(this.minRadius, this.radius * Math.exp(e.deltaY * 0.0012)));
@@ -81,6 +82,9 @@ export class DioramaCamera {
     if (dur <= 0) { this.target.set(x, 0, z); this.radius = radius; this.pitch = pitch; this._glide = null; return; }
     this._glide = { x, z, radius, pitch, t: 0, dur, from: { x: this.target.x, z: this.target.z, radius: this.radius, pitch: this.pitch } };
   }
+
+  /** A tool that wants the wheel (the dome's diameter handle on Shift+wheel) returns true when it took the event. */
+  wheelHook: ((e: WheelEvent) => boolean) | null = null;
 
   get gliding(): boolean { return this._glide !== null; }
 

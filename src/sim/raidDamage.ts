@@ -22,7 +22,7 @@ import { isHome } from './blueprints';
 import { log } from './economy';
 import { dayIndex, type GameState } from './state';
 import { domesOf } from './dome/standing';
-import { isShellKind, panelJob, panelsHit, domeIdOfRun, tierOfShell } from './dome/siege';
+import { isShellKind, panelJob, panelsHit, domeIdOfRun, tierOfShell, panelSpot, awayFromAirlocks } from './dome/siege';
 
 export type DamageKind = 'breach' | 'gate' | 'burn' | 'panel';
 
@@ -122,7 +122,8 @@ export function applyRaidDamage(s: GameState, battle: Battle | null, overrun: bo
     if (d && tier) {
       const gate = domeBreach.where.gate, n = gate ? 2 : tier === 'earthen' ? 1 : 4 + Math.round(r() * 3);
       const job = panelJob(tier, n, { wealth: 0 });
-      add({ kind: 'panel', x: domeBreach.where.x, z: domeBreach.where.z, structure: d.id, panels: n, hours: Math.max(4, job.hours), bill: job.bill, readyDay: day + job.leadDays, what: gate ? 'the airlock door' : 'the shell' });
+      const at = gate ? domeBreach.where : { ...domeBreach.where, ...awayFromAirlocks(d, domeBreach.where.x, domeBreach.where.z) };
+      add({ kind: 'panel', x: at.x, z: at.z, structure: d.id, panels: n, hours: Math.max(4, job.hours), bill: job.bill, readyDay: day + job.leadDays, what: gate ? 'the airlock door' : 'the shell' });
       lines.push(gate ? 'The outer door of the airlock was forced.' : `They cut through the shell: ${n} panels are down. A glazier has to order them (about ${job.leadDays} days).`);
       made++;
     }
@@ -135,7 +136,8 @@ export function applyRaidDamage(s: GameState, battle: Battle | null, overrun: bo
       const hit = panelsHit(d.tier, stray, battle.events.filter(e => e.kind === 'rocket' && !e.from.startsWith('h_')).length);
       if (hit > 0) {
         const job = panelJob(d.tier, hit);
-        add({ kind: 'panel', x: d.x + Math.sin(0.4) * d.r, z: d.z + Math.cos(0.4) * d.r, structure: d.id, panels: hit, hours: Math.max(2, job.hours), bill: job.bill, readyDay: day + job.leadDays, what: 'the glazing' });
+        const spot = panelSpot(d, openDamage(s).filter(o => o.kind === 'panel' && o.structure === d.id).length);
+        add({ kind: 'panel', x: spot.x, z: spot.z, structure: d.id, panels: hit, hours: Math.max(2, job.hours), bill: job.bill, readyDay: day + job.leadDays, what: 'the glazing' });
         lines.push(`${hit} panel${hit === 1 ? '' : 's'} of the glazing were hit by stray rounds.`);
       }
     }

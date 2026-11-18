@@ -1,13 +1,15 @@
 /**
  * Where a tunnel meets a dome (sim/dome/crossing.ts): at each airlock a corridor of the family's passes through, the inner end of the vestibule gets a
- * concrete portal collar with a dark steel door set in it and a lamp over it, and the ground outside the airlock shows the tunnel's line as a strip of
- * fresh spoil (the corridor itself runs buried under the buried skirt, which is why it must cross at the airlock). One merged mesh, built only when the
+ * floor hatch (a concrete coaming and a steel lid, a lamp on its post) beside the inner door, and the ground outside the airlock shows the
+ * tunnel's line as a low turfed ridge of backfill with marker posts and a pile of the spoil beside it (the corridor itself runs buried under the buried
+ * skirt, which is why it must cross at the airlock). One merged mesh, built only when the
  * domes or corridors change. SCALE v2: 1 unit = 20 ft, a door about 0.37.
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Dome } from '../../sim/dome/standing';
 import { airlockOfCorridor } from '../../sim/dome/crossing';
+import { vestibuleOf } from '../../sim/dome/vestibule';
 import type { PerimeterRun } from '../../sim/perimeter';
 import { CROSSING_KINDS } from '../../sim/dome/crossing';
 
@@ -26,7 +28,7 @@ function part(geo: THREE.BufferGeometry, color: number, x: number, y: number, z:
 export class DomePortals {
   private _mesh: THREE.Mesh | null = null;
   private _key = '';
-  private readonly _mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0.1 });
+  private readonly _mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0.05, side: THREE.DoubleSide });
   private readonly _scene: THREE.Scene;
   private readonly _ground: Ground;
   constructor(scene: THREE.Scene, ground: Ground) { this._scene = scene; this._ground = ground; }
@@ -43,19 +45,50 @@ export class DomePortals {
     if (this._mesh) { this._scene.remove(this._mesh); this._mesh.geometry.dispose(); this._mesh = null; }
     const all: THREE.BufferGeometry[] = [];
     for (const { d, i } of found) {
-      const a = d.airlocks[i], s = Math.sin(a.angle), c = Math.cos(a.angle), g = this._ground;
-      const P = (back: number, lat: number): [number, number] => [a.inX - s * back + c * lat, a.inZ - c * back - s * lat];
-      const y = g(a.inX, a.inZ);
-      const [cx, cz] = P(0.14, 0);
-      all.push(part(new THREE.BoxGeometry(a.w * 0.95, 0.05, 0.2), 0x9d9d96, cx, y + 0.025, cz, a.angle));                           // the collar slab
-      for (const side of [-1, 1]) { const [px, pz] = P(0.14, side * a.w * 0.36); all.push(part(new THREE.BoxGeometry(a.w * 0.1, 0.34, 0.2), 0x8d8d87, px, y + 0.17, pz, a.angle)); }   // its jambs
-      const [lx, lz] = P(0.14, 0);
-      all.push(part(new THREE.BoxGeometry(a.w * 0.7, 0.04, 0.2), 0x8d8d87, lx, y + 0.34, lz, a.angle));                           // the lintel
-      const [dx, dz] = P(0.215, 0);
-      all.push(part(new THREE.BoxGeometry(a.w * 0.62, 0.3, 0.012), 0x2a3036, dx, y + 0.17, dz, a.angle));                          // the steel door, closed
-      all.push(part(new THREE.BoxGeometry(a.w * 0.2, 0.012, 0.012), 0xffe9a8, dx, y + 0.31, dz, a.angle));                         // its lamp
-      // the line of the buried corridor out beyond the airlock: a strip of fresh spoil
-      for (let k = 0; k < 6; k++) { const [sx, sz] = [a.outX + s * (0.12 + k * 0.17), a.outZ + c * (0.12 + k * 0.17)]; all.push(part(new THREE.BoxGeometry(a.w * (0.7 - k * 0.05), 0.012, 0.15), 0x6b5a45, sx, g(sx, sz) + 0.008, sz, a.angle)); }
+      const a = d.airlocks[i], s = Math.sin(a.angle), c = Math.cos(a.angle), g = this._ground, r = Math.hypot(a.x - d.x, a.z - d.z), v = vestibuleOf(d.tier, r);
+      // the airlock's frame: `rho` out along its axis from the dome's center, `lam` across it (sim/dome/vestibule.ts)
+      const W = (rho: number, lam: number): [number, number] => [d.x + s * rho + c * lam, d.z + c * rho - s * lam];
+      const y = (x: number, z: number) => g(x, z);
+      // inside: the tunnel's person hatch in the floor beside the inner door, a low concrete coaming and a steel lid 
+      { const [hx, hz] = W(r - v.len - 0.2, v.dw / 2 + 0.13), hy = y(hx, hz);
+        all.push(part(new THREE.BoxGeometry(0.17, 0.035, 0.17), 0x9d9d96, hx, hy + 0.0175, hz, a.angle));
+        all.push(part(new THREE.BoxGeometry(0.15, 0.01, 0.15), 0x3c444b, hx, hy + 0.04, hz, a.angle));                       // the steel lid
+        all.push(part(new THREE.BoxGeometry(0.07, 0.012, 0.012), 0x8d949a, hx, hy + 0.051, hz, a.angle));                     // its handle
+        all.push(part(new THREE.BoxGeometry(0.012, 0.05, 0.012), 0xffe9a8, hx - c * 0.1, hy + 0.06, hz + s * 0.1, a.angle)); // a lamp on its post
+      }
+      // outside: the line of the buried corridor, a low turfed ridge of backfill with a crest of fresh soil that greens over, marker posts along it, a pile of spoil beside
+      const L0 = r + 0.1, L1 = r + 3.2, N = 16, wMax = Math.max(0.26, v.cw * 0.7);
+      const Q = [-1, -0.78, -0.42, 0, 0.42, 0.78, 1], PROFILE = [0, 0.4, 0.82, 1, 0.82, 0.4, 0];
+      const soil = new THREE.Color(0x4f3f2c), grass = new THREE.Color(0x6b7b3c), dry = new THREE.Color(0x7a7a48);
+      const hAt = (t: number) => 0.1 * (1 - 0.5 * t) * Math.min(1, (1 - t) * 6 + 0.15) * (0.3 + 0.7 * Math.min(1, t / 0.1));   // (it rises out of the ground at the airlock and tapers out at the far end)
+      const rows: Array<Array<{ p: [number, number, number]; c: THREE.Color }>> = [];
+      for (let k = 0; k <= N; k++) {
+        const t = k / N, rho = L0 + (L1 - L0) * t, w = wMax * (1 - 0.3 * t), h = hAt(t);
+        rows.push(Q.map((q, j) => {
+          const [x, z] = W(rho, q * w);
+          // fresh soil down the crest line, greening toward the flanks and along the run
+          const along = Math.min(1, t * 1.3), edge = Math.abs(q), c = soil.clone().lerp(grass, Math.min(1, 0.25 + edge * 0.9) * (0.5 + 0.5 * along)).lerp(dry, 0.15 * t);
+          return { p: [x, y(x, z) + (j === 0 || j === 6 ? 0.003 : h * PROFILE[j]), z], c };
+        }));
+      }
+      const pos: number[] = [], col: number[] = [];
+      for (let k = 0; k < N; k++) for (let j = 0; j < Q.length - 1; j++) {
+        const A = rows[k][j], B = rows[k][j + 1], C = rows[k + 1][j + 1], D = rows[k + 1][j];
+        for (const q of [A, B, C, A, C, D]) { pos.push(...q.p); col.push(q.c.r, q.c.g, q.c.b); }
+      }
+      const ridge = new THREE.BufferGeometry();
+      ridge.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); ridge.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); ridge.computeVertexNormals();
+      all.push(ridge);
+      for (let k = 0; k < 4; k++) {   // marker posts: a concrete stub with a yellow cap, on the crest every few steps
+        const [mx, mz] = W(L0 + 0.45 + k * 0.78, 0), my = y(mx, mz) + hAt((0.35 + k * 0.78) / 3.1);
+        all.push(part(new THREE.BoxGeometry(0.022, 0.09, 0.022), 0xb9b9b1, mx, my + 0.045, mz, a.angle));
+        all.push(part(new THREE.BoxGeometry(0.026, 0.014, 0.026), 0xe9b72b, mx, my + 0.097, mz, a.angle));
+      }
+      { const [px, pz] = W(r + 0.55, -(v.cw * 0.9 + 0.12)), py = y(px, pz);   // the spoil pile, loose and mounded, and a few stones on it
+        const pile = new THREE.SphereGeometry(1, 9, 5, 0, Math.PI * 2, 0, Math.PI / 2); pile.scale(0.26, 0.09, 0.19);
+        all.push(part(pile, 0x6e5b44, px, py - 0.004, pz, a.angle + 0.4));
+        for (let q = 0; q < 4; q++) { const [sx, sz] = W(r + 0.55 + (q - 1.5) * 0.07, -(v.cw * 0.9 + 0.12) + (q % 2 ? 0.07 : -0.06)); all.push(part(new THREE.DodecahedronGeometry(0.022, 0), 0x8a8478, sx, y(sx, sz) + 0.045 + (q % 2) * 0.012, sz, q)); }
+      }
     }
     if (!all.length) return;
     this._mesh = new THREE.Mesh(mergeGeometries(all), this._mat);
