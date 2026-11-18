@@ -57,6 +57,13 @@ try {
     if (process.env.DIAG) console.error('DIAG', P, JSON.stringify(await page.evaluate(id => { const w = window.__cb.world, b = w._built.get(id), bg = w._buried.get(id); return { gv: b.group.visible, pos: b.group.position.toArray(), kids: b.group.children.map(c => [c.name, c.visible, c.geometry ? c.geometry.drawRange.count : -1]).slice(0, 14), bgv: bg.visible, bgk: bg.children.map(c => [c.name, c.visible]), key: b.key, fin: b.finished, far: b.far, st: window.__cb.game.getState().game.structures.find(x => x.id === id) }; }, info.id)));
     if (process.env.DIAG) continue;
     const tag = `p${String(Math.round(P * 100)).padStart(3, '0')}`;
+    if (views.includes('panel')) {
+      await page.evaluate(id => { const cb = window.__cb; cb.store.getState().setHudHidden?.(false); cb.game.getState().select?.(id); }, D.id);
+      await page.getByRole('button', { name: /^Projects/ }).first().click().catch(() => {});
+      await frames(3); await page.waitForTimeout(400);
+      await page.screenshot({ path: `${out}/${tier}-${tag}-panel.png` }); lap(tag + '-panel');
+      await page.evaluate(() => window.__cb.store.getState().setHudHidden?.(true));
+    }
     if (views.includes('aerial')) { await pose([D.x + R * 1.5, ground + R * 2.2, D.z + R * 2.3], [D.x, ground - 0.5, D.z], 50); await shot(`${tag}-aerial`); }
     if (views.includes('top')) { await pose([D.x, ground + R * 3.4, D.z + 0.01], [D.x, ground - 0.5, D.z], 50); await shot(`${tag}-top`); }
     if (views.includes('low')) { await pose([D.x + R * 1.9, ground + 0.9, D.z + R * 1.1], [D.x, ground - 0.2, D.z], 60); await shot(`${tag}-low`); }
