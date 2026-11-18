@@ -49,6 +49,7 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 91 → 92: life on the county road (sim/roadPassers.ts, sim/roadWarn.ts): `road` is optional and made on first use
   // 93 → 94: the road post (sim/roadPost.ts): `RoadBlock.crew`, `Order.held`, both optional; no old-save work
   // 97 → 98: the per-kind disaster hook seam (sim/disasterFx.ts): `disaster.fx` is optional, made on first use; no old-save work
+  98: s => ({ ...s, version: 99 }),
   97: s => ({ ...s, version: 98 }),
   // 95 → 96: hiding in the bunker (sim/bunkerHide.ts): `Outcome.bunker` on the gate card, optional; no old-save work
   95: s => ({ ...s, version: 96 }),

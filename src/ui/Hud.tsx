@@ -121,6 +121,7 @@ import { CursorHint, LineToolBar, ToastLine, WelcomeCard } from './hud/Feedback'
 import { getViolence, setViolence, type Violence } from '../game/battle/bloodFx';
 import { getNames, setNames, getPips, setPips } from '../game/battle/nameLabels';
 import { useFeelStore, saveRevealed, worldId } from '../store/feelStore';
+import { DomePanel } from './hud/DomePanel';
 import { RIGHT_TABS, visibleTabs, type RightTab } from '../sim/tabReveal';
 import { caloriesText, feetText, gallonsText, kmText, lengthText, remRateText, remText } from '../sim/units';
 
@@ -292,7 +293,7 @@ export function Hud() {
   const warned = !!game.disaster.kind && game.clock.t >= game.disaster.warnAt;
   const daysFood = daysOfFood(game);
   const foodAlert: Tone | undefined = !game.food.fromStores && game.food.ateKcal < game.food.needKcal * 0.95 ? 'bad' : warned && (game.food.fromStores ? daysFood < 180 : daysFood < 30) ? 'warn' : undefined;
-  const utilAlert: Tone | undefined = game.utilities.report.shortL > 0 ? 'bad' : game.utilities.hauling || game.utilities.report.shortKwh > 0.5 ? 'warn' : undefined;
+  const utilAlert: Tone | undefined = game.utilities.report.shortL > 0 ? 'bad' : game.utilities.hauling || game.utilities.report.shortKwh > 0.5 || (game.dome?.lockdown && game.dome.alarm !== 'ok') ? 'warn' : undefined;
   const defenseAlert: Tone | undefined = defenseTabAlert(game);
   const outsideAlert: Tone | undefined = game.clock.t >= game.disaster.hitAt && game.disaster.kind ? 'bad' : warned ? 'warn' : undefined;
   // fight wounds heal only with meds, a medic (skill 3+) or the bunker's medical bay
@@ -589,6 +590,7 @@ export function Hud() {
                 {game.site.gwQuality === 'hard' && game.stock.softener < 1 && <Note>Hard water: scale wears the pump faster without a softener.</Note>}
               </Section></Page>
               <Page id="vehicles"><FleetPanel /></Page>
+              <Page id="dome"><DomePanel /></Page>
             </>;
           })()}
 

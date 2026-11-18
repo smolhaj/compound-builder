@@ -47,7 +47,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 98;
+export const SAVE_VERSION = 99;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -269,6 +269,8 @@ export interface GameState {
   upkeep: Upkeep;
   /** Severe weather: the storm on or warned of (sim/weatherThreats.ts; lazily set, absent in old saves). */
   weather?: WeatherState;
+  /** The dome: lockdown, air filtering, closed ecology and the gauges (sim/dome/live.ts; absent until the player touches it; save v99). */
+  dome?: import('./dome/live').DomeState;
   /** How old the stores are, rotation, traps. */
   shelf: Shelf;
   /** What the food stores are made of, item by item, and the diet's running averages (sim/pantry.ts; save v39). */

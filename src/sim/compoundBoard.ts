@@ -25,6 +25,7 @@ import { stuckAction, stuckProject } from './stalls';
 import { KIT } from '../game/buildkit/kit';
 import { dayIndex, type GameState } from './state';
 import { pluralize } from './words';
+import { domeAirLine } from './dome/live';
 
 export type BoardTone = 'good' | 'warn' | 'bad';
 /** What a board button does (the HUD handles these four): open a right-hand tab, select a building, arm a kit piece, open the Shop. */
@@ -131,6 +132,10 @@ export function compoundBoard(s: GameState, drive?: readonly Pt[]): CompoundBoar
   { const hurt = alive.filter(x => { const n = s.personState[x.i].needs; return n.health < 40 || n.hurt.length > 0; }).length;
     if (hurt) threats.push({ id: 'hurt', text: `${hurt} hurt or ill`, tone: 'bad', act: { label: 'Family', act: open('family') } }); }
 
+  // the dome's air while it is sealed and the clock is short (sim/dome/live.ts): one home for the fact
+  { const da = domeAirLine(s);
+    if (da) threats.unshift({ id: 'dome_air', text: da.text, tone: da.tone, act: { label: 'Dome', act: open('utilities') } }); }
+
   // the road post (sim/roadPost.ts): who is tied up at the drive
   { const post = roadPostLine(s);
     if (post) threats.push({ id: 'roadpost', text: post, tone: 'warn', act: { label: 'Family', act: open('family') } }); }
@@ -167,7 +172,7 @@ export function boardCache(): (s: GameState, drive?: readonly Pt[]) => CompoundB
   let key = '', last: CompoundBoard | null = null;
   return (s, drive) => {
     const fin = s.structures.reduce((a, st) => a + (isFinished(st) ? 1 : 0), 0);
-    const k = `${dayIndex(s.clock.t)}|${s.structures.length}|${fin}|${s.people.length}|${s.gate.pending ? 1 : 0}${s.gate.aftermath ? 1 : 0}|${s.perimeter.length}|${s.disaster.phase}`;
+    const k = `${dayIndex(s.clock.t)}|${s.structures.length}|${fin}|${s.people.length}|${s.gate.pending ? 1 : 0}${s.gate.aftermath ? 1 : 0}|${s.perimeter.length}|${s.disaster.phase}|${s.dome?.alarm ?? ''}${s.dome?.lockdown ? 1 : 0}${Math.floor((s.dome?.hours ?? 0) / 2)}`;
     if (!last || k !== key) { last = compoundBoard(s, drive); key = k; }
     return last;
   };

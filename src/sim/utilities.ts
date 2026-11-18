@@ -36,6 +36,8 @@ import { intakeCare, renewablesDay, type RenewDay } from './renewables';
 import { bestLevel } from './skills';
 import { regionFor } from './climate';
 import { gallonsText } from './units';
+import { domeKwhDay, domeLoadPriority } from './dome/live';
+import { tierOfKind } from './dome/tiers';
 
 /** What utility buildings provide. */
 export interface UtilityDef {
@@ -82,7 +84,7 @@ export const UTILITY: Record<string, UtilityDef> = {
 };
 
 /** Daily power draw (kWh) of a wired building by kind, and water use (L/person/day) carried vs plumbed. */
-export const DRAW_KWH: Record<string, number> = { lodge: 16, lodge_plinth: 15, lodge_solar: 16, stone_house: 8, timber_frame: 6, container_house: 5, adobe_house: 5, timber_cabin: 5, log_house: 8, farmhouse: 9, trailer: 6, travel_trailer: 2, rv_camper: 3, modular_home: 4, cottage: 4, guest_house: 3, moms_house: 5, barn: 1, workshop: 4, metal_garage: 1, garage_solar: 1, filtration_shed: 0.3, root_cellar: 0.2, chicken_coop: 0.3, outhouse: 0, garden: 0, field: 0, greenhouse: 1, greenhouse_heated: 4, aquaponics: 4, high_tunnel: 0.5,marina: 2, boat_dock: 0.1,stilted_house: 4, cabin_village: 3, helipad: 0.3, tower_pod: 0.4, orchard: 0, orchard_grove: 0, pond: 1.5, reservoir: 1, sheep_barn: 0.3, equipment_yard: 0.2, solar_farm: 0, battery_bank: 0 };
+export const DRAW_KWH: Record<string, number> = { dome_earthen: 0.2, dome_geodesic: 1, dome_glass: 1, dome_arcology: 1, lodge: 16, lodge_plinth: 15, lodge_solar: 16, stone_house: 8, timber_frame: 6, container_house: 5, adobe_house: 5, timber_cabin: 5, log_house: 8, farmhouse: 9, trailer: 6, travel_trailer: 2, rv_camper: 3, modular_home: 4, cottage: 4, guest_house: 3, moms_house: 5, barn: 1, workshop: 4, metal_garage: 1, garage_solar: 1, filtration_shed: 0.3, root_cellar: 0.2, chicken_coop: 0.3, outhouse: 0, garden: 0, field: 0, greenhouse: 1, greenhouse_heated: 4, aquaponics: 4, high_tunnel: 0.5,marina: 2, boat_dock: 0.1,stilted_house: 4, cabin_village: 3, helipad: 0.3, tower_pod: 0.4, orchard: 0, orchard_grove: 0, pond: 1.5, reservoir: 1, sheep_barn: 0.3, equipment_yard: 0.2, solar_farm: 0, battery_bank: 0 };
 export const WATER_CARRIED = 25, WATER_PLUMBED = 130;
 /** Fitting jobs: hours and materials (per building). */
 export const FIT = {
@@ -110,7 +112,7 @@ export const NET_METER_USD_PER_KWH = 0.05;
  * Who gets power first when there isn't enough (lower first): pumps, the
  * root cellar (freezer), homes, then the coop and the workshop.
  */
-export const LOAD_PRIORITY: Record<string, number> = { well_drilled: 0, root_cellar: 1, timber_cabin: 2, log_house: 2, lodge: 2, lodge_plinth: 2, lodge_solar: 2, stone_house: 2, timber_frame: 2, container_house: 2, adobe_house: 2, farmhouse: 2, trailer: 2, travel_trailer: 2, rv_camper: 2, modular_home: 2, cottage: 2, guest_house: 2, moms_house: 2, filtration_shed: 0, barn: 4, chicken_coop: 3, workshop: 4, metal_garage: 4, garage_solar: 4, greenhouse: 3, greenhouse_heated: 3, aquaponics: 1,marina: 5,stilted_house: 2, cabin_village: 3, pond: 1, reservoir: 3, sheep_barn: 4, equipment_yard: 5 };
+export const LOAD_PRIORITY: Record<string, number> = { dome_earthen: 2, dome_geodesic: 2, dome_glass: 2, dome_arcology: 2, well_drilled: 0, root_cellar: 1, timber_cabin: 2, log_house: 2, lodge: 2, lodge_plinth: 2, lodge_solar: 2, stone_house: 2, timber_frame: 2, container_house: 2, adobe_house: 2, farmhouse: 2, trailer: 2, travel_trailer: 2, rv_camper: 2, modular_home: 2, cottage: 2, guest_house: 2, moms_house: 2, filtration_shed: 0, barn: 4, chicken_coop: 3, workshop: 4, metal_garage: 4, garage_solar: 4, greenhouse: 3, greenhouse_heated: 3, aquaponics: 1,marina: 5,stilted_house: 2, cabin_village: 3, pond: 1, reservoir: 3, sheep_barn: 4, equipment_yard: 5 };
 
 export interface Fitting { building: string; kind: 'plumb' | 'wire'; done: number; hours: number; supplied: boolean; finishedAt: number | null }
 
@@ -305,7 +307,7 @@ export function joinBank(nodes: readonly Node[], power: Map<string, number>): Ma
   return out;
 }
 
-function fitted(s: GameState, id: string, kind: Fitting['kind']): boolean {
+export function fitted(s: GameState, id: string, kind: Fitting['kind']): boolean {
   return s.utilities.fittings.some(f => f.building === id && f.kind === kind && f.finishedAt !== null);
 }
 
@@ -371,7 +373,7 @@ export function sunHours(doy: number): number {
 }
 
 /** Half-size (world units) a line must reach to touch a building, and its roof area (m²) for rain catchment, by kind. */
-export const NODE_R: Record<string, number> = { orchard_terraced: 2, stilted_house: 0.6, cabin_village: 2, helipad: 0.8, tower_pod: 0.3, aquaponics: 2, high_tunnel: 2, polytunnel: 1.2, micro_hydro: 0.7, wind_turbine: 0.4, solar_farm: 1.5, battery_bank: 0.5, greenhouse_heated: 1.5, orchard_grove: 2, pond: 1.5, reservoir: 1.2, sheep_barn: 1, equipment_yard: 1, timber_cabin: 0.5, lodge: 1.3, lodge_plinth: 1.3, lodge_solar: 1.3, stone_house: 0.8, timber_frame: 0.8, container_house: 0.6, adobe_house: 0.8, log_house: 0.75, farmhouse: 0.75, trailer: 0.6, travel_trailer: 0.5, rv_camper: 0.5, modular_home: 0.55, cottage: 0.55, guest_house: 0.45, moms_house: 0.75, barn: 1.0, workshop: 0.75, metal_garage: 0.8, garage_solar: 0.8, filtration_shed: 0.2, root_cellar: 0.4, chicken_coop: 0.4, garden: 0.7, field: 2.2, outhouse: 0.2, well_hand: 0.25, well_drilled: 0.3, cistern: 0.3, water_tower: 0.35, solar_array: 0.6, battery_shed: 0.3, generator_shed: 0.3, septic: 0.4, greenhouse: 0.6, orchard: 1.3 };
+export const NODE_R: Record<string, number> = { dome_earthen: 0.6, dome_geodesic: 1.6, dome_glass: 3.8, dome_arcology: 9, orchard_terraced: 2, stilted_house: 0.6, cabin_village: 2, helipad: 0.8, tower_pod: 0.3, aquaponics: 2, high_tunnel: 2, polytunnel: 1.2, micro_hydro: 0.7, wind_turbine: 0.4, solar_farm: 1.5, battery_bank: 0.5, greenhouse_heated: 1.5, orchard_grove: 2, pond: 1.5, reservoir: 1.2, sheep_barn: 1, equipment_yard: 1, timber_cabin: 0.5, lodge: 1.3, lodge_plinth: 1.3, lodge_solar: 1.3, stone_house: 0.8, timber_frame: 0.8, container_house: 0.6, adobe_house: 0.8, log_house: 0.75, farmhouse: 0.75, trailer: 0.6, travel_trailer: 0.5, rv_camper: 0.5, modular_home: 0.55, cottage: 0.55, guest_house: 0.45, moms_house: 0.75, barn: 1.0, workshop: 0.75, metal_garage: 0.8, garage_solar: 0.8, filtration_shed: 0.2, root_cellar: 0.4, chicken_coop: 0.4, garden: 0.7, field: 2.2, outhouse: 0.2, well_hand: 0.25, well_drilled: 0.3, cistern: 0.3, water_tower: 0.35, solar_array: 0.6, battery_shed: 0.3, generator_shed: 0.3, septic: 0.4, greenhouse: 0.6, orchard: 1.3 };
 export const ROOF_M2: Record<string, number> = { stilted_house: 70, cabin_village: 120, timber_cabin: 70, lodge: 330, lodge_plinth: 330, lodge_solar: 330, stone_house: 140, timber_frame: 150, container_house: 90, adobe_house: 120, log_house: 160, farmhouse: 140, trailer: 90, travel_trailer: 25, rv_camper: 30, modular_home: 45, cottage: 60, guest_house: 40, moms_house: 80, barn: 220, workshop: 120, metal_garage: 120, garage_solar: 120, filtration_shed: 5, chicken_coop: 6, outhouse: 2, battery_shed: 8, generator_shed: 8, well_drilled: 6, well_hand: 3, greenhouse: 26, greenhouse_heated: 216, sheep_barn: 110, battery_bank: 18 };
 
 /** Rain and snowmelt (mm a day, averaged by month): wet spring, dry late summer. */
@@ -405,7 +407,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   const pumpFactor = pumpDrawFactor(s);
   const loadOf = (o: Node) => u.off.includes(o.id) ? 0
     : UTILITY[o.kind]?.water?.needsPower ? (u.broken.includes(o.id) || u.fried.includes(o.id) ? 0 : UTILITY[o.kind]!.water!.needsPower! * pumpFactor)
-    : fitted(s, o.id, 'wire') ? (o.kind === 'greenhouse_heated' ? greenhouseKwh(s, built.get(o.id)!) : o.kind === 'aquaponics' ? aquaKwh(s, built.get(o.id)) : DRAW_KWH[o.kind] ?? 0) : 0;
+    : fitted(s, o.id, 'wire') ? (o.kind === 'greenhouse_heated' ? greenhouseKwh(s, built.get(o.id)!) : o.kind === 'aquaponics' ? aquaKwh(s, built.get(o.id)) : tierOfKind(o.kind) ? domeKwhDay(s, built.get(o.id)!) : DRAW_KWH[o.kind] ?? 0) : 0;
   const isSource = (o: Node) => !!(UTILITY[o.kind]?.solarKw || UTILITY[o.kind]?.genKw || UTILITY[o.kind]?.batteryKwh || UTILITY[o.kind]?.renew);
   // a gale strips an exposed ground array (sim/microclimate.ts): it makes nothing until a hardware kit and two panels put the panels back
   for (const st of fin) if (arrayStripped(s, st) && !u.broken.includes(st.id)) { u.broken.push(st.id); log(s, `The gale tore panels off the ${st.kind.replace(/_/g, ' ')}. A hardware kit and two solar panels will put them back.`); }
@@ -425,7 +427,7 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   for (const [key, members] of groups) {
     // a building on no network of its own: the grid or nothing (dark, no shortage to report)
     if (typeof key === 'string' && !gridUp) continue;
-    const loads = members.filter(o => loadOf(o) > 0).sort((a, b) => (LOAD_PRIORITY[a.kind] ?? 2) - (LOAD_PRIORITY[b.kind] ?? 2));
+    const loads = members.filter(o => loadOf(o) > 0).sort((a, b) => (domeLoadPriority(s, a.kind) ?? LOAD_PRIORITY[a.kind] ?? 2) - (domeLoadPriority(s, b.kind) ?? LOAD_PRIORITY[b.kind] ?? 2));
     const d = loads.reduce((a, o) => a + loadOf(o), 0);
     const cap = members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.batteryKwh ?? 0), 0) * (1 - u.batteryFade);
     const genKw = members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.genKw ?? 0), 0);

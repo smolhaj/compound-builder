@@ -23,6 +23,7 @@ import { mulberry32 } from './rng';
 import { empVehicles } from './vehicles';
 import type { Stock } from './materials';
 import { takeIodide } from './radiation';
+import { domeShelter, domeFalloutAdj } from './dome/live';
 
 /** Dose rate at H+1 (Sv/h) at the compound, by variant, and hours until the fallout arrives. */
 const R1: Record<string, number> = { distant: 2.0, nearby: 4.0, exchange: 3.0 };
@@ -73,6 +74,7 @@ export function hoursOutside(s: GameState, h0: number, kid: boolean): number {
 export function bestShelter(s: GameState): [number, string] {
   let best: [number, string] = [1.5, 'the open camp'];
   for (const st of s.structures.filter(isFinished)) { const r = shelterOf(st); if (r && r[0] > best[0]) best = r; }
+  { const r = domeShelter(s); if (r && r[0] > best[0]) best = r; }
   return best;
 }
 
@@ -143,6 +145,7 @@ export function falloutDay(s: GameState): string[] {
   const v = s.disaster.variant, h0 = (s.clock.t - s.disaster.hitAt) * 24;
   if (h0 > 24 * 400) return [];
   const [pf] = bestShelter(s);
+  const adj = domeFalloutAdj(s), outPf = adj?.outPf ?? 1.5, foodK = adj?.foodK ?? 1;
   const out: string[] = [];
   const fin = s.structures.filter(isFinished);
   const cleanWater = !s.utilities.hauling && fin.some(st => st.kind === 'well_drilled' || st.kind === 'well_hand' || st.kind === 'cistern' || st.kind === 'water_tower');
@@ -151,13 +154,13 @@ export function falloutDay(s: GameState): string[] {
     const n = s.personState[i]?.needs;
     if (!n || n.died != null) return;
     const outside = hoursOutside(s, h0, !!p.kid);   // hours in the open: none the first three days, a dash for water after (a meter keeps it to what the rate allows)
-    let dose = doseBetween(v, h0, h0 + 24 - outside) / pf + doseBetween(v, h0 + 24 - outside, h0 + 24) / 1.5;
+    let dose = doseBetween(v, h0, h0 + 24 - outside) / pf + doseBetween(v, h0 + 24 - outside, h0 + 24) / outPf;
     // contaminated food and water: garden produce and creek water carry it for two months
     if (day < CONTAMINATED_DAYS) {
       const k = (1 - day / CONTAMINATED_DAYS) * (R1[v] ?? 1);
-      if (!cleanWater) dose += 0.004 * k;
+      if (!cleanWater) dose += 0.004 * k * foodK;
       // (by the share of the diet that's fresh from the place, not the size of the farm: playtest round 3, a fallout over a 16-field harvest gave everyone 0.3 Sv a day)
-      if (s.food.producedKcal > 0) dose += 0.002 * k * Math.min(1, s.food.producedKcal / Math.max(1, s.food.needKcal));
+      if (s.food.producedKcal > 0) dose += 0.002 * k * foodK * Math.min(1, s.food.producedKcal / Math.max(1, s.food.needKcal));
     }
     // (the sickness itself, with the body's repair, is sim/radiation.ts)
     n.dose += dose;
