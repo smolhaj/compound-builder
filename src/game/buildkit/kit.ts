@@ -7,7 +7,7 @@
  * units. Footprints are in cells; `rot` turns in quarter turns.
  */
 import type { KitMaterialId } from './materials';
-import { TIER, DOME_TIERS } from '../../sim/dome/tiers';
+import { TIER, DOME_TIERS, parseDomeKind, withSizedDomes } from '../../sim/dome/tiers';
 import { rectVsCircle } from '../../sim/dome/siting';
 
 const TIER_CELLS = Object.fromEntries(DOME_TIERS.map(t => [t, TIER[t].cells])) as Record<(typeof DOME_TIERS)[number], number>;
@@ -577,7 +577,9 @@ export const DOME_KIT: KitPieceDef[] = [
 /** The Enclosure menu order. */
 export const DOME_ORDER: readonly string[] = DOME_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([...DOME_KIT, ORCHARD_TERRACED, CABIN_VILLAGE, HELIPAD, TOWER_POD, STILTED_HOUSE, BOAT_DOCK, MARINA, POLYTUNNEL, HIGH_TUNNEL, AQUAPONICS, LODGE, LODGE_PLINTH, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, FORGE, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, VEHICLE_YARD_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, TRAVEL_TRAILER, RV_CAMPER, MODULAR_HOME, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, TERRACE_STAIR, TERRACE_RAMP, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
+const KIT_BASE: Record<string, KitPieceDef> = Object.fromEntries([...DOME_KIT, ORCHARD_TERRACED, CABIN_VILLAGE, HELIPAD, TOWER_POD, STILTED_HOUSE, BOAT_DOCK, MARINA, POLYTUNNEL, HIGH_TUNNEL, AQUAPONICS, LODGE, LODGE_PLINTH, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, FORGE, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, VEHICLE_YARD_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, TRAVEL_TRAILER, RV_CAMPER, MODULAR_HOME, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, TERRACE_STAIR, TERRACE_RAMP, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
+/** The kit, and the domes the player sized (`dome_geodesic_9`: the same piece 9 cells across; see sim/dome/tiers.ts). */
+export const KIT: Record<string, KitPieceDef> = withSizedDomes(KIT_BASE, (b, p) => ({ ...b, cellsX: p.cells, cellsZ: p.cells, id: `${b.id}_${p.cells}` }));
 /** Build-menu order. */
 /** Rigs a joiner brought (sim/joinerHome.ts): in the build menu only while one is waiting for a pad. */
 export const RIG_ORDER: readonly string[] = ['travel_trailer', 'rv_camper'];
@@ -676,7 +678,7 @@ export const domeCircle = (d: KitPieceDef, x: number, z: number) => ({ x, z, r: 
 
 /** Why a piece can't go here (null = it can). Underground pieces also need underground.ts's rules. */
 export function placementProblem(def: KitPieceDef, x: number, z: number, rot: number, site: SiteQuery, placed: readonly Placed[]): PlaceProblem | null {
-  const below = levelOf(def) === 'underground', cover = levelOf(def) === 'cover';
+  const below = levelOf(def) === 'underground', cover = levelOf(def) === 'cover', round = parseDomeKind(def.id) !== null;
   const r = footprint(def, x, z, rot, !below);
   const N = 4;
   const hs: number[][] = [];
@@ -693,6 +695,7 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
     const row: number[] = [];
     for (let j = 0; j <= N; j++) {
       const [px, pz] = spot(i, j);
+      if (round && Math.hypot(px - x, pz - z) > hx + 1e-6) { row.push(site.height(px, pz)); continue; }    // (a dome is a circle: the square's corners are not its ground)
       if (!site.owned(px, pz)) return 'off_parcel';
       if (def.waterside) { if (site.water(px, pz)) wet++; else dry++; }
       else if (site.water(px, pz)) return 'water';
@@ -708,7 +711,9 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
     const m = below ? 0 : 0.06, x0 = r.x0 - m, x1 = r.x1 + m, z0 = r.z0 - m, z1 = r.z1 + m;
     const nx = Math.min(28, Math.ceil((x1 - x0) / 0.3)), nz = Math.min(28, Math.ceil((z1 - z0) / 0.3));
     for (let i = 0; i <= nx; i++) for (let j = 0; j <= nz; j++) {
-      const px = x0 + (x1 - x0) * i / nx, pz = z0 + (z1 - z0) * j / nz, inside = px >= r.x0 && px <= r.x1 && pz >= r.z0 && pz <= r.z1;
+      const px = x0 + (x1 - x0) * i / nx, pz = z0 + (z1 - z0) * j / nz;
+      if (round && Math.hypot(px - x, pz - z) > hx + 1e-6) continue;
+      const inside = px >= r.x0 && px <= r.x1 && pz >= r.z0 && pz <= r.z1;
       if (inside && !site.owned(px, pz)) return 'off_parcel';
       if (inside && !def.waterside && site.water(px, pz)) return 'water';
       if (!below && !cover && site.blocked?.(px, pz)) return 'overlaps';

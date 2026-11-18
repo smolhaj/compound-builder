@@ -149,3 +149,39 @@ export function domeBarrier(s: Pick<GameState, 'structures'> & Partial<Pick<Game
   for (const d of domesOf(s)) if (Math.hypot(home.x - d.x, home.z - d.z) < d.r) best = Math.max(best, SHELL_BARRIER[d.tier] * d.health);
   return best;
 }
+
+// ── where a lost panel sits ──
+
+/** How far (world units, along the shell) a panel hole keeps from an airlock's axis: the chamber, its surround plate and room to stand beside it. */
+export const PANEL_CLEARANCE = 0.9;
+const angDiff = (a: number, b: number): number => Math.atan2(Math.sin(a - b), Math.cos(a - b));
+
+/**
+ * A point on the shell for a panel lost to stray rounds: the middle of the widest stretch of shell between two airlocks (the `k`-th widest for the
+ * `k`-th hole, so two holes do not stack), never beside an airlock. A dome with one airlock takes it opposite.
+ */
+export function panelSpot(d: Pick<Dome, 'x' | 'z' | 'r' | 'airlocks'>, k = 0): { x: number; z: number; angle: number } {
+  const angs = d.airlocks.map(a => a.angle).sort((p, q) => p - q), gaps: Array<{ mid: number; span: number }> = [];
+  if (!angs.length) gaps.push({ mid: 0.4, span: 2 * Math.PI });
+  for (let i = 0; i < angs.length; i++) {
+    const a = angs[i], b = i + 1 < angs.length ? angs[i + 1] : angs[0] + 2 * Math.PI;
+    gaps.push({ mid: (a + b) / 2, span: b - a });
+  }
+  gaps.sort((p, q) => q.span - p.span || p.mid - q.mid);
+  const angle = gaps[k % gaps.length].mid, [x, z] = onShell(d, angle);
+  return { x, z, angle };
+}
+
+/** A hole's spot moved along the shell to clear the airlocks (it stays where it is when it already does). */
+export function awayFromAirlocks(d: Pick<Dome, 'x' | 'z' | 'r' | 'airlocks'>, x: number, z: number, clear = PANEL_CLEARANCE): { x: number; z: number; moved: boolean } {
+  let a = Math.atan2(x - d.x, z - d.z), moved = false;
+  const need = clear / d.r;
+  for (let pass = 0; pass < 3; pass++) {
+    for (const l of d.airlocks) {
+      const off = angDiff(a, l.angle);
+      if (Math.abs(off) < need) { a = l.angle + (off >= 0 ? 1 : -1) * need; moved = true; }
+    }
+  }
+  const [nx, nz] = onShell(d, a);
+  return moved ? { x: nx, z: nz, moved } : { x, z, moved };
+}

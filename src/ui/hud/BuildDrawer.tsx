@@ -13,6 +13,7 @@ import { useDrawerStore } from '../../store/drawerStore';
 import { operational, type OpItem } from '../../sim/operational';
 import { adviceCtx, billFor, catalogEntries, cardState, CATS, filterCatalog, moveIndex, priceText, recommendedKeys, type Bill, type CardState, type CatId, type CatalogEntry } from '../../sim/buildCatalog';
 import { runOver } from '../../sim/wipe';
+import { TIER, cellsOfKind, kindOfCells, shellFt, tierOfKind } from '../../sim/dome/tiers';
 import { starterWanted } from '../../sim/starterCompound';
 import { fosterNote } from '../../sim/orphans';
 import { BuildMenu } from './BuildMenu';
@@ -100,7 +101,7 @@ function BillCard({ bill, anchor, scale }: { bill: Bill; anchor: HTMLElement; sc
       </div>
       <div>{row('Work', `${Math.round(bill.hours)} h`)}{row('A hired crew', `about ${bill.crewWeeks} ${bill.crewWeeks === 1 ? 'week' : 'weeks'}`)}</div>
       {bill.needs.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: 2, color: tv.color('warn') }}>{bill.needs.map(n => <div key={n}>{T.glyph.warn} {n}</div>)}</div>}
-      <div style={{ color: tv.color('dim'), fontSize: tv.font('fine') }}>{bill.state === 'off' ? 'Not yet' : 'Click to place it. R rotates, Esc cancels.'}</div>
+      <div style={{ color: tv.color('dim'), fontSize: tv.font('fine') }}>{bill.state === 'off' ? 'Not yet' : bill.sizable ? 'Click to place it. + and - (or Shift+wheel) set the diameter, R rotates, Esc cancels.' : 'Click to place it. R rotates, Esc cancels.'}</div>
     </div>, document.body);
 }
 
@@ -180,7 +181,14 @@ export function BuildDrawer() {
     else if (ev.key === 'Escape') { ev.stopPropagation(); if (query) setQuery(''); else searchRef.current?.blur(); }
   };
 
-  const bill = hover ? billFor(game, hover.e, ctx) : null;
+  // a dome's bill is for the diameter the player has picked (the placing card's slider, + and -): the sized kind prices through the same blueprint
+  const sized = (e: CatalogEntry): CatalogEntry => {
+    const t = tierOfKind(e.key);
+    if (!t) return e;
+    const k = kindOfCells(t, g.domeCells[t] ?? TIER[t].cells);
+    return k === e.key ? e : { ...e, key: k, tool: k, name: `${e.name}, ${Math.round(shellFt(t, cellsOfKind(k)!))} ft` };
+  };
+  const bill = hover ? billFor(game, sized(hover.e), ctx) : null;
   const toolBox = <div data-testid="build-tools">
     <BuildMenu toolsOnly showProjects={() => useDrawerStore.getState().show('projects')} />
   </div>;

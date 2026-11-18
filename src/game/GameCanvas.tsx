@@ -171,6 +171,7 @@ export function GameCanvas() {
       onCaption: c => useWorldStore.getState().setTourCaption(c),
     });
     const tool = new PlacementTool(ws.scene, ws.camera, canvas, world);
+    cam.wheelHook = e => tool.wheel(e);
     const marker = new MarkTool(ws.scene, ws.camera, canvas, world);
     const fence = new PerimeterTool(ws.scene, ws.camera, canvas, world);
     // the HUD's "Mark 10 trees": the nearest standing trees on our land, nearest the yard first
@@ -402,7 +403,7 @@ export function GameCanvas() {
     const damageView = new RaidDamageRenderer(ws.scene, world.groundAt, d => {
       if (d.kind === 'panel') {   // a hole in a dome's shell: the wall runs along the shell, at right angles to the radius
         const dome = domesOf(useGameStore.getState().game).find(x => x.id === d.structure);
-        return dome ? -Math.atan2(d.x - dome.x, -(d.z - dome.z)) : 0;
+        return dome ? Math.atan2(d.x - dome.x, d.z - dome.z) - Math.PI / 2 : 0;   // (its local x is the hole's thin side, so x points out along the radius and the hole lies in the shell)
       }
       const run = useGameStore.getState().game.perimeter.find(r => r.id === d.runId);
       if (!run) return 0;

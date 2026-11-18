@@ -12,12 +12,12 @@ const NAMES: Record<DomeTier, [string, string, string, string, string]> = {
 const SPLIT: Array<[number]> = [[0.06], [0.22], [0.32], [0.28], [0.12]];
 const IDS = ['site', 'foundation', 'frame', 'roof', 'finish'] as const;
 
-export function domeBlueprint(tier: DomeTier): Blueprint {
-  const c = domeCost(tier);
+export function domeBlueprint(tier: DomeTier, cells: number = TIER[tier].cells, kind: string = DOME_KIND[tier]): Blueprint {
+  const c = domeCost(tier, cells);
   return {
-    kind: DOME_KIND[tier],
+    kind,
     stages: IDS.map((id, i) => ({ id, name: NAMES[tier][i], hours: Math.max(2, Math.round(c.hours * SPLIT[i][0])), materials: c.stages[id] })),
   };
 }
-export const DOME_BLUEPRINTS: Blueprint[] = DOME_TIERS.map(domeBlueprint);
+export const DOME_BLUEPRINTS: Blueprint[] = DOME_TIERS.map(t => domeBlueprint(t));
 export const DOME_HOURS = Object.fromEntries(DOME_TIERS.map(t => [DOME_KIND[t], TIER[t].hours]));

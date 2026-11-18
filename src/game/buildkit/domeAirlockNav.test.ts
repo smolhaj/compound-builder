@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as THREE from 'three';
 
+
 vi.mock('./materials', () => ({ kitMaterial: () => new THREE.MeshStandardMaterial(), setWindowGlow: () => {} }));
 
 import { KIT } from './kit';
@@ -13,21 +14,28 @@ import type { Collider } from './interior';
 
 const unit = (id: string, side: 'home' | 'raider', x: number, z: number): BattleUnit => ({ id, side, x, z, post: 'open' });
 
+/** The radius the builder lays the airlocks on (the footprint less the berm and a hair). */
+const Rof = (kind: string): number => KIT[kind].cellsX * 0.5 / 2 - 0.03 - (kind === 'dome_geodesic' ? 0.25 : 0);
+
+/** A body's radius in the live world (HomesteadWorld INDOOR_R is 0.04): the boxes are grown by it, so a path that clears the grown boxes clears the walls with room, and no tolerance is needed for a leg that hugs a doorway. */
+const BODY = 0.03;
+const grow = (bs: Collider[], r: number): Collider[] => bs.map(b => ({ x0: b.x0 - r, z0: b.z0 - r, x1: b.x1 + r, z1: b.z1 + r }));
+
 /** The router's world for one dome: its own colliders (the shell ring, with gaps at the airlocks) at the origin. */
 function world(kind: 'dome_geodesic' | 'dome_glass' | 'dome_arcology') {
   const g = DOME_BUILDERS[kind](KIT[kind], 1, {});
   const boxes = g.userData.colliders as Collider[];
   const tier = kind === 'dome_geodesic' ? 'geodesic' : kind === 'dome_glass' ? 'glass' : 'arcology';
   const r = shellFt(tier, KIT[kind].cellsX * 2 * 10 / 10) / 2 / 20;
-  return { boxes, tier, r, airlocks: airlocksOf(tier, 0, 0, KIT[kind].cellsX * 0.5 / 2 - 0.03 - (tier === 'geodesic' ? 0.25 : 0), 0) };
+  return { boxes, tier, r, R: Rof(kind), airlocks: airlocksOf(tier, 0, 0, Rof(kind), 0) };
 }
 
 describe('people go through the airlocks of a dome, never through the shell', () => {
   for (const kind of ['dome_geodesic', 'dome_glass', 'dome_arcology'] as const) {
     it(`${kind}: a raider outside between two airlocks and a defender inside are routed through an airlock gap, with no clipping`, () => {
-      const w = world(kind), nav = boxWorld(w.boxes), R = w.airlocks[0] ? Math.hypot(w.airlocks[0].x, w.airlocks[0].z) : w.r;
+      const w = world(kind), nav = boxWorld(grow(w.boxes, BODY)), R = w.airlocks[0] ? Math.hypot(w.airlocks[0].x, w.airlocks[0].z) : w.r;
       // the raider starts outside on the far side from every airlock (the middle of two neighbors) and is sent to the middle of the dome
-      const a0 = w.airlocks[0].angle, a1 = w.airlocks[1].angle, mid = (a0 + a1) / 2, out = R + 2;
+      const a0 = w.airlocks[0].angle, a1 = w.airlocks[1].angle, mid = (a0 + a1) / 2 + 0.02, out = R + 2;
       const start = { x: Math.sin(mid) * out, z: Math.cos(mid) * out };
       const b: Battle = {
         night: false, duration: 60, units: [unit('r0', 'raider', start.x, start.z), unit('h0', 'home', 0, 0)],
@@ -36,8 +44,7 @@ describe('people go through the airlocks of a dome, never through the shell', ()
       expect(findClips(b, nav).length).toBeGreaterThan(0);   // straight through the shell is a clip
       const r = routeBattle(b, nav);
       expect(r.unrouted).toBe(0);
-      // (a leg that only grazes the corner of a collider box at the gap edge, under 6 cm, is the router hugging the opening, not a walk through the shell)
-      const cl = findClips(r.battle, nav).filter(c => Math.hypot(c.to.x - c.from.x, c.to.z - c.from.z) > 0.06); expect(cl).toEqual([]);
+      expect(findClips(r.battle, nav)).toEqual([]);
       // every place the walked path crosses the shell ring is at an airlock
       const legs = r.battle.events.filter(e => e.kind === 'move' && e.unit === 'r0').map(e => e as { x: number; z: number });
       let prev = start, crossings = 0;
@@ -54,6 +61,28 @@ describe('people go through the airlocks of a dome, never through the shell', ()
         prev = { x: p.x, z: p.z };
       }
       expect(crossings).toBeGreaterThan(0);
+    });
+  }
+
+  for (const kind of ['dome_geodesic', 'dome_glass', 'dome_arcology'] as const) {
+    it(`${kind}: the chamber is a hollow room: in through the outer door, across the chamber, out the inner door, both ways, with no clip`, () => {
+      const w = world(kind), nav = boxWorld(grow(w.boxes, BODY)), a = w.airlocks[0];
+      // the chamber's middle is open floor; a spot beside it, through the side wall, is not
+      const midR = (Math.hypot(a.x, a.z) + Math.hypot(a.inX, a.inZ)) / 2, s = Math.sin(a.angle), c = Math.cos(a.angle);
+      expect(nav.solid(s * midR, c * midR)).toBe(false);
+      for (const dir of [1, -1]) {
+        const out = { x: a.outX, z: a.outZ }, inn = { x: 0.1, z: 0.1 };
+        const from = dir === 1 ? out : inn, to = dir === 1 ? inn : out;
+        const b: Battle = { night: false, duration: 60, units: [unit('r0', 'raider', from.x, from.z)], events: [{ t: 1, kind: 'move', unit: 'r0', x: to.x, z: to.z }, { t: 60, kind: 'end', result: 'repelled' }] };
+        const r = routeBattle(b, nav);
+        expect(r.unrouted).toBe(0);
+        expect(findClips(r.battle, nav)).toEqual([]);
+        // the walked line passes through both doors
+        const pts = [from, ...r.battle.events.filter(e => e.kind === 'move').map(e => e as { x: number; z: number })];
+        const near = (px: number, pz: number) => { let best = Infinity; for (let i = 1; i < pts.length; i++) for (let k = 0; k <= 40; k++) { const x = pts[i - 1].x + (pts[i].x - pts[i - 1].x) * k / 40, z = pts[i - 1].z + (pts[i].z - pts[i - 1].z) * k / 40; best = Math.min(best, Math.hypot(x - px, z - pz)); } return best; };
+        expect(near(a.x, a.z)).toBeLessThan(a.dw / 2);
+        expect(near(a.inX, a.inZ)).toBeLessThan(a.dw / 2);
+      }
     });
   }
 });

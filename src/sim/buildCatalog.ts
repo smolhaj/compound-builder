@@ -15,7 +15,7 @@ import { PERIMETER, UTILITY_LINES, runBill, runHours, type PerimeterKind } from 
 import { FT_PER_M, lengthText } from './units';
 import { pluralize } from './words';
 import type { GameState } from './state';
-import { tierOfKind } from './dome/tiers';
+import { cellsOfKind, tierOfKind } from './dome/tiers';
 import { domeFacts } from './dome/facts';
 import { BUNKER_ORDER, DOME_ORDER, GATEHOUSE_ORDER, KIT, POD_ORDER, TERRACE_ORDER, TOWER_ORDER, UTILITY_ORDER } from '../game/buildkit/kit';
 
@@ -162,6 +162,8 @@ export function recommendedKeys(s: GameState, all: readonly CatalogEntry[], ctx:
 export interface BillLine { label: string; usd: number }
 export interface Bill {
   title: string;
+  /** A dome: its diameter is set while placing (the card says how). */
+  sizable?: boolean;
   /** One or two sentences: what it gives. */
   gives: string;
   /** Plain facts: sleeps, shelters, footprint. */
@@ -216,12 +218,12 @@ export function billFor(s: GameState, e: CatalogEntry, ctx: AdviceCtx = adviceCt
     if (d.shelters) facts.push(`Shelters ${d.shelters}`);
     facts.push(`Footprint ${d.cellsX * 10} x ${d.cellsZ * 10} ft`);
   }
-  { const dt = e.run ? null : tierOfKind(e.key); if (dt) facts.push(...domeFacts(dt)); }
+  { const dt = e.run ? null : tierOfKind(e.key); if (dt) facts.push(...domeFacts(dt, cellsOfKind(e.key) ?? undefined)); }
   const needs: string[] = [];
   if (st.reason) needs.push(st.reason);
   if (own) needs.push(`From your own land: ${own}`);
   if (permit) needs.push(`County review about ${pluralize(reviewDays(s, e.key), 'day')} before work starts`);
-  return { title: e.name, gives: shortGives(e.blurb), facts, materials, other, ownerUsd, crewLaborUsd, crewUsd: ownerUsd + crewLaborUsd, hours, crewWeeks: Math.max(1, Math.ceil(hours / CREW_WEEK)), ownNeeds: own, needs, state: st.kind };
+  return { title: e.name, gives: shortGives(e.blurb), facts, materials, other, ownerUsd, crewLaborUsd, crewUsd: ownerUsd + crewLaborUsd, hours, crewWeeks: Math.max(1, Math.ceil(hours / CREW_WEEK)), ownNeeds: own, needs, state: st.kind, sizable: !e.run && tierOfKind(e.key) !== null };
 }
 
 /** The bill as plain text lines (also the card's tooltip for assistive tech). */

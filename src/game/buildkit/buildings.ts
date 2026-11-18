@@ -24,6 +24,7 @@ import { FARM_BUILDERS } from './farmBuildings';
 import { RENEWABLE_BUILDERS } from './renewableBuildings';
 import { TUNNEL_BUILDERS } from './tunnelBuildings';
 import { DOME_BUILDERS } from './domeBuildings';
+import { parseDomeKind } from '../../sim/dome/tiers';
 import { DOCK_BUILDERS } from './dockBuildings';
 import { OUTPOST_BUILDERS } from './outpostBuildings';
 import { HERD_BUILDERS } from './herdBuildings';
@@ -541,7 +542,7 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpt
 /** Every layer of a kit piece (construction shows them stage by stage). */
 export function buildLayers(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   if (def.sleeps > 0 && !opts.home) opts = { ...opts, home: true };
-  const g = BUILDERS[def.id](def, seed, opts);
+  const g = BUILDERS[parseDomeKind(def.id)?.base ?? def.id](def, seed, opts);
   g.userData.opts = opts;
   g.userData.seats ??= SEATS[def.id] ?? [];
   if (SEAT_ROLES[def.id]) g.userData.seatRoles ??= SEAT_ROLES[def.id];
