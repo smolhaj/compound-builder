@@ -48,11 +48,11 @@ try {
     await page.evaluate(() => window.__cb.store.getState().setBuildingView('full'));
     await page.evaluate(([big]) => {
       const cb = window.__cb, w = cb.world, st = cb.game.getState().game.structures[0];
-      const half = big * 1.0 + 0.8;
-      // placed directly (openSpotNear pushes everything away from the camp, where the pieces stand)
-      const fx = st.x - 0.3, fz = st.z + half, px = st.x + 0.6, pz = st.z + half + 1.4 + big * 0.4;
-      w.qaFigure(fx, fz);
-      cb.cam.placeEye(px, pz, st.x, st.z, 0.26);
+      // orbit like buildingSheet (the eye-pose helper keeps the camera far out here); the person stands half way to the camera
+      const R = 1.3 + big * 1.1, yaw = 0.5, pitch = 0.3, gy = w.groundAt(st.x, st.z);
+      const sx = Math.sin(yaw), cz = Math.cos(yaw);
+      w.qaFigure(st.x + sx * R * 0.55 + cz * 0.5, st.z + cz * R * 0.55 - sx * 0.5);
+      cb.cam.target.set(st.x, gy + 0.25, st.z); cb.cam.radius = R; cb.cam.yaw = yaw; cb.cam.pitch = pitch;
     }, [info.big]);
     await frame(2);
     const f = `${outDir}/${String(from + done.length).padStart(3, '0')}-${kind}.png`;
