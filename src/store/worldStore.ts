@@ -14,7 +14,7 @@ import { autoStartTier } from '../engine/perf/device';
 import { clampScale } from '../ui/hud/tokens';
 
 export type FrameCap = 0 | 30 | 60;
-/** The HUD layout: Classic (today's panels, the default) or layout A (docs/UX_AUDIT.md section 11). `?layout=a|classic` overrides for QA; Settings and Alt+L change it (remembered as cb.layout). */
+/** The HUD layout: layout A (the default since 2026-11-18) or Classic (today's panels, kept behind a toggle until stage 6) (docs/UX_AUDIT.md section 11). `?layout=a|classic` overrides for QA; Settings and Alt+L change it (remembered as cb.layout). */
 export type Layout = 'classic' | 'a';
 /** Once-a-second readout of the running game (Settings -> Graphics). */
 export interface PerfStats { fps: number; ms: number; calls: number; tris: number; tier: Quality; budgetMs: number }
@@ -162,7 +162,7 @@ function savedQuality(): Quality {
 }
 function savedLayout(): Layout {
   try { const q = new URLSearchParams(location.search).get('layout'); if (q === 'a' || q === 'classic') return q; } catch { /* no location */ }
-  try { return localStorage.getItem('cb.layout') === 'a' ? 'a' : 'classic'; } catch { return 'classic'; }
+  try { return localStorage.getItem('cb.layout') === 'classic' ? 'classic' : 'a'; } catch { return 'a'; }
 }
 function savedUiScale(): number {
   try { const v = Number(localStorage.getItem('cb.uiscale')); if (v) return clampScale(v); } catch { /* no storage */ }

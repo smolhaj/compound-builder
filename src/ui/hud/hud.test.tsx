@@ -13,6 +13,8 @@ import { BuildMenu } from './BuildMenu';
 import { ProjectsTab } from './ProjectsTab';
 import { TerrainLegendChip } from '../Hud';
 import { useWorldStore } from '../../store/worldStore';
+// These cases exercise the Classic panels; layout A is the default since 2026-11-18.
+Object.assign(useWorldStore.getInitialState(), { layout: 'classic' });
 import { ShopWindow } from '../ShopWindow';
 import { FarmPanel } from '../FarmPanel';
 import { FarmTab } from '../FarmTab';
