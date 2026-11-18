@@ -31,6 +31,9 @@ import { SHELL } from './protection';
 import { domeLoad, BAND, comfortAt, type ClimateMode, type CoolStage } from './climate';
 import { WATER_LOOPS, loopUsd, loopKw, rainCatchL, reuseL, condensateL, GAL_PER_L, type WaterLoop } from './waterLoop';
 import { stockCover } from './agro';
+import type { PlantKind } from './plantUnits';
+import { damagePlant, fxOf, plantJobs, rushPlant, rushQuote, specOf, unitsOf } from './plantLive';
+import { PLANT_SHORT, plantKinds, spareProblem, spareUsd } from './plantUnits';
 import {
   FILTERING, LIMIT_PPM, O2, SCRUB, BED_CAP, freshAir, lockdownClock, sealedAir, advancedFilterUsd, closedEcologyUsd, scrubberUsd,
   type AirCtx, type Clock, type Filtering,
@@ -108,6 +111,8 @@ export interface DomeState {
   stress?: number;
   /** Whether the shell reaches a cistern (so its rain is kept), as the water balance last found it. */
   cistern?: boolean;
+  /** Kinds of plant unit with a second (N+1) unit bought (save v103, optional; sim/dome/plantUnits.ts). */
+  spares?: PlantKind[];
 }
 
 export const newDomeState = (): DomeState => ({
@@ -263,6 +268,7 @@ export function dayLoad(s: GameState, d: DomeRef, st: DomeState = stateOf(s, d))
   for (const p of dayProfile(s)) { const l = domeLoad(d.tier, d.cells, p.f, p.sun, st.mode, { sealed: st.lockdown, dry }); clim += l.kwhPerDay / 4; water += l.waterGalDay / 4; }
   const air = st.lockdown || st.filtering === 'closed' ? airPlantKw(d.tier, d.cells, st.filtering) * 24 : 0;
   const loopK = loopKw(d.tier, d.cells, st.loop ?? 'none') * 24, aux = auxKwhDay(d.tier, d.cells);
+  clim *= fxOf(s, d, st).climate;
   return { kwh: Math.max(0.2, clim + aux + loopK + air), climateKwh: clim, auxKwh: aux, loopKwh: loopK, airKwh: air, waterGal: water };
 }
 
@@ -284,6 +290,7 @@ export function planPowered(s: GameState, d: DomeRef, st: DomeState): boolean {
   if (s.clock.t < st.plantDownUntil) return false;
   if (!wired(s, d.st.id)) return false;
   if (s.utilities.report?.shed?.includes(d.st.id) || s.utilities.fried.includes(d.st.id)) return false;
+  if (fxOf(s, d, st).power === 'dark') return false;   // the substation is lost and the batteries are spent (sim/dome/plantUnits.ts)
   return powerOnPlace(s);
 }
 
@@ -295,7 +302,7 @@ export const mediaK = (health: number): number => 0.4 + 0.6 * Math.max(0, Math.m
 export function airCtx(s: GameState, d: DomeRef, st: DomeState, powered = planPowered(s, d, st)): AirCtx {
   const eco = st.filtering === 'closed' ? Math.max(0, Math.min(1, st.ecoHealth)) : 0;
   // the closed loop's own beds work with no power too (they live on sun); its machinery needs the plant
-  return { tier: d.tier, cells: d.cells, people: Math.max(0, peopleUnder(s, d)), filtering: st.filtering, powered, beds: Math.min(BED_CAP, bedsUnder(s, d) + eco * BED_CAP), seals: 1 };
+  return { tier: d.tier, cells: d.cells, people: Math.max(0, peopleUnder(s, d)), filtering: st.filtering, powered, beds: Math.min(BED_CAP, bedsUnder(s, d) + eco * BED_CAP), seals: 1, scrubK: fxOf(s, d, st).scrub };
 }
 
 /** The effective scrubbing shares at a level and health (used by the property tests): more filtering never scrubs less. */
@@ -358,7 +365,14 @@ function stepOne(s: GameState, d: DomeRef, st: DomeState, dtDays: number, multi:
   // the inside temperature: the plant holds the mode's band when it has power (and in a hot hour, rented chillers count as power), else the shell floats
   // with only the free parts of the ladder (vents when open, roof screens); a sealed dome with the plant dark floats
   const chill = s.clock.t < (st.chillUntil ?? 0);
-  const ld = domeLoad(d.tier, d.cells, o.f, o.sun, st.mode, { sealed: st.lockdown, dry: dryAir(s), powered: powered || chill });
+  const fx = fxOf(s, d, st), ventK = fx.vent;
+  const ld = domeLoad(d.tier, d.cells, o.f, o.sun, st.mode, { sealed: st.lockdown, dry: dryAir(s), powered: powered || chill, ventK });
+  // a damaged or lost climate plant holds the band by its share, and the air drifts toward what it would float at by the rest (rented chillers cover the gap)
+  const held = chill ? 1 : fx.climate;
+  if (held < 1 && powered) {
+    const flo = domeLoad(d.tier, d.cells, o.f, o.sun, st.mode, { sealed: st.lockdown, dry: dryAir(s), powered: false, ventK });
+    ld.indoorF = ld.indoorF * held + flo.indoorF * (1 - held);
+  }
   st.indoorF = ld.indoorF;
   st.stage = ld.stage;
   st.kwhDay = dayLoad(s, d, st).kwh;
@@ -429,8 +443,9 @@ export function domeWaterFlows(s: GameState, rainMmDay: number, perPersonL: numb
   for (const d of domesOf(s)) {
     const st = stateOf(s, d), loop = st.loop ?? 'none', up = s.clock.t >= (st.loopDownUntil ?? 0), pw = wired(s, d.st.id) && !s.utilities.fried.includes(d.st.id);   // a daily figure: the pumps and coils run on the day's power, not the instant's
     const link = connected(d.st.id);
-    const rain = link ? rainCatchL(d.tier, d.cells, rainMmDay, loop) : 0;
-    const re = loop !== 'none' && up && pw ? reuseL(peopleUnder(s, d), perPersonL, loop) : 0;
+    const wk = fxOf(s, d, st).water;   // the water plant's share (sim/dome/plantUnits.ts): lost, the loop is off and the rain runs in unfiltered
+    const rain = link ? rainCatchL(d.tier, d.cells, rainMmDay, wk > 0 ? loop : 'none') : 0;
+    const re = loop !== 'none' && up && pw ? reuseL(peopleUnder(s, d), perPersonL, loop) * wk : 0;
     const cond = d.tier !== 'earthen' ? condensateL(bedsUnder(s, d), pw) : 0, cool = dayLoad(s, d, st).waterGal * 3.785;
     f.rainL += rain; f.reuseL += re; f.condL += cond; f.coolL += cool;
     const own = s.domes?.[d.st.id];
@@ -490,6 +505,12 @@ function domeDayOne(s: GameState, d: DomeRef, st: DomeState, multi: boolean): st
   if (loop !== 'none' && s.clock.t >= (st.loopDownUntil ?? 0) && r() < LIVE.P_LOOP * scale * (loop === 'recycle' ? 1.4 : 1) * (powered ? 1 : 1.5)) {
     st.loopDownUntil = s.clock.t + 3 + Math.floor(r() * 3);
     if (raise(s, st, 'loop', day)) out.push(`${name}'s ${loop === 'recycle' ? 'recycle' : 'graywater'} loop has failed: a fouled membrane and a burned-out pump. The wastewater is backing up toward the sump.`);
+  }
+  // a storm: a lightning surge into the substation, hail on the roof vents (only the units the dome has; a second unit takes the hit first)
+  if (nightOf(s).stormy && tierOfKind(d.st.kind) !== 'earthen' && r() < P_STORM * scale) {
+    const kinds = plantKinds(d.tier, specOf(st)).filter(k => k === 'substation' || k === 'vents'), kind = kinds[Math.floor(r() * kinds.length)];
+    const unit = kind && unitsOf(s, d, st).find(u => u.kind === kind && u.cond === 'ok');
+    if (unit) { const line = damagePlant(s, d, st, unit.id, r() < 0.2 ? 'down' : 'damaged', 'storm'); if (line) out.push(line); }
   }
   // a hot day the plant could not hold
   const hotH = st.overH ?? 0;
@@ -642,6 +663,41 @@ export function buyLoop(s: GameState, level: WaterLoop, id?: string): string | n
   return null;
 }
 
+// ── the plant: a second unit (N+1) and the repair of what a raid, a fire or a storm broke (sim/dome/plantUnits.ts) ──
+
+/** What a second unit of this kind costs on this dome (null: no spare for it). */
+export function spareBill(s: GameState, kind: PlantKind, id?: string): number | null {
+  const d = domeOf(s, id);
+  return d ? spareUsd(d.tier, d.cells, kind, stateOf(s, d).filtering) : null;
+}
+export function sparesProblem(s: GameState, kind: PlantKind, id?: string): string | null {
+  const d = domeOf(s, id);
+  if (!d) return 'no dome stands finished yet';
+  const st = stateOf(s, d), why = spareProblem(d.tier, specOf(st), kind);
+  if (why) return why;
+  const c = spareUsd(d.tier, d.cells, kind, st.filtering);
+  if (c !== null && s.money < c) return `needs $${c.toLocaleString('en-US')}`;
+  return null;
+}
+/** Buy the second unit: the money goes now, the crew sets it in the same bay or pad within the day. */
+export function buySpare(s: GameState, kind: PlantKind, id?: string): string | null {
+  const why = sparesProblem(s, kind, id);
+  if (why) return why;
+  const d = domeOf(s, id)!, c = spareUsd(d.tier, d.cells, kind, stateOf(s, d).filtering) ?? 0, st = ownState(s, d);
+  s.money -= c; st.spares = [...(st.spares ?? []), kind];
+  log(s, `A second ${PLANT_SHORT[kind]} is set beside the first: if one is lost the other carries the dome.`);
+  return null;
+}
+/** Pay a contractor to finish a plant repair now. */
+export function rushPlantJob(s: GameState, jobId: string, id?: string): string | null {
+  const d = domeOf(s, id);
+  if (!d) return 'no dome stands finished yet';
+  return rushPlant(s, d, stateOf(s, d), jobId);
+}
+
+/** Daily chance (Standard) that a storm's lightning or hail damages a plant unit that is not backed up. */
+const P_STORM = 0.02;
+
 // ── cards ─────────────────────────────────────────────────────────────────────────────────
 
 const usd = (n: number): string => `$${Math.round(n).toLocaleString('en-US')}`;
@@ -653,6 +709,12 @@ export function domeCards(s: GameState): FxCard[] {
   const out: FxCard[] = [], all = domesOf(s);
   all.forEach((d, i) => {
     const st = stateOf(s, d), sfx = i === 0 ? '' : `@${d.st.id}`, who = all.length > 1 ? ` (${domeLabel(s, d).toLowerCase()})` : '', id = d.st.id;
+    for (const j of plantJobs(s, id)) {
+      const q = rushQuote(d, st, j), ready = (j.readyDay ?? 0) <= dayIndex(s.clock.t);
+      out.push({ id: `dome:plantjob:${j.id}${sfx}`, title: `${j.what ? j.what[0].toUpperCase() + j.what.slice(1) : 'A plant unit'} is ${j.cond === 'down' ? 'out' : 'damaged'}${who}`,
+        why: `${j.cond === 'down' ? 'It is out' : 'It runs at half'}. ${ready ? 'The family is working on it.' : `The parts are on order (about ${Math.max(1, (j.readyDay ?? 0) - dayIndex(s.clock.t))} days).`}`, urgency: j.cond === 'down' ? 88 : 60, tone: j.cond === 'down' ? 'alarm' : undefined,
+        acts: q === null ? [] : [{ label: `Rush a contractor · ${usd(q)}`, choice: `dome:rush:${j.id}${sfx}` }] } as FxCard);
+    }
     for (const c of st.cards) {
       switch (c) {
         case 'foul': out.push({ id: `dome:foul${sfx}`, title: `The dome's filter media is fouled${who}`, why: `${Math.round(st.filterHealth * 100)} percent of the media is left, so the bank scrubs less every hour. A fresh set costs ${usd(spareFiltersUsd(s, id))}.`, urgency: 86, acts: [{ label: `Swap the media · ${usd(spareFiltersUsd(s, id))}`, choice: `dome:foul:swap${sfx}` }, { label: 'Run it dirty', choice: `dome:foul:ignore${sfx}` }] }); break;
@@ -679,6 +741,7 @@ export function domeCards(s: GameState): FxCard[] {
 export function domeChoose(s: GameState, choice: string): string | null {
   if (!choice.startsWith('dome:')) return null;
   const [head, at] = choice.split('@'), id = at || undefined;
+  if (head.startsWith('dome:rush:')) { const w = rushPlantJob(s, head.slice(10), id); return w ?? 'A contractor finished the repair.'; }
   const d = domeOf(s, id);
   if (!d) return null;
   const st = stateOf(s, d);

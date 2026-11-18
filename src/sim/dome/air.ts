@@ -27,10 +27,10 @@ export const BED_OFFSET = 0.4, BED_CAP = 12;
 export interface Air { co2ppm: number; o2pct: number }
 export const freshAir = (): Air => ({ co2ppm: OUTSIDE_PPM, o2pct: O2.normal });
 
-export interface AirCtx { tier: DomeTier; cells: number; people: number; filtering: Filtering; powered: boolean; beds: number; /** Seal health 0..1: a worn seal leaks more. */ seals?: number }
+export interface AirCtx { tier: DomeTier; cells: number; people: number; filtering: Filtering; powered: boolean; beds: number; /** Seal health 0..1: a worn seal leaks more. */ seals?: number; /** Share 0..1 of the fitted scrubbing the plant still does (a damaged or lost scrubber house, sim/dome/plantUnits.ts). */ scrubK?: number }
 
 function rates(c: AirCtx): { V: number; k: number; co2Cf: number; o2Cf: number } {
-  const V = domeGeometry(c.tier, shellFt(c.tier, c.cells)).volumeCf, f = c.powered ? SCRUB[c.filtering] : SCRUB.none;
+  const V = domeGeometry(c.tier, shellFt(c.tier, c.cells)).volumeCf, sk = Math.max(0, Math.min(1, c.scrubK ?? 1)), f0 = c.powered ? SCRUB[c.filtering] : SCRUB.none, f = { co2: f0.co2 * sk, o2: f0.o2 * sk };
   const plants = Math.min(BED_CAP, Math.max(0, c.beds)) * BED_OFFSET;
   const net = Math.max(0, c.people - plants);
   const k = LEAK_PER_DAY[c.tier] / 24 * (2 - Math.max(0, Math.min(1, c.seals ?? 1)));

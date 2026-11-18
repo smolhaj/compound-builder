@@ -67,6 +67,8 @@ export interface LoadOpts {
   dry?: number;
   /** Is the cooling plant powered (false: only the passive part, the vents and screens by hand, none of the machines). */
   powered?: boolean;
+  /** Share 0..1 of the roof vents that open (damaged or lost vent hatches, sim/dome/plantUnits.ts). */
+  ventK?: number;
 }
 
 const earthK = (tier: DomeTier): number => tier === 'earthen' ? 0.6 : tier === 'geodesic' ? 0.12 : 0;
@@ -105,7 +107,7 @@ export function domeLoad(tier: DomeTier, cells: number, outsideF: number, sun: n
   let gain = solar, kwE = 0, water = 0, stage: CoolStage = 'idle';
   const need = () => gain - through(hold);   // Btu per hour still to shed at the hold temperature
   if (need() > 0 && !o.sealed && outsideF < hold - 3) {
-    const cap = COOL.VENT_ACH * g.volumeCf * COOL.AIR_BTU * (hold - outsideF);
+    const cap = COOL.VENT_ACH * g.volumeCf * COOL.AIR_BTU * (hold - outsideF) * clamp01(o.ventK ?? 1);
     const take = Math.min(need(), cap);
     // fans run in proportion to how hard the vents work
     kwE += COOL.VENT_KW_KSF * ksf * Math.min(1, take / Math.max(1, cap)) + 0.0001;
