@@ -161,6 +161,9 @@ import { homeSafety, homeSafetyInput, type HomeSafety } from './atmosphere/homeS
 import { ritualsOf, stanceOf, tableSet } from '../sim/rituals';
 import { bedHour, pickHomeLine } from '../sim/domesticLines';
 import { domeOf, domeLook } from '../sim/dome/live';
+import { isGradedTier } from '../sim/dome/grading';
+import { makeDomePlant, type DomePlantFx } from './fx/DomePlant';
+import { tierOfKind } from '../sim/dome/tiers';
 import { makeDomeAir, type DomeAirFx } from './fx/DomeAir';
 import { FOOD, type FoodItemId } from '../sim/pantry';
 
@@ -450,11 +453,22 @@ export class HomesteadWorld {
       let f = fx;
       if (!f) {
         const gx = b.placed.x, gz = b.placed.z, y0 = b.group.position.y;
-        f = makeDomeAir(d.r, (lx, lz) => this._naturalH(gx + lx, gz + lz) - y0 + 0.01);
+        f = makeDomeAir(d.r, (lx, lz) => this.parcel.height(gx + lx, gz + lz) - y0 + 0.01);
         b.group.add(f.group); b.group.userData.domeAir = f;
       }
       f.group.visible = true;
       f.apply(look);
+      // the plant: the machinery, roof hatches and path lamps of a big dome, scaled by its ecology and size (sim/dome/plant.ts)
+      if (isGradedTier(d.tier)) {
+        const key = `${d.tier}:${d.r.toFixed(2)}:${look.filtering}`, cur = this._domePlants.get(b.placed.id);
+        if (!cur || cur.key !== key) {
+          if (cur) { this._root.remove(cur.group); cur.dispose(); }
+          const gx = b.placed.x, gz = b.placed.z, y0 = b.group.position.y;
+          const pf = makeDomePlant(d.tier, d.r, look.filtering, (lx, lz) => this.parcel.height(gx + lx, gz + lz) - y0 + 0.01);
+          pf.group.position.set(gx, y0, gz);
+          this._root.add(pf.group); this._domePlants.set(b.placed.id, pf);
+        }
+      }
     }
   }
 
@@ -1647,18 +1661,24 @@ export class HomesteadWorld {
     const r = footprint(def, p.x, p.z, p.rot);
     const below = isUnderground(def);
     // (the pad, its retaining wall and the level it stands at: game/buildkit/sitePad, the same call the headless scene audit makes)
+    const gradedDome = def.level === 'cover' && isGradedTier(tierOfKind(p.kind));
+    // inside a graded dome the ground is the dome's level pad: what is built there later is graded from that, not from the hill under it (no mini terraces)
+    const lvl = (x: number, z: number): number | null => { for (const d of this._domeLevels.values()) if (x >= d.x0 && x <= d.x1 && z >= d.z0 && z <= d.z1) return d.y; return null; };
     const { pad, wall, y: padLevel, climb } = sitePad(def, p, {
-      natural: this._naturalH, seen: this.parcel.height, padHeight: (x0, z0, x1, z1) => this.parcel.padHeight(x0, z0, x1, z1),
+      natural: (x, z) => lvl(x, z) ?? this._naturalH(x, z), seen: this.parcel.height,
+      padHeight: (x0, z0, x1, z1) => lvl((x0 + x1) / 2, (z0 + z1) / 2) ?? this.parcel.padHeight(x0, z0, x1, z1),
       isLot: !!this.parcel.lot, touchesAccess: (rr, m) => this._touchesAccess(rr, m),
       waterLevel: x => this.parcel.lakeY ?? this.parcel.creek.waterY(x),
       near: [...this._built.values()].filter(b => !b.under && !b.cover && b.placed.id !== p.id).map(b => b.wall?.rect ?? b.fpPorch),
     });
     let y = padLevel;
-    if (pad) this.parcel.setPads([...this.parcel.pads, pad]);
+    // a dome's pad goes under the pads already graded, so the buildings that stand in it keep their own level
+    if (pad) this.parcel.setPads(gradedDome ? [pad, ...this.parcel.pads] : [...this.parcel.pads, pad]);
+    if (pad && gradedDome) this._domeLevels.set(p.id, { x0: pad.x0, z0: pad.z0, x1: pad.x1, z1: pad.z1, y: pad.y });
     const opts: BuildOpts = {};
     if (climb) opts.rise = climb.rise;
     // a dome meets the hill: its stem wall and berm are draped on the natural ground (no pad), sampled from the group's own frame
-    if (def.level === 'cover') { const gx = p.x, gz = p.z; opts.ground = (lx, lz) => this._naturalH(gx + lx, gz + lz) - y; }
+    if (def.level === 'cover') { const gx = p.x, gz = p.z, base = gradedDome ? this.parcel.height : this._naturalH; opts.ground = (lx, lz) => base(gx + lx, gz + lz) - y; }
     if (p.kind === 'vehicle_yard') {
       const half = def.cellsX * CELL / 2;
       opts.spur = yardSpur(this.access.drive, p.x, p.z, p.rot, half, DRIVE_W);
@@ -1730,6 +1750,10 @@ export class HomesteadWorld {
 
   /** A bunker room's doorways (its neighbors) and the ground above its surface point. */
   /** Hardening fitted per bunker room (from the sim), and its key. */
+  /** The level pad under each graded dome (glass, arcology): what is built inside it is graded from this level. */
+  /** The machinery, roof hatches and path lamps of each big dome (game/fx/DomePlant), in the world (not in the dome's group, which the building layers manage). */
+  private readonly _domePlants = new Map<string, DomePlantFx>();
+  private readonly _domeLevels = new Map<string, { x0: number; z0: number; x1: number; z1: number; y: number }>();
   private readonly _harden = new Map<string, { key: string; tiers: NonNullable<Structure['hardening']> }>();
 
   private _underOpts(p: Placed, placed: readonly Placed[], datum: number): BuildOpts {
@@ -2116,6 +2140,8 @@ export class HomesteadWorld {
     b.group.traverse(o => (o as THREE.Mesh).geometry?.dispose());
     if (b.smoke) this._ws.scene.remove(b.smoke.points);
     this._built.delete(id);
+    this._domeLevels.delete(id);
+    { const pf = this._domePlants.get(id); if (pf) { this._root.remove(pf.group); pf.dispose(); this._domePlants.delete(id); } }
     this.walls.remove(id);
     this._harden.delete(id);
     if (b.under) this._syncUnderground();
@@ -2244,7 +2270,8 @@ export class HomesteadWorld {
       const floorSee = (v === 'cutaway' || v === 'xray') && b.finished && SEE_THROUGH_FLOOR.has(b.placed.kind) && m.name === 'bldg_deck_floorboards';
       const see = v === 'ghost' || (v === 'xray' && XRAY_LAYERS.includes(layer)) || floorSee;
       m.material = see ? xrayOf(ud.baseMat) : ud.baseMat;
-      m.castShadow = !see && !['kit_glass', 'kit_string'].includes(ud.baseMat.name) && !ud.baseMat.name.startsWith('kit_glow');
+      // (a foundation's banked earth and a dome's stem wall, berm and embankment hug the ground: no shadow pass cost)
+      m.castShadow = !see && !['kit_glass', 'kit_string'].includes(ud.baseMat.name) && !ud.baseMat.name.startsWith('kit_glow') && !(layer === 'foundation' && (ud.baseMat.name === 'kit_earth' || b.cover));
       if (layer === 'cutwalls') m.visible = v === 'cutaway' && b.finished;
       else if (v === 'cutaway' && CUTAWAY_HIDE.includes(layer) && (b.finished || layer !== 'walls')) m.visible = false;
       // seen from far off, the inside of an enclosed building is hidden (no draw, no shadow); only in the plain exterior view

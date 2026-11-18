@@ -51,6 +51,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   // 97 → 98: the per-kind disaster hook seam (sim/disasterFx.ts): `disaster.fx` is optional, made on first use; no old-save work
   98: s => ({ ...s, version: 99 }),
   99: s => ({ ...s, version: 100 }),
+  // 100 → 101: the graded dome pad (sim/dome/grading.ts): `Structure.siteWork`, optional; no old-save work
+  100: s => ({ ...s, version: 101 }),
   97: s => ({ ...s, version: 98 }),
   // 95 → 96: hiding in the bunker (sim/bunkerHide.ts): `Outcome.bunker` on the gate card, optional; no old-save work
   95: s => ({ ...s, version: 96 }),

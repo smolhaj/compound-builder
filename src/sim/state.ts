@@ -47,7 +47,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 100;
+export const SAVE_VERSION = 101;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -139,6 +139,8 @@ export interface Structure {
   filmAt?: number;
   /** County permit (sim/paperwork.ts): under review, approved, built without one, or stopped by the inspector; when review / the stop ends. */
   permit?: 'review' | 'ok' | 'none' | 'stopped';
+  /** The earthwork paid for a graded dome pad (sim/dome/grading.ts): cubic yards cut and filled, retaining wall face in square feet, and what it cost. */
+  siteWork?: { cutCy: number; fillCy: number; wallSf: number; usd: number };
   permitAt?: number;
   /** A fire, storm or looters took its roof off after it stood: the guidance suggests re-roofing it until it is finished again (optional, so no save bump). */
   roofLost?: boolean;

@@ -760,12 +760,12 @@ export function domeHeatK(s: GameState): number {
 }
 
 /** What the renderer shows inside the main dome: haze (CO2 and dust), sealed, plants (the closed loop's health). */
-export function domeLook(s: GameState, id?: string): { sealed: boolean; haze: number; plants: number; dust: number } {
+export function domeLook(s: GameState, id?: string): { sealed: boolean; haze: number; plants: number; dust: number; filtering: Filtering } {
   const d = domeOf(s, id);
-  if (!d) return { sealed: false, haze: 0, plants: 0, dust: 0 };
+  if (!d) return { sealed: false, haze: 0, plants: 0, dust: 0, filtering: 'none' };
   const st = stateOf(s, d);
   const co2 = Math.max(0, Math.min(1, (st.co2ppm - 1500) / (LIMIT_PPM.hard - 1500)));
-  return { sealed: st.lockdown, haze: Math.max(co2 * 0.8, st.dust * 0.6), plants: st.filtering === 'closed' ? st.ecoHealth : 0, dust: st.dust };
+  return { sealed: st.lockdown, haze: Math.max(co2 * 0.8, st.dust * 0.6), plants: st.filtering === 'closed' ? st.ecoHealth : 0, dust: st.dust, filtering: st.filtering };
 }
 
 /** The sealed-dome shelter facts the felt cards and the radio quote: any dome sealed, hours of air (the shortest), whether it is clean, and its filtering. */

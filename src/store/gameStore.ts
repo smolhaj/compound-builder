@@ -5,7 +5,8 @@ import { planProblem } from '../sim/construction';
 import { unscripted } from '../sim/godMode';
 import { dropBridge, routeProblem } from '../sim/terrainFx';
 import { routeThroughDomes } from '../sim/dome/crossing';
-import { clampCells, type DomeTier } from '../sim/dome/tiers';
+import { clampCells, tierOfKind, type DomeTier } from '../sim/dome/tiers';
+import { gradingCost, isGradedTier } from '../sim/dome/grading';
 import { clearCollapse, strandAway } from '../sim/corridors';
 import { dropRoadBridge, rebuildRoadBridge } from '../sim/roadFx';
 import { interrogate, type Approach, type Question } from '../sim/interrogation';
@@ -83,6 +84,11 @@ import { muteFeedback } from '../ui/feel/quiet';
  *  playing    the scenes play; the visible game is untouched and the clock reads off the siege timeline
  *  aftermath  the result is committed (the clock advanced once); the report card, then control returns
  */
+/** The earthwork a graded dome pad needs, measured by the world under the cursor (sim/dome/grading.ts). */
+export interface SiteWork { cutCy: number; fillCy: number; wallSf: number }
+/** What the circle ghost says about the spot under the cursor. */
+export interface DomeSite { tier: DomeTier; cells: number; ok: boolean; summary: string; work?: SiteWork; workLine?: string }
+
 export interface CutsceneState {
   phase: 'prompt' | 'playing' | 'aftermath';
   /** The hour of day the raid arrived, and one line of what you can see and hear. */
@@ -143,8 +149,8 @@ export interface GameStore {
   domeCells: Partial<Record<DomeTier, number>>;
   setDomeCells: (tier: DomeTier, cells: number) => void;
   /** What the circle ghost says about the spot under the cursor (the placing card shows it). Not saved. */
-  domeSite: { tier: DomeTier; cells: number; ok: boolean; summary: string } | null;
-  setDomeSite: (s: { tier: DomeTier; cells: number; ok: boolean; summary: string } | null) => void;
+  domeSite: DomeSite | null;
+  setDomeSite: (s: DomeSite | null) => void;
   /** A one-line notice that fades by itself (a refused click: why). Not saved. */
   toast: { text: string; id: number } | null;
   showToast: (text: string) => void;
@@ -194,7 +200,7 @@ export interface GameStore {
   /** Jump ahead by game days (debug / QA). */
   advance: (days: number) => void;
   order: (lines: OrderLine[]) => boolean;
-  plan: (kind: string, x: number, z: number, rot: number) => void;
+  plan: (kind: string, x: number, z: number, rot: number, site?: SiteWork) => void;
   /** The gate card: where the joiners will sleep, and whether the player picks a rig's pad (sim/joinerHome.ts). */
   setStay: (stay: StayKind, placeRig?: boolean) => void;
   /** The world checked the sim's spots for joiners' homes against the terrain (sim/joinerHome.ts). */
@@ -488,16 +494,19 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (ok) { set({ game: g }); void saveGame(AUTOSAVE, g); }
     return ok;
   },
-  plan: (kind, x, z, rot) => {
+  plan: (kind, x, z, rot, site) => {
     if (locked()) return;
     const why0 = planProblem(get().game, kind);
     if (why0) { get().showToast(why0[0].toUpperCase() + why0.slice(1) + '.'); return; }
     const aff = permitAffordable(get().game, kind);
     if (!aff.ok) { set({ spendAsk: null, toolProblem: aff.why }); get().showToast(aff.why ?? 'That is not affordable now.'); return; }   // the permit fee would take cash below zero
+    const work = site && isGradedTier(tierOfKind(kind)) ? { ...site, usd: gradingCost(site).usd } : null;
+    if (work && get().game.disaster.mode !== 'god' && get().game.money < work.usd + aff.cost) { const m = `The site work for the dome pad is $${work.usd.toLocaleString('en-US')} and you have $${Math.max(0, Math.round(get().game.money)).toLocaleString('en-US')}.`; set({ toolProblem: m }); get().showToast(m); return; }
     if (isRig(kind) && !(get().game.joiners?.waiting.length)) return;   // a rig is parked only for a joiner who is waiting for a pad
     const g = structuredClone(get().game);
     const st = planStructure(g, kind, x, z, rot);
     stampHighGround(st);
+    if (work) { st.siteWork = work; g.money -= work.usd; log(g, `Graded the dome pad: ${work.cutCy.toLocaleString('en-US')} cu yd cut, ${work.fillCy.toLocaleString('en-US')} cu yd filled, $${work.usd.toLocaleString('en-US')}.`); }
     if (isRig(kind)) claimWaitingRig(g, st);
     else {
       claimForWaiting(g, st, kinOf(g).waiting);
