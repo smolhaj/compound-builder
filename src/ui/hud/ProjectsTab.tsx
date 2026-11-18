@@ -246,7 +246,7 @@ export function ProjectsTab() {
 }
 
 /** A dome's ground works, in words: what the crew is doing now (the crater, the utilities, the skirt, the backfill) and how much dirt there is. */
-function DigLine({ st }: { st: Structure }) {
+export function DigLine({ st }: { st: Structure }) {
   const tier = tierOfKind(st.kind);
   if (!tier) return null;
   const hrs = blueprintOf(st).stages[st.stage]?.hours ?? 1, d = digState(tier, st.stage, st.done / hrs, st.supplied), cells = cellsOfKind(st.kind) ?? TIER[tier].cells;
