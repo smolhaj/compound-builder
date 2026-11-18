@@ -31,8 +31,8 @@ describe('layout A top bar (server-rendered)', () => {
     expect(html).toMatch(/data-chip="threat" data-tone="(warn|bad)"/);
     expect(html).toMatch(/[▲✕]/);
   });
-  it('the layout defaults to Classic and the scale to 100 percent', () => {
-    const w = useWorldStore.getInitialState(); expect(w.layout).toBe('classic'); expect(w.uiScale).toBe(1);
+  it('the layout defaults to layout A and the scale to 100 percent', () => {
+    const w = useWorldStore.getInitialState(); expect(w.layout).toBe('a'); expect(w.uiScale).toBe(1);
   });
 });
 
