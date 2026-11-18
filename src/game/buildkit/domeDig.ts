@@ -445,10 +445,12 @@ export function disposeSite(g: THREE.Object3D): void {
 
 // ── the skirt section ──
 
+/** How far the cut slab reaches out from the section plane toward the viewer (units). */
+export const SECTION_LEN = 14;
 export interface SectionOpts { tier: DomeTier; cells: number; ground: Ground; sensors?: number }
 const rulerTex = new Map<string, THREE.Texture>();
-function label(text: string, w = 256, h = 64, fg = '#f6efe0', bg = 'rgba(20,28,40,0.78)'): THREE.Texture {
-  const key = `${text}|${fg}|${bg}`;
+function label(text: string, w = Math.max(256, text.length * 21), h = 64, fg = '#f6efe0', bg = 'rgba(20,28,40,0.78)'): THREE.Texture {
+  const key = `${text}|${fg}|${bg}|${w}`;
   let t = rulerTex.get(key);
   if (t) return t;
   if (typeof document === 'undefined') return new THREE.Texture();
@@ -484,7 +486,7 @@ export function buildSection(o: SectionOpts): THREE.Group {
     }
   }
   // side and back walls (into the cut): the block's own sides, so the removed slab reads as a dug box
-  const zq = 5.5;
+  const zq = SECTION_LEN;
   for (const sgn of [-1, 1]) {
     const xs = sgn * half;
     for (let b = 0; b + 1 < bandEdges.length; b++) {

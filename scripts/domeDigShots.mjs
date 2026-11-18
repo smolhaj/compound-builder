@@ -61,9 +61,9 @@ try {
     if (views.includes('top')) { await pose([D.x, ground + R * 3.4, D.z + 0.01], [D.x, ground - 0.5, D.z], 50); await shot(`${tag}-top`); }
     if (views.includes('low')) { await pose([D.x + R * 1.9, ground + 0.9, D.z + R * 1.1], [D.x, ground - 0.2, D.z], 60); await shot(`${tag}-low`); }
     if (views.includes('eye')) { await pose([D.x + R * 1.62, ground + 0.5, D.z + R * 0.45], [D.x + R * 0.6, ground - 0.2, D.z - R * 0.1], 62); await shot(`${tag}-eye`); }
-    if (views.includes('under') && P >= 1) { await page.evaluate(() => window.__cb.store.getState().setUnderground(true)); await frames(3); await pose([D.x + R * 1.1, ground + R * 1.0, D.z + R * 1.4], [D.x, ground - R * 0.2, D.z], 55); await shot(`${tag}-under`); await page.evaluate(() => window.__cb.store.getState().setUnderground(false)); }
+    if (views.includes('under') && P >= 1) { await page.evaluate(() => window.__cb.store.getState().setUnderground(true)); await frames(3); await pose([D.x + R * 0.9, ground + R * 1.1, D.z + R * 1.5], [D.x, ground - R * 0.3, D.z], 55); await shot(`${tag}-under`); await page.evaluate(() => window.__cb.store.getState().setUnderground(false)); }
     if (views.includes('moat') && P >= 1) { await page.evaluate(() => window.__cb.store.getState().setBuildingView('cutaway')); await frames(3); await pose([D.x + R * 1.4, ground + R * 1.2, D.z + R * 1.9], [D.x, ground - R * 0.1, D.z], 55); await shot(`${tag}-moat`); await page.evaluate(() => window.__cb.store.getState().setBuildingView('full')); }
-    if (views.includes('section') && P >= 1) { await pose([D.x + 0.3, ground + R * 0.55, D.z + R * 2.3], [D.x, ground - R * 0.1, D.z], 52); await frames(2); await page.evaluate(id => window.__cb.store.getState().setDomeSection(id), D.id); await frames(3); await shot(`${tag}-section`); await page.evaluate(() => window.__cb.store.getState().setDomeSection(null)); }
+    if (views.includes('section') && P >= 1) { await pose([D.x + 0.3, ground + R * 0.95, D.z + R * 1.75], [D.x, ground - R * 0.2, D.z], 56); await frames(2); await page.evaluate(id => window.__cb.store.getState().setDomeSection(id), D.id); await frames(3); await shot(`${tag}-section`); await page.evaluate(() => window.__cb.store.getState().setDomeSection(null)); }
   }
   await page.close();
 } finally { await browser.close(); vite.kill(); }

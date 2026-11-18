@@ -73,7 +73,7 @@ import { detailGeometryOn, setDetailTier } from './buildkit/buildingDetail';
 import { CELL, type KitPieceDef } from './buildkit/kit';
 import { yardSpur } from './buildkit/yardSite';
 import { sitePad } from './buildkit/sitePad';
-import { buildBuried, buildDigSite, buildSection, disposeSite, showBuried, type DigSite as DomeDigSite } from './buildkit/domeDig';
+import { buildBuried, buildDigSite, buildSection, SECTION_LEN, disposeSite, showBuried, type DigSite as DomeDigSite } from './buildkit/domeDig';
 import { digState, pitShape, type DigState } from '../sim/dome/dig';
 import type { DomeTier } from '../sim/dome/tiers';
 import { cellsOfKind } from '../sim/dome/tiers';
@@ -2028,6 +2028,7 @@ export class HomesteadWorld {
   /** Height of the earth bed: just under the deepest bunker room or passage (a passage built after the view went on moves it down). */
   private _earthY(): number {
     const floors = [...this._built.values()].filter(b => b.under).map(b => b.under!.datum);
+    for (const [id, bg] of this._buried) { const b = this._built.get(id); if (b && bg.children.length) floors.push(b.group.position.y - new THREE.Box3().setFromObject(bg).getSize(new THREE.Vector3()).y); }
     for (const r of this._runs) if (r.kind === 'underground_passage' && r.pts.length > 1) floors.push(Math.min(...this._pathOf(r).map(p => p.floor)));
     return (floors.length ? Math.min(...floors) : this.groundAt(this.camp.x, this.camp.z) - DEPTH) - 0.08;
   }
@@ -2259,7 +2260,7 @@ export class HomesteadWorld {
       g.position.set(gx, y0, gz); g.rotation.y = rot;
       this._ws.scene.add(g);
       const half = this._sectionHalf(tier, cells);
-      this.terrain.setCut(gx, gz, ax, az, half, 5.5);
+      this.terrain.setCut(gx, gz, ax, az, half, SECTION_LEN);
       const plane = new THREE.Plane(new THREE.Vector3(-ax, 0, -az), ax * gx + az * gz);
       this._section = { id, group: g, plane, ax, az };
       this._ws.renderer.localClippingEnabled = true;
