@@ -25,7 +25,7 @@ import { solarFogK } from '../fogFx';
 import { powerOnPlace } from '../hookups';
 import { DIFFICULTY } from '../difficulty';
 import type { FxCard } from '../disasterFx';
-import { TIER, shellFt, tierOfKind, tierRank, DOME_KINDS, type DomeTier } from './tiers';
+import { TIER, shellFt, tierOfKind, tierRank, cellsOfKind, type DomeTier } from './tiers';
 import { domeGeometry } from './geometry';
 import { SHELL } from './protection';
 import { domeLoad, BAND, comfortAt, type ClimateMode, type CoolStage } from './climate';
@@ -124,8 +124,8 @@ export interface DomeRef { st: Structure; tier: DomeTier; cells: number; /** She
 export function domesOf(s: GameState): DomeRef[] {
   const out: DomeRef[] = [];
   for (const st of s.structures) {
-    if (!DOME_KINDS.includes(st.kind) || !isFinished(st)) continue;
-    const tier = tierOfKind(st.kind)!, cells = TIER[tier].cells;
+    if (!tierOfKind(st.kind) || !isFinished(st)) continue;
+    const tier = tierOfKind(st.kind)!, cells = cellsOfKind(st.kind) ?? TIER[tier].cells;
     out.push({ st, tier, cells, r: shellFt(tier, cells) / 2 / 20, shellFt: shellFt(tier, cells) });
   }
   return out.map((d, i) => ({ d, i })).sort((a, b) => tierRank(b.d.tier) - tierRank(a.d.tier) || a.i - b.i).map(x => x.d);

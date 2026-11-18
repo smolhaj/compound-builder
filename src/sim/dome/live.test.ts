@@ -4,7 +4,7 @@ import { migrate } from '../save/migrations';
 import { step } from '../engine';
 import { BLUEPRINTS } from '../blueprints';
 import { FILTERING, freshAir, lockdownClock, type Filtering } from './air';
-import { TIER, DOME_KIND, type DomeTier } from './tiers';
+import { TIER, DOME_KIND, kindOfCells, sizesOf, type DomeTier } from './tiers';
 import {
   buyFiltering, domeAirLine, domeCards, domeChoose, domeClean, domeFalloutAdj, domeKwhDay, domeLook, domeOf, domeShelter, effectiveScrub, filteringBill, filteringProblem,
   newDomeState, replaceFilters, setLockdown, stepDome, domeDay, tendEcology, airCtx, domeHeatK,
@@ -270,4 +270,14 @@ describe('look and save', () => {
     expect(g.dome!.co2ppm).toBeGreaterThan(freshAir().co2ppm);
   });
   it('filtering types cover the ladder', () => { expect((FILTERING as readonly Filtering[]).length).toBe(4); });
+});
+
+describe('a resized dome runs its own size', () => {
+  it('a bigger shell has more cells and a bigger power draw than the tier default', () => {
+    const small = base(), big = base();
+    const st = big.structures.find(x => x.kind === DOME_KIND.geodesic)!;
+    st.kind = kindOfCells('geodesic', Math.max(...sizesOf('geodesic'))); st.stage = BLUEPRINTS[st.kind].stages.length;
+    expect(domeOf(big)!.cells).toBeGreaterThan(domeOf(small)!.cells);
+    expect(domeKwhDay(big, st)).toBeGreaterThan(domeKwhDay(small, small.structures.find(x => x.kind === DOME_KIND.geodesic)!));
+  });
 });
