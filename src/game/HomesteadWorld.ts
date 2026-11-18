@@ -160,6 +160,8 @@ import { ritualCtx } from './people/ritualGoals';
 import { homeSafety, homeSafetyInput, type HomeSafety } from './atmosphere/homeSafety';
 import { ritualsOf, stanceOf, tableSet } from '../sim/rituals';
 import { bedHour, pickHomeLine } from '../sim/domesticLines';
+import { domeOf, domeLook } from '../sim/dome/live';
+import { makeDomeAir, type DomeAirFx } from './fx/DomeAir';
 import { FOOD, type FoodItemId } from '../sim/pantry';
 
 /** The order the stores take their turns: the buried storeroom, the root cellar, the bunker's galley and container, then the house pantries. */
@@ -436,6 +438,24 @@ export class HomesteadWorld {
     this.atmos.update(f, game, doy);
     this._underfoot = { mud: this.atmos.mud, snow: f.snow, rain: f.rain };
     this.lived.update(game, performance.now(), { night: f.night, lightsOut: lightsOutNow(game) });
+    this._domeAir(game);
+  }
+
+  /** The main dome's inner haze and closed-ecology plants (sim/dome/live.ts domeLook), kept on its own group. */
+  private _domeAir(game: GameState): void {
+    const d = domeOf(game), look = domeLook(game);
+    for (const b of this._built.values()) {
+      const fx = b.group.userData.domeAir as DomeAirFx | undefined;
+      if (!d || b.placed.id !== d.st.id || !b.finished) { if (fx) fx.group.visible = false; continue; }
+      let f = fx;
+      if (!f) {
+        const gx = b.placed.x, gz = b.placed.z, y0 = b.group.position.y;
+        f = makeDomeAir(d.r, (lx, lz) => this._naturalH(gx + lx, gz + lz) - y0 + 0.01);
+        b.group.add(f.group); b.group.userData.domeAir = f;
+      }
+      f.group.visible = true;
+      f.apply(look);
+    }
   }
 
   /** A gravel drive in to the yard (else a two-track, and the truck stops at the gate). */

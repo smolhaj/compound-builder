@@ -608,6 +608,12 @@ Where the dispatch and this document differ, the dispatch (the owner's newer rea
 7. Perf census scenes `dome_t1` to `dome_t3` in `scripts/perfBudget.json`, LOD far mesh and the Low tier shell (D6).
 8. Contractor monthly draw for the arcology, failure events, per-region cost (D9, D4).
 
+## Status: lockdown slice shipped (live air, filtering, closed ecology, climate and the clean zone; 2026-11-18; save v99)
+
+Where it lives: `src/sim/dome/live.ts` (+ `live.test.ts`, 30 tests), `src/ui/hud/DomePanel.tsx` (the Dome page of the Utilities drawer, Layout A and Classic), `src/game/fx/DomeAir.ts` (haze and plants). Hooks: `engine.ts` (`stepDome` per sub-step, `domeDay` per day), `utilities.ts` (load node and priority), `nuclear.ts` (clean zone, shelter), `heating.ts` (`domeHeatK`), `disasterFx.ts` (`fxCards` / `fxChoose` carry the `dome:` cards), `compoundBoard.ts` and `whatToDo.ts` (the single air alert).
+
+- **Done:** lockdown toggle, live CO2 and O2 clock, fail-safe vents, filtering ladder as purchases with bills and install days, closed ecology (permit, upkeep, food, blight, tend), power node with life-support priority, climate mode and inside/outside temperature, wood saved by a powered dome, fallout clean zone and dust, four failure cards, board and What-to-do alert, haze and plants, 30 tests (monotone filtering, vents, purchases, power, fallout, cards, save).
+- **Next (unchanged order):** tunnels and airlock crossing (parallel agent), raids against the shell, visibility into stealth and encounter weights, placement handle, perf scenes for the new meshes if they grow, per-region cost, contractor draw. Open owner questions are in the PR.
 ## Status: tunnels, airlock crossing, raids and visibility (2026-11-18)
 
 Items 2, 3 and 5 of the list above are in, except where noted. See the DECISIONS row "Dome raids, tunnel crossing and visibility".

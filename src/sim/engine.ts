@@ -81,6 +81,7 @@ import { legalDay } from './breakins';
 import { prisonersDay } from './aftermath';
 import { storyDay } from './raiderStory';
 import { isAway, rescueDay } from './rescue';
+import { stepDome, domeDay } from './dome/live';
 import { falloutDay, isNuclear, SHELTER_DAYS } from './nuclear';
 import { fxApplyServiceMods, fxOnHit, fxOnWarning } from './disasterFx';
 import { tallyDay } from './report';
@@ -214,6 +215,7 @@ function subStep(s: GameState): void {
   if (s.disaster.tracks.banks > 0.5) s.money += (s.startFunds ? s.startFunds.passive : LIFESTYLE[s.lifestyle].passive) / 365 * SUBSTEP;
   crewStep(s, SUBSTEP);
   burnFirewood(s, SUBSTEP * (split ? heatShare(s) : 1));
+  for (const line of stepDome(s, SUBSTEP)) log(s, line);   // the dome's air and climate gauges (sim/dome/live.ts)
   // the collapse clock, once a day: warning signs, the hit, the outside world's services
   if (dayIndex(s.clock.t) !== s.disaster.day) {
     const before = s.disaster.phase;
@@ -296,6 +298,7 @@ function subStep(s: GameState): void {
     rescueDay(s);   // the taken: their fate, leads, word from the crew, a rescue out (logs its own lines)
     if (before !== 'impact' && s.disaster.phase === 'impact') for (const line of fxOnHit(s)) log(s, line);   // (nuclear's strike lives in sim/disasters/nuclear.ts)
     for (const line of falloutDay(s)) log(s, line);
+    for (const line of domeDay(s)) log(s, line);
     for (const line of effectsDay(s)) log(s, line);
     for (const line of choresDay(s, mulberry32(s.seed * 6151 + dayIndex(s.clock.t) * 3))) log(s, line);
     for (const line of gatheringsDay(s)) log(s, line);

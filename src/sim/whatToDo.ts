@@ -90,6 +90,8 @@ function boardAlarms(s: GameState, b: CompoundBoard): TodoRow[] {
   if (power?.tone === 'bad') out.push({ id: 'alarm:power', kind: 'alarm', tone: 'bad', title: 'Power is short', sub: 'More is used than made. Cut the load or add supply.', act: { label: 'Open Utilities', act: { type: 'open', right: 'utilities' } } });
   const hurt = b.threats.find(t => t.id === 'hurt');
   if (hurt) out.push({ id: 'alarm:hurt', kind: 'alarm', tone: 'bad', title: `${hurt.text[0].toUpperCase()}${hurt.text.slice(1)}`, sub: 'Dressings, rest and medicine help most.', act: { label: 'Open People', act: { type: 'open', right: 'family' } } });
+  const air = b.threats.find(t => t.id === 'dome_air');
+  if (air) out.push({ id: 'alarm:dome', kind: 'alarm', tone: air.tone === 'bad' ? 'bad' : 'warn', title: air.text, sub: 'Open the vents, restore power, or buy filtering.', act: { label: 'Open the Dome page', act: { type: 'open', right: 'utilities' } } });
   const stuck = b.decisions.find(d => d.id === 'stalled');
   if (stuck?.act) out.push({ id: 'alarm:stalled', kind: 'alarm', tone: 'bad', title: stuck.text.replace(/^STUCK: /, ''), act: fix(stuck.act.act, s, stuck.act.label) });
   return out;

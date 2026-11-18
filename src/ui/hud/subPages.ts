@@ -32,6 +32,7 @@ export const PAGES: Partial<Record<DrawerId, readonly PageDef[]>> = {
     { id: 'power', label: 'Power', blurb: 'Grid, solar, batteries, the generator' },
     { id: 'water', label: 'Water', blurb: 'Wells, storage, what ran short' },
     { id: 'vehicles', label: 'Vehicles', blurb: 'Vehicles and the garage' },
+    { id: 'dome', label: 'Dome', blurb: 'Lockdown, the air clock, filtering, the closed ecology, the dome\'s own climate' },
   ],
   land: [
     { id: 'place', label: 'The place', blurb: 'Acreage, region, the way in, services' },

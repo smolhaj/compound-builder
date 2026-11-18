@@ -17,6 +17,7 @@ import type { Encounter, EncounterKind, Outcome, Posture, Stance } from './encou
 import type { GameState, Structure } from './state';
 import type { CollapseLook } from './collapseLook';
 import { mulberry32 } from './rng';
+import { domeCards, domeChoose } from './dome/live';
 import { fx as gridDown } from './disasters/grid_down';
 import { fx as nuclear } from './disasters/nuclear';
 import { fx as lawless } from './disasters/lawless';
@@ -169,8 +170,8 @@ export const fxNpcMod = (s: GameState): number => after(s)?.npcMods?.(s) ?? 1;
 export const fxMedical = (s: GameState): { contact: number; spread: number } => after(s)?.medical?.(s) ?? { contact: 0, spread: 0 };
 export const fxSupplyMods = (s: GameState): { grow: number; cold: number } => { const m = after(s)?.supplyMods?.(s); return { grow: m?.grow ?? 1, cold: m?.cold ?? 0 }; };
 export const fxRadio = (s: GameState, ctx: FxCtx) => after(s)?.radioBulletins?.(s, ctx) ?? null;
-export const fxCards = (s: GameState): FxCard[] => active(s)?.cards?.(s) ?? [];
-export const fxChoose = (s: GameState, choice: string): string | null => active(s)?.choose?.(s, choice) ?? null;
+export const fxCards = (s: GameState): FxCard[] => [...(active(s)?.cards?.(s) ?? []), ...domeCards(s)];   // (the dome's own decisions ride along: sim/dome/live.ts)
+export const fxChoose = (s: GameState, choice: string): string | null => (choice.startsWith('dome:') ? domeChoose(s, choice) : active(s)?.choose?.(s, choice) ?? null);
 export const fxGoal = (s: GameState): FxGoal | null => active(s)?.goal?.(s) ?? null;
 export const fxMakeExtra = (s: GameState, kind: string, r: () => number, id: string, day: number): Encounter | null => (isExtraKind(kind) ? active(s)?.makeExtra?.(s, kind, r, id, day) ?? null : null);
 export const fxResolveExtra = (s: GameState, e: Encounter, stance: Stance): Outcome | null => (isExtraKind(e.kind) ? active(s)?.resolveExtra?.(s, e, stance) ?? null : null);
