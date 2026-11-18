@@ -537,15 +537,17 @@ export function buildSection(o: SectionOpts): THREE.Group {
   const props = b.finish(false); props.traverse(q => { q.userData.own = true; });
   g.add(props);
   // labels: depth marks and the lines' names (sprites that always face the camera, drawn over the face)
-  const sprite = (text: string, x: number, y: number, z: number, w = 0.9, bg?: string): void => {
+  const sc = Math.max(0.3, Math.min(1, half / 9));
+  const sprite = (text: string, x: number, y: number, z: number, w0 = 0.9, bg?: string): void => {
+    const w = w0 * sc;
     const m = new THREE.SpriteMaterial({ map: label(text, 256, 64, '#f6efe0', bg), depthTest: false, transparent: true });
     const sp = new THREE.Sprite(m); sp.scale.set(w, w / 4, 1); sp.position.set(x, y, z); sp.renderOrder = 20; sp.userData.own = true; g.add(sp);
   };
   for (let ft = 10; ft <= D * FT_PER_UNIT + 1e-6; ft += ft < 50 ? 10 : 20) sprite(`${ft} ft`, rx - 0.52, rulerTop - ft / FT_PER_UNIT, 0.02, 0.55);
   sprite('grade', rx - 0.52, rulerTop, 0.02, 0.55);
-  sprite(`Skirt: ${TIER[tier].skirtFt} ft deep, ${TIER[tier].skirtThickFt} ft thick`, 0, rulerTop - k.depthU - 0.35, 0.03, 3.4, 'rgba(110,112,118,0.85)');
-  sprite(`A plain crew digs ${DIG_DEPTH_FT[0]} to ${DIG_DEPTH_FT[1]} ft`, half * 0.45, rulerTop - DIG_DEPTH_FT[1] / FT_PER_UNIT - 0.14, 0.03, 2.4, 'rgba(120,90,10,0.85)');
-  sprite(`A crew that has learned the ground: ${DIG_DEPTH_FT[0] + DIG_DEEPER} to ${DIG_DEPTH_FT[1] + DIG_DEEPER} ft`, half * 0.4, rulerTop - (DIG_DEPTH_FT[1] + DIG_DEEPER) / FT_PER_UNIT - 0.14, 0.03, 3.6, 'rgba(150,40,30,0.85)');
+  sprite(`Skirt: ${TIER[tier].skirtFt} ft deep, ${TIER[tier].skirtThickFt} ft thick`, -half * 0.5, rulerTop - k.depthU - 0.25 * sc, 0.03, 3.4, 'rgba(110,112,118,0.85)');
+  sprite(`A plain crew digs ${DIG_DEPTH_FT[0]} to ${DIG_DEPTH_FT[1]} ft`, half * 0.62, rulerTop - DIG_DEPTH_FT[1] / FT_PER_UNIT - 0.14, 0.03, 2.4, 'rgba(120,90,10,0.85)');
+  sprite(`A crew that has learned the ground: ${DIG_DEPTH_FT[0] + DIG_DEEPER} to ${DIG_DEPTH_FT[1] + DIG_DEEPER} ft`, half * 0.62, rulerTop - (DIG_DEPTH_FT[1] + DIG_DEEPER) / FT_PER_UNIT - 0.14, 0.03, 3.6, 'rgba(150,40,30,0.85)');
   let ys = 0; for (const st of STRATA.slice(0, 4)) { const mid = (st.fromFt + Math.min(st.toFt, D * FT_PER_UNIT)) / 2; if (st.fromFt < D * FT_PER_UNIT) sprite(st.name, -half + 1.0, rulerTop - mid / FT_PER_UNIT, 0.02, 1.4); ys++; }
   void ys;
   return g;
