@@ -983,7 +983,7 @@ export function setWindowGlow(k: number, time = 0, warmth = 1, fire = 0): void {
   const l = _cache.get('lamp');
   if (l) l.emissiveIntensity = 0.4 + 2.6 * kk;
   const ar = _cache.get('arcology');
-  if (ar) ar.emissiveIntensity = 0.12 + 0.9 * kk;
+  if (ar) ar.emissiveIntensity = 0.12 + 0.3 * kk;
   // an oil lamp's flame breathes; electric light holds steady; a blackout curtain lets a glimmer round its edges
   const flick = 0.9 + 0.06 * Math.sin(time * 7.1) + 0.04 * Math.sin(time * 17.3 + 1.3);
   for (const id of ['glow_oil', 'glow_oil_b', 'glow_oil_c'] as const) {
