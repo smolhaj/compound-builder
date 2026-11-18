@@ -9,7 +9,7 @@ import { plantJobs, unitsOf } from './plantLive';
 import { SIEGE_ORDER, SIEGE_ORDER_OPEN, pickUnits, plantFires, plantTargetOdds, reachable, strikePlant, unitsFor, yardBreachOdds, yardCover, type TargetCtx } from './plantStrike';
 import { plantUnits, PLANT_KINDS } from './plantUnits';
 import { yardGeometry } from './plantYard';
-import { WALL_RESIST } from '../breachMeans';
+import { WALL_RESIST, ramOdds, blastOdds } from '../breachMeans';
 
 const T0: TargetCtx = { organized: true, sealed: false, impervious: false, overrun: false, anyReachable: true, cover: 0 };
 
@@ -37,6 +37,8 @@ describe('which way a crew goes: the plant or not', () => {
     const none = { yardBreached: false, shellOpened: false, airlockForced: false };
     for (const k of PLANT_KINDS) for (const place of ['yard', 'gallery', 'inside'] as const) expect(reachable(place, k, none)).toBe(false);
     expect(reachable('yard', 'chiller', { ...none, yardBreached: true })).toBe(true);
+    expect(reachable('yard', 'substation', { ...none, airlockForced: true })).toBe(true);   // forcing an airlock opens the passage to the yard
+    expect(reachable('yard', 'chiller', { ...none, shellOpened: true })).toBe(false);          // a hole in the glass is not the passage
     expect(reachable('gallery', 'air', { ...none, shellOpened: true })).toBe(false);
     expect(reachable('gallery', 'air', { ...none, airlockForced: true })).toBe(true);
     expect(reachable('inside', 'air', { ...none, shellOpened: true })).toBe(true);
@@ -54,10 +56,14 @@ describe('breaching the hardened yard uses the wall model', () => {
     expect(yardBreachOdds({ ...A, satchels: 2 })).toBeGreaterThan(yardBreachOdds(A));
     expect(yardBreachOdds(A)).toBeGreaterThan(yardBreachOdds({ ...A, truck: false, satchels: 0 }));
     expect(yardBreachOdds({ ...A, bollards: true })).toBeLessThanOrEqual(yardBreachOdds(A));
-    expect(yardBreachOdds({ ...A, gateBarrier: 6 })).toBeLessThanOrEqual(yardBreachOdds(A));
     expect(yardBreachOdds({ ...A, vehicleBlocked: 0.8 })).toBeLessThanOrEqual(yardBreachOdds(A));
     let last = 1; for (const cover of [0, 0.2, 0.4, 0.6, 0.9]) { const p = yardBreachOdds({ ...A, cover }); expect(p).toBeLessThanOrEqual(last); last = p; }
     for (const d of ['cozy', 'standard', 'hardcore'] as const) { expect(yardBreachOdds({ ...A, difficulty: d })).toBeLessThanOrEqual(0.95); }
+  });
+  it('there is no gate weak point: the odds are the wall-only odds, lower than the same crew at a gate', () => {
+    const wallOnly = yardBreachOdds(A), atGate = 1 - (1 - ramOdds({ wallKind: 'concrete_wall', gate: true, difficulty: 'standard', bollards: false, gateBarrier: 3, vehicleBlocked: 0 })) * (1 - blastOdds({ wallKind: 'concrete_wall', gate: true, difficulty: 'standard', gateBarrier: 3 }));
+    expect(wallOnly).toBeLessThan(atGate);
+    expect(wallOnly).toBeCloseTo(1 - (1 - ramOdds({ wallKind: 'concrete_wall', gate: false, difficulty: 'standard', bollards: false, gateBarrier: 0, vehicleBlocked: 0 })) * (1 - blastOdds({ wallKind: 'concrete_wall', gate: false, difficulty: 'standard', gateBarrier: 0 })), 6);
   });
   it('the yard wall is the poured-concrete wall of the ordinary table: harder than the fences', () => {
     expect(WALL_RESIST.concrete_wall.ram).toBeLessThan(WALL_RESIST.chain_link.ram);

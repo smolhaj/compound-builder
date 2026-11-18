@@ -5,8 +5,10 @@
  *  target    `plantTargetOdds`: nothing reachable, nothing happens. An organized crew goes for the plant far more often than a rabble; a sealed dome,
  *            and one whose shell no crew can open (the arcology), make it the best plan left; a crew that has overrun the houses is after loot, not
  *            machinery; towers and guards watching the yard put a crew off. Never above 85 percent, never below zero.
- *  reach     the yard stands outside: a crew has to breach its wall or its gate (the ordinary wall model: `ramOdds` and `blastOdds` of a poured-concrete
- *            wall, the steel gate's counters, then the defenders' fire from towers and guards in reach); without a truck or a charge a concrete wall holds.
+ *  reach     the yard stands outside and has NO gate: it is reached from inside the dome through a service airlock and a sealed passage. A crew from outside has
+ *            to breach the wall (the ordinary wall model: `ramOdds` and `blastOdds` of a poured-concrete wall, no gate weak point, then the defenders' fire from
+ *            towers and guards in reach); without a truck or a charge a concrete wall holds. A crew that forced an airlock of the dome walks the passage in
+ *            (the same rule as the gallery bays).
  *            What stands inside the shell (the glass dome's plant yard, the arcology's service gallery, the roof vents) is reachable only if the shell was opened
  *            in this fight: a panel cut or shot out (inside, vents), an airlock forced (gallery).
  *  what      a crew takes the units that most starve the dome, in the order `SIEGE_ORDER` (the substation first, then the scrubber house when the dome is
@@ -20,7 +22,7 @@ import { towersBuilt } from '../towers';
 import { onDuty } from '../guards';
 import { isHome } from '../blueprints';
 import { isFinished } from '../construction';
-import { yardGeometry, YARD_GATE_BARRIER, YARD_WALL, type YardGeom } from './plantYard';
+import { yardGeometry, YARD_WALL, type YardGeom } from './plantYard';
 import { type PlantKind, type PlantPlace, type PlantUnit } from './plantUnits';
 import { domesOf as liveDomes, stateOf, type DomeRef, type DomeState } from './live';
 import { damagePlant, unitsOf } from './plantLive';
@@ -33,7 +35,7 @@ export const SIEGE_ORDER_OPEN: readonly PlantKind[] = ['substation', 'chiller', 
 export interface Reach { yardBreached: boolean; shellOpened: boolean; airlockForced: boolean }
 /** Can a crew touch a unit that stands at `place`, given what it opened? (`vents` stand in the shell itself.) */
 export function reachable(place: PlantPlace, kind: PlantKind, r: Reach): boolean {
-  if (place === 'yard') return r.yardBreached;
+  if (place === 'yard') return r.yardBreached || r.airlockForced;   // (an airlock forced: the passage runs from inside the shell to the yard)
   if (place === 'gallery') return r.airlockForced;
   return kind === 'vents' ? r.shellOpened || r.airlockForced : r.shellOpened || r.airlockForced;
 }
@@ -71,11 +73,11 @@ export function yardCover(s: GameState, yard: Pick<YardGeom, 'center'>, ox: numb
   return Math.min(0.6, c);
 }
 
-/** The chance the crew gets through the yard wall: its best attempt (a ram at the gate, a charge at the gate or wall) against the walls and gate, less the defenders' cover. Zero with no truck and no charge. */
-export function yardBreachOdds(a: { truck: boolean; satchels: number; difficulty: 'cozy' | 'standard' | 'hardcore'; cover: number; bollards?: boolean; vehicleBlocked?: number; gateBarrier?: number }): number {
-  const base = { wallKind: YARD_WALL as string, difficulty: a.difficulty, bollards: !!a.bollards, vehicleBlocked: a.vehicleBlocked ?? 0, gateBarrier: (a.gateBarrier ?? 0) + YARD_GATE_BARRIER };
-  const ram = a.truck ? ramOdds({ ...base, gate: true }) : 0;
-  const blast = a.satchels > 0 ? 1 - Math.pow(1 - Math.max(blastOdds({ ...base, gate: true }), blastOdds({ ...base, gate: false })), a.satchels) : 0;
+/** The chance the crew gets through the yard wall: its best attempt (a ram or a charge at the wall: there is no gate to go for) less the defenders' cover. Zero with no truck and no charge. */
+export function yardBreachOdds(a: { truck: boolean; satchels: number; difficulty: 'cozy' | 'standard' | 'hardcore'; cover: number; bollards?: boolean; vehicleBlocked?: number }): number {
+  const base = { wallKind: YARD_WALL as string, difficulty: a.difficulty, bollards: !!a.bollards, vehicleBlocked: a.vehicleBlocked ?? 0, gateBarrier: 0, gate: false };
+  const ram = a.truck ? ramOdds(base) : 0;
+  const blast = a.satchels > 0 ? 1 - Math.pow(1 - blastOdds(base), a.satchels) : 0;
   const p = 1 - (1 - ram) * (1 - blast);
   return Math.max(0, p * (1 - Math.max(0, Math.min(0.6, a.cover))));
 }
@@ -107,16 +109,16 @@ export function strikePlant(s: GameState, battle: Battle | null, overrun: boolea
     const units = unitsOf(s, d, st);
     if (!units.length) continue;
     const yard = yardGeometry(d.tier, d.r, d.st.rot);
-    const counters = countersOf(s, yard ? { x: d.st.x + yard.gate.x, z: d.st.z + yard.gate.z } : null, home, null);
+    const counters = countersOf(s, yard ? { x: d.st.x + yard.center[0], z: d.st.z + yard.center[1] } : null, home, null);
     const cover = yard ? yardCover(s, yard, d.st.x, d.st.z) : 0;
-    const breachP = yard ? yardBreachOdds({ truck: crew.means.truck, satchels: crew.means.satchels, difficulty: diff, cover, bollards: counters.bollards, vehicleBlocked: counters.vehicleBlocked, gateBarrier: counters.gateBarrier }) : 0;
+    const breachP = yard ? yardBreachOdds({ truck: crew.means.truck, satchels: crew.means.satchels, difficulty: diff, cover, bollards: counters.bollards, vehicleBlocked: counters.vehicleBlocked }) : 0;
     const base: Reach = { yardBreached: false, shellOpened: shell.opened, airlockForced: shell.airlock };
     const anyReachable = breachP > 0 || units.some(u => reachable(u.place, u.kind, base));
     const odds = plantTargetOdds({ organized: crew.organized, sealed: st.lockdown, impervious: d.tier === 'arcology', overrun, anyReachable, cover });
     if (!(r() < odds)) continue;
     const yardBreached = yard ? r() < breachP : false;
     if (yard && !yardBreached && !units.some(u => reachable(u.place, u.kind, base))) {
-      lines.push(`A part of the crew went for the plant yard against the dome. The concrete wall and the steel gate held${cover > 0 ? ', with the towers and the watch firing on them' : ''}; nothing inside was touched.`);
+      lines.push(`A part of the crew went for the plant yard against the dome. The concrete wall held${cover > 0 ? ', with the towers and the watch firing on them' : ''}; nothing inside was touched.`);
       continue;
     }
     const reach: Reach = { ...base, yardBreached };

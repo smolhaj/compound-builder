@@ -21,7 +21,7 @@ export interface PlantLook { loop?: WaterLoop; spares?: readonly PlantKind[]; ro
 export const plantKey = (tier: DomeTier, r: number, filtering: Filtering, o: PlantLook = {}): string =>
   `${tier}:${r.toFixed(2)}:${filtering}:${o.loop ?? 'none'}:${(o.spares ?? []).join(',')}:${o.rot ?? 0}:${Object.entries(o.hurt ?? {}).filter(([, c]) => c !== 'ok').map(([k, c]) => k + c).sort().join(',')}:${o.dark ? 1 : 0}`;
 
-const LINE_COLOR: Record<PlantLine['kind'], number> = { power: 0xd9822b, chill: 0x4f9bd0, water: 0x2f7fb5, feeder: 0xe0a030 };
+const LINE_COLOR: Record<PlantLine['kind'], number> = { power: 0xd9822b, chill: 0x4f9bd0, water: 0x2f7fb5, feeder: 0xe0a030, passage: 0x3fb8a8 };
 const CHAR = 0x1c1a18;
 const tint = (hex: number, cond: PlantCond | undefined): number => {
   if (!cond || cond === 'ok') return hex;
@@ -32,7 +32,7 @@ const tint = (hex: number, cond: PlantCond | undefined): number => {
 const STEM: Partial<Record<DomeTier, number>> = { glass: 0.08, arcology: 0.14 };
 
 function partGeometry(q: PlantPart, ground: (x: number, z: number) => number, stem: number, color = q.color): THREE.BufferGeometry {
-  let g: THREE.BufferGeometry = q.shape === 'box' ? new THREE.BoxGeometry(q.w, q.h, q.d) : new THREE.CylinderGeometry(q.r, q.r, q.h, 10);
+  let g: THREE.BufferGeometry = q.shape === 'box' ? new THREE.BoxGeometry(q.w, q.h, q.d) : new THREE.CylinderGeometry(q.r2 ?? q.r, q.r, q.h, q.r < 0.03 ? 6 : 10);
   if (q.onShell) {
     const { theta, phi } = q.onShell;
     g.translate(0, q.h / 2, 0); g.rotateY(q.rot);
@@ -99,7 +99,7 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
     const pieces: THREE.BufferGeometry[] = [];
     for (const ln of plant.lines) for (let i = 1; i < ln.pts.length; i++) {
       const [ax, az] = ln.pts[i - 1], [bx, bz] = ln.pts[i], len = Math.hypot(bx - ax, bz - az); if (len < 1e-3) continue;
-      const g = new THREE.CylinderGeometry(ln.kind === 'feeder' ? 0.035 : 0.025, ln.kind === 'feeder' ? 0.035 : 0.025, len, 6);
+      const g = new THREE.CylinderGeometry(ln.kind === 'passage' ? 0.14 : ln.kind === 'feeder' ? 0.035 : 0.025, ln.kind === 'passage' ? 0.14 : ln.kind === 'feeder' ? 0.035 : 0.025, len, 8);
       g.rotateZ(Math.PI / 2); g.rotateY(Math.atan2(-(bz - az), bx - ax));
       const mx = (ax + bx) / 2, mz = (az + bz) / 2; g.translate(mx, ground(mx, mz) - ln.depth, mz);
       g.deleteAttribute('uv'); const ng = g.toNonIndexed(), col = new THREE.Color(LINE_COLOR[ln.kind]), arr = new Float32Array(ng.attributes.position.count * 3);
