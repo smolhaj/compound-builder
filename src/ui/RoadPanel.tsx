@@ -21,7 +21,7 @@ const card = { position: 'fixed', left: 12, bottom: 64, width: 'min(330px, calc(
 const ft = (units: number): number => Math.round(toFeet(units * 6) / 10) * 10;
 const b = (primary = false, off = false) => ({ ...btn(primary), padding: '3px 8px', fontSize: 12, opacity: off ? 0.4 : 1, marginRight: 4, marginTop: 4 });
 
-/** Layout A: the road alert is a banner under the top bar (below the breaking-news banner when one is up), not a card over the map. */
+/** Layout A: the road alert is a banner under the top bar, narrowed to clear the What-to-do card on the left (like the breaking-news banner) (below the breaking-news banner when one is up), not a card over the map. */
 function useBannerBox(): CSSProperties | null {
   const A = useWorldStore(w => w.layout === 'a'), scale = useWorldStore(w => w.uiScale);
   const [below, setBelow] = useState(0);
@@ -32,7 +32,7 @@ function useBannerBox(): CSSProperties | null {
   }, [A]);
   if (!A) return null;
   const top = Math.max(TOP_BAR.top + T.size.bar * scale + TOP_BAR.gap, below);
-  return { position: 'fixed', top, left: '50%', transform: `translateX(-50%) scale(${scale})`, transformOrigin: 'top center', zIndex: 3, boxSizing: 'border-box', width: 'max-content', maxWidth: `min(620px, calc((100vw - 32px) / ${scale}))`,
+  return { position: 'fixed', top, left: '50%', transform: `translateX(-50%) scale(${scale})`, transformOrigin: 'top center', zIndex: 3, boxSizing: 'border-box', width: 'max-content', maxWidth: `min(620px, max(380px, calc((100vw - 700px) / ${scale})))`,
     display: 'flex', flexWrap: 'wrap', alignItems: 'center', columnGap: 10, rowGap: 2, background: tv.color('panel'), color: tv.color('text'), border: `1px solid ${T.color.line}`, borderLeft: `3px solid ${tv.color('warn')}`, borderRadius: tv.radius('panel'), boxShadow: tv.shadow(2), padding: '6px 12px', fontFamily: tv.font('family'), fontSize: tv.font('sm'), pointerEvents: 'auto' };
 }
 
