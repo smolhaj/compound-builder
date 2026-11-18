@@ -1,6 +1,6 @@
 /**
  * The dome's water (owner decision 2 of 2026-11-18): the shell is a roof, so it catches the rain and the snowmelt for the cisterns (after a
- * first-flush diverter and a sand filter if the loop is fitted); a greywater loop reuses sink and shower water on the beds and the toilets; a
+ * first-flush diverter and a sand filter if the loop is fitted); a graywater loop reuses sink and shower water on the beds and the toilets; a
  * full recycle loop treats the wastewater too and drinks it again; and the beds under glass give back their breath as condensate on the cold
  * coils. The evaporative cooling pads drink water on a hot day (dome/climate.ts). Pure (tested). Liters inside (utilities.ts), gallons in text.
  */
@@ -10,7 +10,7 @@ import { domeGeometry } from './geometry';
 
 export type WaterLoop = 'none' | 'grey' | 'recycle';
 export const WATER_LOOPS: readonly WaterLoop[] = ['none', 'grey', 'recycle'];
-export const LOOP_NAME: Record<WaterLoop, string> = { none: 'No loop', grey: 'Greywater loop', recycle: 'Full recycle loop' };
+export const LOOP_NAME: Record<WaterLoop, string> = { none: 'No loop', grey: 'Graywater loop', recycle: 'Full recycle loop' };
 
 /** Share of the household water of the people living under the shell that goes round again. */
 export const REUSE: Record<WaterLoop, number> = { none: 0, grey: 0.35, recycle: 0.8 };

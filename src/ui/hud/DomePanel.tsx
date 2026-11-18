@@ -25,7 +25,7 @@ function Bar({ v, tone }: { v: number; tone: Tone }) {
 }
 
 const STAGE: Record<CoolStage, string> = { idle: 'Floating inside the band: nothing running', heating: 'Heating (heat pump)', vent: 'Cooling with vents and fans', shade: 'Cooling with roof screens drawn', evap: 'Cooling with evaporative pads (drinks water)', chill: 'Cooling with chillers (the dear last resort)' };
-const LOOP_BLURB: Record<WaterLoop, string> = { none: '', grey: 'Sink and shower water goes to the beds and toilets, a first-flush diverter and sand filter clean the rain off the shell. Reuses about a third of the household water.', recycle: 'Wastewater is treated through a membrane skid and drunk again, plus everything the greywater loop does. Reuses about four fifths of the household water.' };
+const LOOP_BLURB: Record<WaterLoop, string> = { none: '', grey: 'Sink and shower water goes to the beds and toilets, a first-flush diverter and sand filter clean the rain off the shell. Reuses about a third of the household water.', recycle: 'Wastewater is treated through a membrane skid and drunk again, plus everything the graywater loop does. Reuses about four fifths of the household water.' };
 const TIER_NAME = (v: DomeView): string => TIER[v.ref.tier].name;
 
 export function DomePanel() {

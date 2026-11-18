@@ -489,7 +489,7 @@ function domeDayOne(s: GameState, d: DomeRef, st: DomeState, multi: boolean): st
   const loop = st.loop ?? 'none';
   if (loop !== 'none' && s.clock.t >= (st.loopDownUntil ?? 0) && r() < LIVE.P_LOOP * scale * (loop === 'recycle' ? 1.4 : 1) * (powered ? 1 : 1.5)) {
     st.loopDownUntil = s.clock.t + 3 + Math.floor(r() * 3);
-    if (raise(s, st, 'loop', day)) out.push(`${name}'s ${loop === 'recycle' ? 'recycle' : 'greywater'} loop has failed: a fouled membrane and a burned-out pump. The wastewater is backing up toward the sump.`);
+    if (raise(s, st, 'loop', day)) out.push(`${name}'s ${loop === 'recycle' ? 'recycle' : 'graywater'} loop has failed: a fouled membrane and a burned-out pump. The wastewater is backing up toward the sump.`);
   }
   // a hot day the plant could not hold
   const hotH = st.overH ?? 0;
@@ -638,7 +638,7 @@ export function buyLoop(s: GameState, level: WaterLoop, id?: string): string | n
   if (why) return why;
   const d = domeOf(s, id)!, b = loopBill(s, level, id)!, st = ownState(s, d);
   s.money -= b.usd; st.loop = level; st.loopDownUntil = 0;
-  log(s, level === 'grey' ? 'A greywater loop is plumbed in: sink and shower water goes to the beds and the toilets, and rain off the shell is filtered into the cisterns.' : 'A full recycle loop is plumbed in: the wastewater is treated and drunk again, and rain off the shell is filtered into the cisterns.');
+  log(s, level === 'grey' ? 'A graywater loop is plumbed in: sink and shower water goes to the beds and the toilets, and rain off the shell is filtered into the cisterns.' : 'A full recycle loop is plumbed in: the wastewater is treated and drunk again, and rain off the shell is filtered into the cisterns.');
   return null;
 }
 
