@@ -34,6 +34,7 @@ import { diffOf } from './difficulty';
 import { WAVE } from './waves';
 import { dayIndex, type GameState, type Structure } from './state';
 import { pluralize } from './words';
+import { etaForKind, rentalQuote, rushQuote } from './shelterBridge';
 
 export type GoalId = 'roof' | 'water' | 'food' | 'power' | 'drive' | 'fence';
 export const GOAL_IDS: readonly GoalId[] = ['roof', 'water', 'food', 'power', 'drive', 'fence'];
@@ -271,7 +272,8 @@ function look(s: GameState, id: GoalId, ops: Map<OpId, OpItem>, nudge: ReturnTyp
       return { ...base, ...(tents > 0 && s.money >= tents * TENT_PRICE ? { act: { label: `Buy ${pluralize(tents, 'tent')} (${usd(tents * TENT_PRICE)}) so nobody sleeps outside`, act: { type: 'order' as const, lines: [{ material: 'tent' as const, qty: tents }] } } } : {}) };
     }
     // a finished home with too few beds, or no home at all
-    return { ...base, ...(kind ? { act: { label: `Stake a ${adv?.name ?? (kind === 'cottage' ? 'cottage' : 'cabin')} (~${usd(kitCost(s, kind))}${adv ? `, ${pluralize(adv.beds, 'bed')}` : ''})`, act: { type: 'stake' as const, kind }, ...(buildOff(s, kind) ? { off: buildOff(s, kind)! } : {}) } } : op.act ? { act: { label: op.act.label, act: op.act.act } } : {}) };
+    const et = kind ? etaForKind(s, kind) : null;
+    return { ...base, ...(et ? { line: `${base.line} ${et.line}.` } : {}), ...(kind ? { act: { label: `Stake a ${adv?.name ?? (kind === 'cottage' ? 'cottage' : 'cabin')} (~${usd(kitCost(s, kind))}${adv ? `, ${pluralize(adv.beds, 'bed')}` : ''})`, act: { type: 'stake' as const, kind }, ...(buildOff(s, kind) ? { off: buildOff(s, kind)! } : {}) } } : op.act ? { act: { label: op.act.label, act: op.act.act } } : {}) };
   }
   if (id === 'fence') {
     if (!anyOwnPlaced(s) && starterFits(s)) return { ...base, act: { label: 'Lay out a starter compound', act: { type: 'starter' } } };
@@ -296,6 +298,8 @@ function actCost(s: GameState, a: GoalAct): number {
   if (a.type === 'order') return orderCost(a.lines, prices(s));
   if (a.type === 'crew') { const st = s.structures.find(x => x.id === a.id) ?? s.perimeter.find(x => x.id === a.id); return st ? crewQuote(st).usd + (a.lines ? orderCost(a.lines, prices(s)) : 0) : 0; }
   if (a.type === 'hookup') return driveQuote(s.site.improvements, s.site, s.seed).usd;
+  if (a.type === 'rent') { const q = rentalQuote(s, a.kind); return q.upfront + q.nightly; }
+  if (a.type === 'rush') { const st = s.structures.find(x => x.id === a.id); return (st && rushQuote(s, st)?.fee) || 0; }
   return 0;
 }
 

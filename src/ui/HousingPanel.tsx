@@ -10,6 +10,8 @@ import { orderProblem } from '../sim/economy';
 import { arrivalOutlook, BAG_PRICE, cachedPlan, housingFixes, SPOT_ORDER, TENT_PRICE, type SpotKind } from '../sim/housing';
 import type { Person } from '../sim/family';
 import { Hint } from './hud/common';
+import { bridgeOffers, endRental, startRental, RENTALS, type RentalKind } from '../sim/shelterBridge';
+import { rentalLabel } from '../sim/bridgeText';
 
 const DIM = 'rgba(238,238,238,0.6)';
 const TONE = { good: '#a8d080', warn: '#f0c070', bad: '#f08060' } as const;
@@ -36,6 +38,21 @@ export function HousingPanel() {
     const why = orderProblem(game, lines);
     return <button key={item} style={{ ...btn, opacity: why ? 0.5 : 1, cursor: why ? 'not-allowed' : 'pointer' }} disabled={!!why} title={why ?? `Order ${qty} to the road`} onClick={() => g.order(lines)}>Buy {qty} {item === 'tent' ? (qty === 1 ? 'tent' : 'tents') : (qty === 1 ? 'bag' : 'bags')} {usd(qty * (item === 'tent' ? TENT_PRICE : BAG_PRICE))}</button>;
   };
+  const offers = bridgeOffers(game), rental = game.rental;
+  const rent = (k: RentalKind) => { g.money(d => startRental(d, k)); };
+  const bridge = (rental || offers.rentals.length > 0) && (
+    <div style={{ marginTop: 6 }} data-testid="shelter-bridge">
+      {rental
+        ? <div style={{ ...small, color: TONE.good }}>Renting {RENTALS[rental.kind].name.toLowerCase()}: {usd(rental.nightly)} a night, {rental.nights} {rental.nights === 1 ? 'night' : 'nights'} so far ({usd(rental.paid)}). {game.clock.t < rental.readyAt ? `Ready in ${Math.ceil(rental.readyAt - game.clock.t)} days. ` : ''}The family checks out the day the house has beds.{' '}
+          <button style={btn} onClick={() => g.money(d => { endRental(d); return null; })}>Check out</button></div>
+        : <>
+          <div style={{ ...small, color: DIM }}>Bridge the wait with cash:</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {offers.rentals.map(q => { const poor = game.money < q.upfront + q.nightly; return <button key={q.kind} style={{ ...btn, opacity: poor ? 0.5 : 1, cursor: poor ? 'not-allowed' : 'pointer' }} disabled={poor} title={`${q.blurb}. About ${usd(q.monthly)} a month for ${q.units} ${q.units === 1 ? 'unit' : 'units'} of ${q.seats}.`} onClick={() => rent(q.kind)}>{rentalLabel(q)}</button>; })}
+          </div>
+        </>}
+    </div>
+  );
   return (
     <div style={{ marginBottom: 10 }} data-testid="housing">
       <div style={h3}>Housing</div>
@@ -59,6 +76,7 @@ export function HousingPanel() {
             {fixes.filter(x => x.action === 'buy').map(x => buy(x.item as 'tent' | 'sleeping_bag', x.qty))}
           </div>
         </>}
+      {bridge}
     </div>
   );
 }

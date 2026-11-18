@@ -100,6 +100,7 @@ function BillCard({ bill, anchor, scale }: { bill: Bill; anchor: HTMLElement; sc
         {row(`Hire a crew (wages ${usd(bill.crewLaborUsd)})`, usd(bill.crewUsd))}
       </div>
       <div>{row('Work', `${Math.round(bill.hours)} h`)}{row('A hired crew', `about ${bill.crewWeeks} ${bill.crewWeeks === 1 ? 'week' : 'weeks'}`)}</div>
+      {bill.eta && <div data-testid="build-eta" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}><div style={{ fontWeight: T.weight.semi }}>{bill.eta.line}</div><div style={{ color: tv.color('dim') }}>{bill.eta.meanwhile}</div></div>}
       {bill.needs.length > 0 && <div style={{ display: 'flex', flexDirection: 'column', gap: 2, color: tv.color('warn') }}>{bill.needs.map(n => <div key={n}>{T.glyph.warn} {n}</div>)}</div>}
       <div style={{ color: tv.color('dim'), fontSize: tv.font('fine') }}>{bill.state === 'off' ? 'Not yet' : bill.sizable ? 'Click to place it. + and - (or Shift+wheel) set the diameter, R rotates, Esc cancels.' : 'Click to place it. R rotates, Esc cancels.'}</div>
     </div>, document.body);

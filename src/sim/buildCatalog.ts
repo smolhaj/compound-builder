@@ -186,6 +186,8 @@ export interface Bill {
   /** What must be true: the reason it is dim, county review time, the logs. */
   needs: string[];
   state: CardKind;
+  /** How long until the family can use it, and what happens meanwhile (sim/shelterBridge.ts moveInEta; not for runs). */
+  eta?: { line: string; meanwhile: string };
 }
 
 /** A description cut at a sentence end near `max` characters. */
@@ -197,6 +199,7 @@ export function shortGives(text: string, max = 170): string {
   return `${cut.slice(0, sp > 0 ? sp : max)}...`;
 }
 
+import { moveInEta } from './shelterBridge';
 export function billFor(s: GameState, e: CatalogEntry, ctx: AdviceCtx = adviceCtx(s)): Bill {
   const bill = kindBill(e), buy = toBuy(bill), hours = kindHours(e);
   const materials: BillLine[] = buy.map(l => ({ label: billText({ [l.material]: l.qty }), usd: orderCost([l]) - DELIVERY_FEE }));
@@ -223,7 +226,7 @@ export function billFor(s: GameState, e: CatalogEntry, ctx: AdviceCtx = adviceCt
   if (st.reason) needs.push(st.reason);
   if (own) needs.push(`From your own land: ${own}`);
   if (permit) needs.push(`County review about ${pluralize(reviewDays(s, e.key), 'day')} before work starts`);
-  return { title: e.name, gives: shortGives(e.blurb), facts, materials, other, ownerUsd, crewLaborUsd, crewUsd: ownerUsd + crewLaborUsd, hours, crewWeeks: Math.max(1, Math.ceil(hours / CREW_WEEK)), ownNeeds: own, needs, state: st.kind, sizable: !e.run && tierOfKind(e.key) !== null };
+  return { title: e.name, gives: shortGives(e.blurb), facts, materials, other, ownerUsd, crewLaborUsd, crewUsd: ownerUsd + crewLaborUsd, hours, crewWeeks: Math.max(1, Math.ceil(hours / CREW_WEEK)), ownNeeds: own, needs, state: st.kind, sizable: !e.run && tierOfKind(e.key) !== null, ...(e.run ? {} : { eta: (({ line, meanwhile }) => ({ line, meanwhile }))(moveInEta(s, e.key, hours, !!permit)) }) };
 }
 
 /** The bill as plain text lines (also the card's tooltip for assistive tech). */

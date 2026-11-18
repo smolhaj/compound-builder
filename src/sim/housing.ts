@@ -38,6 +38,7 @@ import { regionFor } from './climate';
 import { crowdingFx, quarterHomes, quartersKey } from './quarters';
 import { pluralize } from './words';
 import { townHeat } from './cold';
+import { rentalSeats, rentalQuality } from './shelterBridge';
 
 export type SpotKind = 'bed' | 'bunk' | 'couch' | 'floor' | 'tent' | 'outbuilding' | 'nowhere';
 export const SPOT_ORDER: readonly SpotKind[] = ['bed', 'bunk', 'couch', 'floor', 'tent', 'outbuilding', 'nowhere'];
@@ -233,6 +234,8 @@ function pools(s: GameState): Pool[] {
   const fin = finished(s);
   for (const st of fin) add('bed', st.id, HOME_BEDS[st.kind] ?? 0);
   for (const st of fin) add('bunk', st.id, HOMES[st.kind]?.bunks ?? 0);
+  // a rented room, suite, RV or modular unit (sim/shelterBridge.ts): a real bed, but not the family's own house
+  if (s.rental && rentalSeats(s) > 0) add('bed', `rental:${s.rental.kind}`, rentalSeats(s), { quality: rentalQuality(s) });
   for (const st of fin) add('couch', st.id, HOMES[st.kind]?.couches ?? 0);
   for (const st of fin) { const sp = HOMES[st.kind]; if (sp && !sp.outbuilding) add('floor', st.id, Math.floor((sp.floorM2 ?? 0) / M2_PER_BAG), { quality: sp.floorQ }); }
   const tents: Pool[] = [];
@@ -368,7 +371,7 @@ let memo: { key: string; plan: HousingPlan } | null = null;
 /** The plan, reused while nothing it depends on has changed (the world asks every frame). */
 export function cachedPlan(s: GameState): HousingPlan {
   const fin = finished(s).length;
-  const key = `${s.seed}|${s.clock.startDoy}|${dayIndex(s.clock.t)}|${s.site.region}|${s.people.length}|${s.personState.map(p => (p.needs.died != null || p.needs.taken ? 1 : 0)).join('')}|${s.structures.length}|${fin}|${s.people.map(p => p.home ?? '').join(',')}|${s.stock.tent}|${s.stock.sleeping_bag}|${heatOn(s) ? 1 : 0}|${s.weather?.active?.kind ?? ''}|${quartersKey(s)}`;
+  const key = `${s.seed}|${s.clock.startDoy}|${dayIndex(s.clock.t)}|${s.site.region}|${s.people.length}|${s.personState.map(p => (p.needs.died != null || p.needs.taken ? 1 : 0)).join('')}|${s.structures.length}|${fin}|${s.people.map(p => p.home ?? '').join(',')}|${s.stock.tent}|${s.stock.sleeping_bag}|${s.rental ? `${s.rental.kind}${rentalSeats(s)}` : ''}|${heatOn(s) ? 1 : 0}|${s.weather?.active?.kind ?? ''}|${quartersKey(s)}`;
   if (memo?.key === key) return memo.plan;
   const plan = housingPlan(s);
   memo = { key, plan };

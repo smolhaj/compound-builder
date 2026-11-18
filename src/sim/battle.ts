@@ -1490,7 +1490,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         hurt(f, wallDogs.minHurt + r() * wallDogs.spanHurt, t + 0.1, undefined, 'leg');
         if (!f.dead && r() < 0.6) say(t + 0.3, pick(['The dog — get it off me — GET IT OFF!', 'Dog! It\'s got my leg — aah —']), f);
       }
-      if (temper !== 'savage' && !peace && t - lineSince >= 6) for (const f of atLine) if (!f.fled && !f.out && r() < (0.03 + 0.05 * Math.min(1, losses / Math.max(1, raiders)) + 0.03 * bitten) * (1 + 1.5 * (opts.deter ?? 0))) {
+      if (temper !== 'savage' && !peace && t - lineSince >= 6) for (const f of atLine) if (!f.fled && !f.out && r() < (0.03 + 0.05 * Math.min(1, losses / Math.max(1, raiders)) + 0.03 * bitten) * (1 + 3 * (opts.deter ?? 0))) {
         f.fled = true; ev.push({ t, kind: 'flee', unit: f.id });
         if (r() < 0.5) say(t + 0.2, pick(['Fuck this — I\'m not going over that.', 'It\'s not worth it — back, get BACK!', 'No way — I\'m out — I\'m out of here!']), f);
       }
