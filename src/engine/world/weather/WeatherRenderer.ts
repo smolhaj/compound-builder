@@ -578,15 +578,18 @@ export class WeatherRenderer {
     u.uTime.value = this._time;
     u.uSnow.value = snowy ? 1 : 0;
     const ac = ash > Math.max(o.rain, o.snow) ? f.ashColor ?? [0.52, 0.5, 0.48] : null;
-    u.uSize.value = misty ? 0.4 : ac ? 1.7 : 1;
+    // blown dust (tan) is a fine, dull grit streaming sideways; ash (grey) keeps its big soft flakes. Big bright tan dots read as snow.
+    const grit = !!ac && ac[0] > ac[2] * 1.5;
+    u.uSize.value = misty ? 0.4 : grit ? 0.75 : ac ? 1.7 : 1;
     u.uDrift.value = misty ? 0.25 : 1;
-    u.uOpacity.value = misty ? 0.35 : snowy ? 0.9 : 0.3 + 0.2 * o.rain;
+    u.uOpacity.value = misty ? 0.35 : grit ? 0.6 : snowy ? 0.9 : 0.3 + 0.2 * o.rain;
     // Light level: precipitation is lit by the (dim, overcast) sky
     const lit = 1 - 0.8 * f.night;
+    const dim = grit ? 0.75 : 1;
     (u.uColor.value as THREE.Color).setRGB(
-      (ac ? ac[0] : snowy ? 0.95 : 0.70) * lit + this._flash * 0.6,
-      (ac ? ac[1] : snowy ? 0.96 : 0.75) * lit + this._flash * 0.6,
-      (ac ? ac[2] : snowy ? 1.0 : 0.84) * lit + this._flash * 0.6,
+      (ac ? ac[0] * dim : snowy ? 0.95 : 0.70) * lit + this._flash * 0.6,
+      (ac ? ac[1] * dim : snowy ? 0.96 : 0.75) * lit + this._flash * 0.6,
+      (ac ? ac[2] * dim : snowy ? 1.0 : 0.84) * lit + this._flash * 0.6,
     );
     // Wind: rain slants in a gust front; snow squalls drive the flakes sideways
     (u.uWind.value as THREE.Vector2).set(snowy ? 0.3 + o.wind * 2.6 : 1.1 + o.rain * 1.2 + o.wind * 1.6, snowy ? 0.15 + o.wind * 0.8 : 0.5 + o.wind * 0.5);
