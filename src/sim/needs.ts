@@ -55,6 +55,7 @@ import { isRadiationHurt, radiationDay, type RadState } from './radiation';
 import { drinkShare, dryWork, heatFactor, isThirstHurt, thirstDay } from './thirst';
 import { coldDay, isColdHurt, propaneDay, rooflessGain } from './cold';
 import { treated } from './water';
+import { domeSeason, domeYieldK } from './dome/agro';
 
 export type FoodId = 'fresh' | 'frozen' | 'canned' | 'staples';
 /** Food is kept in the stockpile in these units; kcal in one unit. */
@@ -173,7 +174,7 @@ export function produceParts(s: GameState): ProduceParts {
   // later sowings (successions, sim/crops.ts) run the end of the season on a little and raise the crop
   const [g0, g1a] = gardenSeason(s), g1 = g1a + successionDays(s);
   // each bed has its own frost dates and wind (sim/microclimate.ts): a cold-air pocket starts late and ends early, an open ridge dries the bed
-  const season = fin.filter(st => st.kind === 'garden').reduce((a, st) => a + gardenSeasonK(s, st, doy, g0, g1) * fertigationK(s, st), 0);
+  const season = fin.filter(st => st.kind === 'garden').reduce((a, st) => a + gardenSeasonK(s, st, doy, ...domeSeason(s, st, g0, g1)) * fertigationK(s, st) * domeYieldK(s, st), 0);
   const skill = bestGardener(s);
   // a month to come back after hail (replanted from saved seed), then a shorter season
   const hd = hailThisYear(s), hail = hd == null || doy < hd ? 1 : doy - hd < 30 ? 0 : 0.7;

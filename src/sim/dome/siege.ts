@@ -40,7 +40,7 @@ export const SHELL_ODDS: Record<DomeTier, { ram: number; blast: number }> = {
 /** The same against an airlock's outer door (the gate odds): the doors of a dome are a vestibule's, not a farm gate's. */
 export const AIRLOCK_DOOR: Record<DomeTier, { ram: number; blast: number }> = {
   earthen: { ram: 0.55, blast: 0.85 },
-  geodesic: { ram: 0.6, blast: 0.88 },
+  geodesic: { ram: 0.45, blast: 0.88 },
   glass: { ram: 0.35, blast: 0.7 },
   arcology: { ram: 0.03, blast: 0.12 },
 };

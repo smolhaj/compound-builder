@@ -31,6 +31,7 @@ import { kitchenOf, putUpMeat, renderLard, MEAT_WHERE } from './kitchen';
 import type { Animal, Livestock } from './livestock';
 import { regionFor } from './climate';
 import { caloriesShort } from './units';
+import { domeSickK } from './dome/agro';
 
 export interface Herd {
   /** Sick animals by kind. */
@@ -117,7 +118,7 @@ function sicknessDay(s: GameState, l: Livestock, r: () => number): string[] {
     if (n <= 0) { h.sick[a] = 0; continue; }
     let sick = Math.min(n, h.sick[a] ?? 0);
     // new cases
-    const p = ILL_PER_YEAR[a] / 365 * ((l.condition[a] ?? 1) < 0.6 ? 2 : 1) * neglect * (1 - 0.3 * sheltered(s));
+    const p = ILL_PER_YEAR[a] / 365 * ((l.condition[a] ?? 1) < 0.6 ? 2 : 1) * neglect * (1 - 0.3 * sheltered(s)) * domeSickK(s);
     for (let k = 0; k < n - sick; k++) if (r() < p) { sick++; if (logGate(s, `ill:${a}`, 8)) out.push(`A ${a === 'steer' ? 'steer' : a} is off its feed and hanging its head: sick.`); }
     if (sick > 0) {
       l.condition[a] = Math.max(0, (l.condition[a] ?? 1) - 0.01 * sick / n);

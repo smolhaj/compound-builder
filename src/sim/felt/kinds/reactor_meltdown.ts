@@ -1,11 +1,12 @@
 import type { FeltSpec } from '../types';
 import { kindCards, noNeighbors } from '../cardLibrary';
+import { domeFalloutCards, hasDome } from '../domeFelt';
 import { householdSize as N, r25 } from '../cardFx';
 
 /** Felt layer for reactor_meltdown: the plume on the radio, the shelter-in-place order, the milk and the creek. Distinct from nuclear's (a bomb) fallout cards. */
 export const felt: FeltSpec = {
-  cards: kindCards('reactor_meltdown', [
-    { id: 'plume', phase: 'hit', title: 'The shelter-in-place order', fallback: 'inside',
+  cards: [...domeFalloutCards('reactor_meltdown'), ...kindCards('reactor_meltdown', [
+    { id: 'plume', phase: 'hit', if: s => !hasDome(s), title: 'The shelter-in-place order', fallback: 'inside',
       text: 'The radio says to stay inside, shut the windows, bring the animals in and wait for word. Nobody can say how long.',
       options: [
         { id: 'pills', label: 'Buy potassium iodide and a dosimeter', hint: 'A real protection for the thyroid, and a way to know.', cost: s => ({ money: r25(200 + N(s) * 70) }), now: s => [{ k: 'stock', id: 'potassium_iodide', n: N(s) }, { k: 'stock', id: 'geiger_counter', n: 1 }], risk: { p: 0.08, good: 'Everyone has a pill and a reading.', bad: 'The pills were old.', lose: [{ k: 'dose', n: 0.05 }] }, line: 'You bought pills and a dosimeter.' },
@@ -33,5 +34,5 @@ export const felt: FeltSpec = {
         { id: 'eat', label: 'Eat what the dosimeter clears and burn the rest', hint: 'A lot of reading, a little waste.', cost: () => ({ hours: 8 }), now: s => [{ k: 'stock', id: 'canned', n: N(s) * 2 }], risk: { p: 0.25, good: 'It kept you fed.', bad: 'The meter lied.', lose: [{ k: 'dose', n: 0.08 }] }, line: 'You ate what the meter cleared.' },
         { id: 'trade', label: 'Trade clean produce to the quarantined families', hint: 'Humane and risky.', cost: s => ({ stock: { canned: N(s) } }), off: noNeighbors, now: [{ k: 'humanity', n: 4 }, { k: 'standing', n: 6 }], risk: { p: 0.2, good: 'They wept.', bad: 'Someone said it was not enough.', lose: [{ k: 'standing', n: -2 }] }, line: 'You traded clean produce.' },
       ] },
-  ]),
+  ])],
 };

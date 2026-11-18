@@ -2,8 +2,8 @@
  * The dome as live game state (docs/DOME_COMPOUND.md 7.1 to 7.3, owner decisions of 2026-11-17 and 11-18): lockdown with a CO2 clock, paid air
  * filtering, the very expensive closed ecology, the dome's own climate and the clean zone under the shell.
  *
- * One dome runs the compound's air: the biggest finished enclosure (`domeOf`). `GameState.dome` holds the switches and the gauges (save v99,
- * optional: absent until the player touches the dome). The pure models are `air.ts` (the CO2 clock), `climate.ts` (kWh) and `protection.ts`;
+ * EVERY finished dome runs its own air, climate, filtering, ecology, water loop and power node (owner decision 1 of 2026-11-18; save v100):
+ * `GameState.domes[structureId]` holds each one's switches and gauges, and `GameState.dome` mirrors the biggest (`domeOf`) for the older readers. The pure models are `air.ts` (the CO2 clock), `climate.ts` (kWh) and `protection.ts`;
  * this file only reads the state, steps the gauges and makes the small events. Not exported from `dome/index.ts` (it reads GameState).
  *
  *  Sealed       people burn air, the shell leaks a little, filtering and plants take it back. The clock is `lockdownClock`.
@@ -19,7 +19,8 @@ import { isFinished } from '../construction';
 import { isHome } from '../blueprints';
 import { log } from '../economy';
 import { mulberry32 } from '../rng';
-import { nightOf, meanLow } from '../housing';
+import { nightOf } from '../housing';
+import { regionFor } from '../climate';
 import { solarFogK } from '../fogFx';
 import { powerOnPlace } from '../hookups';
 import { DIFFICULTY } from '../difficulty';
@@ -27,7 +28,9 @@ import type { FxCard } from '../disasterFx';
 import { TIER, shellFt, tierOfKind, tierRank, DOME_KINDS, type DomeTier } from './tiers';
 import { domeGeometry } from './geometry';
 import { SHELL } from './protection';
-import { domeLoad, passiveF, type ClimateMode } from './climate';
+import { domeLoad, BAND, comfortAt, type ClimateMode, type CoolStage } from './climate';
+import { WATER_LOOPS, loopUsd, loopKw, rainCatchL, reuseL, condensateL, GAL_PER_L, type WaterLoop } from './waterLoop';
+import { stockCover } from './agro';
 import {
   FILTERING, LIMIT_PPM, O2, SCRUB, BED_CAP, freshAir, lockdownClock, sealedAir, advancedFilterUsd, closedEcologyUsd, scrubberUsd,
   type AirCtx, type Clock, type Filtering,
@@ -48,12 +51,12 @@ export const LIVE = {
   /** The closed ecology's standing cost a day, as a share of its price, and the food it grows (baskets per person a day at full health). */
   ECO_UPKEEP_DAY: 0.00012, ECO_FOOD: 0.35,
   /** Daily failure chances at Standard (scaled by the difficulty). */
-  P_PLANT: 0.012, P_BLIGHT: 0.03,
+  P_PLANT: 0.012, P_BLIGHT: 0.03, P_LOOP: 0.012,
   /** Days between two cards of one kind. */
   COOLDOWN: 6,
 } as const;
 
-export type LifeCard = 'foul' | 'plant' | 'blight' | 'power';
+export type LifeCard = 'foul' | 'plant' | 'blight' | 'power' | 'hot' | 'loop' | 'stock';
 export type DomeAlarm = 'ok' | 'low' | 'critical';
 
 export interface DomeState {
@@ -88,29 +91,81 @@ export interface DomeState {
   powered: boolean;
   /** The last time the fail-safe vents opened (game time), or null. */
   ventedAt: number | null;
+  /** The structure this state belongs to (set when the state is filed under `GameState.domes`). */
+  id?: string;
+  /** Water loop level, and the game time its pumps are down until (a fouled membrane), or 0. (All below: save v100, optional.) */
+  loop?: WaterLoop;
+  loopDownUntil?: number;
+  /** Rented chillers run until this game time (a hot-day fix), or 0. */
+  chillUntil?: number;
+  /** The last rung of the cooling ladder used, and the day's estimates: water the pads drink, rain caught, water the loops gave back (gallons). */
+  stage?: CoolStage;
+  waterGalDay?: number;
+  rainGalDay?: number;
+  savedGalDay?: number;
+  /** Hours today above the top of the band by 3 F or more, and a slow 0..1 mean of how far the air has been from comfortable (animals, beds). */
+  overH?: number;
+  stress?: number;
+  /** Whether the shell reaches a cistern (so its rain is kept), as the water balance last found it. */
+  cistern?: boolean;
 }
 
 export const newDomeState = (): DomeState => ({
-  lockdown: false, since: null, filtering: 'none', mode: 'frost', co2ppm: freshAir().co2ppm, o2pct: freshAir().o2pct, filterHealth: 1, ecoHealth: 1, dust: 0,
+  lockdown: false, since: null, filtering: 'none', mode: 'temperate', co2ppm: freshAir().co2ppm, o2pct: freshAir().o2pct, filterHealth: 1, ecoHealth: 1, dust: 0,
   plantDownUntil: 0, installing: null, cards: [], cool: {}, alarm: 'ok', hours: null, indoorF: 55, outF: 55, kwhDay: 0, powered: false, ventedAt: null,
 });
 
-/** What the dome has right now (a read: never creates the state). */
-export const domeOfState = (s: GameState): DomeState => s.dome ?? newDomeState();
 
-// ── which dome, who is inside ─────────────────────────────────────────────────────────────
+// ── which domes, who is inside ────────────────────────────────────────────────────────────
 
 export interface DomeRef { st: Structure; tier: DomeTier; cells: number; /** Shell radius, world units (1 unit = 20 ft). */ r: number; shellFt: number }
 
-/** Footprint cells of the structure (the default size of its tier: the diameter handle is a later slice). */
-export function domeOf(s: GameState): DomeRef | null {
-  let best: DomeRef | null = null;
+/** Every finished dome, biggest tier first (ties by the order they were built): the first is the "main" dome the older readers mean. */
+export function domesOf(s: GameState): DomeRef[] {
+  const out: DomeRef[] = [];
   for (const st of s.structures) {
     if (!DOME_KINDS.includes(st.kind) || !isFinished(st)) continue;
     const tier = tierOfKind(st.kind)!, cells = TIER[tier].cells;
-    if (!best || tierRank(tier) > tierRank(best.tier)) best = { st, tier, cells, r: shellFt(tier, cells) / 2 / 20, shellFt: shellFt(tier, cells) };
+    out.push({ st, tier, cells, r: shellFt(tier, cells) / 2 / 20, shellFt: shellFt(tier, cells) });
   }
-  return best;
+  return out.map((d, i) => ({ d, i })).sort((a, b) => tierRank(b.d.tier) - tierRank(a.d.tier) || a.i - b.i).map(x => x.d);
+}
+
+/** The main dome (the biggest tier), or the one with this structure id. */
+export function domeOf(s: GameState, id?: string): DomeRef | null {
+  const all = domesOf(s);
+  return id ? all.find(d => d.st.id === id) ?? null : all[0] ?? null;
+}
+
+/** A dome's gauges and switches as they stand (a read: never files anything). The first dome falls back to the older single `dome` of a v99 save. */
+export function stateOf(s: GameState, d: DomeRef): DomeState {
+  const own = s.domes?.[d.st.id];
+  if (own) return own;
+  if (s.dome && (s.dome.id === d.st.id || (!s.dome.id && domeOf(s)?.st.id === d.st.id))) return s.dome;
+  return newDomeState();
+}
+
+/** The dome's state, filed under `GameState.domes` (made if absent; a v99 save's single `dome` is adopted by the main dome). Keeps `dome` mirroring the main one. */
+export function ownState(s: GameState, d: DomeRef): DomeState {
+  const L = (s.domes ??= {});
+  let st = L[d.st.id];
+  if (!st) {
+    const main = domeOf(s)?.st.id === d.st.id;
+    st = main && s.dome && (!s.dome.id || s.dome.id === d.st.id) ? s.dome : newDomeState();
+    L[d.st.id] = st;
+  }
+  st.id = d.st.id;
+  if (domeOf(s)?.st.id === d.st.id) s.dome = st;
+  return st;
+}
+
+/** The main dome's state (older readers and the single-dome tests): a read. */
+export const domeOfState = (s: GameState): DomeState => { const d = domeOf(s); return d ? stateOf(s, d) : s.dome ?? newDomeState(); };
+
+/** A short name for the Dome page and the cards: "Geodesic dome", or "Geodesic dome 2" when there is more than one of a tier. */
+export function domeLabel(s: GameState, d: DomeRef): string {
+  const same = s.structures.filter(x => x.kind === d.st.kind && isFinished(x));
+  return same.length > 1 ? `${TIER[d.tier].name} ${same.findIndex(x => x.id === d.st.id) + 1}` : TIER[d.tier].name;
 }
 
 const inside = (d: DomeRef, x: number, z: number): boolean => Math.hypot(x - d.st.x, z - d.st.z) <= d.r;
@@ -128,17 +183,33 @@ export function homesUnder(s: GameState, d: DomeRef): number { return s.structur
 /** Everyone alive and on the place (the air does not care who is working where). */
 export const peopleHome = (s: GameState): number => s.personState.filter(ps => ps.needs.died == null && !ps.needs.left && !ps.needs.taken).length;
 
+/**
+ * People who live under this dome's shell: everyone on the place split among the domes by their homes (a family with no home under a shell is
+ * counted with the main dome, which is where the air plant, the lockdown and the shelter are; nobody is counted twice).
+ */
+export function peopleUnder(s: GameState, d: DomeRef): number {
+  const all = domesOf(s), total = peopleHome(s);
+  if (all.length === 1) return total;
+  const homes = all.map(x => homesUnder(s, x)), sum = homes.reduce((a, b) => a + b, 0), i = all.findIndex(x => x.st.id === d.st.id);
+  if (sum === 0) return i === 0 ? total : 0;
+  return Math.round(total * (homes[i] / sum));
+}
+
 // ── outside ───────────────────────────────────────────────────────────────────────────────
 
 export interface Outside { f: number; sun: number; hour: number }
-/** The temperature and the sun outside right now (U.S. degrees F): the night's low from the region and the day, a 22 degree swing to mid afternoon. */
+/** The temperature and the sun outside right now (U.S. degrees F): the night's low from the region and the day, a 22 degree swing to mid afternoon. A blizzard or storm dims the sun and chills the day. */
 export function outside(s: GameState): Outside {
   const hour = hourOf(s.clock.t), n = nightOf(s), doy = calendarOf(s.clock).doy;
   const swing = 22 * (0.5 - 0.5 * Math.cos(2 * Math.PI * (hour - 5) / 24));
   const season = 0.55 + 0.45 * Math.cos(2 * Math.PI * (doy - 172) / 365);
   const day = Math.max(0, Math.sin(Math.PI * (hour - 6) / 12));
-  return { f: n.lowF + swing + (n.hot ? 12 : 0), sun: day * season * Math.min(1, solarFogK(s) * 1.5), hour };
+  const dim = n.snowy || n.stormy ? 0.3 : n.rainy ? 0.55 : 1;
+  return { f: n.lowF + swing + (n.hot ? 12 : 0) - (n.snowy ? 4 : 0), sun: day * season * dim * Math.min(1, solarFogK(s) * 1.5), hour };
 }
+
+/** How dry the air is here, 0 (humid) to 1 (desert): evaporative cooling works in dry air. From the region's annual rain. */
+export const dryAir = (s: GameState): number => Math.max(0.1, Math.min(0.95, 1.15 - regionFor(s.site).rainMm / 900));
 
 /** How much dust, ash or smoke there is in the air outside, 0..1: fallout for three weeks, ash for two months, wildfire smoke for the fire. */
 export function outsideDirt(s: GameState): number {
@@ -168,26 +239,43 @@ export function airPlantKw(tier: DomeTier, cells: number, filtering: Filtering):
   }
 }
 
-/** The dome's draw a day (kWh): the climate plant on a typical day here plus the air plant while sealed. Read by utilities.ts. */
-export function domeKwhDay(s: GameState, st: Structure): number {
-  const tier = tierOfKind(st.kind);
-  if (!tier) return 0;
-  const d = domeOfState(s), cells = TIER[tier].cells;
-  const low = meanLow(s, calendarOf(s.clock).doy);
-  let clim = 0;
-  for (const [h, sun] of [[2, 0], [8, 0.35], [14, 1], [20, 0]] as const) {
-    const f = low + 22 * (0.5 - 0.5 * Math.cos(2 * Math.PI * (h - 5) / 24));
-    clim += domeLoad(tier, cells, f, sun * 0.8, d.mode).kwhPerDay / 4;
-  }
-  const air = d.lockdown || d.filtering === 'closed' ? airPlantKw(tier, cells, d.filtering) * 24 : 0;
-  // sealed on life support the climate plant only holds the shell (a quarter of its work): the air plant is what the compound's power must keep
-  return Math.max(0.2, (d.lockdown && d.filtering !== 'none' ? clim * 0.25 : clim) + air);
+/**
+ * The always-on house load of a glazed dome that is run as a living place (kWh a day per 1,000 sq ft of floor): circulation fans (a closed greenhouse
+ * needs air moving across the leaves), irrigation and sump pumps, the humidity and CO2 controls, the lights and the control system. About 12 kWh per
+ * 1,000 sq ft (0.012 kWh per sq ft), so a small 60 ft geodesic carries about 34 kWh a day before it heats or cools anything.
+ * See docs/DOME_COMPOUND.md 5.2 for where it comes from (Dutch glasshouses, Biosphere 2, indoor plant factories).
+ */
+export const AUX_KWH_KSF = 12;
+export const auxKwhDay = (tier: DomeTier, cells: number): number => tier === 'earthen' ? 0.2 : AUX_KWH_KSF * domeGeometry(tier, shellFt(tier, cells)).footprintSf / 1000;
+
+/** The four sample hours of a day (2, 8, 14 and 20 o'clock): outside temperature and sun, from today's real low. */
+function dayProfile(s: GameState): Array<{ f: number; sun: number }> {
+  const n = nightOf(s), doy = calendarOf(s.clock).doy;
+  const season = 0.55 + 0.45 * Math.cos(2 * Math.PI * (doy - 172) / 365), dim = n.snowy || n.stormy ? 0.3 : n.rainy ? 0.55 : 1;
+  return ([[2, 0], [8, 0.35], [14, 1], [20, 0]] as const).map(([h, sun]) => ({ f: n.lowF + 22 * (0.5 - 0.5 * Math.cos(2 * Math.PI * (h - 5) / 24)) + (n.hot ? 12 : 0) - (n.snowy ? 4 : 0), sun: sun * season * dim }));
 }
 
-/** Life support gets its power first while sealed; the climate alone is the last load served. */
-export function domeLoadPriority(s: GameState, kind: string): number | null {
+export interface DayLoad { kwh: number; climateKwh: number; auxKwh: number; loopKwh: number; airKwh: number; waterGal: number }
+/** A dome's draw and water for today: the climate plant over the day's weather, the house load, the water loop's pumps and the air plant while sealed. */
+export function dayLoad(s: GameState, d: DomeRef, st: DomeState = stateOf(s, d)): DayLoad {
+  let clim = 0, water = 0;
+  const dry = dryAir(s);
+  for (const p of dayProfile(s)) { const l = domeLoad(d.tier, d.cells, p.f, p.sun, st.mode, { sealed: st.lockdown, dry }); clim += l.kwhPerDay / 4; water += l.waterGalDay / 4; }
+  const air = st.lockdown || st.filtering === 'closed' ? airPlantKw(d.tier, d.cells, st.filtering) * 24 : 0;
+  const loopK = loopKw(d.tier, d.cells, st.loop ?? 'none') * 24, aux = auxKwhDay(d.tier, d.cells);
+  return { kwh: Math.max(0.2, clim + aux + loopK + air), climateKwh: clim, auxKwh: aux, loopKwh: loopK, airKwh: air, waterGal: water };
+}
+
+/** The dome's draw a day (kWh), read by utilities.ts. */
+export function domeKwhDay(s: GameState, st: Structure): number {
+  const d = domeOf(s, st.id);
+  return d ? dayLoad(s, d).kwh : 0;
+}
+
+/** Life support gets its power first while sealed; the climate alone is the last load served. `id` picks the dome (the main one if omitted). */
+export function domeLoadPriority(s: GameState, kind: string, id?: string): number | null {
   if (!tierOfKind(kind)) return null;
-  const d = s.dome;
+  const d = id ? s.domes?.[id] : s.dome;
   return d && (d.lockdown || d.filtering === 'closed') && d.filtering !== 'none' ? 1 : 5;
 }
 
@@ -207,7 +295,7 @@ export const mediaK = (health: number): number => 0.4 + 0.6 * Math.max(0, Math.m
 export function airCtx(s: GameState, d: DomeRef, st: DomeState, powered = planPowered(s, d, st)): AirCtx {
   const eco = st.filtering === 'closed' ? Math.max(0, Math.min(1, st.ecoHealth)) : 0;
   // the closed loop's own beds work with no power too (they live on sun); its machinery needs the plant
-  return { tier: d.tier, cells: d.cells, people: Math.max(0, peopleHome(s)), filtering: st.filtering, powered, beds: Math.min(BED_CAP, bedsUnder(s, d) + eco * BED_CAP), seals: 1 };
+  return { tier: d.tier, cells: d.cells, people: Math.max(0, peopleUnder(s, d)), filtering: st.filtering, powered, beds: Math.min(BED_CAP, bedsUnder(s, d) + eco * BED_CAP), seals: 1 };
 }
 
 /** The effective scrubbing shares at a level and health (used by the property tests): more filtering never scrubs less. */
@@ -222,20 +310,19 @@ export function effectiveScrub(level: Filtering, mediaHealth: number, ecoHealth:
   return { co2: base.co2 * k, o2: base.o2 * k };
 }
 
-/** The clock from now: hours of air if nothing changes. */
-export function domeClock(s: GameState): Clock | null {
-  const d = domeOf(s);
+/** The clock from now: hours of air if nothing changes (the dome with this id, or the main one). */
+export function domeClock(s: GameState, id?: string): Clock | null {
+  const d = domeOf(s, id);
   if (!d) return null;
-  const st = domeOfState(s);
-  const air = { co2ppm: st.co2ppm, o2pct: st.o2pct };
-  return lockdownClock(air, airCtx(s, d, st));
+  const st = stateOf(s, d);
+  return lockdownClock({ co2ppm: st.co2ppm, o2pct: st.o2pct }, airCtx(s, d, st));
 }
 
 /** The clock for a sealed dome from fresh air, at the current people, filtering and power (what the card says before sealing). */
-export function freshClock(s: GameState): Clock | null {
-  const d = domeOf(s);
+export function freshClock(s: GameState, id?: string): Clock | null {
+  const d = domeOf(s, id);
   if (!d) return null;
-  const st = domeOfState(s);
+  const st = stateOf(s, d);
   return lockdownClock(freshAir(), airCtx(s, d, st));
 }
 
@@ -246,22 +333,39 @@ const difficultyOf = (s: GameState) => DIFFICULTY[s.disaster.difficulty ?? 'stan
 export const failScale = (s: GameState): number => ({ cozy: 0.35, standard: 1, hardcore: 1.4 } as const)[s.disaster.difficulty ?? 'standard'] * (difficultyOf(s) ? 1 : 1);
 
 const FILTER_SHARE = (f: Filtering): number => SCRUB[f].co2;
+/** The air at which the sealed dome's heat fail-safe opens the vents on its own (degrees F). */
+export const HEAT_VENT_F = 105;
 
-/** One sub-step of the dome's gauges (`dtDays` of game time). Returns log lines. */
+/** One sub-step of every dome's gauges (`dtDays` of game time). Returns log lines. */
 export function stepDome(s: GameState, dtDays: number): string[] {
-  const d = domeOf(s);
-  if (!d) { if (s.dome && (s.dome.lockdown || s.dome.alarm !== 'ok')) { s.dome.lockdown = false; s.dome.since = null; s.dome.alarm = 'ok'; s.dome.hours = null; } return []; }
-  const out: string[] = [];
-  const st = s.dome ??= newDomeState();
+  const all = domesOf(s);
+  if (!all.length) {
+    for (const st of [s.dome, ...Object.values(s.domes ?? {})]) if (st && (st.lockdown || st.alarm !== 'ok')) { st.lockdown = false; st.since = null; st.alarm = 'ok'; st.hours = null; }
+    return [];
+  }
+  const out: string[] = [], multi = all.length > 1;
+  for (const d of all) for (const line of stepOne(s, d, ownState(s, d), dtDays, multi)) out.push(line);
+  return out;
+}
+
+function stepOne(s: GameState, d: DomeRef, st: DomeState, dtDays: number, multi: boolean): string[] {
+  const out: string[] = [], name = multi ? `The ${domeLabel(s, d).toLowerCase()}'s ` : "The dome's ";
   const hrs = dtDays * 24;
   const powered = planPowered(s, d, st);
   st.powered = powered;
   const o = outside(s);
   st.outF = o.f;
-  // the inside temperature: the climate plant holds the mode's band when it has power, else the shell floats
-  const ld = domeLoad(d.tier, d.cells, o.f, o.sun, st.mode);
-  st.indoorF = powered ? ld.indoorF : passiveF(d.tier, d.cells, o.f, o.sun);
-  st.kwhDay = domeKwhDay(s, d.st);
+  // the inside temperature: the plant holds the mode's band when it has power (and in a hot hour, rented chillers count as power), else the shell floats
+  // with only the free parts of the ladder (vents when open, roof screens); a sealed dome with the plant dark floats
+  const chill = s.clock.t < (st.chillUntil ?? 0);
+  const ld = domeLoad(d.tier, d.cells, o.f, o.sun, st.mode, { sealed: st.lockdown, dry: dryAir(s), powered: powered || chill });
+  st.indoorF = ld.indoorF;
+  st.stage = ld.stage;
+  st.kwhDay = dayLoad(s, d, st).kwh;
+  // comfort bookkeeping: hours well over the band, and a slow mean of discomfort
+  const hi = BAND[st.mode][1];
+  st.overH = (st.overH ?? 0) + (st.indoorF > hi + 3 ? hrs : 0);
+  st.stress = (st.stress ?? 0) + ((1 - comfortAt(st.indoorF)) - (st.stress ?? 0)) * Math.min(1, dtDays * 2);
 
   const dirt = outsideDirt(s);
   const sealed = st.lockdown;
@@ -288,10 +392,13 @@ export function stepDome(s: GameState, dtDays: number): string[] {
       const bad = Math.min(3, Math.max(st.co2ppm / LIMIT_PPM.alarm, (O2.normal - st.o2pct) / (O2.normal - O2.impaired)));
       for (const ps of s.personState) if (ps.needs.died == null && !ps.needs.left && !ps.needs.taken) ps.needs.morale = Math.max(0, ps.needs.morale - 7 * bad * dtDays);
     }
-    // the fail-safe vents
-    if (st.co2ppm >= LIVE.VENT_PPM || st.o2pct <= LIVE.VENT_O2) {
+    // the fail-safe vents: bad air, or a sealed shell cooking in the sun with the plant dark
+    const hot = st.indoorF >= HEAT_VENT_F;
+    if (st.co2ppm >= LIVE.VENT_PPM || st.o2pct <= LIVE.VENT_O2 || hot) {
       st.lockdown = false; st.since = null; st.ventedAt = s.clock.t;
-      out.push(`The dome's fail-safe vents opened on their own: the air had gone bad (${(st.co2ppm / 10000).toFixed(1)} percent CO2, ${st.o2pct.toFixed(1)} percent oxygen). The lockdown is over.${dirt > 0.2 ? ' There is dust in the air outside, and it is coming in.' : ''}`);
+      out.push(hot && st.co2ppm < LIVE.VENT_PPM
+        ? `${name}fail-safe vents opened on their own: the sealed shell had reached ${Math.round(st.indoorF)} F. The lockdown is over.${dirt > 0.2 ? ' There is dust in the air outside, and it is coming in.' : ''}`
+        : `${name}fail-safe vents opened on their own: the air had gone bad (${(st.co2ppm / 10000).toFixed(1)} percent CO2, ${st.o2pct.toFixed(1)} percent oxygen). The lockdown is over.${dirt > 0.2 ? ' There is dust in the air outside, and it is coming in.' : ''}`);
     }
   } else {
     // open: the air is fresh and the dust comes in; filtering takes some of it
@@ -306,7 +413,7 @@ export function stepDome(s: GameState, dtDays: number): string[] {
   st.hours = clock.hours === Infinity ? null : clock.hours;
   const before = st.alarm;
   st.alarm = !st.lockdown ? 'ok' : (st.hours !== null && st.hours < LIVE.CRIT_H) || st.co2ppm >= LIMIT_PPM.alarm ? 'critical' : st.hours !== null && st.hours < LIVE.LOW_H ? 'low' : 'ok';
-  if (st.alarm !== before && st.alarm !== 'ok') out.push(st.alarm === 'critical' ? `The dome's air is nearly gone: about ${Math.max(0, Math.floor(st.hours ?? 0))} hours to the limit. Open the vents or fix the air plant.` : `The dome's air is getting short: about ${Math.floor(st.hours ?? 0)} hours left sealed.`);
+  if (st.alarm !== before && st.alarm !== 'ok') out.push(st.alarm === 'critical' ? `${name}air is nearly gone: about ${Math.max(0, Math.floor(st.hours ?? 0))} hours to the limit. Open the vents or fix the air plant.` : `${name}air is getting short: about ${Math.floor(st.hours ?? 0)} hours left sealed.`);
   return out;
 }
 
@@ -315,89 +422,132 @@ const raise = (_s: GameState, st: DomeState, kind: LifeCard, day: number): boole
   st.cards.push(kind); st.cool[kind] = day; return true;
 };
 
-/** Once a day: installs finish, the loop is fed and pays its upkeep, the media and the machines fail now and then, and decisions are raised. Returns log lines. */
+/** Per-dome water flows for today's balance (liters), read by utilities.ts. `rainMmDay` is the day's rain already scaled to the region; `connected` says whether a dome reaches a cistern. */
+export interface DomeWaterFlows { rainL: number; reuseL: number; condL: number; coolL: number }
+export function domeWaterFlows(s: GameState, rainMmDay: number, perPersonL: number, connected: (id: string) => boolean): DomeWaterFlows {
+  const f: DomeWaterFlows = { rainL: 0, reuseL: 0, condL: 0, coolL: 0 };
+  for (const d of domesOf(s)) {
+    const st = stateOf(s, d), loop = st.loop ?? 'none', up = s.clock.t >= (st.loopDownUntil ?? 0), pw = wired(s, d.st.id) && !s.utilities.fried.includes(d.st.id);   // a daily figure: the pumps and coils run on the day's power, not the instant's
+    const link = connected(d.st.id);
+    const rain = link ? rainCatchL(d.tier, d.cells, rainMmDay, loop) : 0;
+    const re = loop !== 'none' && up && pw ? reuseL(peopleUnder(s, d), perPersonL, loop) : 0;
+    const cond = d.tier !== 'earthen' ? condensateL(bedsUnder(s, d), pw) : 0, cool = dayLoad(s, d, st).waterGal * 3.785;
+    f.rainL += rain; f.reuseL += re; f.condL += cond; f.coolL += cool;
+    const own = s.domes?.[d.st.id];
+    if (own) { own.cistern = link; own.rainGalDay = rain * GAL_PER_L; own.savedGalDay = (re + cond) * GAL_PER_L; own.waterGalDay = cool / 3.785; }
+  }
+  return f;
+}
+
+/** Hours a hot day pushes the plant over the band before it is a decision for the player. */
+const HOT_H = 3;
+/** What a day of rented chillers costs, per 1,000 sq ft of floor. */
+const CHILLER_USD_KSF = 600;
+export const chillerUsd = (_s: GameState, d: DomeRef): number => Math.max(1500, Math.round(domeGeometry(d.tier, d.shellFt).footprintSf / 1000 * CHILLER_USD_KSF / 500) * 500);
+export const STOCK_CARE_USD = 350;
+
+/** Once a day, for every dome: installs finish, the loop is fed and pays its upkeep, the media and the machines fail now and then, and decisions are raised. Returns log lines. */
 export function domeDay(s: GameState): string[] {
-  const d = domeOf(s);
-  if (!d) return [];
-  const st = s.dome;
-  if (!st) return [];
-  const out: string[] = [], day = dayIndex(s.clock.t), r = mulberry32(s.seed * 7919 + day * 31 + 5), scale = failScale(s);
+  const all = domesOf(s), out: string[] = [];
+  for (const d of all) out.push(...domeDayOne(s, d, ownState(s, d), all.length > 1));
+  return out;
+}
+
+function domeDayOne(s: GameState, d: DomeRef, st: DomeState, multi: boolean): string[] {
+  const out: string[] = [], day = dayIndex(s.clock.t), idh = Array.from(d.st.id).reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7);
+  const r = mulberry32(s.seed * 7919 + day * 31 + 5 + (multi ? idh : 0)), scale = failScale(s), name = multi ? `The ${domeLabel(s, d).toLowerCase()}` : 'The dome';
   // installs
   if (st.installing && s.clock.t >= st.installing.readyAt) {
     const lv = st.installing.level;
     st.filtering = lv; st.installing = null;
     if (lv === 'closed') st.ecoHealth = 1;
     st.filterHealth = 1;
-    out.push(lv === 'closed' ? 'The closed ecology is planted and running: the loop will make the dome\'s air for as long as it is fed, powered and tended.' : `The ${lv === 'scrubber' ? 'CO2 scrubbers are' : 'advanced air bank is'} fitted and running.`);
+    out.push(lv === 'closed' ? `${name}'s closed ecology is planted and running: the loop will make the dome's air for as long as it is fed, powered and tended.` : `${name}'s ${lv === 'scrubber' ? 'CO2 scrubbers are' : 'advanced air bank is'} fitted and running.`);
   }
   const powered = planPowered(s, d, st);
-  const people = peopleHome(s);
+  const people = peopleUnder(s, d);
   // the closed ecology: upkeep, food, recovery, the dark
   if (st.filtering === 'closed') {
     const cost = Math.round(closedEcologyUsd(d.tier, d.cells) * LIVE.ECO_UPKEEP_DAY);
     if (s.money >= cost) { s.money -= cost; if (powered) st.ecoHealth = Math.min(1, st.ecoHealth + 0.02); }
-    else { st.ecoHealth = Math.max(0, st.ecoHealth - 0.08); out.push('The closed ecology went without its upkeep today: seed, nutrients, parts. The loop is weakening.'); }
+    else { st.ecoHealth = Math.max(0, st.ecoHealth - 0.08); out.push(`${name}'s closed ecology went without its upkeep today: seed, nutrients, parts. The loop is weakening.`); }
     if (!powered) st.ecoHealth = Math.max(0, st.ecoHealth - 0.03);
     if (st.ecoHealth > 0.2 && people > 0) s.stock.fresh += people * LIVE.ECO_FOOD * st.ecoHealth;
     if (r() < LIVE.P_BLIGHT * scale * (powered ? 1 : 1.6)) {
       st.ecoHealth = Math.max(0, st.ecoHealth - (0.25 + 0.25 * r()));
-      if (raise(s, st, 'blight', day)) out.push('Blight in the closed ecology: leaves yellowing across the grow beds. The loop is losing ground.');
+      if (raise(s, st, 'blight', day)) out.push(`Blight in ${name.toLowerCase()}'s closed ecology: leaves yellowing across the grow beds. The loop is losing ground.`);
     }
   }
   // the machines
   if (st.filtering !== 'none' && powered && st.lockdown && r() < LIVE.P_PLANT * scale * (st.filtering === 'closed' ? 1.5 : 1)) {
     st.plantDownUntil = s.clock.t + 2 + Math.floor(r() * 3);
-    if (raise(s, st, 'plant', day)) out.push('The air plant seized: the main blower stopped and the bank is dark.');
+    if (raise(s, st, 'plant', day)) out.push(`${name}'s air plant seized: the main blower stopped and the bank is dark.`);
   }
-  if (st.filtering !== 'none' && st.filterHealth < 0.35 && (st.lockdown || st.dust > 0.1)) if (raise(s, st, 'foul', day)) out.push('The filter media is fouled: the air bank is passing less every hour.');
-  if (st.lockdown && st.filtering !== 'none' && !powered && st.alarm !== 'ok') if (raise(s, st, 'power', day)) out.push('The dome is sealed and the air plant has no power.');
+  if (st.filtering !== 'none' && st.filterHealth < 0.35 && (st.lockdown || st.dust > 0.1)) if (raise(s, st, 'foul', day)) out.push(`${name}'s filter media is fouled: the air bank is passing less every hour.`);
+  if (st.lockdown && st.filtering !== 'none' && !powered && st.alarm !== 'ok') if (raise(s, st, 'power', day)) out.push(`${name} is sealed and the air plant has no power.`);
+  // the water loop's pumps and membranes wear out
+  const loop = st.loop ?? 'none';
+  if (loop !== 'none' && s.clock.t >= (st.loopDownUntil ?? 0) && r() < LIVE.P_LOOP * scale * (loop === 'recycle' ? 1.4 : 1) * (powered ? 1 : 1.5)) {
+    st.loopDownUntil = s.clock.t + 3 + Math.floor(r() * 3);
+    if (raise(s, st, 'loop', day)) out.push(`${name}'s ${loop === 'recycle' ? 'recycle' : 'greywater'} loop has failed: a fouled membrane and a burned-out pump. The wastewater is backing up toward the sump.`);
+  }
+  // a hot day the plant could not hold
+  const hotH = st.overH ?? 0;
+  if (hotH >= HOT_H && raise(s, st, 'hot', day)) out.push(`${name} ran hot for ${Math.round(hotH)} hours today (${Math.round(st.indoorF)} F inside): the beds are wilting and the animals are panting.`);
+  st.overH = 0;
+  // animals under the shell that are stressed by the heat or the cold
+  const stock = stockCover(s);
+  if (stock.share > 0 && (st.stress ?? 0) > 0.45 && raise(s, st, 'stock', day)) out.push(`The animals under ${name.toLowerCase()} are stressed by the ${st.indoorF > 80 ? 'heat' : 'cold'} (${Math.round(st.indoorF)} F inside).`);
   // a card whose cause is gone goes away
-  st.cards = st.cards.filter(c => c === 'foul' ? st.filterHealth < 0.5 : c === 'plant' ? s.clock.t < st.plantDownUntil : c === 'blight' ? st.filtering === 'closed' && st.ecoHealth < 0.75 : st.lockdown && !powered);
+  st.cards = st.cards.filter(c => c === 'foul' ? st.filterHealth < 0.5 : c === 'plant' ? s.clock.t < st.plantDownUntil : c === 'blight' ? st.filtering === 'closed' && st.ecoHealth < 0.75
+    : c === 'hot' ? st.indoorF > BAND[st.mode][1] + 1 : c === 'loop' ? s.clock.t < (st.loopDownUntil ?? 0) : c === 'stock' ? (st.stress ?? 0) > 0.25 : st.lockdown && !powered);
   return out;
 }
 
 // ── player controls ───────────────────────────────────────────────────────────────────────
 
-/** Why the lockdown cannot be switched now (null = it can). */
-export function lockdownProblem(s: GameState, on: boolean): string | null {
-  if (!domeOf(s)) return 'no dome stands finished yet';
-  const st = domeOfState(s);
+/** Why the lockdown cannot be switched now (null = it can). `id` picks the dome (the main one if omitted). */
+export function lockdownProblem(s: GameState, on: boolean, id?: string): string | null {
+  const d = domeOf(s, id);
+  if (!d) return 'no dome stands finished yet';
+  const st = stateOf(s, d);
   if (on && st.lockdown) return 'already sealed';
   if (!on && !st.lockdown) return 'already open';
   return null;
 }
 
 /** Seal the dome (airlocks shut, vents closed) or open it. Returns why not, or null. */
-export function setLockdown(s: GameState, on: boolean): string | null {
-  const why = lockdownProblem(s, on);
+export function setLockdown(s: GameState, on: boolean, id?: string): string | null {
+  const why = lockdownProblem(s, on, id);
   if (why) return why;
-  const st = s.dome ??= newDomeState();
+  const d = domeOf(s, id)!, st = ownState(s, d), nm = domesOf(s).length > 1 ? `The ${domeLabel(s, d).toLowerCase()}` : 'The dome';
   if (on) {
     st.lockdown = true; st.since = s.clock.t; st.co2ppm = freshAir().co2ppm; st.o2pct = freshAir().o2pct;
-    const c = freshClock(s);
-    log(s, `The dome is sealed: airlocks shut, vents closed. ${c && c.hours !== Infinity ? `Sealed with ${peopleHome(s)} people the air lasts about ${c.hours < 72 ? `${Math.floor(c.hours)} hours` : `${Math.floor(c.hours / 24)} days`}.` : 'The air will hold as long as the plant runs.'}`);
+    const c = freshClock(s, d.st.id);
+    log(s, `${nm} is sealed: airlocks shut, vents closed. ${c && c.hours !== Infinity ? `Sealed with ${peopleUnder(s, d)} people the air lasts about ${c.hours < 72 ? `${Math.floor(c.hours)} hours` : `${Math.floor(c.hours / 24)} days`}.` : 'The air will hold as long as the plant runs.'}`);
   } else {
     const dirt = outsideDirt(s);
     st.lockdown = false; st.since = null;
-    log(s, dirt > 0.2 ? 'The airlocks are open with dust in the air outside: it is coming in, and the ground under the shell is no longer clean.' : 'The dome is open: vents and airlocks, fresh air.');
+    log(s, dirt > 0.2 ? `${nm}'s airlocks are open with dust in the air outside: it is coming in, and the ground under the shell is no longer clean.` : `${nm} is open: vents and airlocks, fresh air.`);
   }
   return null;
 }
 
-export function setClimateMode(s: GameState, mode: ClimateMode): string | null {
-  if (!domeOf(s)) return 'no dome stands finished yet';
-  (s.dome ??= newDomeState()).mode = mode;
+export function setClimateMode(s: GameState, mode: ClimateMode, id?: string): string | null {
+  const d = domeOf(s, id);
+  if (!d) return 'no dome stands finished yet';
+  ownState(s, d).mode = mode;
   return null;
 }
 
 export interface FilterBill { level: Filtering; usd: number; permitUsd: number; reviewDays: number; installDays: number; totalUsd: number; days: number }
 
 /** What an upgrade to `level` costs here: the equipment less half the credit for the level already owned, the county's life-safety review for the closed loop, and the days. */
-export function filteringBill(s: GameState, level: Filtering): FilterBill | null {
-  const d = domeOf(s);
+export function filteringBill(s: GameState, level: Filtering, id?: string): FilterBill | null {
+  const d = domeOf(s, id);
   if (!d || level === 'none') return null;
   const price = (l: Filtering): number => l === 'scrubber' ? scrubberUsd(d.tier, d.cells) : l === 'advanced' ? advancedFilterUsd(d.tier, d.cells) : l === 'closed' ? closedEcologyUsd(d.tier, d.cells) : 0;
-  const owned = domeOfState(s).filtering;
+  const owned = stateOf(s, d).filtering;
   const usd = Math.max(0, price(level) - (owned === 'none' ? 0 : Math.round(price(owned) * 0.5)));
   const permitUsd = level === 'closed' ? Math.round(usd * 0.05 / 1000) * 1000 : 0;
   const reviewDays = level === 'closed' ? Math.max(14, Math.round(TIER[d.tier].reviewDays / 3)) : 0;
@@ -405,25 +555,25 @@ export function filteringBill(s: GameState, level: Filtering): FilterBill | null
   return { level, usd, permitUsd, reviewDays, installDays, totalUsd: usd + permitUsd, days: reviewDays + installDays };
 }
 
-export function filteringProblem(s: GameState, level: Filtering): string | null {
-  const d = domeOf(s);
+export function filteringProblem(s: GameState, level: Filtering, id?: string): string | null {
+  const d = domeOf(s, id);
   if (!d) return 'no dome stands finished yet';
   if (level === 'none') return 'nothing to buy';
-  const st = domeOfState(s);
+  const st = stateOf(s, d);
   if (FILTERING.indexOf(st.filtering) >= FILTERING.indexOf(level)) return 'already fitted';
   if (st.installing) return 'another upgrade is being fitted';
   if (level === 'closed' && FILTERING.indexOf(st.filtering) < FILTERING.indexOf('advanced')) return 'the closed ecology needs the advanced air bank first';
   if (d.tier === 'earthen' && level !== 'scrubber') return 'an earthen dome is too small for that';
-  const b = filteringBill(s, level)!;
+  const b = filteringBill(s, level, id)!;
   if (s.money < b.totalUsd) return `needs $${b.totalUsd.toLocaleString('en-US')}`;
   return null;
 }
 
 /** Buy a filtering level (or the closed ecology): the money goes now, the crew fits it over the days. */
-export function buyFiltering(s: GameState, level: Filtering): string | null {
-  const why = filteringProblem(s, level);
+export function buyFiltering(s: GameState, level: Filtering, id?: string): string | null {
+  const why = filteringProblem(s, level, id);
   if (why) return why;
-  const b = filteringBill(s, level)!, st = s.dome ??= newDomeState();
+  const d = domeOf(s, id)!, b = filteringBill(s, level, id)!, st = ownState(s, d);
   s.money -= b.totalUsd;
   st.installing = { level, readyAt: s.clock.t + b.days };
   log(s, level === 'closed'
@@ -432,123 +582,199 @@ export function buyFiltering(s: GameState, level: Filtering): string | null {
   return null;
 }
 
-export function spareFiltersUsd(s: GameState): number {
-  const d = domeOf(s);
+export function spareFiltersUsd(s: GameState, id?: string): number {
+  const d = domeOf(s, id);
   return d ? Math.max(2000, Math.round(advancedFilterUsd(d.tier, d.cells) * LIVE.SPARE_SHARE / 500) * 500) : 0;
 }
-export function replaceFilters(s: GameState): string | null {
-  const d = domeOf(s), st = domeOfState(s);
+export function replaceFilters(s: GameState, id?: string): string | null {
+  const d = domeOf(s, id);
   if (!d) return 'no dome stands finished yet';
+  const st = stateOf(s, d);
   if (st.filtering === 'none') return 'no filters fitted';
   if (st.filterHealth > 0.9) return 'the media is still good';
-  const c = spareFiltersUsd(s);
+  const c = spareFiltersUsd(s, id);
   if (s.money < c) return `needs $${c.toLocaleString('en-US')}`;
-  s.money -= c; (s.dome ??= newDomeState()).filterHealth = 1;
+  s.money -= c; ownState(s, d).filterHealth = 1;
   log(s, 'The filter media is swapped for a fresh set.');
   return null;
 }
 
-export function tendCostUsd(s: GameState): number { const d = domeOf(s); return d ? Math.round(closedEcologyUsd(d.tier, d.cells) * 0.01 / 500) * 500 : 0; }
-export function tendEcology(s: GameState): string | null {
-  const st = domeOfState(s);
+export function tendCostUsd(s: GameState, id?: string): number { const d = domeOf(s, id); return d ? Math.round(closedEcologyUsd(d.tier, d.cells) * 0.01 / 500) * 500 : 0; }
+export function tendEcology(s: GameState, id?: string): string | null {
+  const d = domeOf(s, id);
+  if (!d) return 'no dome stands finished yet';
+  const st = stateOf(s, d);
   if (st.filtering !== 'closed') return 'no closed ecology';
   if (st.ecoHealth > 0.9) return 'the loop is healthy';
-  const c = tendCostUsd(s);
+  const c = tendCostUsd(s, id);
   if (s.money < c) return `needs $${c.toLocaleString('en-US')}`;
-  s.money -= c; (s.dome ??= newDomeState()).ecoHealth = 1;
+  s.money -= c; ownState(s, d).ecoHealth = 1;
   log(s, 'The grow beds are replanted and treated: the loop is whole again.');
+  return null;
+}
+
+/** The water loop's bill (the dome with this id, or the main one): null when nothing to buy. */
+export function loopBill(s: GameState, level: WaterLoop, id?: string): { usd: number; days: number } | null {
+  const d = domeOf(s, id);
+  if (!d || level === 'none') return null;
+  const own = stateOf(s, d).loop ?? 'none';
+  const usd = Math.max(0, loopUsd(d.tier, d.cells, level) - (own === 'none' ? 0 : Math.round(loopUsd(d.tier, d.cells, own) * 0.5)));
+  return { usd, days: level === 'grey' ? 5 : 21 };
+}
+export function loopProblem(s: GameState, level: WaterLoop, id?: string): string | null {
+  const d = domeOf(s, id);
+  if (!d) return 'no dome stands finished yet';
+  if (level === 'none') return 'nothing to buy';
+  if (d.tier === 'earthen') return 'an earthen dome is too small for a water loop';
+  const st = stateOf(s, d);
+  if (WATER_LOOPS.indexOf(st.loop ?? 'none') >= WATER_LOOPS.indexOf(level)) return 'already fitted';
+  const b = loopBill(s, level, id)!;
+  if (s.money < b.usd) return `needs $${b.usd.toLocaleString('en-US')}`;
+  return null;
+}
+/** Buy a water loop level: the money goes now and it works at once (the crew plumbs it while the dome runs). */
+export function buyLoop(s: GameState, level: WaterLoop, id?: string): string | null {
+  const why = loopProblem(s, level, id);
+  if (why) return why;
+  const d = domeOf(s, id)!, b = loopBill(s, level, id)!, st = ownState(s, d);
+  s.money -= b.usd; st.loop = level; st.loopDownUntil = 0;
+  log(s, level === 'grey' ? 'A greywater loop is plumbed in: sink and shower water goes to the beds and the toilets, and rain off the shell is filtered into the cisterns.' : 'A full recycle loop is plumbed in: the wastewater is treated and drunk again, and rain off the shell is filtered into the cisterns.');
   return null;
 }
 
 // ── cards ─────────────────────────────────────────────────────────────────────────────────
 
 const usd = (n: number): string => `$${Math.round(n).toLocaleString('en-US')}`;
-const repairUsd = (s: GameState): number => { const d = domeOf(s); return d ? Math.max(3000, Math.round(advancedFilterUsd(d.tier, d.cells) * 0.2 / 500) * 500) : 0; };
+const repairUsd = (s: GameState, id?: string): number => { const d = domeOf(s, id); return d ? Math.max(3000, Math.round(advancedFilterUsd(d.tier, d.cells) * 0.2 / 500) * 500) : 0; };
+const loopRepairUsd = (s: GameState, id?: string): number => { const d = domeOf(s, id); return d ? Math.max(2500, Math.round(loopUsd(d.tier, d.cells, stateOf(s, d).loop ?? 'grey') * 0.12 / 500) * 500) : 0; };
 
-/** Decisions the dome puts on the Next-steps list (dispatched from disasterFx.fxCards). */
+/** Decisions the dome puts on the Next-steps list (dispatched from disasterFx.fxCards). The main dome's ids are plain; another dome's carry `@structureId`. */
 export function domeCards(s: GameState): FxCard[] {
-  const st = s.dome;
-  if (!st?.cards.length || !domeOf(s)) return [];
-  const out: FxCard[] = [];
-  for (const c of st.cards) {
-    switch (c) {
-      case 'foul': out.push({ id: 'dome:foul', title: 'The dome\'s filter media is fouled', why: `${Math.round(st.filterHealth * 100)} percent of the media is left, so the bank scrubs less every hour. A fresh set costs ${usd(spareFiltersUsd(s))}.`, urgency: 86, acts: [{ label: `Swap the media · ${usd(spareFiltersUsd(s))}`, choice: 'dome:foul:swap' }, { label: 'Run it dirty', choice: 'dome:foul:ignore' }] }); break;
-      case 'plant': out.push({ id: 'dome:plant', title: 'The dome\'s air plant has seized', why: 'The blower stopped. Sealed, the air is running on the shell alone until it is back.', urgency: 94, tone: 'alarm', acts: [{ label: `Call the repair crew · ${usd(repairUsd(s))}`, choice: 'dome:plant:crew' }, { label: 'Rig a hand-crank blower', choice: 'dome:plant:hand' }, { label: 'Open the vents', choice: 'dome:open' }] }); break;
-      case 'blight': out.push({ id: 'dome:blight', title: 'Blight in the closed ecology', why: `The loop is at ${Math.round(st.ecoHealth * 100)} percent. Below half it makes less air than the advanced bank alone.`, urgency: 84, acts: [{ label: `Replant and treat · ${usd(tendCostUsd(s))}`, choice: 'dome:blight:tend' }, { label: 'Let it recover on its own', choice: 'dome:blight:wait' }] }); break;
-      case 'power': out.push({ id: 'dome:power', title: 'No power to the dome\'s air plant', why: 'Sealed with the plant dark, the air is on a clock. Fix the power, or open the vents before the fail-safe does.', urgency: 92, tone: 'alarm', acts: [{ label: 'Open the vents', choice: 'dome:open' }, { label: 'Hold sealed and ration the air', choice: 'dome:power:hold' }] }); break;
+  const out: FxCard[] = [], all = domesOf(s);
+  all.forEach((d, i) => {
+    const st = stateOf(s, d), sfx = i === 0 ? '' : `@${d.st.id}`, who = all.length > 1 ? ` (${domeLabel(s, d).toLowerCase()})` : '', id = d.st.id;
+    for (const c of st.cards) {
+      switch (c) {
+        case 'foul': out.push({ id: `dome:foul${sfx}`, title: `The dome's filter media is fouled${who}`, why: `${Math.round(st.filterHealth * 100)} percent of the media is left, so the bank scrubs less every hour. A fresh set costs ${usd(spareFiltersUsd(s, id))}.`, urgency: 86, acts: [{ label: `Swap the media · ${usd(spareFiltersUsd(s, id))}`, choice: `dome:foul:swap${sfx}` }, { label: 'Run it dirty', choice: `dome:foul:ignore${sfx}` }] }); break;
+        case 'plant': out.push({ id: `dome:plant${sfx}`, title: `The dome's air plant has seized${who}`, why: 'The blower stopped. Sealed, the air is running on the shell alone until it is back.', urgency: 94, tone: 'alarm', acts: [{ label: `Call the repair crew · ${usd(repairUsd(s, id))}`, choice: `dome:plant:crew${sfx}` }, { label: 'Rig a hand-crank blower', choice: `dome:plant:hand${sfx}` }, { label: 'Open the vents', choice: `dome:open${sfx}` }] }); break;
+        case 'blight': out.push({ id: `dome:blight${sfx}`, title: `Blight in the closed ecology${who}`, why: `The loop is at ${Math.round(st.ecoHealth * 100)} percent. Below half it makes less air than the advanced bank alone.`, urgency: 84, acts: [{ label: `Replant and treat · ${usd(tendCostUsd(s, id))}`, choice: `dome:blight:tend${sfx}` }, { label: 'Let it recover on its own', choice: `dome:blight:wait${sfx}` }] }); break;
+        case 'power': out.push({ id: `dome:power${sfx}`, title: `No power to the dome's air plant${who}`, why: 'Sealed with the plant dark, the air is on a clock. Fix the power, or open the vents before the fail-safe does.', urgency: 92, tone: 'alarm', acts: [{ label: 'Open the vents', choice: `dome:open${sfx}` }, { label: 'Hold sealed and ration the air', choice: `dome:power:hold${sfx}` }] }); break;
+        case 'hot': {
+          const dirty = outsideDirt(s) > 0.2, sealed = st.lockdown;
+          out.push({ id: `dome:hot${sfx}`, title: `The dome is running hot${who}`, why: `${Math.round(st.indoorF)} F inside against a ${BAND[st.mode][1]} F ceiling. ${sealed ? 'Sealed, there are no vents to open, so the plant has to do it all.' : 'The vents and screens are doing what they can.'}${dirty ? ' There is dust outside: opening up lets it in.' : ''} Beds wilt and animals pant above 90 F.`, urgency: 82, tone: st.indoorF >= 98 ? 'alarm' : undefined,
+            acts: [{ label: `Rent portable chillers for two days · ${usd(chillerUsd(s, d))}`, choice: `dome:hot:chill${sfx}` }, { label: sealed ? 'Open the vents and screens' : 'Roll the screens by hand and prop the doors', choice: `dome:hot:vent${sfx}` }, { label: 'Ride it out', choice: `dome:hot:wait${sfx}` }] });
+          break;
+        }
+        case 'loop': out.push({ id: `dome:loop${sfx}`, title: `The dome's water loop has failed${who}`, why: 'A fouled membrane and a dead pump: the wastewater is backing up toward the sump, and the rain filter is bypassed. The cistern covers the household until it is fixed.', urgency: 76,
+          acts: [{ label: `Call the plumber · ${usd(loopRepairUsd(s, id))}`, choice: `dome:loop:fix${sfx}` }, { label: 'Flush to the septic and wait it out', choice: `dome:loop:flush${sfx}` }] }); break;
+        case 'stock': out.push({ id: `dome:stock${sfx}`, title: `The animals under the dome are stressed${who}`, why: `It is ${Math.round(st.indoorF)} F in the barn. Panting hens stop laying, and stressed goats and sheep take sick more easily. Electrolytes, shade and a visit from the vet cost ${usd(STOCK_CARE_USD)}.`, urgency: 70,
+          acts: [{ label: `Electrolytes and a vet visit · ${usd(STOCK_CARE_USD)}`, choice: `dome:stock:care${sfx}` }, { label: 'Let them cope', choice: `dome:stock:wait${sfx}` }] }); break;
+      }
     }
-  }
+  });
   return out;
 }
 
 /** Answer a dome card's button. Null when the choice is not the dome's. */
 export function domeChoose(s: GameState, choice: string): string | null {
   if (!choice.startsWith('dome:')) return null;
-  const st = s.dome;
-  if (!st) return null;
-  const drop = (c: LifeCard) => { st.cards = st.cards.filter(x => x !== c); };
-  switch (choice) {
-    case 'dome:foul:swap': { const w = replaceFilters(s); if (!w) drop('foul'); return w ?? 'The media is swapped.'; }
+  const [head, at] = choice.split('@'), id = at || undefined;
+  const d = domeOf(s, id);
+  if (!d) return null;
+  const st = stateOf(s, d);
+  if (!s.domes?.[d.st.id] && s.dome !== st) return null;
+  const drop = (c: LifeCard) => { const o = ownState(s, d); o.cards = o.cards.filter(x => x !== c); };
+  switch (head) {
+    case 'dome:foul:swap': { const w = replaceFilters(s, id); if (!w) drop('foul'); return w ?? 'The media is swapped.'; }
     case 'dome:foul:ignore': drop('foul'); return 'You leave it: the bank scrubs less until the media is changed.';
-    case 'dome:plant:crew': { const c = repairUsd(s); if (s.money < c) return `needs ${usd(c)}`; s.money -= c; st.plantDownUntil = 0; drop('plant'); log(s, 'A repair crew drove out and had the blower running by evening.'); return 'The blower is running again.'; }
-    case 'dome:plant:hand': { st.plantDownUntil = Math.min(st.plantDownUntil, s.clock.t + 1.5); drop('plant'); log(s, 'The family rigged a hand-crank blower: it moves air, but somebody has to turn it. The plant is back in a day and a half.'); return 'A hand-crank blower will do until the plant is back.'; }
-    case 'dome:open': { const w = setLockdown(s, false); drop('plant'); drop('power'); return w ?? 'The vents are open.'; }
+    case 'dome:plant:crew': { const c = repairUsd(s, id); if (s.money < c) return `needs ${usd(c)}`; s.money -= c; ownState(s, d).plantDownUntil = 0; drop('plant'); log(s, 'A repair crew drove out and had the blower running by evening.'); return 'The blower is running again.'; }
+    case 'dome:plant:hand': { const o = ownState(s, d); o.plantDownUntil = Math.min(o.plantDownUntil, s.clock.t + 1.5); drop('plant'); log(s, 'The family rigged a hand-crank blower: it moves air, but somebody has to turn it. The plant is back in a day and a half.'); return 'A hand-crank blower will do until the plant is back.'; }
+    case 'dome:open': { const w = setLockdown(s, false, d.st.id); drop('plant'); drop('power'); return w ?? 'The vents are open.'; }
     case 'dome:power:hold': drop('power'); return 'You hold sealed. Watch the clock.';
-    case 'dome:blight:tend': { const w = tendEcology(s); if (!w) drop('blight'); return w ?? 'The beds are replanted.'; }
+    case 'dome:blight:tend': { const w = tendEcology(s, id); if (!w) drop('blight'); return w ?? 'The beds are replanted.'; }
     case 'dome:blight:wait': drop('blight'); return 'You let the loop recover on its own.';
+    case 'dome:hot:chill': { const c = chillerUsd(s, d); if (s.money < c) return `needs ${usd(c)}`; s.money -= c; ownState(s, d).chillUntil = s.clock.t + 2; drop('hot'); log(s, 'Portable chillers were trucked in and ducted through the airlocks: the air is coming down.'); return 'The chillers are running for two days.'; }
+    case 'dome:hot:vent': { if (st.lockdown) setLockdown(s, false, d.st.id); drop('hot'); log(s, 'The screens are drawn and the doors are propped: all the air the shell can move.'); return 'The vents and screens are open.'; }
+    case 'dome:hot:wait': drop('hot'); return 'You ride it out.';
+    case 'dome:loop:fix': { const c = loopRepairUsd(s, id); if (s.money < c) return `needs ${usd(c)}`; s.money -= c; ownState(s, d).loopDownUntil = 0; drop('loop'); log(s, 'A plumber swapped the membrane and the pump: the loop is running again.'); return 'The loop is running again.'; }
+    case 'dome:loop:flush': drop('loop'); return 'You flush to the septic and wait out the repair.';
+    case 'dome:stock:care': { if (s.money < STOCK_CARE_USD) return `needs ${usd(STOCK_CARE_USD)}`; s.money -= STOCK_CARE_USD; ownState(s, d).stress = 0; drop('stock'); log(s, 'The vet came out and left electrolytes, shade cloth and a cooling schedule: the animals settled.'); return 'The animals settle.'; }
+    case 'dome:stock:wait': drop('stock'); return 'You let them cope.';
     default: return null;
   }
 }
 
 // ── readers for the other systems ─────────────────────────────────────────────────────────
 
-/** The one board line for the air: a threat when the dome is sealed and the clock is short. Null when all is well. */
+/** One dome as the Dome page and the board read it. */
+export interface DomeView { ref: DomeRef; id: string; label: string; st: DomeState; people: number; homes: number; beds: number; main: boolean }
+export function domeViews(s: GameState): DomeView[] {
+  return domesOf(s).map((ref, i) => ({ ref, id: ref.st.id, label: domeLabel(s, ref), st: stateOf(s, ref), people: peopleUnder(s, ref), homes: homesUnder(s, ref), beds: bedsUnder(s, ref), main: i === 0 }));
+}
+
+/** The one board line for the air: the worst sealed dome with a short clock. Null when all is well. */
 export function domeAirLine(s: GameState): { text: string; tone: 'warn' | 'bad' } | null {
-  const st = s.dome;
-  if (!st || !domeOf(s) || !st.lockdown || st.alarm === 'ok') return null;
-  const h = st.hours === null ? 0 : Math.max(0, Math.floor(st.hours));
-  if (!st.powered && st.filtering !== 'none') return { text: `The sealed dome's air plant has no power: about ${h} ${h === 1 ? 'hour' : 'hours'} of air`, tone: st.alarm === 'critical' ? 'bad' : 'warn' };
-  return { text: `The sealed dome has about ${h} ${h === 1 ? 'hour' : 'hours'} of air left`, tone: st.alarm === 'critical' ? 'bad' : 'warn' };
+  const all = domesOf(s);
+  let worst: { d: DomeRef; st: DomeState } | null = null;
+  for (const d of all) {
+    const st = stateOf(s, d);
+    if (!st.lockdown || st.alarm === 'ok') continue;
+    if (!worst || (st.alarm === 'critical' && worst.st.alarm !== 'critical') || (st.alarm === worst.st.alarm && (st.hours ?? 0) < (worst.st.hours ?? 0))) worst = { d, st };
+  }
+  if (!worst) return null;
+  const { d, st } = worst, h = st.hours === null ? 0 : Math.max(0, Math.floor(st.hours)), who = all.length > 1 ? `The sealed ${domeLabel(s, d).toLowerCase()}` : 'The sealed dome';
+  if (!st.powered && st.filtering !== 'none') return { text: `${who}'s air plant has no power: about ${h} ${h === 1 ? 'hour' : 'hours'} of air`, tone: st.alarm === 'critical' ? 'bad' : 'warn' };
+  return { text: `${who} has about ${h} ${h === 1 ? 'hour' : 'hours'} of air left`, tone: st.alarm === 'critical' ? 'bad' : 'warn' };
 }
 
-/** Is the ground under the shell a clean zone (shell whole, nothing dusty let in)? */
-export function domeClean(s: GameState): boolean {
-  const d = domeOf(s);
-  if (!d) return false;
-  const st = domeOfState(s);
-  return !d.st.roofLost && st.dust < LIVE.DIRTY;
+/** Is the ground under this dome's shell a clean zone (shell whole, nothing dusty let in)? With no id: any dome that is (the main one first). */
+export function domeClean(s: GameState, id?: string): boolean {
+  const ds = id ? [domeOf(s, id)].filter((x): x is DomeRef => !!x) : domesOf(s);
+  return ds.some(d => !d.st.roofLost && stateOf(s, d).dust < LIVE.DIRTY);
 }
 
-/** What the dome changes in a fallout day: the dose divisor for hours worked on the place, and the share of the food and water dose that remains. Null with no dome. */
+/** What the domes change in a fallout day: the dose divisor for hours worked on the place, and the share of the food and water dose that remains. Null with no dome. The best clean dome counts. */
 export function domeFalloutAdj(s: GameState): { outPf: number; foodK: number; clean: boolean } | null {
-  const d = domeOf(s);
-  if (!d) return null;
-  const clean = domeClean(s);
-  if (!clean) return { outPf: 1.5, foodK: 1, clean };
-  return { outPf: Math.max(1.5, SHELL[d.tier].fallout_pf), foodK: 0.2, clean };
+  const all = domesOf(s);
+  if (!all.length) return null;
+  const clean = all.filter(d => domeClean(s, d.st.id));
+  if (!clean.length) return { outPf: 1.5, foodK: 1, clean: false };
+  return { outPf: Math.max(1.5, ...clean.map(d => SHELL[d.tier].fallout_pf)), foodK: 0.2, clean: true };
 }
 
-/** The dome as a fallout shelter: [protection factor, name] while it is sealed and clean, else null. */
+/** The dome as a fallout shelter: [protection factor, name] for the best sealed, clean dome, else null. */
 export function domeShelter(s: GameState): [number, string] | null {
-  const d = domeOf(s), st = s.dome;
-  if (!d || !st?.lockdown || !domeClean(s)) return null;
-  return [Math.max(1.5, SHELL[d.tier].fallout_pf), 'the dome'];
+  const ok = domesOf(s).filter(d => stateOf(s, d).lockdown && domeClean(s, d.st.id));
+  if (!ok.length) return null;
+  const best = ok.reduce((a, b) => SHELL[b.tier].fallout_pf > SHELL[a.tier].fallout_pf ? b : a);
+  return [Math.max(1.5, SHELL[best.tier].fallout_pf), domesOf(s).length > 1 ? `the ${domeLabel(s, best).toLowerCase()}` : 'the dome'];
 }
 
-/** Fraction of the wood stove's work the dome saves: homes under a powered, climate-held shell are mild. 1 = no saving. */
+/** Fraction of the wood stove's work the domes save: homes under a powered, climate-held shell are mild. 1 = no saving. */
 export function domeHeatK(s: GameState): number {
-  const d = domeOf(s), st = s.dome;
-  if (!d || !st?.powered) return 1;
   const homes = s.structures.filter(x => isFinished(x) && isHome(x.kind)).length;
   if (homes === 0) return 1;
-  const under = homesUnder(s, d);
-  return 1 - 0.5 * (under / homes) * (st.mode === 'frost' ? 0.6 : 1);
+  let saved = 0;
+  for (const d of domesOf(s)) { const st = stateOf(s, d); if (st.powered) saved += homesUnder(s, d) * (st.mode === 'frost' ? 0.6 : 1); }
+  return 1 - 0.5 * Math.min(1, saved / homes);
 }
 
-/** What the renderer shows inside: haze (CO2 and dust), sealed, plants (the closed loop's health). */
-export function domeLook(s: GameState): { sealed: boolean; haze: number; plants: number; dust: number } {
-  const st = s.dome;
-  if (!st || !domeOf(s)) return { sealed: false, haze: 0, plants: 0, dust: 0 };
+/** What the renderer shows inside the main dome: haze (CO2 and dust), sealed, plants (the closed loop's health). */
+export function domeLook(s: GameState, id?: string): { sealed: boolean; haze: number; plants: number; dust: number } {
+  const d = domeOf(s, id);
+  if (!d) return { sealed: false, haze: 0, plants: 0, dust: 0 };
+  const st = stateOf(s, d);
   const co2 = Math.max(0, Math.min(1, (st.co2ppm - 1500) / (LIMIT_PPM.hard - 1500)));
   return { sealed: st.lockdown, haze: Math.max(co2 * 0.8, st.dust * 0.6), plants: st.filtering === 'closed' ? st.ecoHealth : 0, dust: st.dust };
 }
+
+/** The sealed-dome shelter facts the felt cards and the radio quote: any dome sealed, hours of air (the shortest), whether it is clean, and its filtering. */
+export function domeShelterFacts(s: GameState): { count: number; sealed: boolean; clean: boolean; hours: number | null; filtering: Filtering; people: number } | null {
+  const all = domesOf(s);
+  if (!all.length) return null;
+  const sealed = all.filter(d => stateOf(s, d).lockdown);
+  const best = (sealed.length ? sealed : all).map(d => ({ d, st: stateOf(s, d), c: freshClock(s, d.st.id) })).sort((a, b) => (b.c?.hours ?? 0) - (a.c?.hours ?? 0))[0];
+  const h = best.c && best.c.hours !== Infinity ? best.c.hours : null;
+  return { count: all.length, sealed: sealed.length > 0, clean: all.some(d => domeClean(s, d.st.id)), hours: h, filtering: best.st.filtering, people: peopleUnder(s, best.d) };
+}
+
