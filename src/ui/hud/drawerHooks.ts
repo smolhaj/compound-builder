@@ -44,7 +44,7 @@ export function escSnapshot(): EscSnapshot {
 }
 
 /**
- * Hotkeys while layout A is on: a panel letter toggles that drawer (B P F S T L D O Y G), N the Compound board, M the Shop & money,
+ * Hotkeys while layout A is on: a panel letter toggles that drawer (B P F S T L D O Y N G; N the Compound board, G its Log page), M the Shop & money,
  * Tab brings the last drawer back, Esc closes the top layer of the Esc stack (one press, one thing). Letters only work in the
  * Diorama camera and not while a tool is armed or a window is up (the Walk / Fly camera uses WASD; placing uses R and S).
  */
@@ -68,14 +68,14 @@ export function useDrawerKeys(active: boolean): void {
         if (t && t !== document.body && t.tagName !== 'CANVAS') return;   // Tab keeps moving focus anywhere else
         e.preventDefault(); ds.reopen(); return;
       }
-      if (e.code === 'KeyN' || e.code === 'KeyM') {   // the Board and the Shop live in the action bar, not in a drawer
-        if (escTop(escSnapshot()) === 'overlay' || w.boardOpen) return;
+      if (e.code === 'KeyM') {   // the Shop lives in the action bar, not in a drawer
+        if (escTop(escSnapshot()) === 'overlay') return;
         e.preventDefault();
-        if (e.code === 'KeyN') w.setBoardOpen(true); else useGameStore.getState().openShop(!useGameStore.getState().shopOpen);
+        useGameStore.getState().openShop(!useGameStore.getState().shopOpen);
         return;
       }
       const id = drawerForCode(e.code);
-      if (id) { e.preventDefault(); ds.toggle(id); }
+      if (id) { if (id === 'board' && escTop(escSnapshot()) === 'overlay') return; e.preventDefault(); ds.toggle(id); }
     };
     window.addEventListener('keydown', onKey, true);   // capture: read the state before Esc closes anything else
     return () => window.removeEventListener('keydown', onKey, true);

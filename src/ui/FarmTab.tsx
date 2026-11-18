@@ -38,12 +38,12 @@ const Bar = ({ v, color = '#9cc070', title }: { v: number; color?: string; title
   <div title={title} style={{ flex: 1, height: 5, background: '#333', borderRadius: 2, minWidth: 40 }}><div style={{ width: `${Math.max(0, Math.min(100, v * 100))}%`, height: '100%', background: color, borderRadius: 2 }} /></div>
 );
 
-export function FarmTab({ game }: { game: GameState }) {
-  const [sub, setSub] = useState<Sub>('season');
+export function FarmTab({ game, view }: { game: GameState; /** Layout A: the drawer's sub-page chips pick the view; no tab strip here. */ view?: Sub }) {
+  const [sub0, setSub] = useState<Sub>('season'), sub = view ?? sub0;
   const plan = foodPlan(game);
   const worst: Tone | undefined = plan.some(p => p.tone === 'bad') ? 'bad' : plan.some(p => p.tone === 'warn') ? 'warn' : undefined;
   return <>
-    <Tabs<Sub> tabs={[['season', 'Season'], ['fields', 'Fields'], ['kitchen', 'Kitchen'], ['animals', 'Animals'], ['plan', 'Food plan', worst]]} value={sub} set={setSub} />
+    {!view && <Tabs<Sub> tabs={[['season', 'Season'], ['fields', 'Fields'], ['kitchen', 'Kitchen'], ['animals', 'Animals'], ['plan', 'Food plan', worst]]} value={sub} set={setSub} />}
     {sub === 'season' && <SeasonView game={game} />}
     {sub === 'fields' && <FieldsView game={game} />}
     {sub === 'kitchen' && <KitchenView game={game} />}

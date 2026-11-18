@@ -1,0 +1,2045 @@
+{
+ "a-day0-family-people-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 35.3,
+  "centerCoveredPct": 12.9,
+  "controls": 57,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-family-medical-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 22.6,
+  "centerCoveredPct": 11.9,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-family-work-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 20.7,
+  "centerCoveredPct": 11.7,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-family-daily-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 19.3,
+  "centerCoveredPct": 11.6,
+  "controls": 49,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-family-home-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 23.3,
+  "centerCoveredPct": 11.9,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-family-kin-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 22.8,
+  "centerCoveredPct": 11.9,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-family-dogs-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 19.7,
+  "centerCoveredPct": 11.6,
+  "controls": 49,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-family-classes-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 24.7,
+  "centerCoveredPct": 12,
+  "controls": 55,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-supplies-stores-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 35.3,
+  "centerCoveredPct": 12.9,
+  "controls": 52,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-supplies-keeping-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 20.2,
+  "centerCoveredPct": 11.7,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-supplies-season-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 22.3,
+  "centerCoveredPct": 11.8,
+  "controls": 47,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-supplies-fields-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 27.7,
+  "centerCoveredPct": 12.3,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-supplies-kitchen-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 35.3,
+  "centerCoveredPct": 12.9,
+  "controls": 52,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-supplies-animals-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 17.6,
+  "centerCoveredPct": 11.4,
+  "controls": 47,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-supplies-plan-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 27,
+  "centerCoveredPct": 12.2,
+  "controls": 47,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-utilities-heat-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 18.8,
+  "centerCoveredPct": 11.5,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-utilities-power-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 20,
+  "centerCoveredPct": 11.6,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-utilities-water-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 19.3,
+  "centerCoveredPct": 11.6,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-utilities-vehicles-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 25.4,
+  "centerCoveredPct": 12.1,
+  "controls": 48,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-land-place-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 22.6,
+  "centerCoveredPct": 11.9,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-land-paperwork-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 19.7,
+  "centerCoveredPct": 11.6,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-land-next-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 35.3,
+  "centerCoveredPct": 12.9,
+  "controls": 57,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-defense-score-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 21.4,
+  "centerCoveredPct": 11.8,
+  "controls": 47,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-defense-staff-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 35.3,
+  "centerCoveredPct": 12.9,
+  "controls": 62,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-defense-walls-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 31.3,
+  "centerCoveredPct": 12.6,
+  "controls": 55,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-defense-ground-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 18.6,
+  "centerCoveredPct": 11.5,
+  "controls": 47,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-defense-houses-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 27.5,
+  "centerCoveredPct": 12.3,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-defense-checks-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 23,
+  "centerCoveredPct": 11.9,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-outside-world-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 17.4,
+  "centerCoveredPct": 11.4,
+  "controls": 43,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-outside-security-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 19,
+  "centerCoveredPct": 11.6,
+  "controls": 43,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-projects-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 16.2,
+  "centerCoveredPct": 11.3,
+  "controls": 40,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-chronicle-family-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 22.6,
+  "centerCoveredPct": 11.9,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-chronicle-eras-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 18.1,
+  "centerCoveredPct": 11.5,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-chronicle-album-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 18.8,
+  "centerCoveredPct": 11.5,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-chronicle-chronicle-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 18.1,
+  "centerCoveredPct": 11.5,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-board-status-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 32.2,
+  "centerCoveredPct": 12.7,
+  "controls": 64,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-board-feed-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 17.9,
+  "centerCoveredPct": 11.5,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-board-radio-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 17.9,
+  "centerCoveredPct": 11.5,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-board-log-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 17.6,
+  "centerCoveredPct": 11.4,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-log-status-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 32.2,
+  "centerCoveredPct": 12.7,
+  "controls": 64,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-log-feed-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 17.9,
+  "centerCoveredPct": 11.5,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-log-radio-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 17.9,
+  "centerCoveredPct": 11.5,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-log-log-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 17.6,
+  "centerCoveredPct": 11.4,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-people-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 35.7,
+  "centerCoveredPct": 12.8,
+  "controls": 56,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-medical-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 26.3,
+  "centerCoveredPct": 12,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-work-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 21.6,
+  "centerCoveredPct": 11.6,
+  "controls": 49,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-daily-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 21.1,
+  "centerCoveredPct": 11.6,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-home-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 24.6,
+  "centerCoveredPct": 11.9,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-kin-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 20.9,
+  "centerCoveredPct": 11.6,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-dogs-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 21.6,
+  "centerCoveredPct": 11.6,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-classes-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 26.5,
+  "centerCoveredPct": 12,
+  "controls": 56,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-supplies-stores-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 37.1,
+  "centerCoveredPct": 12.9,
+  "controls": 53,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-supplies-keeping-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 22,
+  "centerCoveredPct": 11.7,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-supplies-season-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 24.6,
+  "centerCoveredPct": 11.9,
+  "controls": 48,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-supplies-fields-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 29.6,
+  "centerCoveredPct": 12.3,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-supplies-kitchen-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 37.1,
+  "centerCoveredPct": 12.9,
+  "controls": 53,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-supplies-animals-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 19.4,
+  "centerCoveredPct": 11.4,
+  "controls": 48,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-supplies-plan-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 27.7,
+  "centerCoveredPct": 12.1,
+  "controls": 48,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-utilities-heat-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 20.6,
+  "centerCoveredPct": 11.5,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-utilities-power-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 21.8,
+  "centerCoveredPct": 11.6,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-utilities-water-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 22.7,
+  "centerCoveredPct": 11.7,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-utilities-vehicles-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 27.2,
+  "centerCoveredPct": 12.1,
+  "controls": 49,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-land-place-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 24.4,
+  "centerCoveredPct": 11.9,
+  "controls": 47,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-land-paperwork-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 20.4,
+  "centerCoveredPct": 11.5,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-land-next-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 37.1,
+  "centerCoveredPct": 12.9,
+  "controls": 55,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-defense-score-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 23.2,
+  "centerCoveredPct": 11.8,
+  "controls": 49,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-defense-staff-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 37.1,
+  "centerCoveredPct": 12.9,
+  "controls": 63,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-defense-walls-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 35,
+  "centerCoveredPct": 12.7,
+  "controls": 57,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-defense-ground-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 20.4,
+  "centerCoveredPct": 11.5,
+  "controls": 49,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-defense-houses-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 31,
+  "centerCoveredPct": 12.4,
+  "controls": 53,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-defense-road-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 24.1,
+  "centerCoveredPct": 11.8,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-defense-checks-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 24.8,
+  "centerCoveredPct": 11.9,
+  "controls": 52,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-outside-world-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 34.3,
+  "centerCoveredPct": 12.7,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-outside-neighbors-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 30.7,
+  "centerCoveredPct": 12.4,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-outside-security-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 22,
+  "centerCoveredPct": 11.7,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-projects-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 18,
+  "centerCoveredPct": 11.3,
+  "controls": 41,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-chronicle-family-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 24.4,
+  "centerCoveredPct": 11.9,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-chronicle-eras-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 19.9,
+  "centerCoveredPct": 11.5,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-chronicle-album-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 20.6,
+  "centerCoveredPct": 11.5,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-chronicle-chronicle-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 20.1,
+  "centerCoveredPct": 11.5,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-board-status-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 33.5,
+  "centerCoveredPct": 12.6,
+  "controls": 66,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-board-feed-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 21.3,
+  "centerCoveredPct": 11.6,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-board-radio-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 37.1,
+  "centerCoveredPct": 12.9,
+  "controls": 52,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-board-log-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 35.2,
+  "centerCoveredPct": 12.8,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-log-status-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 33.5,
+  "centerCoveredPct": 12.6,
+  "controls": 66,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-log-feed-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 21.3,
+  "centerCoveredPct": 11.6,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-log-radio-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 37.1,
+  "centerCoveredPct": 12.9,
+  "controls": 52,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-log-log-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 35.2,
+  "centerCoveredPct": 12.8,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-hover-title-card-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 39.1,
+  "centerCoveredPct": 12.9,
+  "controls": 54,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 5
+ },
+ "a-hover-chip-card-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 39.1,
+  "centerCoveredPct": 13,
+  "controls": 54,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 5
+ },
+ "a-hover-family-card-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 39,
+  "centerCoveredPct": 12.9,
+  "controls": 58,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 5
+ },
+ "a-hover-top-chip-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 39,
+  "centerCoveredPct": 12.9,
+  "controls": 59,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-hover-bar-button-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 39,
+  "centerCoveredPct": 12.9,
+  "controls": 58,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-hover-feed-line-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 40.4,
+  "centerCoveredPct": 12.9,
+  "controls": 58,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 5
+ },
+ "a-hover-feed-opened-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 24.7,
+  "centerCoveredPct": 11.6,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 5
+ },
+ "a-touch-long-press-bill-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 43.1,
+  "centerCoveredPct": 28.6,
+  "controls": 66,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 6
+ },
+ "a-touch-long-press-title-card-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 35.3,
+  "centerCoveredPct": 12.9,
+  "controls": 52,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 5
+ },
+ "a-touch-long-press-chip-card-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 35.3,
+  "centerCoveredPct": 13,
+  "controls": 52,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 5
+ },
+ "a-day0-family-people-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 46.4,
+  "centerCoveredPct": 25.8,
+  "controls": 56,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-family-medical-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 34.1,
+  "centerCoveredPct": 20.7,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-family-work-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 31.4,
+  "centerCoveredPct": 19.6,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-family-daily-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 29.4,
+  "centerCoveredPct": 18.8,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-family-home-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 32.1,
+  "centerCoveredPct": 19.9,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-family-kin-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 29.1,
+  "centerCoveredPct": 18.6,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-family-dogs-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 30.1,
+  "centerCoveredPct": 19,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-family-classes-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 36.4,
+  "centerCoveredPct": 21.7,
+  "controls": 56,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-supplies-stores-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 46.4,
+  "centerCoveredPct": 25.8,
+  "controls": 52,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-supplies-keeping-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 30.8,
+  "centerCoveredPct": 19.3,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-supplies-season-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 34.8,
+  "centerCoveredPct": 21,
+  "controls": 48,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-supplies-fields-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 41.4,
+  "centerCoveredPct": 23.8,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-supplies-kitchen-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 46.4,
+  "centerCoveredPct": 25.8,
+  "controls": 53,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-supplies-animals-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 27.1,
+  "centerCoveredPct": 17.8,
+  "controls": 48,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-supplies-plan-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 39.8,
+  "centerCoveredPct": 23.1,
+  "controls": 48,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-utilities-heat-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 28.8,
+  "centerCoveredPct": 18.5,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-utilities-power-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 30.8,
+  "centerCoveredPct": 19.3,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-utilities-water-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 32.8,
+  "centerCoveredPct": 20.1,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-utilities-vehicles-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 38.1,
+  "centerCoveredPct": 22.4,
+  "controls": 49,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-land-place-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 42.4,
+  "centerCoveredPct": 24.2,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-land-paperwork-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 30.1,
+  "centerCoveredPct": 19,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-land-next-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 46.4,
+  "centerCoveredPct": 25.8,
+  "controls": 56,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-defense-score-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 32.4,
+  "centerCoveredPct": 20,
+  "controls": 48,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-defense-staff-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 46.4,
+  "centerCoveredPct": 25.8,
+  "controls": 57,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-defense-walls-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 45.1,
+  "centerCoveredPct": 25.3,
+  "controls": 56,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-defense-ground-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 28.4,
+  "centerCoveredPct": 18.3,
+  "controls": 48,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-defense-houses-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 41.1,
+  "centerCoveredPct": 23.6,
+  "controls": 52,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-defense-checks-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 34.8,
+  "centerCoveredPct": 21,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-outside-world-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 26.8,
+  "centerCoveredPct": 17.6,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-outside-security-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 29.1,
+  "centerCoveredPct": 18.6,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-projects-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 28.8,
+  "centerCoveredPct": 18.5,
+  "controls": 43,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-chronicle-family-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 34.1,
+  "centerCoveredPct": 20.7,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-chronicle-eras-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 27.8,
+  "centerCoveredPct": 18.1,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-chronicle-album-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 28.8,
+  "centerCoveredPct": 18.5,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-chronicle-chronicle-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 27.8,
+  "centerCoveredPct": 18.1,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-board-status-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 46.4,
+  "centerCoveredPct": 25.8,
+  "controls": 65,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-board-feed-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 27.4,
+  "centerCoveredPct": 17.9,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-board-radio-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 27.4,
+  "centerCoveredPct": 17.9,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-board-log-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 27.1,
+  "centerCoveredPct": 17.8,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-log-status-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 46.4,
+  "centerCoveredPct": 25.8,
+  "controls": 65,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-log-feed-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 27.4,
+  "centerCoveredPct": 17.9,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-log-radio-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 27.4,
+  "centerCoveredPct": 17.9,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-log-log-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 27.1,
+  "centerCoveredPct": 17.8,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-family-people-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 51.4,
+  "centerCoveredPct": 33.7,
+  "controls": 55,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-supplies-stores-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 51.4,
+  "centerCoveredPct": 33.7,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-utilities-heat-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 32.5,
+  "centerCoveredPct": 23,
+  "controls": 44,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-land-place-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 48.8,
+  "centerCoveredPct": 32.2,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-defense-score-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 36.7,
+  "centerCoveredPct": 25.3,
+  "controls": 47,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-outside-world-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 30.2,
+  "centerCoveredPct": 21.7,
+  "controls": 43,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-projects-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 33.6,
+  "centerCoveredPct": 23.6,
+  "controls": 42,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-chronicle-family-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 39.7,
+  "centerCoveredPct": 27,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-board-status-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 51.4,
+  "centerCoveredPct": 33.7,
+  "controls": 64,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-day0-log-status-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 51.4,
+  "centerCoveredPct": 33.7,
+  "controls": 64,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-people-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 49.5,
+  "centerCoveredPct": 26.1,
+  "controls": 57,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-medical-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 39.8,
+  "centerCoveredPct": 22.1,
+  "controls": 52,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-work-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 32.1,
+  "centerCoveredPct": 18.9,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-daily-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 32.5,
+  "centerCoveredPct": 19,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-home-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 35.1,
+  "centerCoveredPct": 20.1,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-kin-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 32.1,
+  "centerCoveredPct": 18.9,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-dogs-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 33.1,
+  "centerCoveredPct": 19.3,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-classes-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 40.1,
+  "centerCoveredPct": 22.2,
+  "controls": 57,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-supplies-stores-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 49.5,
+  "centerCoveredPct": 26.1,
+  "controls": 54,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-supplies-keeping-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 33.8,
+  "centerCoveredPct": 19.6,
+  "controls": 52,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-supplies-season-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 40.1,
+  "centerCoveredPct": 22.2,
+  "controls": 49,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-supplies-fields-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 44.5,
+  "centerCoveredPct": 24,
+  "controls": 52,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-supplies-kitchen-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 49.5,
+  "centerCoveredPct": 26.1,
+  "controls": 54,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-supplies-animals-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 30.1,
+  "centerCoveredPct": 18.1,
+  "controls": 49,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-supplies-plan-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 41.8,
+  "centerCoveredPct": 22.9,
+  "controls": 49,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-utilities-heat-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 31.8,
+  "centerCoveredPct": 18.8,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-utilities-power-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 33.8,
+  "centerCoveredPct": 19.6,
+  "controls": 47,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-utilities-water-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 34.8,
+  "centerCoveredPct": 20,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-utilities-vehicles-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 41.1,
+  "centerCoveredPct": 22.6,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-land-place-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 44.8,
+  "centerCoveredPct": 24.2,
+  "controls": 52,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-land-paperwork-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 31.5,
+  "centerCoveredPct": 18.6,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-land-next-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 49.5,
+  "centerCoveredPct": 26.1,
+  "controls": 54,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-defense-score-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 35.5,
+  "centerCoveredPct": 20.3,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-defense-staff-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 49.5,
+  "centerCoveredPct": 26.1,
+  "controls": 59,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-defense-walls-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 49.5,
+  "centerCoveredPct": 26.1,
+  "controls": 58,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-defense-ground-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 31.5,
+  "centerCoveredPct": 18.6,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-defense-houses-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 46.5,
+  "centerCoveredPct": 24.9,
+  "controls": 54,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-defense-road-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 37.8,
+  "centerCoveredPct": 21.3,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-defense-checks-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 37.8,
+  "centerCoveredPct": 21.3,
+  "controls": 53,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-outside-world-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 49.5,
+  "centerCoveredPct": 26.1,
+  "controls": 52,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-outside-neighbors-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 45.1,
+  "centerCoveredPct": 24.3,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-outside-security-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 33.8,
+  "centerCoveredPct": 19.6,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-projects-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 45.8,
+  "centerCoveredPct": 24.6,
+  "controls": 49,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-chronicle-family-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 37.1,
+  "centerCoveredPct": 21,
+  "controls": 47,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-chronicle-eras-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 30.8,
+  "centerCoveredPct": 18.3,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-chronicle-album-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 31.8,
+  "centerCoveredPct": 18.8,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-chronicle-chronicle-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 31.1,
+  "centerCoveredPct": 18.5,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-board-status-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 49.5,
+  "centerCoveredPct": 26.1,
+  "controls": 67,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-board-feed-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 34.1,
+  "centerCoveredPct": 19.7,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-board-radio-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 49.5,
+  "centerCoveredPct": 26.1,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-board-log-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 49.5,
+  "centerCoveredPct": 26.1,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-log-status-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 49.5,
+  "centerCoveredPct": 26.1,
+  "controls": 67,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-log-feed-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 34.1,
+  "centerCoveredPct": 19.7,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-log-radio-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 49.5,
+  "centerCoveredPct": 26.1,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-log-log-1280x720": {
+  "bar": "labels 1017x48 left 132",
+  "coveredPct": 49.5,
+  "centerCoveredPct": 26.1,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-family-people-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 55,
+  "centerCoveredPct": 35,
+  "controls": 56,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-supplies-stores-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 55,
+  "centerCoveredPct": 35,
+  "controls": 53,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-utilities-heat-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 36.1,
+  "centerCoveredPct": 24.3,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-land-place-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 50.8,
+  "centerCoveredPct": 32.6,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-defense-score-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 40.2,
+  "centerCoveredPct": 26.6,
+  "controls": 49,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-outside-world-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 55,
+  "centerCoveredPct": 35,
+  "controls": 51,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-projects-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 53.5,
+  "centerCoveredPct": 34.1,
+  "controls": 48,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-chronicle-family-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 43.2,
+  "centerCoveredPct": 28.3,
+  "controls": 46,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-board-status-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 55,
+  "centerCoveredPct": 35,
+  "controls": 66,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-week1-log-status-1100x700": {
+  "bar": "labels 1017x48 left 42",
+  "coveredPct": 55,
+  "centerCoveredPct": 35,
+  "controls": 66,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-scale-u125-closed-1280x720": {
+  "bar": "icons 1024x60 left 128",
+  "coveredPct": 34.2,
+  "centerCoveredPct": 26.9,
+  "controls": 38,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-scale-u125-supplies-1280x720": {
+  "bar": "icons 1024x60 left 128",
+  "coveredPct": 62.3,
+  "centerCoveredPct": 45.7,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-scale-u125-defense-1280x720": {
+  "bar": "icons 1024x60 left 128",
+  "coveredPct": 50.4,
+  "centerCoveredPct": 37.8,
+  "controls": 47,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-scale-u125-board-1280x720": {
+  "bar": "icons 1024x60 left 128",
+  "coveredPct": 62.3,
+  "centerCoveredPct": 45.7,
+  "controls": 62,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-scale-u125-closed-1100x700": {
+  "bar": "icons 1024x60 left 38",
+  "coveredPct": 39.5,
+  "centerCoveredPct": 34.5,
+  "controls": 36,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-scale-u125-supplies-1100x700": {
+  "bar": "icons 1024x60 left 38",
+  "coveredPct": 71.9,
+  "centerCoveredPct": 61.8,
+  "controls": 48,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-scale-u125-defense-1100x700": {
+  "bar": "icons 1024x60 left 38",
+  "coveredPct": 58.8,
+  "centerCoveredPct": 50.7,
+  "controls": 45,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-scale-u125-board-1100x700": {
+  "bar": "icons 1024x60 left 38",
+  "coveredPct": 71.9,
+  "centerCoveredPct": 61.8,
+  "controls": 59,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 5
+ },
+ "a-scale-u90-closed-1280x720": {
+  "bar": "labels 915x43 left 182",
+  "coveredPct": 21,
+  "centerCoveredPct": 13.3,
+  "controls": 41,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-scale-u90-supplies-1280x720": {
+  "bar": "labels 915x43 left 182",
+  "coveredPct": 43.7,
+  "centerCoveredPct": 18.6,
+  "controls": 54,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-scale-u90-defense-1280x720": {
+  "bar": "labels 915x43 left 182",
+  "coveredPct": 30,
+  "centerCoveredPct": 15.4,
+  "controls": 50,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-scale-u90-board-1280x720": {
+  "bar": "labels 915x43 left 182",
+  "coveredPct": 41.9,
+  "centerCoveredPct": 18.2,
+  "controls": 67,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-scale-u90-closed-1100x700": {
+  "bar": "labels 915x43 left 92",
+  "coveredPct": 23.5,
+  "centerCoveredPct": 16.3,
+  "controls": 40,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ },
+ "a-scale-u90-supplies-1100x700": {
+  "bar": "labels 915x43 left 92",
+  "coveredPct": 48.1,
+  "centerCoveredPct": 25.9,
+  "controls": 53,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-scale-u90-defense-1100x700": {
+  "bar": "labels 915x43 left 92",
+  "coveredPct": 33.6,
+  "centerCoveredPct": 20.2,
+  "controls": 49,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-scale-u90-board-1100x700": {
+  "bar": "labels 915x43 left 92",
+  "coveredPct": 47.1,
+  "centerCoveredPct": 25.5,
+  "controls": 66,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-final-supplies-kitchen-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 39,
+  "centerCoveredPct": 12.9,
+  "controls": 54,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-final-defense-walls-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 34.1,
+  "centerCoveredPct": 12.5,
+  "controls": 58,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-final-build-hover-one-card-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 46.9,
+  "centerCoveredPct": 28.6,
+  "controls": 69,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 5
+ },
+ "a-final-toast-1512x860": {
+  "bar": "labels 1017x48 left 248",
+  "coveredPct": 18.3,
+  "centerCoveredPct": 11.1,
+  "controls": 42,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 4
+ },
+ "a-final-u125-toast-1512x860": {
+  "bar": "labels 1271x60 left 120",
+  "coveredPct": 26.2,
+  "centerCoveredPct": 17.5,
+  "controls": 40,
+  "hScroll": false,
+  "overflow": [],
+  "fixedBoxes": 3
+ }
+}
