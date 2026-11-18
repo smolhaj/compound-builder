@@ -104,7 +104,7 @@ if (sets.includes('inside')) {
   await sim(0.001, `g.disaster.kind = null; g.disaster.phase = 'peace'; g.weather = undefined; g.clock.startDoy = 150; g.dome = { ...(g.dome ?? L.newDomeState()), lockdown: true, filtering: 'closed', ecoHealth: 1, co2ppm: 900 };`);
   await sim(0.3, ``);
   await noon(); await hideHud();
-  const IN = [[D.x + R * 0.1, ground + 0.45, D.z + R * 0.75], [D.x - R * 0.1, ground + R * 0.55, D.z - R * 0.5]]; await pose(IN[0], IN[1], 78); await shot('10-inside-ecology');
+  const IN = [[D.x + R * 0.8, ground + 0.4, D.z - R * 0.2], [D.x - R * 0.1, ground + R * 0.5, D.z + R * 0.55]]; await pose(IN[0], IN[1], 78); await shot('10-inside-ecology');
   await pose([D.x + R * 1.1, ground + R * 2.0 + 1.0, D.z + R * 1.3], [D.x, ground, D.z], 55); await shot('11-above-ecology');
   await sim(0.001, `g.dome = { ...g.dome, lockdown: true, filtering: 'none', co2ppm: 15000, o2pct: 18, dust: 0.8 };`);
   await pose(IN[0], IN[1], 78); await shot('12-inside-bad-air');
