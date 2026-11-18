@@ -168,11 +168,11 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
   const lam0 = Math.min(hole.lam0, -(v.cw / 2 + v.t + SURROUND_PAD)), lam1 = Math.max(hole.lam1, v.cw / 2 + v.t + SURROUND_PAD), top = Math.max(hole.y1, y0 + v.h) + 0.02;
   const n = Math.max(2, Math.ceil((lam1 - lam0) / 0.11)), skin = tier === 'geodesic' ? 'aluminum' : 'steel', glaze = tier === 'geodesic' ? 'polycarb' : tier === 'glass' ? 'glass' : 'arcology', capY = y0 + v.h + 0.02;
   for (let i = 0; i < n; i++) {
-    const l = lam0 + (lam1 - lam0) * (i + 0.5) / n, w = (lam1 - lam0) / n + 0.004, rho = doors.shellRho(l) + 0.012, lo = Math.abs(l) < v.dw / 2 ? y0 + v.dh : y0;
-    p.add(skin, place(box(w, capY - lo, 0.014, l, lo, rho)));                                                                    // the plate, up to the chamber's roof line
-    if (top > capY) p.add(glaze, place(box(w, top - capY, 0.008, l, capY, rho - 0.004)));                                        // above it the hole the lattice lost is glazed again
+    const l = lam0 + (lam1 - lam0) * (i + 0.5) / n, w = (lam1 - lam0) / n + 0.004, rho = doors.shellRho(l) + 0.017, lo = Math.abs(l) < v.dw / 2 ? y0 + v.dh + 0.004 : y0;
+    p.add(skin, place(box(w, capY - lo, 0.026, l, lo, rho)));                                                                    // the plate, up to the chamber's roof line
+    if (top > capY) p.add(glaze, place(box(w, top - capY, 0.008, l, capY, rho - 0.008)));                                        // above it the hole the lattice lost is glazed again
   }
-  p.add('trim', place(box(lam1 - lam0, 0.016, 0.03, (lam0 + lam1) / 2, capY, doors.shellRho(0) + 0.012)));                       // the cap along the roof line
+  p.add('trim', place(box(lam1 - lam0, 0.016, 0.03, (lam0 + lam1) / 2, capY, doors.shellRho(0) + 0.017)));                       // the cap along the roof line
   p.layer = 'roof';
   p.add(tier === 'geodesic' ? 'polycarb' : tier === 'glass' ? 'glass' : 'arcology', place(box(v.cw + 2 * v.t, 0.012, outer - inner + v.t, 0, y0 + v.h, mid)));   // a glazed ceiling: the chamber reads from above
   for (const k of [0.1, 0.5, 0.9]) p.add('trim', place(box(v.cw + 2 * v.t + 0.01, 0.016, 0.02, 0, y0 + v.h, inner + (outer - inner) * k)));
