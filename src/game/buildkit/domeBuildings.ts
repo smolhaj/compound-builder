@@ -11,6 +11,7 @@
  */
 import * as THREE from 'three';
 import { CELL, type KitPieceDef } from './kit';
+import { detailTier, type DetailTier } from './buildingDetail';
 import { pipe } from './interior';
 import { box, Parts, type BuildOpts } from './shell';
 import { CELL_FT, TIER, tierOfKind, type DomeTier } from '../../sim/dome/tiers';
@@ -299,7 +300,7 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
   // the armored skirt of the arcology: an opaque band round the foot, with a light line along its top
   const band = tier === 'arcology' ? 0.8 : 0;
   p.layer = 'frame';
-  const seen = new Set<string>(), seg = tier === 'arcology' ? 4 : 5;
+  const seen = new Set<string>(), seg = tier === 'arcology' ? 3 : 5;
   const doors = new Doorways(airlockAngles(airlocks), tier, R, y0);
   // the panels that sit in a doorway window are left out first (the holes grow to cover them), then the struts that run along the hole
   const kept = tris.filter(([A, B, C]) => !doors.takes([V(...A), V(...B), V(...C)]));
@@ -335,7 +336,13 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
 }
 
 function geodesic(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group { return triShell(def, 'geodesic', seed, opts, 5, 2, 'polycarb', 'aluminum'); }
-function arcology(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group { return triShell(def, 'arcology', seed, opts, 12, 6, 'arcology', 'steel'); }
+/**
+ * The arcology lattice's frequency by detail tier: 12 on High (a strut every ~30 ft at the default size), 8 on Medium and Low. The struts are the arcology's
+ * biggest shadow caster (about 1,300 of them), and Medium's shadow-triangle budget (scripts/perfBudget.json, never raised) has room for the coarser lattice only.
+ */
+export const arcologyFrequency = (t: DetailTier): number => (t === 'high' ? 12 : 8);
+
+function arcology(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group { return triShell(def, 'arcology', seed, opts, arcologyFrequency(detailTier()), 6, 'arcology', 'steel'); }
 
 function glass(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   const p = new Parts(seed, opts), L = LOOK.glass, R = def.cellsX * CELL / 2 - 0.03, y0 = L.stem, g = opts.ground ?? (() => 0);

@@ -55,6 +55,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   100: s => ({ ...s, version: 101 }),
   // 101 → 102: the graded dome pad (sim/dome/grading.ts): `Structure.siteWork`, optional; no old-save work
   101: s => ({ ...s, version: 102 }),
+  // 102 → 103: the dome plant (sim/dome/plantUnits.ts): optional `DomeState.spares` and plant fields on `RaidDamage` (kind 'plant'); nothing to back-fill
+  102: s => ({ ...s, version: 103 }),
   97: s => ({ ...s, version: 98 }),
   // 95 → 96: hiding in the bunker (sim/bunkerHide.ts): `Outcome.bunker` on the gate card, optional; no old-save work
   95: s => ({ ...s, version: 96 }),

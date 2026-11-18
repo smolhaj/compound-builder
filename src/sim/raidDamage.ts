@@ -22,9 +22,10 @@ import { isHome } from './blueprints';
 import { log } from './economy';
 import { dayIndex, type GameState } from './state';
 import { domesOf } from './dome/standing';
+import { strikePlant, plantFires } from './dome/plantStrike';
 import { isShellKind, panelJob, panelsHit, domeIdOfRun, tierOfShell, panelSpot, awayFromAirlocks } from './dome/siege';
 
-export type DamageKind = 'breach' | 'gate' | 'burn' | 'panel';
+export type DamageKind = 'breach' | 'gate' | 'burn' | 'panel' | 'plant';
 
 export interface RaidDamage {
   id: string;
@@ -46,10 +47,15 @@ export interface RaidDamage {
   structure?: string;
   panels?: number;
   readyDay?: number;
+  /** A dome's plant unit (kind 'plant', sim/dome/plantUnits.ts): the unit id (`chiller`, `chiller2`...), how bad it is, what did it and the game time (days) it happened. The unit stays damaged until the job is done. */
+  unit?: string;
+  cond?: 'damaged' | 'down';
+  cause?: 'raid' | 'fire' | 'storm';
+  at?: number;
 }
 
 /** How much a breach and a broken gate take off the walls' barrier score until mended (and the most damage can take off). */
-export const PENALTY = { breach: 7, gate: 11, burn: 0, panel: 9, cap: 28 } as const;
+export const PENALTY = { breach: 7, gate: 11, burn: 0, panel: 9, plant: 0, cap: 28 } as const;
 const MAX_OPEN = 6;
 
 export const openDamage = (s: GameState): RaidDamage[] => (s.raidDamage ?? []).filter(d => d.done < d.hours);
@@ -159,6 +165,9 @@ export function applyRaidDamage(s: GameState, battle: Battle | null, overrun: bo
   if (home && (overrun || nearHouse || (made > 0 && r() < 0.35))) {
     if (!pendingFixes(home).some(f => f.part === 'glass') && crackGlass(home, overrun ? 'poor' : 'fair')) lines.push(overrun ? 'Most of the downstairs windows are broken.' : 'A few windows were shot out.');
   }
+  // the dome's plant (sim/dome/plantStrike.ts): a crew that got in may go for the machinery to starve the dome out, and a fire in the yard scorches a unit
+  lines.push(...strikePlant(s, battle, overrun, r, { opened: !!domeBreach && !domeBreach.where?.gate, airlock: !!domeBreach && !!domeBreach.where?.gate }));
+  lines.push(...plantFires(s, battle?.raid?.fires ?? [], r));
   return lines;
 }
 
@@ -176,8 +185,8 @@ export function nextDamage(s: GameState): RaidDamage | null {
   return null;
 }
 
-export const damageNoun = (d: RaidDamage): string => d.kind === 'gate' ? 'gate repair' : d.kind === 'breach' ? 'fence repair' : d.kind === 'panel' ? 'panel replacement' : 'cleanup of the burned wreck';
-export const damageName = (d: RaidDamage): string => d.kind === 'gate' ? 'Hang the gate again' : d.kind === 'breach' ? 'Mend the gap in the fence' : d.kind === 'panel' ? `Replace ${d.panels ?? 1} dome panel${(d.panels ?? 1) === 1 ? '' : 's'}` : `Clear the burned ${d.what ?? 'ground'}`;
+export const damageNoun = (d: RaidDamage): string => d.kind === 'gate' ? 'gate repair' : d.kind === 'breach' ? 'fence repair' : d.kind === 'panel' ? 'panel replacement' : d.kind === 'plant' ? 'plant repair' : 'cleanup of the burned wreck';
+export const damageName = (d: RaidDamage): string => d.kind === 'gate' ? 'Hang the gate again' : d.kind === 'breach' ? 'Mend the gap in the fence' : d.kind === 'panel' ? `Replace ${d.panels ?? 1} dome panel${(d.panels ?? 1) === 1 ? '' : 's'}` : d.kind === 'plant' ? `Repair ${d.what ?? 'the dome plant'}` : `Clear the burned ${d.what ?? 'ground'}`;
 
 /** Work on a damage job; returns hours used. Finishing it takes the damage off the list. */
 export function addDamageWork(s: GameState, d: RaidDamage, hours: number): number {
@@ -189,7 +198,7 @@ export function addDamageWork(s: GameState, d: RaidDamage, hours: number): numbe
   }
   const use = Math.min(hours, d.hours - d.done);
   d.done += use;
-  if (d.done >= d.hours - 1e-9) { d.done = d.hours; log(s, `${damageName(d)}: done.`); }
+  if (d.done >= d.hours - 1e-9) { d.done = d.hours; log(s, d.kind === 'plant' ? `${damageName(d)}: done. It is running again and the dome is back to full strength on it.` : `${damageName(d)}: done.`); }
   return use;
 }
 
@@ -208,6 +217,7 @@ export function damageSummary(s: GameState): string[] {
   if (n('breach')) out.push(n('breach') === 1 ? 'a gap in the fence' : `${n('breach')} gaps in the fence`);
   if (n('gate')) out.push('the gate off its hinges');
   if (n('panel')) out.push(`${o.filter(d => d.kind === 'panel').reduce((a, d) => a + (d.panels ?? 1), 0)} dome panels down`);
+  if (n('plant')) out.push(n('plant') === 1 ? 'a dome plant unit out' : `${n('plant')} dome plant units out`);
   if (n('burn')) out.push(n('burn') === 1 ? 'a burned wreck' : `${n('burn')} burned wrecks`);
   if (s.structures.some(st => isHome(st.kind) && pendingFixes(st).some(f => f.part === 'glass'))) out.push('broken windows');
   return out;
@@ -220,7 +230,7 @@ export const damageHoursLeft = (s: GameState): number => openDamage(s).reduce((a
 export function newDamage(before: GameState, after: GameState): string[] {
   const had = new Set((before.raidDamage ?? []).map(d => d.id));
   const out: string[] = [];
-  for (const d of after.raidDamage ?? []) if (!had.has(d.id)) out.push(d.kind === 'gate' ? 'the gate off its hinges' : d.kind === 'breach' ? 'a gap in the fence' : d.kind === 'panel' ? `${d.panels ?? 1} dome panel${(d.panels ?? 1) === 1 ? '' : 's'} down` : `the ${d.what ?? 'building'} burned`);
+  for (const d of after.raidDamage ?? []) if (!had.has(d.id)) out.push(d.kind === 'gate' ? 'the gate off its hinges' : d.kind === 'breach' ? 'a gap in the fence' : d.kind === 'panel' ? `${d.panels ?? 1} dome panel${(d.panels ?? 1) === 1 ? '' : 's'} down` : d.kind === 'plant' ? `${d.what ?? 'a dome plant unit'} ${d.cond === 'down' ? 'wrecked' : 'damaged'}` : `the ${d.what ?? 'building'} burned`);
   const glass = (g: GameState) => g.structures.some(st => isHome(st.kind) && pendingFixes(st).some(f => f.part === 'glass'));
   if (glass(after) && !glass(before)) out.push('broken windows');
   return out;

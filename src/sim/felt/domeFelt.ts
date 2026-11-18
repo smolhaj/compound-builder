@@ -39,6 +39,8 @@ export function domeLines(kind: FeltKind): GenLine[] {
       text: () => 'Stranger at the glass house. Dusk. Walked the fence. Counting the doors. Gone when the lights came on.' }),
     genLine(kind, { id: 'dome_rumor_closed', channel: 'rumor', truth: 'true', tone: 1, when: s => !!sealedDome(s), claim: () => ({ id: 'dome_sealed' }),
       text: () => 'Glass house is shut. Sealed tight. Own air, they say. Nobody going in. Nobody coming out.' }),
+    genLine(kind, { id: 'dome_local_plant', channel: 'local', truth: 'true', tone: 2, when: s => (s.raidDamage ?? []).some(j => j.kind === 'plant' && j.done < j.hours), claim: () => ({ id: 'dome_plant_hurt' }),
+      text: () => 'Smoke over the glass house, from the yard by the wall. They hit the machinery. Lights flickering up there. Whoever lives in there is on borrowed power.' }),
     genLine(kind, { id: 'dome_rumor_sale', channel: 'rumor', truth: 'false', tone: 0, claim: () => ({ id: 'dome_stands' }),
       text: () => `Seats in a dome. By the fairgrounds. Six thousand each. Man swears it. Nobody has seen one.` }),
   ];
