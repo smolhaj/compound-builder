@@ -21,7 +21,8 @@ try {
   await page.goto(`http://localhost:${port}/?seed=7&clean&lowrender=${PR}${process.env.LOOK ? '&looktier=' + process.env.LOOK : ''}&region=${process.env.REGION ?? 'mountain_west'}&acres=20&relief=${process.env.RELIEF ?? 2}&lotseed=${process.env.LOTSEED ?? 8}`);
   await page.waitForFunction(() => window.__cb?.qa?.lowrender, null, { timeout: 300000 });
   const frames = async (n = 1) => { for (let i = 0; i < n; i++) await page.evaluate(() => window.__cb.qa.renderNow()); };
-  const shot = async name => { await frames(3); if (QUAL !== 'none') await page.evaluate(q => window.__cb.qa.renderFull(q), QUAL); // (LOOK=high instead holds the high look for every frame: a construction stage is not rebuilt by renderFull's quality switch) await page.screenshot({ path: `${out}/${tier}-${name}.png` }); lap(name); };
+  // (LOOK=high with QUAL=none holds the high look for every frame: renderFull's quality switch rebuilds the buildings at stage 0 for its one draw)
+  const shot = async name => { await frames(3); if (QUAL !== 'none') await page.evaluate(q => window.__cb.qa.renderFull(q), QUAL); await page.screenshot({ path: `${out}/${tier}-${name}.png` }); lap(name); };
   const pose = (e, l, fov = 55) => page.evaluate(([e, l, fov]) => { window.__cb.qa.pose = { x: e[0], y: e[1], z: e[2], lx: l[0], ly: l[1], lz: l[2], fov }; }, [e, l, fov]);
   const info = await page.evaluate(async ([tier, cells]) => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp; G.getState().setSpeed(0);
