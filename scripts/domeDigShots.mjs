@@ -59,7 +59,7 @@ try {
     const tag = `p${String(Math.round(P * 100)).padStart(3, '0')}`;
     if (views.includes('panel')) {
       await page.evaluate(id => { const cb = window.__cb; cb.store.getState().setHudHidden?.(false); cb.game.getState().select?.(id); }, D.id);
-      await page.getByRole('button', { name: /^Projects/ }).first().click().catch(() => {});
+      await page.getByRole('button', { name: /Projects/ }).first().click({ timeout: 8000 }).catch(e => console.error('no Projects button', String(e).slice(0, 80)));
       await frames(3); await page.waitForTimeout(400);
       await page.screenshot({ path: `${out}/${tier}-${tag}-panel.png` }); lap(tag + '-panel');
       await page.evaluate(() => window.__cb.store.getState().setHudHidden?.(true));
