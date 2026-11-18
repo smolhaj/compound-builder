@@ -30,8 +30,11 @@ export interface OpItem {
   act?: { label: string; act: SuggestionAct };
 }
 
-/** A defense score at or above this counts as guarded (the Defense tab's "Guarded"). */
-export const DEFENSE_OK = 45;
+/**
+ * A defense score at or above this ticks the checklist's Defense row. The tab's own "Guarded" label starts at 45; the row ticks at 40 because a
+ * chain-link ring with the adults armed scores 43 and a first-timer could not otherwise reach the tick before the first hit (playtest 3: 1 %).
+ */
+export const DEFENSE_OK = 40;
 
 const WATER = ['well_hand', 'well_drilled', 'cistern', 'water_tower'];
 const FOOD = ['garden', 'field', 'greenhouse', 'greenhouse_heated', 'polytunnel', 'high_tunnel', 'orchard', 'orchard_grove', 'orchard_terraced', 'aquaponics'];
@@ -77,7 +80,7 @@ export function operational(s: GameState, drive?: readonly Pt[], report?: Defens
   const d = report ?? defenseReport(s, drive);
   const defDone = d.score >= DEFENSE_OK;
   out.push({ id: 'defense', label: 'Defense', done: defDone, line: `${d.label}, ${d.score} of 100`,
-    ...(defDone ? {} : { act: { label: 'Defense', act: { type: 'open' as const, right: 'defense' as const } } }) });
+    ...(defDone ? {} : d.barrier < 40 && !buildOff(s, 'chain_link') ? { act: { label: 'Fence the compound (chain link)', act: { type: 'tool' as const, tool: 'chain_link' } } } : { act: { label: 'Defense', act: { type: 'open' as const, right: 'defense' as const } } }) });
 
   return out;
 }

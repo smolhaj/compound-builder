@@ -13,6 +13,7 @@ import { BLUEPRINTS, totalBill, totalHours } from '../../sim/blueprints';
 import { MATERIALS, billText, type MaterialId } from '../../sim/materials';
 import { orderCost } from '../../sim/economy';
 import { CREW_RATE } from '../../sim/crews';
+import { moveInEta } from '../../sim/shelterBridge';
 import { useRunAct } from './useRunAct';
 import { drillExtra } from '../../sim/site';
 import { FT_PER_M } from '../../sim/units';
@@ -85,9 +86,10 @@ export function BuildMenu({ showProjects = () => undefined, toolsOnly = false }:
   const kit = (kind: string) => {
     const a = buildAdvice(game, kind), own = ownNeeds(kind), extra = kind === 'well_drilled' ? drillExtra(game.site) : 0;
     const permit = needsPermit(kind) && game.paper.permits && countyWorks(game) ? ` · permit ${usd(permitFee(game, kind))}` : '';
+    const et = moveInEta(game, kind, totalHours(BLUEPRINTS[kind]), !!permit);
     return <Item key={kind} flashKey={`kit:${kind}`} name={KIT[kind].name} cost={`~${usd(costOf(kind) + extra)}`}
-      sub={`${totalHours(BLUEPRINTS[kind])} h · crew adds ~${usd(Math.round(totalHours(BLUEPRINTS[kind]) * CREW_RATE / 100) * 100)}${kind === 'well_drilled' ? ` · water at ${lengthText(game.site.gwDepth)}` : ''}${permit}`}
-      on={g.tool === kind} off={a.off} next={a.next ? a.note : null} title={`${KIT[kind].blurb}${own ? ` Needs from your own land: ${own}.` : ''}`} click={() => arm(kind)} />;
+      sub={`${totalHours(BLUEPRINTS[kind])} h · crew adds ~${usd(Math.round(totalHours(BLUEPRINTS[kind]) * CREW_RATE / 100) * 100)}${kind === 'well_drilled' ? ` · water at ${lengthText(game.site.gwDepth)}` : ''}${permit}${et.home ? ` · ${et.line.replace('Family moves in after about', 'move in ~')}` : ''}`}
+      on={g.tool === kind} off={a.off} next={a.next ? a.note : null} title={`${KIT[kind].blurb} ${et.line}. ${et.meanwhile}${own ? ` Needs from your own land: ${own}.` : ''}`} click={() => arm(kind)} />;
   };
 
   const lineItem = (kind: PerimeterKind, per: number, unit: string) => {

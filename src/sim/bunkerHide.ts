@@ -53,6 +53,8 @@ export const BUNKER_HIDE = {
   TRACKS: { bunker_floorhatch: 2, bunker_hatch: 6, bunker_stairs: 8 } as Record<string, number>,
   /** Per-day find chance: base search chance, then each exposure point adds a hundredth. */
   BASE: 0.08,
+  /** Exposure points per loot point: a crew that can see a rich, stocked place (sim/deterrence.ts lootPoints, up to 28) tears it apart, so the bunker is searched harder (it was 0.5). */
+  RICH_SEARCH: 2.2,
   /** Noise points: a running generator (times its sound factor), each dog (capped), a quiet dog keeps this share; a crew with dogs of its own. */
   GEN: 8, DOG: 3, DOG_CAP: 9, DOG_QUIET: 0.25, RAIDER_DOGS: 10,
   /** The stove's smoke from the night before, times the chimney points. */
@@ -177,7 +179,7 @@ export function giveAways(s: GameState, e: Pick<Encounter, 'temper' | 'scouted'>
   const smoke = chimneyPoints(s) * BUNKER_HIDE.SMOKE;
   const tracks = BUNKER_HIDE.TRACKS[ent.kind] ?? 4;
   const raiderDogs = e.temper === 'savage' || e.scouted ? BUNKER_HIDE.RAIDER_DOGS : 0;
-  const rich = s.disaster.difficulty === 'hardcore' ? 0 : lootPoints(s) * 0.5;   // a stocked place is searched harder (sim/deterrence.ts)
+  const rich = s.disaster.difficulty === 'hardcore' ? 0 : lootPoints(s) * BUNKER_HIDE.RICH_SEARCH;   // a stocked place is searched harder (sim/deterrence.ts)
   return { noise, dogs, smoke, tracks, raiderDogs, rich, total: noise + dogs + smoke + tracks + raiderDogs + rich };
 }
 
@@ -492,4 +494,20 @@ function judge(s: GameState, e: Encounter, found: ReadonlyArray<Hider>, fought: 
     else if (fate === 'held') lines.push(`${h.first} was held at gunpoint on the floor.`);
     else if (h.kid) lines.push(`${h.first} was left alone.`);
   }
+}
+
+/**
+ * The cost of the dark (owner: hiding must cost more than supplies): days in a sealed bunker wear on everyone, the kids and the old worst.
+ * Morale falls by this per day below (capped) and does not come back at once; the daily morale drift pulls it back up over a week or two.
+ */
+export const CLAUSTRO = { PER_DAY: 6, KID: 1.5, ELDER: 1.25, CAP: 30 } as const;
+export function claustrophobia(s: GameState, days: number): number {
+  let hit = 0;
+  s.people.forEach((p, i) => {
+    const n = s.personState[i]?.needs;
+    if (!n || n.died != null || n.taken || n.left) return;
+    const d = Math.min(CLAUSTRO.CAP, CLAUSTRO.PER_DAY * days * (p.kid ? CLAUSTRO.KID : p.elder ? CLAUSTRO.ELDER : 1));
+    n.morale = Math.max(0, n.morale - d); hit = Math.max(hit, d);
+  });
+  return hit;
 }

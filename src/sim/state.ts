@@ -47,7 +47,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 101;
+export const SAVE_VERSION = 102;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -142,6 +142,8 @@ export interface Structure {
   /** The earthwork paid for a graded dome pad (sim/dome/grading.ts): cubic yards cut and filled, retaining wall face in square feet, and what it cost. */
   siteWork?: { cutCy: number; fillCy: number; wallSf: number; usd: number };
   permitAt?: number;
+  /** The permit was rushed (sim/shelterBridge.ts): paid through the expedite desk, or the runner was caught and the review started over (optional; save v101). */
+  rushed?: 'ok' | 'caught';
   /** A fire, storm or looters took its roof off after it stood: the guidance suggests re-roofing it until it is finished again (optional, so no save bump). */
   roofLost?: boolean;
   /** The game time the roof came off (sim/roofSafety.ts: the family hires a crew on its own a day after, if nobody has; optional, so no save bump). */
@@ -275,6 +277,8 @@ export interface GameState {
   dome?: import('./dome/live').DomeState;
   /** Every finished dome's own state by structure id (each runs its own air, climate and water loop; save v100). `dome` mirrors the biggest one's. */
   domes?: Record<string, import('./dome/live').DomeState>;
+  /** A rented place to sleep while the house goes up: motel, extended stay, RV or modular unit (sim/shelterBridge.ts; absent until rented; save v101). */
+  rental?: import('./shelterBridge').Rental;
   /** How old the stores are, rotation, traps. */
   shelf: Shelf;
   /** What the food stores are made of, item by item, and the diet's running averages (sim/pantry.ts; save v39). */
