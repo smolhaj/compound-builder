@@ -45,6 +45,7 @@ import { regionFor } from './climate';
 import { fieldSiteK } from './microclimate';
 import { pluralize } from './words';
 import { blightCut } from './blight';
+import { domeYieldK } from './dome/agro';
 
 export type CropId = 'potatoes' | 'beans' | 'wheat' | 'rest';
 export const CROP_IDS: readonly CropId[] = ['potatoes', 'beans', 'wheat', 'rest'];
@@ -232,7 +233,7 @@ export function fieldFactor(s: GameState, st: Structure): FieldFactor {
   const sown = !!p.sown && p.sown.y === y && crop !== 'rest';
   const share = CROPS[crop].share, f = fertFactor(p.fert), rot = rotationFactor(crop, p.prev, p.prev2, p.cover), vig = p.sown?.v ?? 1, tim = p.sown?.late ?? 1;
   const tr = troubleFactor(s, p);
-  return { crop, sown, share, fert: f, rotation: rot, vigor: vig, timing: tim, trouble: tr, total: sown ? share * f * rot * vig * tim * tr * fieldSiteK(s, st) : 0 };
+  return { crop, sown, share, fert: f, rotation: rot, vigor: vig, timing: tim, trouble: tr, total: sown ? share * f * rot * vig * tim * tr * fieldSiteK(s, st) * domeYieldK(s, st) : 0 };
 }
 
 /** The garden's factor: fertility and successions (the season length is `successionDays`). */

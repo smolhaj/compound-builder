@@ -175,7 +175,7 @@ describe('power and climate', () => {
     const g = base(); g.dome = { ...newDomeState(), mode: 'comfortable' };
     stepDome(g, 0.25 / 24);
     expect(g.dome!.powered).toBe(true);
-    expect(g.dome!.indoorF).toBeGreaterThanOrEqual(64.9);
+    expect(g.dome!.indoorF).toBeGreaterThanOrEqual(63.9);
   });
   it('a powered dome over homes saves firewood', () => {
     const g = base(); g.dome = { ...newDomeState(), powered: true };

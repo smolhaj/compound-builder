@@ -32,6 +32,7 @@ import { orchardChoreRate } from './orchard';
 import { glassSound } from './improvements';
 import { regionFor } from './climate';
 import { filmLight, isTunnel, tunnelPestK, TUNNEL } from './tunnels';
+import { underHeldDome } from './dome/agro';
 
 /** Days the greenhouse moves the garden's start earlier and its end later. */
 export const GREENHOUSE_EXTEND = 42;
@@ -92,6 +93,7 @@ export function greenhouseKwh(s: GameState, st: Structure): number {
 /** Is this greenhouse warm for the winter benches? (the hobby house: powered; the production house: its boiler or heater worked yesterday) */
 export function isHeated(s: GameState, st: Structure): boolean {
   if (isTunnel(st.kind)) return false;
+  if (underHeldDome(s, st)) return true;   // a powered dome keeps it frost-free (sim/dome/agro.ts)
   return st.kind === 'greenhouse_heated' ? greenhouseCareOf(s, st.id).heated : s.utilities.lit.includes(st.id);
 }
 

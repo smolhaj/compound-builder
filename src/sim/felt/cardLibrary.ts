@@ -7,6 +7,7 @@
 import type { GameState } from '../state';
 import { feltDay } from './state';
 import type { Cost, DecisionCard, DecisionOption, FeltKind, FeltPhase } from './types';
+import { domesOf } from '../dome/live';
 import { adultsOf, applyFx, badChance, homeNeighbors, householdSize as N, r25, type Fx } from './cardFx';
 
 export type Fxs = Fx[] | ((s: GameState) => Fx[]);
@@ -92,7 +93,7 @@ function signature(kind: FeltKind): Omit<DecisionCard, 'id'> {
         opt({ id: 'forage', label: 'Forage, trap and trade labor', hint: 'Leaves cash alone, takes days and shoe leather.', cost: () => ({ hours: 10 }), risk: { p: 0.35, good: 'You came home with food.', bad: 'Little found, and a bad fall.', win: s => [{ k: 'stock', id: 'canned', n: N(s) * 4 }], lose: [hurtOne('a bad fall', 15)] }, line: 'You spent days foraging.' }),
         opt({ id: 'pool', label: 'Pool with the neighbors: a shared kitchen', hint: 'You put in some cans. Everyone eats better, and they owe you.', cost: s => ({ stock: { canned: N(s) * 2 } }), off: noNeighbors, now: [{ k: 'standing', n: 6 }, { k: 'humanity', n: 2 }, { k: 'morale', n: 5 }], line: 'You started a shared kitchen.' }),
       ] };
-    case 'fallout': return { ...base, title: () => 'How long to stay sealed', text: () => 'The air outside is not the air you remember. Every trip out costs something you cannot see.', fallback: 'sealed',
+    case 'fallout': return { ...base, when: (s: GameState) => base.when(s) && domesOf(s).length === 0, title: () => 'How long to stay sealed', text: () => 'The air outside is not the air you remember. Every trip out costs something you cannot see.', fallback: 'sealed',
       options: [
         opt({ id: 'buy', label: 'Buy potassium iodide and a Geiger counter, then go out carefully', hint: 'Knowing where it is bad is half of staying safe.', cost: s => ({ money: r25(250 + N(s) * 80) }), now: s => [{ k: 'stock', id: 'potassium_iodide', n: N(s) }, { k: 'stock', id: 'geiger_counter', n: 1 }], line: 'You bought pills and a Geiger counter.' }),
         opt({ id: 'sealed', label: 'Stay sealed for two full weeks', hint: 'Eats the pantry and tempers, but nobody is exposed.', cost: s => ({ stock: { canned: N(s) * 2 } }), now: [{ k: 'morale', n: -6 }, { k: 'raidDelay', days: 6 }], line: 'You stayed sealed in.' }),
