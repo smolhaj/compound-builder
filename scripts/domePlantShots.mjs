@@ -64,7 +64,7 @@ try {
   const ground = await page.evaluate(([x, z]) => window.__cb.world.groundAt(x, z), [D.x, D.z]);
   const pose = (e, l, fov = 60) => page.evaluate(([e, l, fov]) => { window.__cb.qa.pose = { x: e[0], y: e[1], z: e[2], lx: l[0], ly: l[1], lz: l[2], fov }; }, [e, l, fov]);
   await set(`const s = cb.store.getState(); s.setTimeOfDay(17.4); s.setBuildingView('full'); s.setSeasonMode?.('summer'); s.setWeatherMode('clear');`);
-  const yphi = Math.PI / 6;   // the plant sits between airlocks A and B (arcology: 6 locks, so 30 degrees)
+  const yphi = tier === 'glass' ? Math.PI / 3 : Math.PI / 6;   // the plant sits between airlocks A and B (arcology: 6 locks, 30 degrees; glass: 3 locks, 60 degrees)
   const Y = [Math.sin(yphi), Math.cos(yphi)];
   await set(`const s = cb.store.getState(); s.setTimeOfDay(16.8); s.setBuildingView('full'); s.setWeatherMode('clear');`);
   if (want('steep')) { await set(`const s = cb.store.getState(); s.setTimeOfDay(17.4)`); await pose([D.x + R * 1.7, ground + R * 0.95, D.z + R * 1.9], [D.x, ground + R * 0.12, D.z], 42); await shot('steep-hero'); }
