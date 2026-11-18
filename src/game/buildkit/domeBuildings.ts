@@ -78,7 +78,8 @@ function embankment(R: number, ground: (x: number, z: number) => number, top: nu
   const pos: number[] = [], rings = 6, MAXR = 8;
   const drop = (a: number): number => Math.max(0, top - ground(R * Math.sin(a), R * Math.cos(a)));
   let any = false;
-  for (let i = 0; i < n && !any; i++) if (drop(i * TAU / n) > 0.12) any = true;
+  // (the stem wall is itself `top` tall over level ground: an embankment is only for ground that falls away more than a stem's height below the base)
+  for (let i = 0; i < n && !any; i++) { const a = i * TAU / n; if (ground(R * Math.sin(a), R * Math.cos(a)) < -0.12) any = true; }
   if (!any) return null;
   // the reach is smoothed round the ring so the slope does not crease between neighbours
   const raw = Array.from({ length: n }, (_, i) => Math.min(MAXR, drop(i * TAU / n) * 2.4));

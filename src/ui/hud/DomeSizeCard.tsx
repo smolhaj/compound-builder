@@ -49,6 +49,7 @@ export function DomeSizeCard() {
       <Row l="Work" v={`${Math.round(bill.hours).toLocaleString('en-US')} h, a crew about ${bill.crewWeeks} ${bill.crewWeeks === 1 ? 'week' : 'weeks'}`} />
       {bill.other.filter(o => /permit/i.test(o.label)).map(o => <Row key={o.label} l="County permit" v={usd(o.usd)} />)}
     </div>
+    {site?.workLine && <div data-testid="dome-site-work" style={{ color: tv.color('text') }}>{site.workLine}</div>}
     {facts.map(f => <div key={f} style={{ color: tv.color('dim') }}>{f}</div>)}
     {bill.needs.map(n => <div key={n} style={{ color: tv.color('warn') }}>{T.glyph.warn} {n}</div>)}
     <div style={{ color: tv.color('dim'), fontSize: tv.font('fine') }}>+ and - or Shift+wheel: diameter. Click places it, R turns it, Esc cancels.</div>

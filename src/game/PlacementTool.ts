@@ -19,6 +19,8 @@ import { clashText, padClash, padSnap } from './buildkit/padRules';
 import { DomeGhost } from './props/DomeGhost';
 import { CELL_FT, TIER, kindOfCells, tierOfKind, shellFt, type DomeTier } from '../sim/dome/tiers';
 import { domeSiteReport, siteSummary } from '../sim/dome/siting';
+import { gradeSquare, gradingLine, isGradedTier } from '../sim/dome/grading';
+import type { SiteWork } from '../store/gameStore';
 
 /**
  * Build tool: a translucent ghost of the kit piece follows the cursor over
@@ -167,7 +169,7 @@ export class PlacementTool {
     const ask = force ? null : stakeSpendAsk(store.game, kind);
     if (ask) { store.askSpend({ kind, x, z, rot: this._turn, cost: ask.cost, after: ask.check.after, reserve: ask.check.reserve, cannot: ask.cannot }); return; }
     const before = store.game.structures.length;
-    store.plan(kind, x, z, this._turn);
+    store.plan(kind, x, z, this._turn, store.domeSite?.work);
     const placed = useGameStore.getState().game.structures.length > before;
     this._just = { x, z, rot: this._turn };
     // one click stakes one building and puts the tool away (Shift-click keeps it armed to stake several), with a line saying so
@@ -268,7 +270,10 @@ export class PlacementTool {
     const rep = domeSiteReport({ x, z, r: footR }, (px, pz) => ownsAt(st.game, px, pz), items, near);
     this._dome.set({ x, z, shellR, footR, height: shellR * 2 * TIER[tier].heightRatio, ok, ringOwned: rep.ringOwned, straddles: rep.straddles.map(id => { const r = items.find(i => i.id === id)!.rect; return [r.x0, r.z0, r.x1, r.z1] as [number, number, number, number]; }), trees: rep.cleared as Array<[number, number]> });
     const summary = !ok && why && !rep.off && !rep.straddles.length ? why : siteSummary(rep, { diameterFt: Math.round(shellFt(tier, cells)) }), cur = st.domeSite;
-    if (!cur || cur.cells !== cells || cur.ok !== ok || cur.summary !== summary) st.setDomeSite({ tier, cells, ok, summary });
+    // the graded pad of a big dome: cut and fill under the square footprint, priced by the dirt moved (sim/dome/grading)
+    let work: SiteWork | undefined, workLine: string | undefined;
+    if (isGradedTier(tier)) { const g = gradeSquare({ x, z, half: footR }, this._site.height); work = { cutCy: g.cutCy, fillCy: g.fillCy, wallSf: g.wallSf }; workLine = gradingLine(g); }
+    if (!cur || cur.cells !== cells || cur.ok !== ok || cur.summary !== summary || cur.workLine !== workLine) st.setDomeSite({ tier, cells, ok, summary, work, workLine });
   }
 
   /** The gravel spur from the yard's gate must meet the road's edge at a drivable grade: not a yard on a bench above a road cut. */

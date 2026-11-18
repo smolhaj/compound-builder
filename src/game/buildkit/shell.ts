@@ -191,7 +191,7 @@ export class Parts {
       if (!g) continue;
       g.computeBoundingSphere();
       const mesh = new THREE.Mesh(g, kitMaterial(m));
-      mesh.castShadow = m !== 'glass' && m !== 'polycarb' && m !== 'arcology' && m !== 'snow' && m !== 'glow' && !m.endsWith('_glow') && m !== 'string' && m !== 'wire_mesh' && m !== 'oil_stain';
+      mesh.castShadow = m !== 'glass' && m !== 'polycarb' && m !== 'arcology' && m !== 'snow' && m !== 'glow' && !m.endsWith('_glow') && m !== 'string' && m !== 'wire_mesh' && m !== 'oil_stain' && !(layer === 'foundation' && m === 'earth');
       mesh.receiveShadow = true;
       mesh.name = `bldg_${layer}_${m}`;
       mesh.userData = { layer, mat: m, vertexCount: g.getAttribute('position').count };
