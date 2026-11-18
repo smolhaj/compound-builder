@@ -60,7 +60,7 @@ export class DomePortals {
       const L0 = r + 0.1, L1 = r + 3.2, N = 16, wMax = Math.max(0.26, v.cw * 0.7);
       const Q = [-1, -0.78, -0.42, 0, 0.42, 0.78, 1], PROFILE = [0, 0.4, 0.82, 1, 0.82, 0.4, 0];
       const soil = new THREE.Color(0x4f3f2c), grass = new THREE.Color(0x6b7b3c), dry = new THREE.Color(0x7a7a48);
-      const hAt = (t: number) => 0.1 * (1 - 0.5 * t) * Math.min(1, (1 - t) * 6 + 0.15);
+      const hAt = (t: number) => 0.1 * (1 - 0.5 * t) * Math.min(1, (1 - t) * 6 + 0.15) * (0.3 + 0.7 * Math.min(1, t / 0.1));   // (it rises out of the ground at the airlock and tapers out at the far end)
       const rows: Array<Array<{ p: [number, number, number]; c: THREE.Color }>> = [];
       for (let k = 0; k <= N; k++) {
         const t = k / N, rho = L0 + (L1 - L0) * t, w = wMax * (1 - 0.3 * t), h = hAt(t);
