@@ -2271,7 +2271,7 @@ export class HomesteadWorld {
       const see = v === 'ghost' || (v === 'xray' && XRAY_LAYERS.includes(layer)) || floorSee;
       m.material = see ? xrayOf(ud.baseMat) : ud.baseMat;
       // (a foundation's banked earth and a dome's stem wall, berm and embankment hug the ground: no shadow pass cost)
-      m.castShadow = !see && !['kit_glass', 'kit_string'].includes(ud.baseMat.name) && !ud.baseMat.name.startsWith('kit_glow') && !(layer === 'foundation' && (ud.baseMat.name === 'kit_earth' || b.cover));
+      m.castShadow = !see && !['kit_glass', 'kit_string'].includes(ud.baseMat.name) && !ud.baseMat.name.startsWith('kit_glow') && !(layer === 'foundation' && (ud.baseMat.name === 'kit_earth' || b.cover)) && !(b.cover && layer === 'walls');
       if (layer === 'cutwalls') m.visible = v === 'cutaway' && b.finished;
       else if (v === 'cutaway' && CUTAWAY_HIDE.includes(layer) && (b.finished || layer !== 'walls')) m.visible = false;
       // seen from far off, the inside of an enclosed building is hidden (no draw, no shadow); only in the plain exterior view
