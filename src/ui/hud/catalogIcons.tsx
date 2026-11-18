@@ -6,7 +6,18 @@ const WOOD = '#b98a58', ROOF = '#a4503a', STONE = '#9aa0a0', DARK = '#2e332b', W
 
 const house = (wall: string, roof: string): ReactNode => <><rect x="7" y="15" width="18" height="11" fill={wall} /><path d="M4 16 L16 6 L28 16 Z" fill={roof} /><rect x="14" y="19" width="4" height="7" fill={DARK} /></>;
 
+const GLASS = '#bfe3f0', RIB = '#e6f4fa';
+/** Dome pictograms, one per tier (dome_earthen / dome_geodesic / dome_glass / dome_arcology). */
+function domeArt(kind: string): ReactNode {
+  const base = <rect x="3" y="24" width="26" height="3" fill={DARK} />;
+  if (/earthen/.test(kind)) return <>{base}<path d="M5 24 a11 15 0 0 1 22 0 Z" fill={SOIL} /><path d="M9 24 a7 9 0 0 1 14 0 Z" fill="#a98462" /><path d="M13 24 v-4 h6 v4 Z" fill={DARK} /><path d="M8 14 q3 -2 6 -1 M20 12 q3 0 4 2" stroke={LEAF} strokeWidth="1.5" fill="none" /></>;
+  if (/geodesic/.test(kind)) return <>{base}<path d="M4 24 a12 17 0 0 1 24 0 Z" fill={GLASS} fillOpacity="0.35" stroke={RIB} strokeWidth="1.5" /><path d="M4 24 L16 11 L28 24 M9 24 L16 11 L23 24 M10 17 H22 M7 21 H25" stroke={RIB} strokeWidth="1.2" fill="none" /></>;
+  if (/arcology/.test(kind)) return <>{base}<path d="M3 24 a13 18 0 0 1 26 0 Z" fill={GLASS} fillOpacity="0.28" stroke={RIB} strokeWidth="1.3" /><rect x="10" y="12" width="4" height="12" fill={STEEL} /><rect x="15" y="8" width="4" height="16" fill={STONE} /><rect x="20" y="14" width="4" height="10" fill={STEEL} /><path d="M11 15 h2 M16 11 h2 M16 15 h2 M21 17 h2" stroke={SUN} strokeWidth="1" /></>;
+  return <>{base}<path d="M4 24 a12 16 0 0 1 24 0 Z" fill={GLASS} fillOpacity="0.4" stroke={RIB} strokeWidth="1.5" /><path d="M16 8 V24 M10 12 V24 M22 12 V24 M5 18 H27" stroke={RIB} strokeWidth="1" /><path d="M11 24 V20 a2 2 0 0 1 4 0 V24 M18 24 v-3 h4 v3" fill={LEAF} stroke={LEAF} strokeWidth="1" /></>;
+}
+
 function art(cat: CatId, kind: string): ReactNode {
+  if (cat === 'enclosure' || /^dome_/.test(kind)) return domeArt(kind);
   if (/^well|cistern|water_tower|reservoir|pond|filtration/.test(kind)) {
     if (kind === 'water_tower') return <><rect x="10" y="6" width="12" height="9" rx="2" fill={WATER} /><path d="M12 15 L10 27 M20 15 L22 27 M16 15 V27" stroke={WOOD} strokeWidth="2" /></>;
     if (kind === 'cistern' || kind === 'filtration_shed') return <><rect x="8" y="9" width="16" height="17" rx="3" fill={STEEL} /><rect x="8" y="17" width="16" height="9" rx="3" fill={WATER} /></>;
@@ -30,6 +41,7 @@ function art(cat: CatId, kind: string): ReactNode {
     case 'underground': return <><rect x="4" y="9" width="24" height="3" fill={LEAF} /><rect x="4" y="12" width="24" height="16" fill={SOIL} /><rect x="11" y="17" width="10" height="8" fill={DARK} /></>;
     case 'walls': return <><path d="M4 22 H28" stroke={WOOD} strokeWidth="2" /><path d="M7 26 V12 M14 26 V12 M21 26 V12 M27 26 V12" stroke={WOOD} strokeWidth="3" strokeLinecap="round" /><path d="M4 16 H28" stroke={WOOD} strokeWidth="2" /></>;
     case 'lines': return <><path d="M4 20 H28" stroke={WATER} strokeWidth="4" /><path d="M4 12 q6 -4 12 0 t12 0" stroke={SUN} strokeWidth="2" fill="none" /></>;
+    default: return house(STEEL, DARK); // a new category without art still gets a pictogram, never a blank square
   }
 }
 
