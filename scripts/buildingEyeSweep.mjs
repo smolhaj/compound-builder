@@ -49,9 +49,9 @@ try {
     await page.evaluate(([big]) => {
       const cb = window.__cb, w = cb.world, st = cb.game.getState().game.structures[0];
       const half = big * 1.0 + 0.8;
-      const [fx, fz] = w.openSpotNear(st.x - 0.3, st.z + half, 0.4);
+      // placed directly (openSpotNear pushes everything away from the camp, where the pieces stand)
+      const fx = st.x - 0.3, fz = st.z + half, px = st.x + 0.6, pz = st.z + half + 1.4 + big * 0.4;
       w.qaFigure(fx, fz);
-      const [px, pz] = w.openSpotNear(st.x + 0.6, st.z + half + 1.6 + big * 0.6, 0.4);
       cb.cam.placeEye(px, pz, st.x, st.z, 0.26);
     }, [info.big]);
     await frame(2);
