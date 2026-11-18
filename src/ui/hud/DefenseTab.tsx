@@ -114,6 +114,7 @@ function ReputationSection() {
   return <Section title="Reputation on the county road">
     <Row label="The road says" value={`${r.label} · ${Math.round(r.hard * 100)}`} tone={r.hard >= 0.4 ? 'good' : undefined} title="How hard the place looks and is known to be. Opportunists (looters, burglars) weigh it; organized crews plan around it." />
     {r.drivers.map(d => <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12, padding: '1px 0' }} title={d.note}><span style={{ color: DIM }}>{d.label} <i>({d.note})</i></span><span style={{ color: tone }}>+{Math.round(d.points)}</span></div>)}
+    {r.dome && <Row label="The dome is seen from" value={`${r.dome.seenMi < 10 ? r.dome.seenMi.toFixed(1) : Math.round(r.dome.seenMi)} miles · ${r.dome.attraction >= 0.5 ? 'an invitation' : r.dome.attraction >= 0.2 ? 'draws attention' : 'well answered'}`} tone={r.dome.attraction >= 0.5 ? 'bad' : r.dome.attraction >= 0.2 ? 'warn' : 'good'} title={`${r.dome.line}. Visibility the walls do not answer draws looters, gangs, scouts and the curious; the road's word for the place (above) answers it.`} />}
     <Row label="The neighbors say" value={r.neighbors + (r.goodwill != null ? ` · goodwill ${r.goodwill}` : '')} title="A fortress look cools neighbors who do not know you yet (never allies); a good-neighbor record warms them." />
     {r.lines.map((l, i) => <div key={i} style={{ color: DIM, fontSize: 12 }}>{l}</div>)}
   </Section>;

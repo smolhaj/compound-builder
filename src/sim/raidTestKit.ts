@@ -12,6 +12,7 @@ import { crewKindOf } from './surrender';
 import type { Difficulty } from './difficulty';
 import type { BattleEvent } from './battleTypes';
 import { isGuardUnit } from './defenseTune';
+import { withDomeShell } from './dome/siege';
 
 export type Layout = 'bare' | 'armed' | 'chain' | 'container' | 'container_gate' | 'concrete_bollards' | 'ditch_wall' | 'palisade_tower';
 export const LAYOUTS: Layout[] = ['bare', 'armed', 'chain', 'container', 'container_gate', 'concrete_bollards', 'ditch_wall', 'palisade_tower'];
@@ -70,7 +71,7 @@ export function problems(g: GameState, b: PlannedBattle, o: BattleOptions): stri
     if (m === 'none') bad.push('breach without a method');
     if (raid.breach && raid.breach.method !== breach.method) bad.push('facts method differs from the breach event');
     if (breach.where) {
-      const run = g.perimeter.find(r => r.id === breach.where!.runId);
+      const run = withDomeShell(g, g.structures.find(st => st.kind === 'farmhouse') ?? { x: 0, z: 0 }).perimeter.find(r => r.id === breach.where!.runId);   // (a dome's shell is a run in the fight, sim/dome/siege.ts)
       if (!run) bad.push('breach on a run that does not exist');
       else if (toRun(run, breach.x, breach.z) > 0.06) bad.push(`breach point is ${toRun(run, breach.x, breach.z).toFixed(2)} off the drawn wall`);
       if (Math.abs(breach.where.x - breach.x) > 0.011 || Math.abs(breach.where.z - breach.z) > 0.011) bad.push('breach point differs from its where');

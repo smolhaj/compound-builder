@@ -15,6 +15,7 @@
  */
 import type { GameState } from './state';
 import { guardCount } from './guards';
+import { domeRead, type DomeRead } from './dome/watched';
 
 /** Every number here is tunable. */
 export const REP = {
@@ -78,6 +79,8 @@ export interface Reputation {
   goodwill: number | null;
   /** One line for each effect on the neighbors. */
   lines: string[];
+  /** What a dome on the place does to who comes (sim/dome/watched.ts); null with none. */
+  dome: DomeRead | null;
 }
 export function reputation(s: GameState, p: Look): Reputation {
   const { hard, drivers } = hardness(s, p);
@@ -90,7 +93,9 @@ export function reputation(s: GameState, p: Look): Reputation {
   else if (closed > 0) lines.push('Behind a high wall, but a good-neighbor record outweighs it: goodwill still warms, more slowly.');
   if (record >= 0.05) lines.push('A good-neighbor record (people taken in, kindness kept) warms the neighbors a little each day.');
   else if (record <= -0.05) lines.push('Turning people away and hard choices have given the place a name on the road; the neighbors do not warm.');
-  return { hard, label: labelOf(hard), drivers, looters: REP.LOOT * hard, burglars: REP.BREAKIN * hard, record, closed, neighbors: neighborWord(record, closed), goodwill, lines };
+  const dome = domeRead(s, hard);
+  if (dome) lines.push(`${dome.line}. Looters come about ${Math.round((dome.looterK - 1) * 100)}% ${dome.looterK >= 1 ? 'more' : 'less'} often, gangs ${Math.round((dome.gangK - 1) * 100)}% more, and passers-by and scouts ${Math.round((dome.curiousK - 1) * 100)}% more.`);
+  return { hard, label: labelOf(hard), drivers, dome, looters: REP.LOOT * hard, burglars: REP.BREAKIN * hard, record, closed, neighbors: neighborWord(record, closed), goodwill, lines };
 }
 
 /** Once a day: the neighbors' goodwill drifts with the look of the place and the record behind it. Returns log lines (none: it is slow). */

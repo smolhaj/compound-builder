@@ -4,6 +4,7 @@ import { wipeEnded } from '../sim/wipe';
 import { planProblem } from '../sim/construction';
 import { unscripted } from '../sim/godMode';
 import { dropBridge, routeProblem } from '../sim/terrainFx';
+import { routeThroughDomes } from '../sim/dome/crossing';
 import { clearCollapse, strandAway } from '../sim/corridors';
 import { dropRoadBridge, rebuildRoadBridge } from '../sim/roadFx';
 import { interrogate, type Approach, type Question } from '../sim/interrogation';
@@ -554,7 +555,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     if (locked()) return;
     if (routeProblem(get().game, kind, pts)) return;   // a tunnel-bridge needs real low ground, a slope tunnel a hillside (the tool says why)
     const g = structuredClone(get().game);
-    planRun(g, kind, pts, gates, offLen);
+    planRun(g, kind, routeThroughDomes(g, kind, pts), gates, offLen);   // (a corridor that crosses a dome goes through the airlock: sim/dome/crossing.ts)
     set({ game: g });
     void saveGame(AUTOSAVE, g);
   },
@@ -570,7 +571,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const why = routeProblem(get().game, kind, [a, b]);
     if (why) return why;
     const g = structuredClone(get().game);
-    planRun(g, kind, [a, b], []);
+    planRun(g, kind, routeThroughDomes(g, kind, [a, b]), []);
     set({ game: g });
     void saveGame(AUTOSAVE, g);
     return null;

@@ -33,6 +33,8 @@ import { logGate } from './nag';
 import { daysOfFood } from './needs';
 import { forewarned } from './radio';
 import { gearPosture } from './gear';
+import { domeRead } from './dome/watched';
+import { domeBarrier } from './dome/siege';
 import { fxEncounterWeights, fxMakeExtra, fxResolveExtra, isExtraRaid } from './disasterFx';
 import { deterrence, turnBackChance, lootPoints, lootK } from './deterrence';
 import { fogSightK } from './fogFx';
@@ -174,6 +176,7 @@ export function postureOf(s: GameState): Posture {
   const visibility = Math.min(100, 12 + surface * 5 + (lit ? 18 * glowFactor(s) : 0) + (s.utilities.report.genKwh > 0.1 ? 15 * genSound(s) : 0) + (homes.length ? 8 : 0) + turbineNoise(s) + chimneyPoints(s) + nightNoiseTotal(s));
   // the line: barrier runs weighted by how much they stop people, against a ring of ≈ 240 m
   const line = enclosure(s);
+  const domeLook = domeRead(s, 0);   // a dome is seen from the road and reads as a fortress (sim/dome/watched.ts; its attraction, which needs the road's hardness, is read in whoComes)
   let held = 0, look = 0, wall = 0;
   for (const r of s.perimeter) {
     const d = PERIMETER[r.kind];
@@ -188,7 +191,7 @@ export function postureOf(s: GameState): Posture {
   // (balance pass) the ring needs ≈ 40 units of wall to close, and how good it is decides the rest: a ring of woven wire holds 50, a steel one 93,
   // so every tier up the chain raises the number (it used to be held / 40, which any 80 units of woven wire already maxed out)
   const ringQuality = wall > 0 ? held / wall : 0;
-  const barrier = Math.max(0, Math.max(Math.min(1, wall / 40) * ringQuality * 100, line.barrier) * fenceHold(s) - damagePenalty(s)), fortress = Math.min(100, look / 40 * 100);
+  const barrier = Math.max(0, Math.max(Math.min(1, wall / 40) * ringQuality * 100, line.barrier, domeBarrier(s, homes[0] ?? { x: 1e9, z: 1e9 })) * fenceHold(s) - damagePenalty(s)), fortress = Math.min(100, look / 40 * 100 + (domeLook?.lookPts ?? 0));
   // anyone away (a rescue, a run, the market) isn't on the line
   const here = (i: number) => s.personState[i]?.needs.died == null && !isAway(s, s.people[i].id);
   const adults = s.people.filter((p, i) => !p.kid && here(i));
@@ -202,7 +205,7 @@ export function postureOf(s: GameState): Posture {
   const kEye = fogSightK(s, 'eye');
   const pre = prepPosture(s);
   const detection = Math.min(100, pre.detection + 25 + (watch * 5 + tw.detection + watchDetection(s)) * kEye + (radioNet ? 20 : 0) + (barrier > 50 ? 10 : 0) + gear.detection + guards.detection + forewarned(s) + villageWatch(s) + ruleWatch(s));
-  return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility), fortress, barrier: Math.min(100, barrier + gear.barrier + pre.barrier), detection, fighters: fighters + pre.fighters, deter: gear.deter, signs: gear.signs, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => BUNKER_ENTRANCES.includes(st.kind)) };
+  return { visibility: Math.min(100, visibility + gear.visibility + tw.visibility + (domeLook?.visibilityPts ?? 0)), fortress, barrier: Math.min(100, barrier + gear.barrier + pre.barrier), detection, fighters: fighters + pre.fighters, deter: gear.deter, signs: gear.signs, safeRoom: gear.safeRoom, armed: armed(s), firepower: firepower(s) * gear.fight * tw.fire, bunker: fin.some(st => BUNKER_ENTRANCES.includes(st.kind)) };
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -406,11 +409,12 @@ const battleOpts = (e: Encounter, extra: { insideBreach?: boolean; angry?: boole
  */
 export function whoComes(s: GameState, p: Posture, r: () => number): EncounterKind {
   const law = s.disaster.tracks.law;
+  const hard = hardness(s, p).hard, dome = domeRead(s, hard);   // a dome draws the curious, scouts and hostile crews, less the better it is defended (sim/dome/watched.ts)
   const w: Array<[EncounterKind, number]> = [
-    ['arrival', 30],
+    ['arrival', 30 * (dome?.curiousK ?? 1)],
     ['refugees', 12 * (p.visibility / 50)],
-    ['looters', 30 * (1 - law) * (1 - p.fortress / 130) * (1 - 0.5 * (s.gate.respect ?? 0)) * opportunistK(hardness(s, p).hard)],   // the compound's name on the county road (sim/reputation.ts): opportunists only
-    ['gang', 18 * (1 - law) * (0.3 + p.fortress / 100 + p.visibility / 150) * (1 - 0.5 * (s.gate.respect ?? 0))],
+    ['looters', 30 * (1 - law) * (1 - p.fortress / 130) * (1 - 0.5 * (s.gate.respect ?? 0)) * opportunistK(hard) * (dome?.looterK ?? 1)],   // the compound's name on the county road (sim/reputation.ts): opportunists only
+    ['gang', 18 * (1 - law) * (0.3 + p.fortress / 100 + p.visibility / 150) * (1 - 0.5 * (s.gate.respect ?? 0)) * (dome?.gangK ?? 1)],
     ['requisition', s.gate.government === 'hindrance' ? 10 * (0.5 + p.visibility / 100) : 0],
     ['trader', 10],
     ['neighbor_help', s.gate.government === 'help' ? 8 : 4],
@@ -607,7 +611,7 @@ export function gateDay(s: GameState): Encounter | null {
   else if (e.strength && !markProbe && ['looters', 'gang', 'militia'].includes(e.kind)) adaptCrew(s, e, p, day);
   // how the raid begins: scouts ahead of it, a man under a white flag, an ambush of the people at work, a diversion (sim/raidOpeners.ts; its own random stream)
   if (['looters', 'gang', 'militia', 'patrol', 'requisition'].includes(e.kind) && !e.back && !e.dig && !e.insiderHelp) {
-    const op = planOpener({ kind: crewKindOf(e.kind), temper: e.temper ?? 'desperate', size: e.size, armed: e.armed, difficulty: d.difficulty ?? 'standard' }, mulberry32(s.seed * 977 + day * 13 + 5));
+    const op = planOpener({ kind: crewKindOf(e.kind), temper: e.temper ?? 'desperate', size: e.size, armed: e.armed, difficulty: d.difficulty ?? 'standard', scoutK: domeRead(s, hardness(s, p).hard)?.scoutK }, mulberry32(s.seed * 977 + day * 13 + 5));
     if (op) {
       e.opener = op;
       if (op.kind === 'demand') {

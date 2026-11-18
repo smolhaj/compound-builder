@@ -607,3 +607,10 @@ Where the dispatch and this document differ, the dispatch (the owner's newer rea
 6. Placement: the diameter handle (sizes are fixed per tier now), the circle ghost, free center placement with a clipped-to-the-lot warning (D5).
 7. Perf census scenes `dome_t1` to `dome_t3` in `scripts/perfBudget.json`, LOD far mesh and the Low tier shell (D6).
 8. Contractor monthly draw for the arcology, failure events, per-region cost (D9, D4).
+
+## Status: tunnels, airlock crossing, raids and visibility (2026-11-18)
+
+Items 2, 3 and 5 of the list above are in, except where noted. See the DECISIONS row "Dome raids, tunnel crossing and visibility".
+- `sim/dome/standing.ts` (the domes on the place, airlocks, panel health), `crossing.ts` (tunnel crossing rule, skirt against a dig), `siege.ts` (shell odds, airlock doors, sally port, panel jobs, `withDomeShell`), `watched.ts` (visibility, look, attraction). Tests: `sim/dome/siege.test.ts`, `game/buildkit/domeAirlockNav.test.ts`.
+- Rendering: tunnel portal collar and spoil strip at each crossed airlock (`game/props/DomePortals.ts`), panel holes (`RaidDamageRenderer` kind `panel`, live while a cutscene plays). Scripts: `scripts/domeRaidMovie.mjs`.
+- Known limits: the airlock vestibule is still a solid block with a door painted on it (slice 1), so people are routed through the gap in the shell collider at the airlock rather than through a hollow chamber; the line-of-fire map in the game scene (not the sim) does not yet draw the shell, so cutscene tracers can cross a T3 shell; `shellOpen` is not yet read by any lockdown code; the earthen dome is not a raid shell unless the home is under it.

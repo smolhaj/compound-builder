@@ -18,6 +18,7 @@ import type { BreachWhere } from './battleTypes';
 import type { CrewKind } from './surrender';
 import type { GameState } from './state';
 import { GATE_SEC, hasGateMotor, hasSallyGate } from './gateSecurity';
+import { SHELL_ODDS, airlockDoor } from './dome/siege';
 
 export type BreachHow = 'climb' | 'ram' | 'charge';
 
@@ -61,6 +62,8 @@ export const WALL_RESIST: Record<PerimeterKind, { ram: number; blast: number }> 
   ditch: { ram: 0, blast: 0.1 }, moat: { ram: 0, blast: 0.05 },
   water_pipe: { ram: 0.95, blast: 0.95 }, power_cable: { ram: 0.95, blast: 0.95 }, escape_tunnel: { ram: 0.2, blast: 0.4 }, underground_passage: { ram: 0.2, blast: 0.4 }, wall_walk: { ram: 0.3, blast: 0.5 },
   tunnel_bridge: { ram: 0.2, blast: 0.4 }, slope_tunnel: { ram: 0.2, blast: 0.4 }, rock_tunnel: { ram: 0.1, blast: 0.3 }, drain_channel: { ram: 0.9, blast: 0.9 },
+  // the shell of a dome (sim/dome/siege.ts): one table there, by tier
+  shell_earthen: SHELL_ODDS.earthen, shell_geodesic: SHELL_ODDS.geodesic, shell_glass: SHELL_ODDS.glass, shell_arcology: SHELL_ODDS.arcology,
 };
 const resistOf = (k: string): { ram: number; blast: number } => WALL_RESIST[k as PerimeterKind] ?? { ram: 0.4, blast: 0.6 };
 
@@ -110,8 +113,9 @@ export function countersOf(s: Pick<GameState, 'stock' | 'perimeter' | 'utilities
 /** The chance one ram opens the target. 0 when nothing can reach it; every counter only lowers it. */
 export function ramOdds(a: { wallKind: string; gate: boolean; difficulty: Difficulty } & MeansCounters): number {
   const d = MEANS_DIFF[a.difficulty] ?? MEANS_DIFF.standard;
-  let p = a.gate ? GATE_BASE.ram - 0.035 * a.gateBarrier : resistOf(a.wallKind).ram;
-  p = Math.max(a.gate ? 0.1 : 0, p);
+  const door = a.gate ? airlockDoor(a.wallKind) : null;   // an airlock's outer door (a dome): its own odds, not a farm gate's
+  let p = door ? door.ram - 0.035 * a.gateBarrier : a.gate ? GATE_BASE.ram - 0.035 * a.gateBarrier : resistOf(a.wallKind).ram;
+  p = Math.max(door ? Math.min(0.1, door.ram) : a.gate ? 0.1 : 0, p);
   if (a.bollards) p *= a.gate ? BOLLARD.gate : BOLLARD.wall;
   p *= 1 - a.vehicleBlocked;
   return Math.max(0, Math.min(0.95, p * d.odds));
@@ -120,7 +124,8 @@ export function ramOdds(a: { wallKind: string; gate: boolean; difficulty: Diffic
 /** The chance one satchel opens the target (a bollard does nothing against a charge; a reinforced gate helps a little). */
 export function blastOdds(a: { wallKind: string; gate: boolean; difficulty: Difficulty } & Pick<MeansCounters, 'gateBarrier'>): number {
   const d = MEANS_DIFF[a.difficulty] ?? MEANS_DIFF.standard;
-  const p = a.gate ? Math.max(0.35, GATE_BASE.blast - 0.03 * a.gateBarrier) : resistOf(a.wallKind).blast;
+  const door = a.gate ? airlockDoor(a.wallKind) : null;
+  const p = door ? Math.max(Math.min(0.35, door.blast), door.blast - 0.03 * a.gateBarrier) : a.gate ? Math.max(0.35, GATE_BASE.blast - 0.03 * a.gateBarrier) : resistOf(a.wallKind).blast;
   return Math.max(0, Math.min(0.95, p * d.odds));
 }
 
