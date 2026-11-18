@@ -179,7 +179,7 @@ export function pitSkin(s: PitShape, depthU: number, ground: Ground, mode: 'pit'
     const mid = (depA + depB) / 2 * FT_PER_UNIT, st = strataAt(mid + 0.01);
     tmp.copy(STRATA_COLOR[STRATA.indexOf(st)]);
     const n = floorFace ? 0.96 + 0.08 * hash(7, Math.floor(j / 6)) : 0.88 + 0.24 * hash(i * 7 + 1, j * 13 + 3), shade = 1 - 0.4 * Math.min(1, (mid / FT_PER_UNIT) / dCur);
-    tmp.multiplyScalar(n * shade * (floorFace ? 0.78 : 0.82));
+    tmp.multiplyScalar(n * shade * (floorFace ? 0.95 : 0.85));
     if (floorFace) tmp.lerp(STRATA_COLOR[1], 0.12);
     return tmp.clone();
   };
@@ -373,7 +373,7 @@ export function buildDigSite(o: DigSiteOpts): DigSite {
     for (let i = 0; i < heaps; i++) {
       const a = roadA + 1.2 + (TAU - 2.4) * (i + hash(o.seed, i)) / Math.max(1, heaps), r = s.rTop + 0.5 + 0.35 * big + hash(i, o.seed) * 0.5;
       const cy = want / heaps, vol = cy / 296.3;                       // cubic yards to cubic units
-      const w = Math.max(0.5, Math.cbrt(vol) * 1.3 * (0.85 + 0.3 * hash(i, 3))), h = Math.max(0.12, Math.min(0.8, w * 0.22));
+      const w = Math.max(0.5, Math.cbrt(vol) * 1.3 * (0.85 + 0.3 * hash(i, 3))), h = Math.max(0.1, Math.min(0.6, w * 0.16));
       const x = r * Math.sin(a), z = r * Math.cos(a);
       b.add('soil', earthMound(w, w * 0.7, h).rotateY(a).translate(x, ground(x, z) - 0.02, z));
     }
