@@ -69,6 +69,35 @@ function berm(R: number, reach: number, rise: number, ground: (x: number, z: num
   return g;
 }
 
+/**
+ * An earth embankment under the foot of a big dome on a slope: the shell stands level, so on the downhill side the stem wall would show as a tall dark cliff
+ * (a 600 ft dome on a 2 percent grade shows a 40 ft wall). This ring slopes from the stem wall's top out to the natural ground, as wide as the drop needs
+ * (about 2.4 units out per unit down, capped), draped on the terrain; where the ground is at or above the wall it is nothing. Returns null on level ground.
+ */
+function embankment(R: number, ground: (x: number, z: number) => number, top: number, n: number): THREE.BufferGeometry | null {
+  const pos: number[] = [], rings = 6, MAXR = 8;
+  const drop = (a: number): number => Math.max(0, top - ground(R * Math.sin(a), R * Math.cos(a)));
+  let any = false;
+  for (let i = 0; i < n && !any; i++) if (drop(i * TAU / n) > 0.12) any = true;
+  if (!any) return null;
+  // the reach is smoothed round the ring so the slope does not crease between neighbours
+  const raw = Array.from({ length: n }, (_, i) => Math.min(MAXR, drop(i * TAU / n) * 2.4));
+  const reach = raw.map((_, i) => { let m = 0, c = 0; for (let k = -3; k <= 3; k++) { m += raw[(i + k + n) % n]; c++; } return m / c; });
+  const P = (k: number, i: number): Pt3 => {
+    const a = (i % n) * TAU / n, r = R + 0.05 + reach[i % n] * k / rings, x = r * Math.sin(a), z = r * Math.cos(a), t = k / rings;
+    const lerp = top - (top - (ground(R * Math.sin(a) + 0, R * Math.cos(a) + 0) - 0.0)) * (t * t * (3 - 2 * t));
+    return [x, k === 0 ? top : Math.max(ground(x, z) + 0.004, Math.min(top, lerp)), z];
+  };
+  for (let i = 0; i < n; i++) for (let k = 0; k < rings; k++) {
+    const A = P(k, i), B = P(k, i + 1), C = P(k + 1, i + 1), D = P(k + 1, i);
+    pos.push(...A, ...D, ...C, ...A, ...C, ...B);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
 /** Triangulated hemisphere: ring k has n*k vertices (k = 0 is the crown); returns vertices per ring and triangles as ring/index triples. */
 function triDome(N: number, n = 6): { rings: number[][]; tris: Array<[[number, number], [number, number], [number, number]]> } {
   const rings: number[][] = [];
@@ -247,6 +276,7 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
   p.layer = 'foundation';
   p.add('concrete', ringWall(R - 0.05, R + 0.04, y0, a => Math.min(y0 - 0.03, rim(a) - 0.08), nWall));
   if (tier === 'geodesic') p.add('earth', berm(R, bermU(tier) - 0.04, 0.12, g, y0 - 0.005, nWall));
+  else { const emb = embankment(R + 0.04, g, y0 - 0.005, nWall); if (emb) p.add('earth', emb); }
   const { rings, tris } = triDome(N);
   const th = (k: number) => k / N * Math.PI / 2;
   const phi = (k: number, j: number) => j * TAU / rings[k].length;
@@ -302,6 +332,7 @@ function glass(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.add('trim', box(0.012, 0.09, 0.012, sx * (def.cellsX * CELL / 2 - 0.03), -0.02, sz * (def.cellsZ * CELL / 2 - 0.03)));
   p.layer = 'foundation';
   p.add('concrete', ringWall(R - 0.08, R + 0.06, y0, a => Math.min(y0 - 0.03, rim(a) - 0.1), 72));
+  { const emb = embankment(R + 0.06, g, y0 - 0.005, 96); if (emb) p.add('earth', emb); }
   const th = (i: number) => i / P * Math.PI / 2 * 0.985;             // parallels from the crown (i = 0 is the oculus ring) down to the foot
   const V = (i: number, m: number): Pt3 => dir(R - 0.03, i === P ? Math.PI / 2 : th(i), m * TAU / M, y0);
   const doors = new Doorways(airlockAngles(3), 'glass', R, y0);

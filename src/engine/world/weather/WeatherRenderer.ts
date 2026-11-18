@@ -350,6 +350,8 @@ export interface WeatherFrameInput {
   snowAllow?: number;
   /** Campus region (location id): regional spell weights (weatherState REGION_WEATHER). */
   region?: string;
+  /** 0-1: how far the camera is under a roof the weather cannot reach (a dome's shell): rain, snow, fog banks and wet ground fade out, the sky keeps its clouds. */
+  sheltered?: number;
   /** Fog-bank strength for the site (PNW sound / river valleys thicker). Default 1. */
   fogBankScale?: number;
   /** The sim's valley bank (fog/ValleyFog.ts): sheets of drifting mist ride its top (world Y) at this opacity 0–1, instead of lying on the ground. */
@@ -495,19 +497,20 @@ export class WeatherRenderer {
     const vdt = f.dt * Math.max(1, f.speed || 1);
     if (f.region !== undefined) this.sim.region = f.region;
     const o = this.sim.update(vdt, f.season, f.hour, mode);
+    const sh = Math.max(0, Math.min(1, f.sheltered ?? 0)), open = 1 - sh;
     this._time = (this._time + f.dt) % 3600;
     WEATHER_NOW.kind = mode === 'off' ? 'clear' : mode === 'auto' ? this.sim.kind : mode;
     WEATHER_NOW.mode = mode;
 
     // ── Surface uniform ──────────────────────────────────────────────────────
-    WX_VALUE.x = Math.min(1, Math.max(o.wetness, f.eventWetness * 0.75));
+    WX_VALUE.x = Math.min(1, Math.max(o.wetness, f.eventWetness * 0.75)) * open;
     // Rain washes lying snow off: a rainy scene never shows snow
     const cover = low ? 0 : f.ashCover ?? 0;
     const snowCover = snowShownUnderRain(Math.max(o.snowCover * (f.snowAllow ?? 1), f.snowBase ?? 0), o.rain, mode);
-    WX_VALUE.y = Math.max(snowCover, cover);
+    WX_VALUE.y = Math.max(snowCover, cover) * open;
     // (ash wins where it lies thicker than the snow; a winter's snow under it still shows as grey ash)
     WX_ASH.value = cover > 0 ? cover / Math.max(cover, snowCover, 1e-3) : 0;
-    WX_VALUE.z = o.rain;
+    WX_VALUE.z = o.rain * open;
     WX_VALUE.w = this._time;
 
     // ── Lightning ────────────────────────────────────────────────────────────
@@ -543,7 +546,7 @@ export class WeatherRenderer {
 
     // ── Fog banks ────────────────────────────────────────────────────────────
     const vb = f.valleyBank;
-    const bank = low ? 0 : vb ? vb.amount : Math.max(0, Math.min(1, (o.fog - 0.2) / 0.6)) * (f.fogBankScale ?? 1) * (0.25 + 0.75 * weatherFogAerialScale(f.camera.position.y));
+    const bank = low ? 0 : vb ? vb.amount : Math.max(0, Math.min(1, (o.fog - 0.2) / 0.6)) * (f.fogBankScale ?? 1) * (0.25 + 0.75 * weatherFogAerialScale(f.camera.position.y)) * open;
     this._bank.visible = bank > 0.01;
     if (this._bank.visible) {
       const bu = this._bankMat.uniforms;
@@ -557,7 +560,7 @@ export class WeatherRenderer {
 
     // ── Precipitation particles ──────────────────────────────────────────────
     const ash = low ? 0 : f.ash ?? 0;
-    const precip = Math.max(mode === 'snow' ? o.snow : mode === 'rain' ? o.rain : Math.max(o.rain, o.snow), ash);
+    const precip = Math.max(mode === 'snow' ? o.snow : mode === 'rain' ? o.rain : Math.max(o.rain, o.snow), ash) * open;
     // mist: where there is no rain or snow, a fog the camera stands in sends fine droplets drifting past (the snow-flake draw, a third the size, hardly falling)
     const mist = low ? 0 : (f.mist ?? 0), misty = mist > 0.05 && precip < 0.05;
     const amount = misty ? mist * 0.3 : precip;
@@ -565,7 +568,7 @@ export class WeatherRenderer {
     const count = Math.floor(max * Math.min(1, amount * 1.15 + o.wind * 0.1));
     if (count < 30 || low) {
       this._mesh.visible = false;
-      return o;
+      return sh > 0.01 ? this._sheltered(o, sh) : o;
     }
     // A forced Settings mode decides the particle type outright: while the
     // sim eases from a previous rain spell into forced snow (or the season
@@ -595,7 +598,15 @@ export class WeatherRenderer {
     (u.uCenter.value as THREE.Vector3).copy(this._center);
     this._geo.instanceCount = count;
     this._mesh.visible = true;
-    return o;
+    return sh > 0.01 ? this._sheltered(o, sh) : o;
+  }
+
+  private readonly _shelOut = {} as WeatherOutputs;
+  /** The outputs as seen from under a roof: a copy (the sim keeps easing its own), with the wet things scaled down. */
+  private _sheltered(o: WeatherOutputs, sh: number): WeatherOutputs {
+    const r = Object.assign(this._shelOut, o), k = 1 - sh;
+    r.rain *= k; r.snow *= k; r.fog *= k; r.storm *= k; r.wetness *= k; r.snowCover *= k;
+    return r;
   }
 
   /** Start a visible lightning bolt at an azimuth (radians). */

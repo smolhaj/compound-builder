@@ -1,5 +1,6 @@
 import { moatStates } from '../sim/waterWorks';
 import { domesOf } from '../sim/dome/standing';
+import { shelterUnderDome } from '../sim/dome/shelter';
 import { DomePortals } from './props/DomePortals';
 import { shellPointAt } from '../sim/dome/siege';
 import { fireMarks, fireOverlayNote } from '../sim/fireRisk';
@@ -629,7 +630,7 @@ export function GameCanvas() {
       const wx = weather.update({
         dt, speed: speed === 0 ? 1 : 60 / SECONDS_PER_DAY[speed], season: wxSeason, hour: t,
         mode: weatherMode, eventWetness: ws.eventWetness, night: ws.nightFactor,
-        camera: ws.camera, focus: cam.target,
+        camera: ws.camera, focus: cam.target, sheltered: shelterUnderDome(domesOf(gs), ws.camera.position, world.groundAt(ws.camera.position.x, ws.camera.position.z)),
         snowBase: sp.snow, snowAllow: seasonState.weatherSnow, region: seasonState.climate.id,
         valleyBank: vc.bankDensity > 1e-4 ? { y: vc.bankTopY, amount: Math.min(1, vc.bankDensity * 2.5) } : null,
         mist: valley.nearMist(ws.camera.position.y),
