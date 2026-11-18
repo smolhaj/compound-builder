@@ -130,3 +130,25 @@ describe('ritual caption (People panel)', () => {
     expect(ritualCaption(g)).toBeNull();
   });
 });
+
+describe('ritual photo prompt', () => {
+  it('offers a picture at dusk with a calm table and a streak, once a fortnight, never in the morning or while wary', async () => {
+    const { ritualPhotoPrompt, ritualsOf } = await import('./rituals');
+    const { newGame } = await import('./state');
+    const g = newGame(4);
+    g.stock.staples = 200;
+    const R = ritualsOf(g); R.calm = 1; R.streak = 4;
+    g.clock.t = 3.5;
+    expect(ritualPhotoPrompt(g)!.caption).toMatch(/Dinner together/);
+    g.clock.t = 3.1;
+    expect(ritualPhotoPrompt(g)).toBeNull();
+    g.clock.t = 3.5;
+    R.streak = 1; expect(ritualPhotoPrompt(g)).toBeNull();
+    R.streak = 4; R.calm = 0.5; expect(ritualPhotoPrompt(g)).toBeNull();
+    R.calm = 1;
+    g.photos = [{ id: 'p1', t: g.clock.t - 3, year: 2027, caption: 'x', size: 10 }];
+    expect(ritualPhotoPrompt(g)).toBeNull();
+    g.photos[0].t = g.clock.t - 20;
+    expect(ritualPhotoPrompt(g)).not.toBeNull();
+  });
+});

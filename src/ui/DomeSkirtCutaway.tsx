@@ -535,7 +535,7 @@ export function SkirtPlan({ standalone = true }: { standalone?: boolean }): Reac
         <Callout x={1010} y={286} n={2} fill={C.red} head="Turned along the ring" body="They follow the footing the short way round to the nearest airlock (red dashes), and a raid on that door follows within 2-4 days." />
         <Callout x={1010} y={402} n={3} fill={C.teal} head="The airlock is the one opening" body={`Two doors and a chamber. A crew that gets in meets the inner door held for about ${SALLY_HOLD.arcology} s (a ${arc.name.toLowerCase()}).`} />
         <Callout x={1010} y={518} n={4} fill={C.teal} head="Ground sensors listen" body="Buried geophones ring the wall (teal dots). A set covers about 390 ft of wall, needs power, and hears a dig 35% of days at full cover." />
-        <Callout x={1010} y={634} n={5} fill={C.ink} head="The way people cross" body="The family's own tunnel and escape route pass through airlock A only (teal dashes), in a sleeve through the footing." />
+        <Callout x={1010} y={634} n={5} fill={C.ink} head="The way people cross" body="The family's own tunnel and escape route pass through the airlock marked A, and nowhere else (teal dashes), in a sleeve through the footing." />
       </g>
 
       {/* small plans of the other tiers */}

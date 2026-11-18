@@ -23,7 +23,7 @@
  * Stories. A few rituals write a line in the chronicle (birthday supper, first harvest, the mended fence, a quiet winter
  * evening), each once, and at most `STORIES_PER_YEAR` a year.
  */
-import { calendarOf, dayIndex, type GameState } from './state';
+import { calendarOf, dayIndex, hourOf, type GameState } from './state';
 import { chronicle } from './lineage';
 import { FOOD_CATS, pantryKcal } from './pantry';
 import { hostileAtGate } from '../game/livestock/livestockPlan';
@@ -252,4 +252,25 @@ export function ritualCaption(s: GameState): { text: string; tone: 'good' | 'war
   if (r.calm < CALM_MIN) return { text: 'The family is wary: dinner is quick and quiet, and the evenings are short.', tone: 'warn' };
   if (!tableSet(s)) return { text: 'No plate for everyone tonight: the table is bare, so the family eats where it can.', tone: 'warn' };
   return { text: r.streak >= 3 ? `Dinner together tonight, ${r.streak} days running. Fireside and play after: it steadies everyone.` : 'Dinner together tonight. Fireside and play after: it steadies everyone.', tone: 'good' };
+}
+
+/** Dusk, when the table is lit and the family is in (hours, clock time). */
+export const DUSK_HOURS: readonly [number, number] = [17, 21];
+/** Days between two photo prompts, so the offer never nags. */
+export const PHOTO_PROMPT_GAP_DAYS = 14;
+
+/**
+ * An offer to keep a picture (playtest 3 problem 9): the family is sitting down to dinner together at dusk, calm is high (a dinner
+ * streak of two nights or more) and nothing was photographed in the last two weeks. Pure; the People panel shows it as a button.
+ */
+export function ritualPhotoPrompt(s: GameState): { caption: string; why: string } | null {
+  const rc = ritualCaption(s);
+  if (!rc || rc.tone !== 'good') return null;
+  const h = hourOf(s.clock.t);
+  if (h < DUSK_HOURS[0] || h >= DUSK_HOURS[1]) return null;
+  const r = ritualsOf(s);
+  if (r.streak < 2 || r.calm < Math.min(0.95, CALM_MIN + 0.15)) return null;
+  if ((s.photos ?? []).some(p => s.clock.t - p.t < PHOTO_PROMPT_GAP_DAYS)) return null;
+  const caption = r.streak >= 7 ? `Dinner together, ${r.streak} nights running` : 'Dinner together at dusk';
+  return { caption, why: 'The table is lit and everyone is in. A picture now is the one you will want later.' };
 }

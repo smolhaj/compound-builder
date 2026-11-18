@@ -38,6 +38,7 @@ import { eta } from './pace';
 import { reroofLines, winterRoofRisk, WINTER_ROOF_URGENT_DAYS } from './roofSafety';
 import { idleCash } from './idleCash';
 import { permitWait, permitWaitText } from './permitWait';
+import { bridgeActs, bridgeCards, bridgeSentence } from './bridgeText';
 import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind, type Pt } from './perimeter';
 import { MAX_TOWERS, ringStatus } from './fortress';
 import { canHostWalkway } from './walkway';
@@ -186,6 +187,10 @@ export type SuggestionAct =
   | { type: 'hookup'; what: 'drive' | 'power' }
   | { type: 'open'; right: 'family' | 'supplies' | 'utilities' | 'land' | 'defense' | 'outside' | 'chronicle'; supplies?: 'stores' | 'farm' }
   | { type: 'moveIn' }
+  /** Rent a place to sleep while the house goes up (sim/shelterBridge.ts). */
+  | { type: 'rent'; kind: import('./shelterBridge').RentalKind }
+  /** Pay to rush a permit under review. */
+  | { type: 'rush'; id: string }
   /** Open the Shop on a shelf (never buys). */
   | { type: 'shop'; tab: string }
   | { type: 'restDay' }
@@ -326,12 +331,16 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
   { const need = plansNeedLines(s), pw = permitWait(s, need);
     if (pw) {
       const t = permitWaitText(pw);
-      out.push({ id: 'permit_wait', kind: '', title: t.title, urgency: 56, why: t.why,
+      const br = bridgeSentence(s);
+      out.push({ id: 'permit_wait', kind: '', title: t.title, urgency: 56, why: br ? `${t.why} ${br}` : t.why,
         acts: [
           ...(pw.lines.length && !orderProblem(s, pw.lines) ? [{ label: `Order what the plans need (${usd(pw.linesUsd)})`, act: { type: 'order' as const, lines: pw.lines } }] : []),
+          ...bridgeActs(s),
           ...(pw.tents > 0 ? [{ label: `Buy ${pluralize(pw.tents, 'tent')} (${usd(pw.tentUsd)})`, act: { type: 'order' as const, lines: [{ material: 'tent' as const, qty: pw.tents }] } }] : []),
           { label: 'Show me', act: { type: 'select' as const, id: pw.longestId } },
         ] }); } }
+  // the cash shelter bridge: a rental for the people with no roof, a rushed permit (sim/shelterBridge.ts, bridgeText.ts)
+  for (const c of bridgeCards(s, housingShortfall(s).outside)) out.push({ id: c.id, kind: '', title: c.title, urgency: c.urgency, why: c.why, acts: c.acts });
   // the family's own hands would take weeks on the house and the cash covers a crew: say so, with the price and a one-click hire (sim/crewNudge.ts)
   { const n = crewNudge(s);
     if (n) out.push({ id: 'house_crew', kind: '', title: n.title, urgency: 93, why: n.why,

@@ -61,7 +61,8 @@ export function turnBackChance(deter: number, e: { kind: EncounterKind; temper?:
 }
 
 /** In the fight: the share of the usual loss limit at which raiders break (1: no change). A fully defended place breaks a crew at 55 % of it. */
-export const nerveK = (deter: number): number => 1 - 0.5 * Math.max(0, Math.min(1, deter));
+export const NERVE = 0.85;
+export const nerveK = (deter: number): number => 1 - NERVE * Math.max(0, Math.min(1, deter));
 
 /** One line for the gate card: what the place's deterrence does. Empty when it does nothing worth saying. */
 export function deterLine(d: Deterrence, turnBack: number): string {
@@ -76,7 +77,7 @@ export function deterLine(d: Deterrence, turnBack: number): string {
  * place hunts it harder and carries off more, so a hide is worse the more you have: up to LOOT.CAP points on the house find chance (percentage
  * points), half again on the search below, and `lootK` on the share carried off.
  */
-export const LOOT = { FOOD_DAYS: 60, FOOD_MAX: 8, BUILT_PER: 4, BUILT_MAX: 6, GUNS_PER: 2, GUNS_MAX: 4, CAP: 18, STRIP: 0.5 } as const;
+export const LOOT = { FOOD_DAYS: 60, FOOD_MAX: 10, BUILT_PER: 3, BUILT_MAX: 10, GUNS_PER: 2, GUNS_MAX: 6, CAP: 28, STRIP: 0.5 } as const;
 export function lootPoints(s: GameState): number {
   const built = s.structures.filter(st => isFinished(st) && !st.kind.startsWith('bunker_')).length;
   const guns = s.armory?.guns.length ?? 0;

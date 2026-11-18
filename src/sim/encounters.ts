@@ -15,7 +15,7 @@
  */
 import { withKnownWalls } from './perimeter';
 import { BUNKER_ENTRANCES } from './bunkerEntrances';
-import { bunkerFindChance, drainStores, entranceOf, hideSupplies, resolveFound, stayDays, type BunkerResult } from './bunkerHide';
+import { bunkerFindChance, claustrophobia, drainStores, entranceOf, hideSupplies, resolveFound, stayDays, type BunkerResult } from './bunkerHide';
 import { leaveAftermath } from './aftermath';
 import { planOpener, scoutSpotted } from './raidOpeners';
 import { raiderName } from './raiderStory';
@@ -977,6 +977,7 @@ export function resolve(s: GameState, stance: Stance): Outcome {
         else {
           const stay = found ? stayDays(e) : 1, can = Math.min(stay, Math.floor(sup.days)), forced = stay > sup.days;
           const used = drainStores(s, can);
+          { const hit = claustrophobia(s, can); if (hit > 0) lines.push(hit >= 12 ? 'Days sealed in the dark wore on everyone: the kids cried, the old man would not speak, and morale is low.' : 'A day sealed in the dark: nobody slept, and morale is down.'); }
           lines.push(`Below for ${pluralize(can, 'day')}: ${Math.round(used.kcal / 6000)} cases of food and ${gallonsText(used.liters)} of water used.`);
           if (found) {
             let foundDay = 0;

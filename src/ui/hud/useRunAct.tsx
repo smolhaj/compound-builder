@@ -18,6 +18,7 @@ import { pluralize } from '../../sim/words';
 import { useDrawerStore } from '../../store/drawerStore';
 import { fxChoose } from '../../sim/disasterFx';
 import type { SuggestionAct } from '../../sim/guidance';
+import { rentalQuote, rushQuote, rushPermit, startRental } from '../../sim/shelterBridge';
 
 export function useRunAct(showProjects: () => void): { run: (a: SuggestionAct) => void; arm: (tool: string) => void; note: string | null; setNote: (n: string | null) => void; guardNode: ReactNode } {
   const g = useGameStore();
@@ -38,6 +39,8 @@ export function useRunAct(showProjects: () => void): { run: (a: SuggestionAct) =
     else if (a.type === 'crew') { const id = a.id, st = game.structures.find(x => x.id === id) ?? game.perimeter.find(x => x.id === id); const lines = a.lines, count = a.count ?? 1; guard((st ? crewQuote(st).usd : 0) + (lines ? orderCost(lines, prices(game)) : 0), () => { if (lines && !g.order(lines)) { setNote('Could not place that order.'); return; } const why = g.hire(id, count); if (why) setNote(`Could not hire them: ${why}.`); }); }
     else if (a.type === 'focus') { const why = g.setFocus(a.id); setNote(why ? `Could not do that: ${why}.` : 'The wall comes first now. Clear it in the Projects tab.'); }
     else if (a.type === 'hookup') { const q = a.what === 'drive' ? driveQuote(game.site.improvements, game.site, game.seed).usd : powerQuote(game.site.improvements, game.site).usd; guard(q, () => { const why = g.hookup(a.what); if (why) setNote(`Could not arrange that: ${why}.`); }); }
+    else if (a.type === 'rent') { const q = rentalQuote(game, a.kind); guard(q.upfront + q.nightly, () => { const why = g.money(d => startRental(d, a.kind)); if (why) setNote(`Could not rent it: ${why}.`); }); }
+    else if (a.type === 'rush') { const st = game.structures.find(x => x.id === a.id), q = st ? rushQuote(game, st) : null; guard(q?.fee ?? 0, () => { const why = g.money(d => rushPermit(d, a.id)); if (why) setNote(`Could not rush it: ${why}.`); }); }
     else if (a.type === 'shop') g.openShop(true, a.tab);
     else if (a.type === 'open') { if (a.right === 'utilities' && game.dome?.lockdown && game.dome.alarm !== 'ok') useDrawerStore.getState().setPage('utilities', 'dome'); g.focusHud({ right: a.right, ...(a.supplies ? { supplies: a.supplies } : {}) }); }
     else if (a.type === 'restDay') { const why = g.daily(d => takeRestDay(d)); if (why) setNote(why); }
