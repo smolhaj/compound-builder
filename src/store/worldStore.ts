@@ -112,6 +112,9 @@ export interface WorldState {
   /** Underground view (bunker rooms; the ground goes see-through). */
   underground: boolean;
   setUnderground: (on: boolean) => void;
+  /** The dome whose skirt is shown in section (the ground and the dome cut open along a vertical plane), or null. */
+  domeSection: string | null;
+  setDomeSection: (id: string | null) => void;
   /** The side panels hidden (H) so the map shows. */
   hudHidden: boolean;
   /** The Compound Board panel is open (mirrors Hud's local state): milestone cards wait while it is. */
@@ -225,6 +228,8 @@ export const useWorldStore = create<WorldState>()(subscribeWithSelector((set) =>
   setPathNet: (pathNet) => set({ pathNet }),
   underground: false,
   setUnderground: (underground) => set({ underground }),
+  domeSection: null,
+  setDomeSection: (domeSection) => set({ domeSection }),
   // a phone-sized window starts with the side panels folded away (they would cover the whole map); "Show panels" brings them back
   hudHidden: typeof window !== 'undefined' && window.innerWidth < 760,
   setHudHidden: (hudHidden) => set({ hudHidden }),

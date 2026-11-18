@@ -15,6 +15,8 @@ import { pipe } from './interior';
 import { box, Parts, type BuildOpts } from './shell';
 import { CELL_FT, TIER, tierOfKind, type DomeTier } from '../../sim/dome/tiers';
 import { airlockAngles } from '../../sim/dome/standing';
+import { digState } from '../../sim/dome/dig';
+import type { BuildLayer } from './shell';
 import { SHELL_INSET, SURROUND_PAD, axisOf, chamberColliders, chamberRho, ringSkipped, vestibuleOf, type Vestibule } from '../../sim/dome/vestibule';
 
 /** World units of berm banked round a dome's shell inside its footprint (the footprint is shell plus berm). */
@@ -233,6 +235,17 @@ function shellColliders(p: Parts, R: number, ring: number, doors: Doorways): voi
   for (const g of gaps) p.collide(...chamberColliders(R, g.a, g.v, 2 * Math.PI * R / ring + 0.02));
 }
 
+
+// ── the buried works: the skirt ring and the utilities laid on the pit floor before it (sim/dome/dig.ts) ──
+
+/** The layers a dome times by its dig state (everything else follows the cabin timing in shell.layerFractions): the stem wall is poured at the end of the foundation stage, the stakes come out when the digging starts. The pit, skirt and utilities are drawn by buildkit/domeDig.ts. */
+export function domeLayerFractions(tier: DomeTier): (stage: number, f: number, supplied: boolean) => Partial<Record<BuildLayer, number>> {
+  return (stage, f, supplied) => {
+    const d = digState(tier, stage, f, supplied);
+    return { foundation: d.stem, stakes: stage === 0 && d.phase === 'layout' ? 1 : 0 };
+  };
+}
+
 // ── the four builders ──
 
 function earthen(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
@@ -263,7 +276,7 @@ function earthen(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
   p.add('metal_roof', new THREE.CylinderGeometry(0.02, 0.02, 0.05, 8).translate(0, L.stem + R * 0.95 + 0.02, 0));   // the vent pipe
   p.collide({ x0: -R * 0.85, z0: -R * 0.85, x1: R * 0.85, z1: R * 0.6 });
   const out = p.finish();
-  out.userData.chimneyTop = null; out.userData.keep = ['frame', 'roof'];
+  out.userData.chimneyTop = null; out.userData.keep = ['frame', 'roof']; out.userData.layerFr = domeLayerFractions('earthen'); out.userData.digTier = 'earthen';
   return out;
 }
 
@@ -317,7 +330,7 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
   // colliders: the shell ring as short boxes, none at the airlocks (people cross only through them), and the chamber walls
   shellColliders(p, R, Math.max(24, Math.min(72, Math.round(R * 8))), doors);
   const out = p.finish();
-  out.userData.chimneyTop = null; out.userData.keep = ['frame', 'roof'];
+  out.userData.chimneyTop = null; out.userData.keep = ['frame', 'roof']; out.userData.layerFr = domeLayerFractions(tier); out.userData.digTier = tier;
   return out;
 }
 
@@ -359,7 +372,7 @@ function glass(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   for (const h of doors.holes) airlock(p, 'glass', R, h, doors, y0);
   shellColliders(p, R, 56, doors);
   const out = p.finish();
-  out.userData.chimneyTop = null; out.userData.keep = ['frame', 'roof'];
+  out.userData.chimneyTop = null; out.userData.keep = ['frame', 'roof']; out.userData.layerFr = domeLayerFractions('glass'); out.userData.digTier = 'glass';
   return out;
 }
 

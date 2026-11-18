@@ -424,6 +424,9 @@ export function layerFractions(stage: number, f: number, supplied: boolean): Rec
 /** Show a layered building group at a stage: each layer drawn up to its fraction (pieces in build order). */
 export function showStage(group: THREE.Group, stage: number, f: number, supplied = true): void {
   const fr = layerFractions(stage, f, supplied);
+  // a building that times some layers its own way (a dome's pit works: utilities, skirt, stem) says so
+  const own = group.userData.layerFr as ((stage: number, f: number, supplied: boolean) => Partial<Record<BuildLayer, number>>) | undefined;
+  if (own) Object.assign(fr, own(stage, f, supplied));
   // pieces whose frame is the finished thing (posts, stands, racking) keep it; stageAs times a layer like another
   const keep = (group.userData.keep ?? []) as BuildLayer[];
   const stageAs = (group.userData.stageAs ?? {}) as Partial<Record<BuildLayer, BuildLayer>>;

@@ -25,6 +25,10 @@ import { stuckRows, stuckShort } from '../../sim/stalls';
 import { Clamp, Note, Row, Section } from './common';
 import { TONE, DIM, LINE, btn, usd } from './style';
 import { pluralize } from '../../sim/words';
+import { digLabel, digState, digVolumes } from '../../sim/dome/dig';
+import { TIER, cellsOfKind, tierOfKind } from '../../sim/dome/tiers';
+import { blueprintOf } from '../../sim/construction';
+import type { Structure } from '../../sim/state';
 
 export function ProjectsTab() {
   const g = useGameStore();
@@ -114,6 +118,7 @@ export function ProjectsTab() {
         <Section title={KIT[sel.kind].name} flashKey={`struct:${sel.id}`}>
           <div ref={el => { if (el && g.selected === sel.id && selSeen.current !== sel.id) { selSeen.current = sel.id; el.scrollIntoView?.({ block: 'start' }); } }} />
           <Row label="Stage" value={sel.pre ? 'Came with the land' : isFinished(sel) ? 'Finished' : BLUEPRINTS[sel.kind].stages[sel.stage].name} />
+          {!sel.pre && !isFinished(sel) && <DigLine st={sel} />}
           {isFinished(sel) && <ResidentsLine id={sel.id} />}
           {(sel.fixes ?? []).length > 0 && <>
             {(sel.fixes ?? []).map(f => <div key={f.part} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginTop: 3 }}>
@@ -238,4 +243,12 @@ export function ProjectsTab() {
       )}
 
   </>;
+}
+
+/** A dome's ground works, in words: what the crew is doing now (the crater, the utilities, the skirt, the backfill) and how much dirt there is. */
+function DigLine({ st }: { st: Structure }) {
+  const tier = tierOfKind(st.kind);
+  if (!tier) return null;
+  const hrs = blueprintOf(st).stages[st.stage]?.hours ?? 1, d = digState(tier, st.stage, st.done / hrs, st.supplied), cells = cellsOfKind(st.kind) ?? TIER[tier].cells;
+  return <div data-testid="dome-dig-line"><Note>{digLabel(tier, d, d.phase === 'excavation' ? digVolumes(tier, cells, d.depthFt) : undefined)}</Note></div>;
 }
