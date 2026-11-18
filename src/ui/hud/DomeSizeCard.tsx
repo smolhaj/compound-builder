@@ -4,7 +4,10 @@
  * air, climate. Layout A and classic both mount it. The size is the tier's own range (sim/dome/tiers.ts); everything priced here is the same pure model
  * the build bill uses.
  */
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useGameStore } from '../../store/gameStore';
+import { SkirtSection } from '../DomeSkirtCutaway';
 import { useWorldStore } from '../../store/worldStore';
 import { TIER, kindOfCells, shellFt, tierOfKind } from '../../sim/dome/tiers';
 import { billFor, adviceCtx, type CatalogEntry } from '../../sim/buildCatalog';
@@ -17,6 +20,8 @@ export function DomeSizeCard() {
   const tool = useGameStore(g => g.tool), cells = useGameStore(g => g.domeCells), site = useGameStore(g => g.domeSite), game = useGameStore(g => g.game), setCells = useGameStore(g => g.setDomeCells);
   const scale = useWorldStore(w => w.uiScale), hidden = useWorldStore(w => w.hudHidden);
   const tier = tool ? tierOfKind(tool) : null;
+  const [skirtOpen, setSkirtOpen] = useState(false);
+  useEffect(() => { if (!skirtOpen) return; const k = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setSkirtOpen(false); } }; window.addEventListener('keydown', k, true); return () => window.removeEventListener('keydown', k, true); }, [skirtOpen]);
   if (!tier || !tool || hidden) return null;
   const t = TIER[tier], c = cells[tier] ?? t.cells, kind = kindOfCells(tier, c), d = Math.round(shellFt(tier, c));
   const entry: CatalogEntry = { key: kind, tool: kind, name: `${t.name}, ${d} ft`, cat: 'enclosure', run: false, blurb: KIT[kind].blurb };
@@ -47,6 +52,8 @@ export function DomeSizeCard() {
     {facts.map(f => <div key={f} style={{ color: tv.color('dim') }}>{f}</div>)}
     {bill.needs.map(n => <div key={n} style={{ color: tv.color('warn') }}>{T.glyph.warn} {n}</div>)}
     <div style={{ color: tv.color('dim'), fontSize: tv.font('fine') }}>+ and - or Shift+wheel: diameter. Click places it, R turns it, Esc cancels.</div>
+    {t.skirtFt >= 20 && <button type="button" data-testid="dome-skirt-info" style={{ cursor: 'pointer', font: 'inherit', textAlign: 'left', padding: '4px 8px', borderRadius: tv.radius('control'), border: `1px solid ${T.color.lineStrong}`, background: tv.color('control'), color: tv.color('text') }} onMouseDown={e => e.preventDefault()} onClick={() => setSkirtOpen(o => !o)}>{skirtOpen ? 'Close: ' : ''}How the {t.skirtFt} ft skirt stops a tunnel</button>}
+    {skirtOpen && createPortal(<div data-testid="dome-skirt-card" role="dialog" aria-label="How the buried skirt works" onClick={() => setSkirtOpen(false)} style={{ position: 'fixed', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: 'min(1500px, 94vw)', zIndex: 30, borderRadius: 10, overflow: 'hidden', boxShadow: '0 12px 60px rgba(0,0,0,0.6)', cursor: 'pointer' }}><SkirtSection standalone={false} /></div>, document.body)}
   </div>;
 }
 
