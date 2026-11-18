@@ -19,7 +19,7 @@ export function obstaclesOf(g: GameState): Box[] {
   const out: Box[] = [];
   for (const st of g.structures) {
     const def = KIT[st.kind];
-    if (!def || st.unplaced || def.level === 'underground') continue;
+    if (!def || st.unplaced || def.level === 'underground' || def.level === 'cover') continue;
     // (fields, gardens, ponds and the like are flat: no box to hit)
     if (['field', 'garden', 'pond', 'reservoir', 'orchard', 'orchard_grove', 'terrace_stair', 'terrace_ramp', 'equipment_yard', 'vehicle_yard', 'motor_court'].includes(st.kind)) continue;
     // the body to the roof line; the porch and steps in front of the door as a low deck only (open above: posts and rails do not hide a person)

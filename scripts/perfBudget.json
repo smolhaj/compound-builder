@@ -1,5 +1,5 @@
 {
- "_doc": "Per-tier budgets for the mountain showcase census (scripts/perfBudget.mjs, docs/DECISIONS.md). Counts are the scene-graph census (visible meshes, upper bound, no frustum culling), set at about 10 % over what was measured on 2026-10-30. Lower these when a PR makes the scene lighter; raising one needs a reason in docs/DECISIONS.md. Shadow numbers are 0 at Low (no shadow pass). loadMsFail is JS-only boot time on a slow CI box (measured 12-20 s) and only catches a blow-up. Heap is measured after a forced GC (lowest of 4 samples) and set about 30 % over (65 / 79 / 91 MB), so it only catches a real leak. The felt_* scenes (FL2) are the mountain showcase with a disaster 30 days (or 1 day for the flood) past its hit, so the felt layer's marks are drawn; their draw-call and triangle limits are the measured value plus 6 calls and 4 % (measured 2026-11-16: the felt layer adds 4 calls, 1 to 6k triangles and no shadow casters); shadow and heap limits are the mountain's. No existing limit was raised.",
+ "_doc": "Per-tier budgets for the mountain showcase census (scripts/perfBudget.mjs, docs/DECISIONS.md). Counts are the scene-graph census (visible meshes, upper bound, no frustum culling), set at about 10 % over what was measured on 2026-10-30. Lower these when a PR makes the scene lighter; raising one needs a reason in docs/DECISIONS.md. Shadow numbers are 0 at Low (no shadow pass). loadMsFail is JS-only boot time on a slow CI box (measured 12-20 s) and only catches a blow-up. Heap is measured after a forced GC (lowest of 4 samples) and set about 30 % over (65 / 79 / 91 MB), so it only catches a real leak. The felt_* scenes (FL2) are the mountain showcase with a disaster 30 days (or 1 day for the flood) past its hit, so the felt layer's marks are drawn; their draw-call and triangle limits are the measured value plus 6 calls and 4 % (measured 2026-11-16: the felt layer adds 4 calls, 1 to 6k triangles and no shadow casters); shadow and heap limits are the mountain's. No existing limit was raised. The dome_* scenes (domed compound slice) are the mountain showcase with one finished dome staked by the camp (&domekind=); limits are measured plus 6 calls and 4 % triangles (a dome adds about 5 calls and 3 to 30k triangles); shadow and heap limits are the mountain's. No existing limit was raised.",
  "scenes": {
   "mountain": {
    "query": "clean&seed=7&region=pnw&lot=hillside&lotcut&relief=9&acres=40&lotseed=8&elev=600&showcase=mountain",
@@ -81,6 +81,93 @@
     "high": {
      "drawCalls": 407,
      "triangles": 1089049,
+     "shadowTriangles": 295000,
+     "shadowCasters": 350,
+     "heapMB": 120,
+     "loadMsFail": 60000
+    }
+   }
+  },
+  "dome_geodesic": {
+   "query": "clean&seed=7&region=pnw&lot=hillside&lotcut&relief=9&acres=40&lotseed=8&elev=600&showcase=mountain&domekind=geodesic",
+   "tiers": {
+    "low": {
+     "drawCalls": 406,
+     "triangles": 540814,
+     "shadowTriangles": 0,
+     "shadowCasters": 0,
+     "heapMB": 85,
+     "loadMsFail": 60000
+    },
+    "medium": {
+     "drawCalls": 411,
+     "triangles": 786324,
+     "shadowTriangles": 240000,
+     "shadowCasters": 345,
+     "heapMB": 105,
+     "loadMsFail": 60000
+    },
+    "high": {
+     "drawCalls": 411,
+     "triangles": 1087162,
+     "shadowTriangles": 295000,
+     "shadowCasters": 350,
+     "heapMB": 120,
+     "loadMsFail": 60000
+    }
+   }
+  },
+  "dome_glass": {
+   "query": "clean&seed=7&region=pnw&lot=hillside&lotcut&relief=9&acres=40&lotseed=8&elev=600&showcase=mountain&domekind=glass",
+   "tiers": {
+    "low": {
+     "drawCalls": 406,
+     "triangles": 543040,
+     "shadowTriangles": 0,
+     "shadowCasters": 0,
+     "heapMB": 85,
+     "loadMsFail": 60000
+    },
+    "medium": {
+     "drawCalls": 411,
+     "triangles": 788512,
+     "shadowTriangles": 240000,
+     "shadowCasters": 345,
+     "heapMB": 105,
+     "loadMsFail": 60000
+    },
+    "high": {
+     "drawCalls": 411,
+     "triangles": 1089251,
+     "shadowTriangles": 295000,
+     "shadowCasters": 350,
+     "heapMB": 120,
+     "loadMsFail": 60000
+    }
+   }
+  },
+  "dome_arcology": {
+   "query": "clean&seed=7&region=pnw&lot=hillside&lotcut&relief=9&acres=40&lotseed=8&elev=600&showcase=mountain&domekind=arcology",
+   "tiers": {
+    "low": {
+     "drawCalls": 407,
+     "triangles": 550885,
+     "shadowTriangles": 0,
+     "shadowCasters": 0,
+     "heapMB": 85,
+     "loadMsFail": 60000
+    },
+    "medium": {
+     "drawCalls": 412,
+     "triangles": 796372,
+     "shadowTriangles": 240000,
+     "shadowCasters": 345,
+     "heapMB": 105,
+     "loadMsFail": 60000
+    },
+    "high": {
+     "drawCalls": 412,
+     "triangles": 1097338,
      "shadowTriangles": 295000,
      "shadowCasters": 350,
      "heapMB": 120,

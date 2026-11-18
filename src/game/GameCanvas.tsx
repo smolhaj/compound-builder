@@ -813,6 +813,17 @@ export function GameCanvas() {
           });
           feltSync(true);
         }
+        // perf scenes "dome_*": the same compound with one finished dome staked over open ground by the camp (scripts/perfBudget.json)
+        const dk = qs.get('domekind');
+        if (dk && !cancelled) {
+          const cb = w.__cb as unknown as { tool: { findSpot(k: string, x: number, z: number, rot: number, r: number): [number, number] | null }; world: { camp: { x: number; z: number } } };
+          const kind = `dome_${dk}`, c = cb.world.camp, sp = cb.tool.findSpot(kind, c.x - 1, c.z - 1, 0, 60);
+          if (sp) {
+            useGameStore.setState(s => ({ game: { ...s.game, money: Math.max(s.game.money, 500_000_000) } }));
+            useGameStore.getState().plan(kind, sp[0], sp[1], 0);
+            useGameStore.setState(s => { const g = structuredClone(s.game); const st = g.structures[g.structures.length - 1]; if (st && st.kind === kind) { st.stage = 99; st.done = 0; st.finishedAt = 0; st.supplied = true; } return { game: g }; });
+          }
+        }
         // the new pieces' shaders compile behind the loading screen too
         boot('Compiling shaders', 0.97, true); await warmShaders(ws);
         if (!cancelled) useWorldStore.getState().setBoot(null);

@@ -577,3 +577,33 @@ Each has a recommendation. Answers drive which work packages start.
 7. **Dug deep:** the dome wall has a deep buried skirt (footing) all the way round, so tunneler crews cannot dig under it. Reuse the existing tunneler counters (deep footings and buried skirt, ground sensors); a dome skirt is the strongest version, priced by depth. Tunnels and the escape route cross it only through an airlock or sally port.
 8. **Permits and discovery:** an Enclosure group in the Build menu. T1 is always shown; T2 and T3 unlock by wealth tier or a hint. T2 and T3 need real permits; building without one risks a county fine and a rumor.
 9. **Still open (recommended default in brackets):** contractor abstraction for T3 workforce (at most 24 instanced workers on screen); failure event difficulty scaling (gentle on Cozy, full on Standard and Hardcore); per-region cost and performance; tone for any later pulpy arcology tier is already covered by decision 4.
+
+## Status: first slice shipped (D0 to D3 plus the shell render; 2026-11-17)
+
+Where the dispatch and this document differ, the dispatch (the owner's newer reading) wins: **the tiers are now by material**, not by shotcrete shell. See the DECISIONS row "Domed compound, first slice".
+
+| Tier | Kit id | Shell | Footprint | Default bill (goods + site labor + permit) | Gate |
+|---|---|---|---|---|---|
+| Earthen (the cheap rung) | `dome_earthen` | 20 ft earthbag, plaster, sod crown, one door | 20 ft | about $19k of goods, $61k if a crew builds it | none |
+| T1 Geodesic | `dome_geodesic` | 60 ft aluminum geodesic frame, twin-wall polycarbonate, 5 ft berm, 2 airlocks | 70 ft | about $1.2M | none; permit $2,800, 30 days |
+| T2 Glass & steel | `dome_glass` | 150 ft steel gridshell, laminated glass, 3 airlocks | 150 ft | about $9.4M | $5M cash (Founder); permit $24,000, 120 days |
+| T3 Arcology | `dome_arcology` | 360 ft space frame, clear armored polycarbonate-composite panels (impervious to firearms and missiles), 6 airlocks, armored skirt band, crown spire | 360 ft | about $99M | $60M cash (Magnate); permit $180,000, 420 days |
+
+**Done (all tested, `src/sim/dome/`, `src/game/buildkit/domeBuildings.ts`):**
+- `tiers`, `geometry`, `cost`: one table, spherical-cap geometry, the bill by stage from the geometry (kits in 1,000 sq ft units, concrete for the buried skirt, crew wages for site hours).
+- `protection`: wind, hail, snow, ash, fire, fallout PF, EMP, blast, weapon stop shares; breach test against outside loads and shell health; the dome never lowers a bunker's PF; clean-zone rule.
+- `climate`: U x area x gap, greenhouse rise, frost / temperate / comfortable modes, kWh a day.
+- `air`: the lockdown CO2 clock (exact solution with leakage, scrubber, advanced filter, plant beds, power), the paid filtering and closed-ecology prices.
+- `exposure`: visibility miles, attraction = visibility x (1 - hardness), looter and gang weight multipliers.
+- `siting`: rectangle vs circle (inside, across, clear), the off-parcel test, wealth gates, permit fee and review days, the buried skirt vs a normal dig.
+- Wired: a new kit level `cover` (no pad, no clash with what is under it; a building or wall cut by the shell is refused), blueprints, seven goods on a Domes shelf, permit and review, the Build catalog and classic menu Enclosure group with hover bills, wealth gate in `buildOff`, structureDamage ratings, procedural shell render (stem wall and berm draped on the hill, partial build by stage, colliders with gaps at the airlocks), circle plan mark.
+
+**Left, in this order (each a package of 12 above):**
+1. Lockdown mode as game state (`DomeState`, the live CO2 and O2 clock on the Compound Board, the LOCK DOWN toggle, fail-safe vents), paid advanced filtering and the closed ecology as purchases, climate mode choice and the power load node in `utilities.ts` (D2 state, D4 events).
+2. Tunnels and the escape route crossing by an airlock (`tunnelers.ts` reads `skirtStops`, `cutNav.ts` and `bunkerHatchPlan` get the airlock openings), people routed through the airlocks (D7).
+3. Raids against the dome: the shell as a wall segment and the airlocks as gates in `battle.ts` / `perimeter.ts` using `STOPS`, the shell in `lineOfFire.ts` and `cameraObstacles.ts` as an annulus (D8).
+4. Fallout and weather: the clean zone and the dome as a shelter candidate in `nuclear.ts` / `hardening.ts`, the dome's own weather and temperature inside the shell (snow, rain and frost kept out visibly; the dome currently only renders its shell, the weather outside is the world's), the greenhouse tier row (D3 remainder).
+5. Visibility into `stealth.ts` / `reputation.ts` and the encounter weights (`attract`, `looterWeight`, `gangWeight`) (D8).
+6. Placement: the diameter handle (sizes are fixed per tier now), the circle ghost, free center placement with a clipped-to-the-lot warning (D5).
+7. Perf census scenes `dome_t1` to `dome_t3` in `scripts/perfBudget.json`, LOD far mesh and the Low tier shell (D6).
+8. Contractor monthly draw for the arcology, failure events, per-region cost (D9, D4).

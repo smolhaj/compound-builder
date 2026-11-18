@@ -75,7 +75,7 @@ export function fireBoxesOf(g: Pick<GameState, 'structures' | 'perimeter'>): Box
   const out: Box[] = [];
   for (const st of g.structures) {
     const def = KIT[st.kind];
-    if (!def || st.unplaced || def.level === 'underground' || NOT_SOLID.has(st.kind) || !isFinished(st)) continue;
+    if (!def || st.unplaced || def.level === 'underground' || def.level === 'cover' || NOT_SOLID.has(st.kind) || !isFinished(st)) continue;
     out.push({ ...footprint(def, st.x, st.z, st.rot, false), h: lowCoverHeight(st.kind) ?? buildingHeight(st.kind, def.floorY), kind: 'building' });
     if (def.frontCells > 0) out.push({ ...footprint(def, st.x, st.z, st.rot, true), h: PORCH_HEIGHT, kind: 'building' });
   }

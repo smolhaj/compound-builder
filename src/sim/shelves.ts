@@ -8,13 +8,17 @@
 import type { MaterialId } from './materials';
 import { BUGOUT_GOODS, HARDEN_GOODS, KIT_GOODS, WATCH_GOODS } from './gear';
 
-export type ShelfTab = 'build' | 'fencing' | 'bunker' | 'water' | 'power' | 'food' | 'household' | 'learning' | 'fuel' | 'defense';
+export type ShelfTab = 'build' | 'fencing' | 'bunker' | 'water' | 'power' | 'food' | 'household' | 'learning' | 'fuel' | 'defense' | 'enclosure';
 
 export const SHELF_TABS: ReadonlyArray<[ShelfTab, string]> = [
-  ['build', 'Building'], ['fencing', 'Fencing'], ['bunker', 'Bunker'], ['water', 'Water'], ['power', 'Power'], ['food', 'Food & farm'], ['household', 'Medical & household'], ['learning', 'Courses & evenings'], ['fuel', 'Fuel & hire'], ['defense', 'Kit & security'],
+  ['build', 'Building'], ['fencing', 'Fencing'], ['bunker', 'Bunker'], ['water', 'Water'], ['power', 'Power'], ['food', 'Food & farm'], ['household', 'Medical & household'], ['learning', 'Courses & evenings'], ['fuel', 'Fuel & hire'], ['defense', 'Kit & security'], ['enclosure', 'Domes'],
 ];
 
+/** The domed compound's kits (sim/dome/): ordered by the dome's stage bills; each is a contractor's kit with its erectors. */
+export const DOME_GOODS: MaterialId[] = ['dome_earthbag', 'dome_geodesic_kit', 'dome_glass_kit', 'dome_arcology_kit', 'dome_air_plant', 'dome_airlock', 'dome_fitout', 'concrete', 'rebar'];
+
 export const SHELVES: Record<ShelfTab, MaterialId[]> = {
+  enclosure: DOME_GOODS,
   build: ['lumber', 'fieldstone', 'concrete', 'roofing', 'hardware', 'wire', 'seedlings', 'greenhouse_kit', 'greenhouse_pro_kit', 'tunnel_kit_small', 'tunnel_kit_high', 'poly_film', 'aqua_kit', 'fruit_trees', 'modular_unit'],
   fencing: ['wire', 'hardware', 'lumber', 'seedlings', 'container', 'rebar', 'concrete', 'cable', 'roofing'],
   bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'passage_hatch', 'lead_sheet', 'faraday_mesh'],

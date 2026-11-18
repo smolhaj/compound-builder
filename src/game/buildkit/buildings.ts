@@ -23,6 +23,7 @@ import { FOOD_BUILDERS } from './foodBuildings';
 import { FARM_BUILDERS } from './farmBuildings';
 import { RENEWABLE_BUILDERS } from './renewableBuildings';
 import { TUNNEL_BUILDERS } from './tunnelBuildings';
+import { DOME_BUILDERS } from './domeBuildings';
 import { DOCK_BUILDERS } from './dockBuildings';
 import { OUTPOST_BUILDERS } from './outpostBuildings';
 import { HERD_BUILDERS } from './herdBuildings';
@@ -534,6 +535,7 @@ const BUILDERS: Record<string, (def: KitPieceDef, seed?: number, opts?: BuildOpt
   ...OUTPOST_BUILDERS,
   ...HOUSING_BUILDERS,
   ...TERRACE_BUILDERS,
+  ...DOME_BUILDERS,
 };
 
 /** Every layer of a kit piece (construction shows them stage by stage). */

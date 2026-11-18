@@ -47,6 +47,7 @@ const single = (prio: Priority, o: Partial<Rule> = {}): Rule => ({ kind: 'single
 const person = (prio: Priority, o: Partial<Rule> = {}): Rule => ({ kind: 'person', prio, ...o });
 const stack = (prio: Priority, rec: Rule['rec'], o: Partial<Rule> = {}): Rule => ({ kind: 'stack', prio, rec, ...o });
 const ALT_UPGRADE = 'an upgrade you choose on purpose';
+const ALT_DOME = 'the dome bill sizes it; choose a dome on purpose';
 const ALT_SITE = 'depends on your site; choose it on purpose';
 
 /** The rules. Anything not listed is a plain stack with no recommendation. */
@@ -61,6 +62,8 @@ export const RULES: Partial<Record<MaterialId, Rule>> = {
   wind_turbine: single(3, { alt: ALT_SITE, installed: ['wind_turbine'] }), tilt_tower: single(3, { alt: ALT_SITE }),
   greenhouse_kit: single(3, { installed: ['greenhouse'] }), greenhouse_pro_kit: single(3, { alt: ALT_UPGRADE, installed: ['greenhouse_heated'] }),
   aqua_kit: single(3, { installed: ['aquaponics'] }), modular_unit: single(3, { alt: 'a whole house; choose it on purpose' }),
+  dome_earthbag: single(3, { alt: ALT_DOME, installed: ['dome_earthen'] }), dome_geodesic_kit: single(3, { alt: ALT_DOME, installed: ['dome_geodesic'] }), dome_glass_kit: single(3, { alt: ALT_DOME, installed: ['dome_glass'] }), dome_arcology_kit: single(3, { alt: ALT_DOME, installed: ['dome_arcology'] }),
+  dome_air_plant: single(3, { alt: ALT_DOME }), dome_airlock: single(3, { alt: ALT_DOME }), dome_fitout: single(3, { alt: ALT_DOME }),
   tunnel_kit_small: single(3, { alt: ALT_SITE, installed: ['polytunnel'] }), tunnel_kit_high: single(3, { alt: ALT_SITE, installed: ['high_tunnel'] }),
   // the kitchen and the farm
   canner: single(3), dehydrator: single(3), grain_mill: single(3), smoker: single(3), crocks: single(3), fishing_gear: single(3), snares: single(3),

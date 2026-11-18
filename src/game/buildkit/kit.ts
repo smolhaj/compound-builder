@@ -7,6 +7,11 @@
  * units. Footprints are in cells; `rot` turns in quarter turns.
  */
 import type { KitMaterialId } from './materials';
+import { TIER, DOME_TIERS } from '../../sim/dome/tiers';
+import { rectVsCircle } from '../../sim/dome/siting';
+
+const TIER_CELLS = Object.fromEntries(DOME_TIERS.map(t => [t, TIER[t].cells])) as Record<(typeof DOME_TIERS)[number], number>;
+const TIER_BLURB = Object.fromEntries(DOME_TIERS.map(t => [t, TIER[t].blurb])) as Record<(typeof DOME_TIERS)[number], string>;
 
 /** World units per build cell (3 m). */
 export const CELL = 0.5;
@@ -24,7 +29,7 @@ export interface KitPieceDef {
   /** Steepest ground (rise / run) under the footprint before it needs a bigger pad. */
   maxSlope: number;
   /** Build-menu group and one-line description. */
-  category: 'home' | 'work' | 'food' | 'sanitation' | 'water' | 'power' | 'bunker' | 'defense';
+  category: 'home' | 'work' | 'food' | 'sanitation' | 'water' | 'power' | 'bunker' | 'defense' | 'enclosure';
   blurb: string;
   /** Floor height above the pad (walking height inside) and porch depth in front of the +z wall (world units). */
   floorY: number;
@@ -44,7 +49,7 @@ export interface KitPieceDef {
    * don't clash with what stands above them); entrances, wells, cellars and
    * septic fields reach both. Default surface.
    */
-  level?: 'surface' | 'underground' | 'both';
+  level?: 'surface' | 'underground' | 'both' | 'cover';
   /** People it shelters in an emergency (bunker rooms). */
   shelters?: number;
   /** Floodlights on a mast: a hard white lamp over the approach at night, with power (towers.ts tier 4+). */
@@ -558,7 +563,21 @@ export const BUNKER_KIT: KitPieceDef[] = [
 /** Underground menu order. */
 export const BUNKER_ORDER: readonly string[] = BUNKER_KIT.map(d => d.id);
 
-export const KIT: Record<string, KitPieceDef> = Object.fromEntries([ORCHARD_TERRACED, CABIN_VILLAGE, HELIPAD, TOWER_POD, STILTED_HOUSE, BOAT_DOCK, MARINA, POLYTUNNEL, HIGH_TUNNEL, AQUAPONICS, LODGE, LODGE_PLINTH, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, FORGE, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, VEHICLE_YARD_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, TRAVEL_TRAILER, RV_CAMPER, MODULAR_HOME, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, TERRACE_STAIR, TERRACE_RAMP, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
+// ── Enclosure (sim/dome/): a shell over part of the property; the family builds whatever it likes under it ──
+/** A dome stands over other buildings: it takes no pad, does not clash with what is under it, and is judged on whether anything is cut by its wall. */
+const dome = (id: string, name: string, cells: number, blurb: string, maxSlope: number, parts: KitPieceDef['parts'], cover = true): KitPieceDef => ({
+  id, name, category: 'enclosure', blurb, cellsX: cells, cellsZ: cells, frontCells: 0, parts, maxSlope, floorY: 0, porch: 0, sleeps: 0, light: null, ...(cover ? { level: 'cover' as const } : {}),
+});
+export const DOME_KIT: KitPieceDef[] = [
+  dome('dome_earthen', 'Earthen dome', TIER_CELLS.earthen, TIER_BLURB.earthen, 0.35, { foundation: 'fieldstone', walls: 'adobe', roof: 'earth' }, false),   // (a solid earthbag hut: an ordinary building on its own pad, nothing stands under it)
+  dome('dome_geodesic', 'Geodesic dome', TIER_CELLS.geodesic, TIER_BLURB.geodesic, 0.3, { foundation: 'concrete', walls: 'aluminum', roof: 'polycarb' }),
+  dome('dome_glass', 'Glass & steel dome', TIER_CELLS.glass, TIER_BLURB.glass, 0.3, { foundation: 'concrete', walls: 'steel', roof: 'glass' }),
+  dome('dome_arcology', 'Arcology dome', TIER_CELLS.arcology, TIER_BLURB.arcology, 0.35, { foundation: 'concrete', walls: 'steel', roof: 'polycarb' }),
+];
+/** The Enclosure menu order. */
+export const DOME_ORDER: readonly string[] = DOME_KIT.map(d => d.id);
+
+export const KIT: Record<string, KitPieceDef> = Object.fromEntries([...DOME_KIT, ORCHARD_TERRACED, CABIN_VILLAGE, HELIPAD, TOWER_POD, STILTED_HOUSE, BOAT_DOCK, MARINA, POLYTUNNEL, HIGH_TUNNEL, AQUAPONICS, LODGE, LODGE_PLINTH, LODGE_SOLAR, STONE_HOUSE, TIMBER_FRAME_HOUSE, CONTAINER_HOUSE, ADOBE_HOUSE, APIARY, FORGE, SUGAR_SHACK, BARNYARD, WOOD_OVEN, GATE_GARAGE_KIT, MOTOR_COURT_KIT, VEHICLE_YARD_KIT, TIMBER_CABIN, LOG_HOUSE, FARMHOUSE, TRAILER, TRAVEL_TRAILER, RV_CAMPER, MODULAR_HOME, BARN, COTTAGE, GUEST_HOUSE, MOMS_HOUSE, METAL_GARAGE, GARAGE_SOLAR, OUTHOUSE, WORKSHOP, ROOT_CELLAR, CHICKEN_COOP, GARDEN, FIELD, GREENHOUSE, GREENHOUSE_HEATED, ORCHARD, ORCHARD_GROVE, POND, RESERVOIR, SHEEP_BARN, EQUIPMENT_YARD, TERRACE_STAIR, TERRACE_RAMP, ...UTILITY_KIT, ...BUNKER_KIT, ...TOWER_KIT].map(d => [d.id, d]));
 /** Build-menu order. */
 /** Rigs a joiner brought (sim/joinerHome.ts): in the build menu only while one is waiting for a pad. */
 export const RIG_ORDER: readonly string[] = ['travel_trailer', 'rv_camper'];
@@ -647,15 +666,17 @@ export interface SiteQuery {
   rule?(kind: string, x: number, z: number): PlaceProblem | null;
 }
 
-export type PlaceProblem = 'cross_slope' | 'needs_house' | 'needs_slope' | 'no_climb' | 'no_creek' | 'no_head' | 'no_water' | 'not_connected' | 'not_on_bank' | 'not_shore' | 'off_parcel' | 'overlaps' | 'pad_clash' | 'pad_over_road' | 'thin_cover' | 'too_deep' | 'too_much_climb' | 'too_steep' | 'water';
+export type PlaceProblem = 'cross_slope' | 'needs_house' | 'needs_slope' | 'no_climb' | 'no_creek' | 'no_head' | 'no_water' | 'not_connected' | 'not_on_bank' | 'not_shore' | 'off_parcel' | 'overlaps' | 'pad_clash' | 'pad_over_road' | 'straddles_dome' | 'thin_cover' | 'too_deep' | 'too_much_climb' | 'too_steep' | 'water';
 
 const levelOf = (d: KitPieceDef) => d.level ?? 'surface';
 /** Do pieces at these levels compete for the same ground? (Bunker rooms go under the yard and houses.) */
-const levelsMeet = (a: KitPieceDef, b: KitPieceDef) => levelOf(a) === 'both' || levelOf(b) === 'both' || levelOf(a) === levelOf(b);
+const levelsMeet = (a: KitPieceDef, b: KitPieceDef) => levelOf(a) === 'cover' || levelOf(b) === 'cover' ? levelOf(a) === levelOf(b) : levelOf(a) === 'both' || levelOf(b) === 'both' || levelOf(a) === levelOf(b);
+/** The shell of a dome piece placed at (x, z): a circle inscribed in its square footprint. */
+export const domeCircle = (d: KitPieceDef, x: number, z: number) => ({ x, z, r: d.cellsX * CELL / 2 });
 
 /** Why a piece can't go here (null = it can). Underground pieces also need underground.ts's rules. */
 export function placementProblem(def: KitPieceDef, x: number, z: number, rot: number, site: SiteQuery, placed: readonly Placed[]): PlaceProblem | null {
-  const below = levelOf(def) === 'underground';
+  const below = levelOf(def) === 'underground', cover = levelOf(def) === 'cover';
   const r = footprint(def, x, z, rot, !below);
   const N = 4;
   const hs: number[][] = [];
@@ -675,7 +696,7 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
       if (!site.owned(px, pz)) return 'off_parcel';
       if (def.waterside) { if (site.water(px, pz)) wet++; else dry++; }
       else if (site.water(px, pz)) return 'water';
-      if (!below && site.blocked?.(px, pz)) return 'overlaps';
+      if (!below && !cover && site.blocked?.(px, pz)) return 'overlaps';
       row.push(site.height(px, pz));
     }
     hs.push(row);
@@ -690,7 +711,7 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
       const px = x0 + (x1 - x0) * i / nx, pz = z0 + (z1 - z0) * j / nz, inside = px >= r.x0 && px <= r.x1 && pz >= r.z0 && pz <= r.z1;
       if (inside && !site.owned(px, pz)) return 'off_parcel';
       if (inside && !def.waterside && site.water(px, pz)) return 'water';
-      if (!below && site.blocked?.(px, pz)) return 'overlaps';
+      if (!below && !cover && site.blocked?.(px, pz)) return 'overlaps';
     }
   }
   // steepest grade across the footprint along either axis
@@ -732,6 +753,9 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
   for (const p of placed) {
     if (host && p.id === host.id) continue;
     const od = KIT[p.kind];
+    // a dome's wall must not cut through a building (or a building's footprint through a dome's wall): inside and clear are both fine
+    if (cover && levelOf(od) !== 'underground' && levelOf(od) !== 'cover' && rectVsCircle(domeCircle(def, x, z), footprint(od, p.x, p.z, p.rot, true)) === 'straddles') return 'straddles_dome';
+    if (levelOf(od) === 'cover' && !below && !cover && rectVsCircle(domeCircle(od, p.x, p.z), r) === 'straddles') return 'straddles_dome';
     if (!levelsMeet(def, od)) continue;
     const o = footprint(od, p.x, p.z, p.rot, levelOf(od) !== 'underground');
     if (r.x0 < o.x1 && r.x1 > o.x0 && r.z0 < o.z1 && r.z1 > o.z0) return 'overlaps';
@@ -752,6 +776,7 @@ export const PROBLEM_TEXT: Record<PlaceProblem, string> = {
   too_much_climb: 'The ground climbs too much along it: a stair takes up to 12 ft, a ramp 4 ft. Terrace the slope or switch back',
   cross_slope: 'The ground falls away sideways across it: turn it (R) to run up the hill, not across',
   pad_clash: 'Its graded pad would cut into a neighbor\'s pad at another level',
+  straddles_dome: 'The dome\'s wall would cut through a building (or a building would stand across the wall): put it wholly inside or wholly outside',
   pad_over_road: 'Its flat ground (and the wall that holds it) would be graded over the drive, the camp or the road\'s bank: move it clear of the road',
   no_water: 'Your land has no lake or river wide enough for a dock',
   not_shore: 'A dock runs from dry land out over the water: put one end on the bank and the other in the lake (R turns it)',

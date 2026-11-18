@@ -419,7 +419,7 @@ export class Atmosphere {
   private _driftWalls(built: readonly AtmosBuilding[], runs: readonly PerimeterRun[]): DriftWall[] {
     const out: DriftWall[] = [];
     for (const b of built) {
-      if (!b.finished || b.under || NO_DRIFT.has(b.kind)) continue;
+      if (!b.finished || b.under || NO_DRIFT.has(b.kind) || KIT[b.kind].level === 'cover') continue;
       const r = footprint(KIT[b.kind], b.x, b.z, b.rot, false);
       out.push(
         { x0: r.x1, z0: r.z0, x1: r.x1, z1: r.z1, nx: 1, nz: 0 },

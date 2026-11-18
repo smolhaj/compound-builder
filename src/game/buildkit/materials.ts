@@ -30,6 +30,8 @@ export type KitMaterialId = 'snow' | 'timber_lap' | 'trim' | 'fieldstone' | 'met
   'art_mountains' | 'art_sunset' | 'art_lake' | 'photo_family' | 'photo_couple' | 'poster_map' | 'poster_seeds' | 'sampler' | 'curtain' | 'curtain_red' | 'flowers'
   // greenhouse and orchard
   | 'polycarb' | 'aluminum' | 'fruit'
+  // the arcology's clear polycarbonate-composite armor panel (sim/dome/): faintly blue, lit from within at night
+  | 'arcology'
   // the orchard's other fruit and its blossom (sim/orchard.ts: each kind blooms and ripens in its own weeks)
   | 'fruit_cherry' | 'fruit_plum' | 'blossom_apple' | 'blossom_pear' | 'blossom_cherry' | 'blossom_plum'
   // the pond, its fish and crayfish, the flock
@@ -903,6 +905,7 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'hedge': m = texMat(id, paintLeaves([52, 84, 44], 131), 3.5, 0.9, 0, 1.6); break;
     case 'hedge2': m = texMat(id, paintLeaves([70, 96, 48], 137), 3.5, 0.9, 0, 1.6); break;
     // twin-wall polycarbonate: milky, lets the light through, seen from both sides
+    case 'arcology': m = new THREE.MeshStandardMaterial({ color: 0xc4e8f4, roughness: 0.1, metalness: 0.35, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide, emissive: new THREE.Color(0.18, 0.5, 0.62), emissiveIntensity: 0.12 }); break;
     case 'polycarb': m = new THREE.MeshStandardMaterial({ color: 0xdfeef0, roughness: 0.25, metalness: 0.05, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide }); break;
     case 'aluminum': m = new THREE.MeshStandardMaterial({ color: 0xc4c8cc, roughness: 0.35, metalness: 0.7 }); break;
     case 'fruit': m = new THREE.MeshStandardMaterial({ color: 0xc23a22, roughness: 0.45 }); break;
@@ -979,6 +982,8 @@ export function setWindowGlow(k: number, time = 0, warmth = 1, fire = 0): void {
   if (g) { g.emissiveIntensity = 1.1 * kk; g.opacity = Math.min(0.9, kk * 1.2); g.visible = kk > 0.02; }
   const l = _cache.get('lamp');
   if (l) l.emissiveIntensity = 0.4 + 2.6 * kk;
+  const ar = _cache.get('arcology');
+  if (ar) ar.emissiveIntensity = 0.12 + 0.9 * kk;
   // an oil lamp's flame breathes; electric light holds steady; a blackout curtain lets a glimmer round its edges
   const flick = 0.9 + 0.06 * Math.sin(time * 7.1) + 0.04 * Math.sin(time * 17.3 + 1.3);
   for (const id of ['glow_oil', 'glow_oil_b', 'glow_oil_c'] as const) {

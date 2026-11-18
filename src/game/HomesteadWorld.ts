@@ -176,6 +176,8 @@ const TREE_MARGIN = 26;
 
 interface Built {
   placed: Placed;
+  /** A dome (cover level): a shell over open ground, not a footprint (no pad, no wear, no blocking of what stands or walks under it). */
+  cover?: boolean;
   group: THREE.Group;
   /** Wood smoke from the chimney / stovepipe (null: no stove). */
   smoke: SmokePlume | null;
@@ -670,7 +672,7 @@ export class HomesteadWorld {
   private _plant(q: Quality): void {
     const margin = TREE_MARGIN;
     const inHome = (x: number, z: number) => x > -margin && x < PARCEL_SIZE + margin && z > -margin && z < PARCEL_SIZE + margin;
-    const blocked = (x: number, z: number) => this.onBuilding(x, z, 0.6) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5) || this.onPerimeterLine(x, z, 0.25);
+    const blocked = (x: number, z: number) => this.onBuilding(x, z, 0.6, true, true) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5) || this.onPerimeterLine(x, z, 0.25);
     // the home square, then each bought neighbor parcel (its own id range; the home square's ids never change)
     const plantAll = (density: number, block: (x: number, z: number) => boolean) => [
       ...planParcelTrees(this.parcel, { margin, density, blocked: block }),
@@ -685,7 +687,7 @@ export class HomesteadWorld {
     for (const t of specs) t.y = this.terrain.surfaceAt(t.x, t.z) - 0.03;
     this._planted = specs;
     // lookups cover every tree a full-density plan has (marks made on High survive a switch to Low)
-    const all = q === 'low' ? plantAll(1, (x, z) => this.onBuilding(x, z, 0.6) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5)) : specs;
+    const all = q === 'low' ? plantAll(1, (x, z) => this.onBuilding(x, z, 0.6, true, true) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5)) : specs;
     this._treeById = new Map(all.map(t => [t.id, t]));
     this._plantForest();
     this._plantShrubs(q, inHome, blocked);
@@ -718,7 +720,7 @@ export class HomesteadWorld {
       const c = this.terrain.coverAt(x, z);
       let density = 1, worn = 0;
       for (const b of this._built.values()) {
-        if (b.under) continue;
+        if (b.under || b.cover) continue;
         const r = b.fpPorch, dx = Math.max(r.x0 - x, 0, x - r.x1), dz = Math.max(r.z0 - z, 0, z - r.z1), d = Math.hypot(dx, dz);
         if (d < 0.7) { density = Math.min(density, d < 0.22 ? 0 : (d - 0.22) / 0.48 * 0.6); worn = Math.max(worn, 0.35 * (1 - d / 0.7)); }
         if (PADDOCK.test(b.placed.kind) && d < 1.1) { density = Math.min(density, 0.1); worn = Math.max(worn, 0.8 * (1 - d / 1.1)); }
@@ -787,7 +789,7 @@ export class HomesteadWorld {
         const b3 = new THREE.Box3().setFromObject(b.group);
         return { cx: (b3.min.x + b3.max.x) / 2, cz: (b3.min.z + b3.max.z) / 2, w: b3.max.x - b3.min.x, d: b3.max.z - b3.min.z, y0: b3.min.y, h: b3.max.y - b3.min.y };
       },
-      blocked: (x, z) => this.onBuilding(x, z, 0.4, false) || this.onAccess(x, z, 0.5) || this.onCamp(x, z, 1.2) || onFarmstead(this.farms, x, z, 0.5),
+      blocked: (x, z) => this.onBuilding(x, z, 0.4, false, true) || this.onAccess(x, z, 0.5) || this.onCamp(x, z, 1.2) || onFarmstead(this.farms, x, z, 0.5),
       water: (x, z) => (x >= 0 && x <= PARCEL_SIZE && z >= 0 && z <= PARCEL_SIZE && this.parcel.isCreek(x, z)) || this.parcel.region.height(x, z) < wy + 0.05 || (this.parcel.lakeY !== null && this.parcel.lakeY !== undefined && this.terrain.surfaceAt(x, z) < this.parcel.lakeY + 0.1),
     };
   }
@@ -1278,7 +1280,7 @@ export class HomesteadWorld {
       const k = Math.floor(t.x) * 4099 + Math.floor(t.z);
       (trees.get(k) ?? trees.set(k, []).get(k)!).push([t.x, t.z, 0.07 * t.scale + 0.07]);
     }
-    const boxes = [...this._built.values()].filter(b => !b.under && KIT[b.placed.kind].level !== 'underground').map(b => footprint(KIT[b.placed.kind], b.placed.x, b.placed.z, b.placed.rot, false));
+    const boxes = [...this._built.values()].filter(b => !b.under && KIT[b.placed.kind].level !== 'underground' && KIT[b.placed.kind].level !== 'cover').map(b => footprint(KIT[b.placed.kind], b.placed.x, b.placed.z, b.placed.rot, false));
     const cars = this._cars, yard = this.access.yard, hasCreek = this.parcel.creekHome, half = this.parcel.creek.halfWidth;
     const own = (x: number, z: number) => (x > this.home.x0 && x < this.home.x1 && z > this.home.z0 && z < this.home.z1) || this._inOwned(x, z);
     const g = this.groundAt;
@@ -1447,7 +1449,7 @@ export class HomesteadWorld {
     if (this.parcel.creekHome && Math.abs(z - this.parcel.creek.zAt(x)) < this.parcel.creek.halfWidth + 0.2 + r * 0.3) return true;
     for (const b of this._built.values()) {
       const def = KIT[b.placed.kind];
-      if (b.under || def.level === 'underground') continue;
+      if (b.under || def.level === 'underground' || def.level === 'cover') continue;
       const body = footprint(def, b.placed.x, b.placed.z, b.placed.rot, false);
       if (b.placed.id === self) {
         if (mode !== 'inside' && x > body.x0 && x < body.x1 && z > body.z0 && z < body.z1) return true;
@@ -1604,8 +1606,10 @@ export class HomesteadWorld {
   }
 
   /** Is (x, z) within `pad` of a built footprint (porch included)? */
-  onBuilding(x: number, z: number, pad = 0, withPorch = true): boolean {
+  onBuilding(x: number, z: number, pad = 0, withPorch = true, domes = false): boolean {
     for (const b of this._built.values()) {
+      // a dome is a circle, and counts only where asked (trees and brush stay out from under the shell; walls, paths and people may stand inside)
+      if (b.cover) { if (domes) { const d = KIT[b.placed.kind]; if (Math.hypot(x - b.placed.x, z - b.placed.z) < d.cellsX * CELL / 2 + pad) return true; } continue; }
       const r = withPorch ? b.fpPorch : b.fpBody;
       if (x > r.x0 - pad && x < r.x1 + pad && z > r.z0 - pad && z < r.z1 + pad) return true;
     }
@@ -1627,12 +1631,14 @@ export class HomesteadWorld {
       natural: this._naturalH, seen: this.parcel.height, padHeight: (x0, z0, x1, z1) => this.parcel.padHeight(x0, z0, x1, z1),
       isLot: !!this.parcel.lot, touchesAccess: (rr, m) => this._touchesAccess(rr, m),
       waterLevel: x => this.parcel.lakeY ?? this.parcel.creek.waterY(x),
-      near: [...this._built.values()].filter(b => !b.under && b.placed.id !== p.id).map(b => b.wall?.rect ?? b.fpPorch),
+      near: [...this._built.values()].filter(b => !b.under && !b.cover && b.placed.id !== p.id).map(b => b.wall?.rect ?? b.fpPorch),
     });
     let y = padLevel;
     if (pad) this.parcel.setPads([...this.parcel.pads, pad]);
     const opts: BuildOpts = {};
     if (climb) opts.rise = climb.rise;
+    // a dome meets the hill: its stem wall and berm are draped on the natural ground (no pad), sampled from the group's own frame
+    if (def.level === 'cover') { const gx = p.x, gz = p.z; opts.ground = (lx, lz) => this._naturalH(gx + lx, gz + lz) - y; }
     if (p.kind === 'vehicle_yard') {
       const half = def.cellsX * CELL / 2;
       opts.spur = yardSpur(this.access.drive, p.x, p.z, p.rot, half, DRIVE_W);
@@ -1675,8 +1681,8 @@ export class HomesteadWorld {
       group.add(light);
     }
     // a plan nobody has started is laid out in lime on the ground, so it reads from the air (the stakes alone don't)
-    if (!below) group.add(planMark(def));
-    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000', opts, under, lod: below ? [] : this._lodLayers(group), far: false, fpPorch: r, fpBody: footprint(def, p.x, p.z, p.rot, false), wall });
+    if (!below) group.add(planMark(def, opts.ground));
+    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000', opts, cover: def.level === 'cover', under, lod: below ? [] : this._lodLayers(group), far: false, fpPorch: r, fpBody: footprint(def, p.x, p.z, p.rot, false), wall });
     if (pad) this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1);
     if (below) this._syncUnderground();
     if (this._batchDepth > 0) this._plantDirty = true; else if (this._quality) this._plant(this._quality);
@@ -2369,7 +2375,7 @@ export class HomesteadWorld {
     const creek = this.parcel.creekHome ? this.parcel.creek : null;
     this.wildlife.update(dt, game, game.clock.t, {
       ground: this.groundAt,
-      blocked: (x, z) => this.onBuilding(x, z, 0.25) || this.onCamp(x, z, 0.5) || this.onAccess(x, z, 0.3),
+      blocked: (x, z) => this.onBuilding(x, z, 0.25, true, true) || this.onCamp(x, z, 0.5) || this.onAccess(x, z, 0.3),
       hard: (x, z, sp) => this._animalHard(sp)(x, z),
       creek,
       threats,
@@ -2448,7 +2454,7 @@ export class HomesteadWorld {
       if (c.wantsBands) {
         const W = 0.2;
         for (const b of this._built.values()) {
-          if (b.under || !b.finished) continue;
+          if (b.under || b.cover || !b.finished) continue;
           const f = b.fpBody;
           if (f.x1 - f.x0 < 0.3 || f.z1 - f.z0 < 0.3) continue;
           // each side in short pieces, every one on the ground (or the pad, where that stands higher) and tilted to it, so a band follows a slope instead of floating or sinking
@@ -2798,7 +2804,7 @@ export class HomesteadWorld {
       if (b.finished && cs) {
         const [lx, lz] = this._local(b, x, z);
         if (hitsColliders(cs, lx, lz, Math.min(r, INDOOR_R))) return true;
-      } else if (this.onBuilding(x, z, r, false) && footprintHas(b, x, z, r)) return true;
+      } else if (!b.cover && this.onBuilding(x, z, r, false) && footprintHas(b, x, z, r)) return true;
     }
     return false;
   }
@@ -2809,7 +2815,7 @@ export class HomesteadWorld {
    */
   walkHeight = (x: number, z: number): number => {
     for (const b of this._built.values()) {
-      if (!b.finished) continue;
+      if (!b.finished || b.cover) continue;
       const def = KIT[b.placed.kind];
       const [lx, lz] = this._local(b, x, z);
       const hw = def.cellsX * CELL / 2, hd = def.cellsZ * CELL / 2;
@@ -3124,9 +3130,22 @@ export function scaleFigure(x: number, z: number, y = 0): THREE.Group {
 
 const LIME = new THREE.MeshBasicMaterial({ color: 0xece8d8, transparent: true, opacity: 0.85, depthWrite: false });
 /** Lime lines round a footprint (local coordinates), about 25 cm wide, just above the ground. */
-function planMark(def: KitPieceDef): THREE.Group {
+function planMark(def: KitPieceDef, ground?: (lx: number, lz: number) => number): THREE.Group {
   const g = new THREE.Group();
   g.name = 'planMark';
+  if (def.level === 'cover') {
+    // a dome's footprint is a circle, laid on the hill in short strips (the square it is inscribed in is not marked)
+    const R = def.cellsX * CELL / 2 - 0.03, n = Math.max(32, Math.round(R * 18)), len = 2 * Math.PI * R / n;
+    for (let i = 0; i < n; i++) {
+      const a = (i + 0.5) * 2 * Math.PI / n, x = R * Math.sin(a), z = R * Math.cos(a);
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.04, len * 1.04).rotateX(-Math.PI / 2), LIME);
+      m.position.set(x, (ground?.(x, z) ?? 0) + 0.02, z);
+      m.rotation.y = a;
+      m.renderOrder = 1;
+      g.add(m);
+    }
+    return g;
+  }
   const hx = def.cellsX * CELL / 2, hz = def.cellsZ * CELL / 2, w = 0.04, y = 0.012;
   const strip = (sx: number, sz: number, x: number, z: number) => {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(sx, sz).rotateX(-Math.PI / 2), LIME);
