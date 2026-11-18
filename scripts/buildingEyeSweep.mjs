@@ -25,7 +25,8 @@ try {
   await page.waitForTimeout(1500);
   let kinds = opt('--only', null)?.split(',');
   if (!kinds) kinds = await page.evaluate(async () => { const K = await import('/src/game/buildkit/kit.ts'); return Object.keys(K.KIT); });
-  console.error('kinds', kinds.length);
+  const from = Number(opt('--from', 0)), to = Number(opt('--to', 9999)); const allKinds = kinds; kinds = kinds.slice(from, to);
+  console.error('kinds', allKinds.length, 'from', from, 'to', to);
   const done = [];
   for (const kind of kinds) {
     const info = await page.evaluate(async ([kind]) => {
@@ -54,7 +55,7 @@ try {
       cb.cam.placeEye(px, pz, st.x, st.z, 0.26);
     }, [info.big]);
     await frame(2);
-    const f = `${outDir}/${String(done.length).padStart(3, '0')}-${kind}.png`;
+    const f = `${outDir}/${String(from + done.length).padStart(3, '0')}-${kind}.png`;
     await page.screenshot({ path: f }); done.push([kind, f]);
     console.error('shot', kind);
   }
@@ -69,7 +70,7 @@ cols=3; rows=(len(ims)+cols-1)//cols
 S=Image.new('RGB',(w*cols,h*rows)); d=ImageDraw.Draw(S)
 for i,im in enumerate(ims):
   S.paste(im,((i%cols)*w,(i//cols)*h)); d.rectangle([(i%cols)*w,(i//cols)*h,(i%cols)*w+250,(i//cols)*h+16],fill=(0,0,0)); d.text(((i%cols)*w+4,(i//cols)*h+2),fs[i].split('/')[-1],fill=(255,255,0))
-S.save(sys.argv[1])`, `${outDir}/sheet-${String(i).padStart(2, '0')}.png`, ...grp.map(g => g[1])]);
+S.save(sys.argv[1])`, `${outDir}/sheet-${String(from + i * per).padStart(3, '0')}.png`, ...grp.map(g => g[1])]);
     } catch (e) { console.error('stitch failed', e.message.slice(0, 160)); }
   }
 } catch (e) { console.error('ERR', e.message); }
