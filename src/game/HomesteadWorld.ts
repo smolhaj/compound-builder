@@ -162,7 +162,9 @@ import { ritualsOf, stanceOf, tableSet } from '../sim/rituals';
 import { bedHour, pickHomeLine } from '../sim/domesticLines';
 import { domeOf, domeLook } from '../sim/dome/live';
 import { isGradedTier } from '../sim/dome/grading';
-import { makeDomePlant, type DomePlantFx } from './fx/DomePlant';
+import { makeDomePlant, plantKey, type DomePlantFx, type PlantLook } from './fx/DomePlant';
+import { stateOf as domeStateOf } from '../sim/dome/live';
+import { fxOf as plantFxOf, unitsOf as plantUnitsOf } from '../sim/dome/plantLive';
 import { tierOfKind } from '../sim/dome/tiers';
 import { makeDomeAir, type DomeAirFx } from './fx/DomeAir';
 import { FOOD, type FoodItemId } from '../sim/pantry';
@@ -460,11 +462,15 @@ export class HomesteadWorld {
       f.apply(look);
       // the plant: the machinery, roof hatches and path lamps of a big dome, scaled by its ecology and size (sim/dome/plant.ts)
       if (isGradedTier(d.tier)) {
-        const key = `${d.tier}:${d.r.toFixed(2)}:${look.filtering}`, cur = this._domePlants.get(b.placed.id);
+        const dst = domeStateOf(game, d), hurt: Record<string, 'ok' | 'damaged' | 'down'> = {};
+        for (const u of plantUnitsOf(game, d, dst)) if (u.cond !== 'ok') hurt[u.id] = u.cond;
+        const plook: PlantLook = { loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark: plantFxOf(game, d, dst).power === 'dark' };
+        const key = plantKey(d.tier, d.r, look.filtering, plook), cur = this._domePlants.get(b.placed.id);
         if (!cur || cur.key !== key) {
           if (cur) { this._root.remove(cur.group); cur.dispose(); }
           const gx = b.placed.x, gz = b.placed.z, y0 = b.group.position.y;
-          const pf = makeDomePlant(d.tier, d.r, look.filtering, (lx, lz) => this.parcel.height(gx + lx, gz + lz) - y0 + 0.01);
+          const pf = makeDomePlant(d.tier, d.r, look.filtering, (lx, lz) => this.parcel.height(gx + lx, gz + lz) - y0 + 0.01, plook);
+          pf.setUnder(this._under);
           pf.group.position.set(gx, y0, gz);
           this._root.add(pf.group); this._domePlants.set(b.placed.id, pf);
         }
@@ -1978,6 +1984,7 @@ export class HomesteadWorld {
     if (on === this._under) return;
     this._under = on;
     this.terrain.setOpacity(on ? 0.3 : 1);
+    for (const pf of this._domePlants.values()) pf.setUnder(on);   // the buried plant lines (sim/dome/plant.ts)
     this.forest.visible = !on;
     this.sage.visible = !on;
     this.willow.visible = !on;

@@ -20,7 +20,9 @@ export type ClaimId =
   /** Kind talk (radioKinds.ts): a service under n percent, n or more days since the hit, ash n inches deep, n percent of the county sick. */
   | 'track_lt' | 'days_ge' | 'ash_ge' | 'sick_ge'
   /** A finished dome stands on the place; one is sealed (sim/dome/live.ts). */
-  | 'dome_stands' | 'dome_sealed';
+  | 'dome_stands' | 'dome_sealed'
+  /** A unit of a dome's plant is out or damaged and not yet repaired (sim/dome/plantUnits.ts). */
+  | 'dome_plant_hurt';
 /** `a` is a track, a neighbor id or a kind; `n` a count, a percent or a price level. */
 export interface Claim { id: ClaimId; a?: string; n?: number }
 
@@ -80,6 +82,7 @@ export function evalClaim(s: GameState, c: Claim): boolean {
     case 'sick_ge': return sickPercent(s) >= (c.n ?? 1);
     case 'dome_stands': return domesOf(s).length > 0;
     case 'dome_sealed': return domesOf(s).some(d => stateOf(s, d).lockdown);
+    case 'dome_plant_hurt': return (s.raidDamage ?? []).some(j => j.kind === 'plant' && j.done < j.hours);
   }
 }
 

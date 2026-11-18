@@ -52,6 +52,10 @@ export function damagePieces(d: Pick<RaidDamage, 'kind' | 'id'>): THREE.BufferGe
     out.push(part(box(0.022, 0.22, 0.022), frame[1], 0.02, 0.2, 0.05, 0.9, 0, 0.3));                                 // a strut hanging across it
     for (let i = 0; i < 7; i++) out.push(part(box(0.1 + r() * 0.1, 0.004, 0.06 + r() * 0.08), pane[i % 3], (i % 2 ? 1 : -1) * (0.06 + r() * 0.2), 0.006 + i * 0.001, (r() - 0.5) * 0.7, 0, r() * 3, 0));   // panes on the ground, both sides
     out.push(part(new THREE.CylinderGeometry(0.3, 0.36, 0.01, 9), 0x3a2f24, 0, 0.005, 0));                          // trampled ground
+  } else if (d.kind === 'plant') {
+    // a unit of a dome's plant that was wrecked or scorched: a small scorched patch and a few fallen pieces (the unit itself is drawn burned by game/fx/DomePlant.ts)
+    out.push(part(new THREE.CylinderGeometry(0.22, 0.26, 0.008, 9), char[0], 0, 0.005, 0));
+    for (let i = 0; i < 3; i++) out.push(part(box(0.22 + r() * 0.1, 0.03, 0.03), char[i % 3], (r() - 0.5) * 0.25, 0.02 + i * 0.02, (r() - 0.5) * 0.25, (r() - 0.5) * 0.3, r() * Math.PI, 0));
   } else {
     out.push(part(new THREE.CylinderGeometry(0.5, 0.56, 0.01, 11), char[0], 0, 0.006, 0));                          // scorched ground
     out.push(part(new THREE.CylinderGeometry(0.28, 0.32, 0.016, 9), 0x3b3835, 0.04, 0.012, -0.04));                // ash
