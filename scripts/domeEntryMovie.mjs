@@ -87,6 +87,14 @@ try {
   await frames(4);
   // the road re-plans to the port and the truck's tail (through the gate to the lane) is laid on the world's next idle ticks: wait for it (a held truck would ignore it)
   for (let k = 0; k < 60; k++) { if (await page.evaluate(() => window.__cb.world.truck.tail.length > 0)) break; await frames(2); }
+  // the far end of the county road lies outside the terrain streamed in around the camera: fly down the road once so its ground is real, then lay the truck's way again (a winter toggle re-lays it)
+  await page.evaluate(async () => {
+    const cb = window.__cb, w = cb.world, gz = w.access.drive[0][1];
+    for (let z = gz - 160; z <= gz + 5; z += 20) { const x = w.county.x(z); cb.qa.pose = { x, y: w.groundAt(x, z) + 1.2, z, lx: x, ly: w.groundAt(x, z + 5), lz: z + 5, fov: 60 }; await cb.qa.renderNow(); }
+    cb.qa.pose = null;
+    w.truck.setWinter(true); w.truck.setWinter(false);
+  });
+  lap('truck way after streaming: ' + await page.evaluate(() => window.__cb.world.truck.inLength.toFixed(1)));
   lap('truck tail points: ' + await page.evaluate(() => window.__cb.world.truck.tail.length));
   // the scene's geometry: the dome, its vehicle port and personnel airlocks, the truck's way in sampled by distance (the truck is held at each distance in turn)
   const geo = await page.evaluate(async id => {
