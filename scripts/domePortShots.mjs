@@ -60,9 +60,10 @@ try {
     await pr([dm.x - u[0] * R * 0.2 + n[0] * 3, R * 3.4, dm.z - u[1] * R * 0.2 + n[1] * 3], E(R + 3, 0, 0), 60); await shot('aerial-high');
   }
   if (want('closeup')) { await pr(E(R + 6.5 * S, -3.5 * S, 2.2 * S), gate, 52); await shot('port-closeup'); }
+  if (want('second')) { await pr(E(-(R + 9 * S), 3 * S, 3), E(-R, 0.5 * S, 0), 58); await shot('second-entrance-opposite'); }
   if (want('eye')) {
-    await page.evaluate(() => { const w = window.__cb.world; const tl = w.truck.tail.reduce((a, p, i, l) => a + (i ? Math.hypot(p[0] - l[i - 1][0], p[1] - l[i - 1][1]) : 0), 0); w.truck.qaHold([{ material: 'lumber', qty: 6 }], w.truck.inLength - tl - 2.7); });
-    lap('truck ' + JSON.stringify(await page.evaluate(() => { const w = window.__cb.world; return { short: w.truck.stopsShort, inLen: w.truck.inLength, driveLen: w.truck.driveLength, tail: w.truck.tail.length }; })));
+    // (the delivery truck stops short on this lot's county road whatever a dome does, so the shot stands a truck on the apron by hand)
+    await page.evaluate(async ([x, z, heading]) => { const m = await import('/src/game/props/truckGeometry.ts'); const t = m.buildTruck(); t.position.set(x, window.__cb.world.groundAt(x, z), z); t.rotation.y = heading; window.__cb.ws.scene.add(t); }, [E(R + 1.1 * S, 0.25 * S, 0)[0], E(R + 1.1 * S, 0.25 * S, 0)[2], (a ? a.angle : 0) + Math.PI]);
     await person(...[E(R + 2.6 * S, 0.9 * S, 0)].map(p => [p[0], p[2]])[0]);
     await frames(2);
     await pr(E(R + 5.2 * S, -1.9 * S, 0.5), [gate[0], 0.3 * S, gate[2]], 58); await shot('eye-at-port-truck-person');
