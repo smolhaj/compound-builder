@@ -12,6 +12,7 @@ import { useWorldStore } from '../../store/worldStore';
 import { TIER, kindOfCells, shellFt, tierOfKind } from '../../sim/dome/tiers';
 import { hasYard, yardBill } from '../../sim/dome/plantYard';
 import { billUsd } from '../../sim/dome/cost';
+import { earthwork } from '../../sim/dome/pricing';
 import { billFor, adviceCtx, type CatalogEntry } from '../../sim/buildCatalog';
 import { KIT } from '../../game/buildkit/kit';
 import { T, tv } from './tokens';
@@ -52,6 +53,7 @@ export function DomeSizeCard() {
       {bill.other.filter(o => /permit/i.test(o.label)).map(o => <Row key={o.label} l="County permit" v={usd(o.usd)} />)}
     </div>
     {hasYard(tier) && <div data-testid="dome-yard-line" style={{ color: tv.color('dim') }}>Includes the hardened plant yard outside ({usd(billUsd(yardBill(tier, shellFt(tier, c) / 40).bill))} of wall, service airlock, passage and sleeves): chillers and the substation need open air, so they stand behind a concrete wall with no gate, reached only through an airlock and a sealed passage from inside. The air and water plant, battery and control room are built inside the {tier === 'arcology' ? 'armored band' : 'shell'}.</div>}
+    {tier !== 'earthen' && (() => { const ew = earthwork(tier, c); return <div data-testid="dome-earthwork-line" style={{ color: tv.color('dim') }}>Includes {usd(ew.usd)} of earthwork under the dome: {ew.lines.map(l => `${l.label.split(':')[0].toLowerCase()} ${usd(l.usd)}`).join(', ')}. The crater is {ew.pitCy.toLocaleString('en-US')} cu yd.</div>; })()}
     {site?.workLine && <div data-testid="dome-site-work" style={{ color: tv.color('text') }}>{site.workLine}</div>}
     {facts.map(f => <div key={f} style={{ color: tv.color('dim') }}>{f}</div>)}
     {bill.needs.map(n => <div key={n} style={{ color: tv.color('warn') }}>{T.glyph.warn} {n}</div>)}
