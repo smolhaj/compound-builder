@@ -60,7 +60,7 @@ try {
   }
   if (want('closeup')) { await pr(E(R + 6.5, -3.5, 2.2), gate, 52); await shot('port-closeup'); }
   if (want('eye')) {
-    await page.evaluate(() => { const w = window.__cb.world; w.truck.qaHold([{ material: 'lumber', qty: 6 }], w.truck.inLength - 0.5); });
+    await page.evaluate(() => { const w = window.__cb.world; const tl = w.truck.tail.reduce((a, p, i, l) => a + (i ? Math.hypot(p[0] - l[i - 1][0], p[1] - l[i - 1][1]) : 0), 0); w.truck.qaHold([{ material: 'lumber', qty: 6 }], w.truck.inLength - tl - 2.7); });
     await person(...[E(R + 2.6, 0.9, 0)].map(p => [p[0], p[2]])[0]);
     await frames(2);
     await pr(E(R + 6.2, -1.9, 0.5), [...gate.slice(0, 1), 0.3, ...gate.slice(2)], 58); await shot('eye-at-port-truck-person');

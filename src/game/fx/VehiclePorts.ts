@@ -14,7 +14,7 @@ export interface PortFixtures { group: THREE.Group; key: string; dispose(): void
 
 export const portsKey = (ins: readonly PortInput[]): string => ins.map(i => `${i.id}:${i.frame.angle.toFixed(3)}:${i.frame.cx.toFixed(2)},${i.frame.cz.toFixed(2)}:${i.frame.r.toFixed(2)}:${i.lane ? 1 : 0}:${i.guarded ? 1 : 0}`).join('|');
 
-const ASPHALT = 0x54575b, CONCRETE = 0x9b988f, PAINT = 0xe6e2d2, YELLOW = 0xe3b92a, STEEL = 0x8a929a, DARK = 0x2a2e33, BOOTH = 0xb9b49f;
+const ASPHALT = 0x54575b, CONCRETE = 0xb3afa3, PAINT = 0xe6e2d2, YELLOW = 0xe3b92a, STEEL = 0x8a929a, DARK = 0x2a2e33, BOOTH = 0xb9b49f;
 
 function paint(g: THREE.BufferGeometry, color: number): THREE.BufferGeometry {
   const ng = g.index ? g.toNonIndexed() : g; ng.deleteAttribute('uv');
@@ -50,9 +50,9 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     const { u, v } = f, yaw = f.angle, at = (rho: number, lam: number): [number, number] => [f.cx + u[0] * rho + u[1] * lam, f.cz + u[1] * rho - u[0] * lam];
     // the apron: a concrete slab from the shell out APRON_LEN, wider than the gate, with a yellow center line to the stop bar
     const [ax, az] = f.apron.c;
-    geos.push(drape(ax, az, u, f.apron.hl + 0.1, f.apron.hw, 0.012, ground, CONCRETE));
-    geos.push(drape(...at(f.r + APRON_LEN / 2 + 0.05, 0), u, APRON_LEN / 2 - 0.05, 0.012, 0.02, ground, YELLOW));
-    geos.push(drape(...at(f.r + APRON_LEN - 0.3, 0), u, 0.02, v.dw / 2, 0.02, ground, PAINT));
+    geos.push(drape(ax, az, u, f.apron.hl + 0.1, f.apron.hw, 0.03, ground, CONCRETE));
+    geos.push(drape(...at(f.r + APRON_LEN / 2 + 0.05, 0), u, APRON_LEN / 2 - 0.05, 0.015, 0.04, ground, YELLOW));
+    geos.push(drape(...at(f.r + APRON_LEN - 0.3, 0), u, 0.02, v.dw / 2, 0.04, ground, PAINT));
     // a flared throat where the road meets the apron: the road's own surface carries on, the slab just widens to the corners
     // bollards: steel posts set in concrete across the mouth of the apron, a gap for the road
     for (const [bx, bz] of f.bollards) {
@@ -73,9 +73,9 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     // inside: the paved lane from the inner gate to the pad, so a truck never crosses the lawn
     if (lane) {
       const [ix, iz] = f.inner, [px, pz] = lane.pad, L = Math.hypot(px - ix, pz - iz), mx = (ix + px) / 2, mz = (iz + pz) / 2;
-      geos.push(drape(mx, mz, u, L / 2 + 0.05, lane.w / 2 + 0.06, 0.012, ground, ASPHALT));
-      geos.push(drape(px, pz, u, lane.half, lane.half, 0.012, ground, ASPHALT));
-      geos.push(drape(mx, mz, u, L / 2, 0.012, 0.016, ground, PAINT));
+      geos.push(drape(mx, mz, u, L / 2 + 0.05, lane.w / 2 + 0.06, 0.03, ground, ASPHALT));
+      geos.push(drape(px, pz, u, lane.half, lane.half, 0.03, ground, ASPHALT));
+      geos.push(drape(mx, mz, u, L / 2, 0.012, 0.04, ground, PAINT));
     }
   }
   const owned: Array<{ dispose(): void }> = [];

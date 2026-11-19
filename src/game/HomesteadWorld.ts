@@ -482,7 +482,7 @@ export class HomesteadWorld {
       return { id: d.id, frame: f, lane: insideLane(f), guarded };
     });
     if (this._ports) { this._root.remove(this._ports.group); this._ports.dispose(); this._ports = null; }
-    if (ins.length) { const f = makeVehiclePorts(ins, (x, z) => this.parcel.height(x, z)); this._root.add(f.group); this._ports = f; }
+    if (ins.length) { const f = makeVehiclePorts(ins, (x, z) => this.groundAt(x, z)); this._root.add(f.group); this._ports = f; }
     this._applyPlan(pr ? pr.plan : this._baseRef);
     this._portTail = pr ? vehicleTail(pr.frame).slice(1) : [];
     this.truck.setLock(pr ? { x: pr.frame.outer[0], z: pr.frame.outer[1], s: portCycleSeconds(pr.dome.tier) } : null);
