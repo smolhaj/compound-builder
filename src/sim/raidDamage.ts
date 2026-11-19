@@ -50,7 +50,7 @@ export interface RaidDamage {
   /** A dome's plant unit (kind 'plant', sim/dome/plantUnits.ts): the unit id (`chiller`, `chiller2`...), how bad it is, what did it and the game time (days) it happened. The unit stays damaged until the job is done. */
   unit?: string;
   cond?: 'damaged' | 'down';
-  cause?: 'raid' | 'fire' | 'storm';
+  cause?: 'raid' | 'fire' | 'storm' | 'heat' | 'load' | 'cold';
   at?: number;
 }
 
