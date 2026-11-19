@@ -21,7 +21,8 @@ try {
   await page.goto(`http://localhost:${port}/?seed=7&clean&lowrender=${PR}&region=mountain_west&acres=20&relief=2&lotseed=8`);
   await page.waitForFunction(() => window.__cb?.qa?.lowrender, null, { timeout: 300000 });
   const frames = async (n = 1) => { for (let i = 0; i < n; i++) await page.evaluate(() => window.__cb.qa.renderNow()); };
-  const shot = async name => { await frames(3); if (QUAL !== 'none') await page.evaluate(q => window.__cb.qa.renderFull(q), QUAL); await page.screenshot({ path: `${out}/${tier}-${name}.png` }); lap(name); };
+  const only = process.env.ONLY?.split(',');
+  const shot = async name => { if (only && !only.some(o => name === o)) return; await frames(3); if (QUAL !== 'none') await page.evaluate(q => window.__cb.qa.renderFull(q), QUAL); await page.screenshot({ path: `${out}/${tier}-${name}.png` }); lap(name); };
   const pose = (e, l, fov = 55) => page.evaluate(([e, l, fov]) => { window.__cb.qa.pose = { x: e[0], y: e[1], z: e[2], lx: l[0], ly: l[1], lz: l[2], fov }; }, [e, l, fov]);
   const info = await page.evaluate(async ([tier, cells]) => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp; G.getState().setSpeed(0);
@@ -34,7 +35,7 @@ try {
     G.getState().plan(kind, sp.x, sp.z, 0);
     const dome = G.getState().game.structures.at(-1);
     // the bunker: a hatch, a bunkroom, a galley and a plant room, wall to wall, west of the center
-    const hx = Math.round(sp.x * 4) / 4 - 1.5, hz = Math.round(sp.z * 4) / 4 - 1.25, bk = await import('/src/sim/dome/bunkerLive.ts');
+    const hx = Math.floor(sp.x / 0.5) * 0.5 + 0.25 - 1.5, hz = Math.floor(sp.z / 0.5) * 0.5 + 0.25 - 1.0, bk = await import('/src/sim/dome/bunkerLive.ts');
     const list = [['bunker_hatch', hx, hz], ['bunker_dorm', hx + 0.75, hz + 0.25], ['bunker_galley', hx + 1.75, hz + 0.25], ['bunker_plant', hx + 0.75, hz + 1.25], ['bunker_comms', hx + 1.75, hz + 1.25]];
     const ids = [];
     for (const [k, x, z] of list) {
@@ -88,8 +89,8 @@ try {
     await page.evaluate(id => window.__cb.store.getState().setDomeSection(id), D.dome); await frames(3); await shot('section');
     await page.evaluate(() => window.__cb.store.getState().setDomeSection(null));
     // eye level in the dome: the hatch with a person beside it
-    await page.evaluate(async ([x, z]) => { const cb = window.__cb, m = await import('/src/game/HomesteadWorld.ts'); cb.ws.scene.add(m.scaleFigure(x, z, cb.world.groundAt(x, z))); }, [D.hx + 0.55, D.hz + 0.9]);
-    await pose([D.hx + 0.2, ground + 0.34, D.hz + 1.6], [D.hx, ground + 0.1, D.hz], 62); await shot('eye-hatch');
+    await page.evaluate(async ([x, z]) => { const cb = window.__cb, m = await import('/src/game/HomesteadWorld.ts'); cb.ws.scene.add(m.scaleFigure(x, z, cb.world.groundAt(x, z))); }, [D.hx + 0.45, D.hz + 0.6]);
+    await pose([D.hx + 0.15, ground + 0.36, D.hz + 1.15], [D.hx + 0.1, ground + 0.05, D.hz], 66); await shot('eye-hatch');
   }
   if (sets.includes('cards')) {
     await setP(1, 1, true);
