@@ -139,3 +139,19 @@ describe('the bill', () => {
     expect(domeCostSummary('earthen').extras.length).toBe(0);
   });
 });
+
+describe('the road plan the world draws', () => {
+  it('replaces the end of the drive, drops what lay past the cut and moves the yard onto the inside pad', async () => {
+    const { planToPort } = await import('./portRoad');
+    const pts = Array.from({ length: 81 }, (_, i) => ({ x: 70 - i * 0.5, z: 40 + (70 - i * 0.5 - 40) * 0.2, y: 1, s: i * 0.5, bank: 0 }));
+    const plan = { pts, gateAt: 2, gate: { x: 70, z: 46, rot: 0 }, yard: [40, 40] as [number, number], structures: [{ kind: 'culvert', s0: 3, s1: 4, x: 0, z: 0, rot: 0, lengthM: 1, usd: 1, days: 1, choke: false, droppable: false }, { kind: 'culvert', s0: 36, s1: 38, x: 0, z: 0, rot: 0, lengthM: 1, usd: 1, days: 1, choke: false, droppable: false }], walls: [], rails: [], hairpins: [], lengthU: 40, lengthM: 240, lengthFt: 800 } as unknown as import('../roadPlan').RoadPlan;
+    const d = domeFrom({ id: 'd', kind: DOME_KIND.glass, x: 40, z: 40, rot: 1, stage: 99, done: 0, supplied: true, finishedAt: 0, portAngle: 1.2 })!;
+    const pr = planToPort(plan, [d], () => 0)!;
+    expect(pr).not.toBeNull();
+    const last = pr.plan.pts[pr.plan.pts.length - 1];
+    expect(last.x).toBeCloseTo(pr.frame.outer[0], 6); expect(last.z).toBeCloseTo(pr.frame.outer[1], 6);
+    expect(pr.plan.structures.length).toBe(1);   // the culvert past the cut is gone
+    expect(pr.plan.yard).toEqual(insideLane(pr.frame)!.pad);
+    for (let i = 1; i < pr.plan.pts.length; i++) expect(pr.plan.pts[i].s).toBeGreaterThan(pr.plan.pts[i - 1].s);
+  });
+});
