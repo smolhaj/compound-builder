@@ -72,7 +72,7 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
     // benches on the ring, facing inward
     for (let i = 0; i < 8; i++) {
       const a = (i + 0.5) * Math.PI / 4 + 0.2, off = rr + PATH_W / 2 + BENCH.dep / 2 + 0.06, x = Math.sin(a) * off, z = Math.cos(a) * off;
-      if (out.segs.some(s => Math.hypot(s.x - Math.sin(a) * rr, s.z - Math.cos(a) * rr) < STEP * 0.6) && free(x, z, BENCH.len / 2 + 0.04) && !angles.some(an => Math.abs(Math.atan2(Math.sin(a - an), Math.cos(a - an))) < 0.2)) out.benches.push({ x, z, rot: Math.atan2(-Math.sin(a), -Math.cos(a)) });
+      if (out.segs.some(s => Math.hypot(s.x - Math.sin(a) * rr, s.z - Math.cos(a) * rr) < STEP * 0.6) && free(x, z, BENCH.len / 2 + 0.04) && !angles.some(an => Math.abs(Math.atan2(Math.sin(a - an), Math.cos(a - an))) < 0.2)) { out.benches.push({ x, z, rot: Math.atan2(-Math.sin(a), -Math.cos(a)) }); if (i % 2 === 0 && out.lamps.length < 14) out.lamps.push({ x: x + Math.cos(a) * 0.16, z: z - Math.sin(a) * 0.16 }); }
     }
   }
   if (out.plaza) {
