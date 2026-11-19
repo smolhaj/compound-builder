@@ -76,7 +76,6 @@ import { sitePad } from './buildkit/sitePad';
 import { buildBuried, buildDigSite, buildSection, SECTION_LEN, disposeSite, showBuried, type DigSite as DomeDigSite } from './buildkit/domeDig';
 import { digState, pitShape, type DigState } from '../sim/dome/dig';
 import type { DomeTier } from '../sim/dome/tiers';
-import { cellsOfKind } from '../sim/dome/tiers';
 import { improvementSpots } from './buildkit/improvementSpots';
 import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
