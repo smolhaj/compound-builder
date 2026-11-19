@@ -1,6 +1,6 @@
 # Design draft: runaway heat and ice age disasters
 
-Status: **scope draft only, not built.** Owner review first. Nothing here is code.
+Status: **approved 2026-11-19: owner accepted every recommended answer in section 7 ("all as recommended, for now"). Build in the order of section 8.** Nothing here is code yet.
 
 Conventions: every mechanic that the GDS or the current code does not already cover is tagged **PROPOSED** so you can accept or cut it. Numbers marked "from the model" were computed by running the current `domeLoad` arithmetic (`src/sim/dome/climate.ts`) at the default dome sizes; everything else is a design target to be tuned by the bot playtest. U.S. units throughout (degrees F, feet, gallons, pounds per square foot, kWh).
 
