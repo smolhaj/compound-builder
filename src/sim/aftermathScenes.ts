@@ -31,7 +31,7 @@ export interface BurialInput { name: string; age: number; kid: boolean; elder: b
 const WORDS_KIN = ['"God. You were just here this morning."', '"{n}. I\'ll keep the place. I told you I would."', '"I should have been out there."', '"Fuck. Fuck, {n}. Why you?"', '"I\'m sorry. I\'m sorry, {n}."', '"Goddamn it, {n}. Goddamn it."'];
 const WORDS_KID = ['"Is {n} cold down there?"', '"Can I put this on top? It was {n}\'s."', '"I\'ll be quiet now. Come back."', '"I want {n} back."'];
 const WORDS_ANY = ['"{n} stayed on the wall. That\'s all I\'ve got."', '"{n} didn\'t run. Remember that."', '"Shit. Shit, {n}."', '"Jesus. I still can\'t believe it."', '"{n} would have done it for any of us."'];
-const WORDS_ELDER = ['"Lord, take {n} home."', '"Dear God, keep {n}. It\'s all we can give."', '"Eternal rest grant unto {n}, O Lord..."'];
+const WORDS_ELDER = ['"Lord, take {n} home."', '"Dear God, keep {n}. It\'s all we can give."', '"Eternal rest grant unto {n}, O Lord..."', '"Goddamn it, {n}. Lord, take {n} home."'];
 
 export function burialWords(inp: BurialInput): SceneLine[] {
   const r = mulberry32(inp.seed * 31 + 7), used = new Set<string>(), v = { n: inp.name };
