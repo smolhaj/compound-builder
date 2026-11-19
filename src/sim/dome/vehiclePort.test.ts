@@ -203,3 +203,39 @@ describe('the new stretch of road is graded for a truck', () => {
     expect(tail[tail.length - 1].y).toBeCloseTo(1.2, 6);   // the apron sits at the pad's level
   });
 });
+
+describe('one entrance: the gate complex (PROPOSED, owner: one entrance, two at most)', () => {
+  it('person airlocks are 1 on the geodesic and glass domes and 2 on the arcology; earthen keeps its one low door', () => {
+    expect([TIER.earthen.airlocks, TIER.geodesic.airlocks, TIER.glass.airlocks, TIER.arcology.airlocks]).toEqual([0, 1, 1, 2]);
+    for (const t of BIG) { const d = domeFrom(st(t, 0, 1.0))!; expect(d.airlocks.filter(a => !a.role).length).toBe(TIER[t].airlocks); }
+  });
+  it('the person airlock stands beside the port on the same approach, clear of it by the gap, and counts as ONE entrance with it', async () => {
+    const { entrancesOf } = await import('./standing');
+    for (const t of BIG) for (const ang of [0.3, 2.0, 4.5]) {
+      const d = domeFrom(st(t, 0, ang))!, p = d.airlocks.find(a => !a.role)!, v = d.airlocks.find(a => a.role === 'vehicle')!;
+      const gap = angDist(p.angle, v.angle) * d.r - (p.w + v.w) / 2;
+      expect(gap).toBeGreaterThanOrEqual(0.19);   // (the chambers do not touch)
+      expect(angDist(p.angle, v.angle) * d.r).toBeLessThan(2.5);   // (side by side, not on another side of the dome)
+      const ent = entrancesOf(d);
+      expect(ent.length).toBe(t === 'arcology' ? 2 : 1);
+      expect(ent.filter(e => e.complex).length).toBe(1);
+      if (t === 'arcology') { const second = d.airlocks.filter(a => !a.role)[1]; expect(angDist(second.angle, v.angle)).toBeCloseTo(Math.PI, 6); }
+    }
+  });
+  it('the apron reaches across the port and the person airlock, so one road serves both', () => {
+    for (const t of BIG) {
+      const r = radius(t), f = portFrame(t, 0, 0, r, 1.0)!;
+      expect(onApron(f, f.outer[0] + f.u[0] * 0.3, f.outer[1] + f.u[1] * 0.3)).toBe(true);
+      const px = f.person!.outer[0] + f.u[0] * 0.8, pz = f.person!.outer[1] + f.u[1] * 0.8;
+      expect(onApron(f, px, pz)).toBe(true);
+    }
+  });
+  it('the second entrance of the arcology never lands in the plant yard or a link lane either', () => {
+    const r = radius('arcology');
+    for (let rot = 0; rot < 4; rot++) for (let k = 0; k < 24; k++) {
+      const ctx = { tier: 'arcology' as const, r, rot, links: [k * 0.3] }, p = choosePortAngle(ctx, k * Math.PI / 12);
+      if (!p.free) continue;
+      for (const a of [p.angle, p.angle + Math.PI]) for (const b of blockedArcs(ctx)) expect(angDist(a, b.angle), `${rot} ${k} ${b.why}`).toBeGreaterThanOrEqual(b.half - 1e-9);
+    }
+  });
+});

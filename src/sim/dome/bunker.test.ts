@@ -27,13 +27,14 @@ describe('where a bunker may stand under a dome', () => {
     expect(bunkerProblemUnder(d, hatchRect(100 + r, 100), FLOOR)).toBe('straddles_skirt');
     expect(bunkerProblemUnder(d, hatchRect(100 + usableR(d), 100), FLOOR)).toBe('straddles_skirt');
     expect(bunkerProblemUnder(d, hatchRect(100 + r + 1, 100), FLOOR)).toBeNull();
-    expect(bunkerProblemUnder(d, hatchRect(100, 100), FLOOR)).toBeNull();
+    // (not on the east side, where the gate complex of a dome staked without a stamp stands: the lane of the port and the person airlock reaches in)
+    expect(bunkerProblemUnder(d, hatchRect(99.4, 100), FLOOR)).toBeNull();
   });
   it('the way in to an airlock stays clear', () => {
-    const d = dome('geodesic');
-    // the first airlock is at the front (+z)
+    const d = { ...dome('geodesic'), portAngle: 0 };
+    // the gate complex (the vehicle port and the person airlock beside it) is at the front (+z)
     expect(inAirlockLane(d, hatchRect(100, 100 + usableR(d) - 0.1))).toBe(true);
-    expect(inAirlockLane(d, hatchRect(100, 100))).toBe(false);
+    expect(inAirlockLane(d, hatchRect(99, 100))).toBe(false);
   });
 });
 
