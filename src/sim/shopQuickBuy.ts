@@ -63,6 +63,7 @@ export const RULES: Partial<Record<MaterialId, Rule>> = {
   greenhouse_kit: single(3, { installed: ['greenhouse'] }), greenhouse_pro_kit: single(3, { alt: ALT_UPGRADE, installed: ['greenhouse_heated'] }),
   aqua_kit: single(3, { installed: ['aquaponics'] }), modular_unit: single(3, { alt: 'a whole house; choose it on purpose' }),
   dome_earthbag: single(3, { alt: ALT_DOME, installed: ['dome_earthen'] }), dome_geodesic_kit: single(3, { alt: ALT_DOME, installed: ['dome_geodesic'] }), dome_glass_kit: single(3, { alt: ALT_DOME, installed: ['dome_glass'] }), dome_arcology_kit: single(3, { alt: ALT_DOME, installed: ['dome_arcology'] }),
+  dome_geodesic_panels: single(3, { alt: ALT_DOME }), dome_glass_panels: single(3, { alt: ALT_DOME }), dome_arcology_panels: single(3, { alt: ALT_DOME }),
   dome_air_plant: single(3, { alt: ALT_DOME }), dome_airlock: single(3, { alt: ALT_DOME }), dome_fitout: single(3, { alt: ALT_DOME }),
   dome_dig: single(3, { alt: ALT_DOME }), dome_rock: single(3, { alt: ALT_DOME }), dome_shoring: single(3, { alt: ALT_DOME }), dome_dewater: single(3, { alt: ALT_DOME }), dome_skirtwork: single(3, { alt: ALT_DOME }), bunker_works: single(3, { alt: 'the bunker bill sizes it; build a bunker on purpose' }),
   tunnel_kit_small: single(3, { alt: ALT_SITE, installed: ['polytunnel'] }), tunnel_kit_high: single(3, { alt: ALT_SITE, installed: ['high_tunnel'] }),
