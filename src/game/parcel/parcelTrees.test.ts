@@ -61,12 +61,34 @@ describe('parcel trees by region', () => {
     expect(nw.k.has('conifer') && nw.k.has('oval')).toBe(true);
     const de = kinds('desert', 0.3, false);
     expect(de.n).toBeGreaterThan(10);
-    expect(de.maxScale).toBeLessThan(1.3);                    // juniper, and a cottonwood or two on the wash
+    expect(de.maxScale).toBeLessThan(1.4);                    // juniper, mesquite and palo verde, no tall timber
     const pnw = kinds('pnw', 1.4);
     expect(pnw.k.has('conifer')).toBe(true);
     expect(pnw.maxScale).toBeGreaterThan(1.5);                // big Douglas fir
+    // the desert is not a conifer woodland: a regional mix of low trees and cacti
+    expect(de.k.has('conifer')).toBe(false);
+    const dk = kinds('desert', 1, false).k;
+    for (const k of ['juniper', 'mesquite', 'paloverde', 'saguaro'] as const) expect(dk.has(k)).toBe(true);
+    // the Texas hill country's Ashe juniper is a juniper, not a spruce
+    expect(kinds('hill_country').k.has('conifer')).toBe(false);
     // the Plains: trees only along the creek
     expect(kinds('plains', 0.2, false).n).toBeLessThan(40);
     expect(kinds('plains', 0.2, true).n).toBeGreaterThan(kinds('plains', 0.2, false).n);
+  });
+});
+
+describe('desert tree mix', () => {
+  it('is mostly low trees: saguaro are sparse, no species outweighs the mix', () => {
+    const t = new ParcelTerrain(11, { region: 'desert', timber: 1, creek: false });
+    const tr = planParcelTrees(t, { margin: 4 });
+    const n = (k: string) => tr.filter(s => s.kind === k).length;
+    expect(tr.length).toBeGreaterThan(30);
+    expect(n('saguaro')).toBeLessThan(tr.length * 0.2);
+    expect(n('juniper') / tr.length).toBeLessThan(0.7);
+    expect(n('mesquite') + n('paloverde')).toBeGreaterThan(0);
+    // a cottonwood only where a creek really runs
+    expect(n('broad')).toBe(0);
+    const wet = planParcelTrees(new ParcelTerrain(11, { region: 'desert', timber: 1, creek: true }), { margin: 4 });
+    expect(wet.some(s => s.kind === 'broad')).toBe(true);
   });
 });

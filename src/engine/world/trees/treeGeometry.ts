@@ -327,6 +327,8 @@ function makeLimb(
   rB: number,
   sides: number,
   shade: (p: THREE.Vector3) => number,
+  /** 1: takes the instance's foliage color (palo verde's green stems, saguaro flesh); 0: bark. */
+  leaf = 0,
 ): THREE.BufferGeometry {
   // r15: each limb starts a little inside its parent so joints never gape
   const back = Math.min(rA * 0.8, a.distanceTo(b) * 0.25);
@@ -336,7 +338,7 @@ function makeLimb(
   const dir = b.clone().sub(a).normalize();
   g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir));
   g.translate(a.x, a.y, a.z);
-  return finalize(g, 0, b, (p) => { const s = shade(p); return [s, s, s]; });
+  return finalize(g, leaf, leaf ? new THREE.Vector3(a.x, 0, a.z) : b, (p) => { const s = shade(p); return [s, s, s]; });
 }
 
 // ── Broadleaf trees ───────────────────────────────────────────────────────────
@@ -809,6 +811,106 @@ export function buildPalmTree(detail: VegDetail, seed: number, lod: TreeLod = 0)
   }
   parts.push(soupGeometry(s));
   return mergeVeg(parts, 'palm');
+}
+
+// ── Desert trees (southwest / desert lots) ────────────────────────────────────
+
+export type DesertTreeSpecies = 'juniper' | 'mesquite' | 'paloverde' | 'saguaro';
+
+/**
+ * Southwest lot trees, true size at scale 1 (1 unit ≈ 20 ft):
+ *   juniper   — one-seed juniper: a squat, dense, lumpy olive-gray dome on a
+ *               short shreddy trunk, ≈ 0.8 tall (16 ft);
+ *   mesquite  — honey mesquite: two or three leaning stems under a low,
+ *               wide, airy, flat-topped crown, ≈ 1.0 tall and 1.6 wide;
+ *   paloverde — a vase of smooth green stems (they take the foliage color)
+ *               under a light, pale yellow-green crown, ≈ 0.95 tall;
+ *   saguaro   — a ribbed green column with up to three upturned arms,
+ *               ≈ 1.6 tall (32 ft), no leaves, no sway to speak of.
+ * Same attribute contract as the other tree builders; low detail only needs a
+ * few hundred triangles each.
+ */
+export function buildDesertTree(species: DesertTreeSpecies, detail: VegDetail, seed: number, lod: TreeLod = 0): THREE.BufferGeometry {
+  const rng = makeRng(seed + 1307 + ({ juniper: 0, mesquite: 53, paloverde: 97, saguaro: 151 })[species]);
+  const parts: THREE.BufferGeometry[] = [];
+  const near = lod === 0;
+  const sides = lod === 2 ? 4 : lod === 1 ? 5 : 7;
+  const barkShade = (p: THREE.Vector3): number => Math.min(1, 0.55 + p.y * 0.5);
+
+  if (species === 'saguaro') {
+    const ribs = lod === 2 ? 6 : lod === 1 ? 8 : 12;
+    const H = 1.6, R = 0.075;
+    const rib = (p: THREE.Vector3): number => (lod === 0 ? 0.74 + 0.26 * Math.abs(Math.cos(Math.atan2(p.z, p.x) * ribs / 2)) : 0.88) * Math.min(1, 0.8 + p.y * 0.3);
+    parts.push(makeLimb(new THREE.Vector3(0, -0.05, 0), new THREE.Vector3(0, H, 0), R * 1.06, R * 0.92, ribs, rib, 1));
+    const cap = new THREE.SphereGeometry(R * 0.92, ribs, 3, 0, Math.PI * 2, 0, Math.PI / 2);
+    cap.translate(0, H, 0);
+    parts.push(finalize(cap, 1, new THREE.Vector3(0, 0, 0), () => [0.95, 0.95, 0.95]));
+    const nArms = rng() < 0.2 ? 0 : rng() < 0.5 ? 1 : rng() < 0.6 ? 2 : 3;
+    for (let i = 0; i < nArms; i++) {
+      const a = (i / Math.max(1, nArms)) * Math.PI * 2 + rng() * 1.2 + (i ? Math.PI : 0);
+      const dir = new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
+      const y0 = 0.62 + rng() * 0.45, reach = 0.2 + rng() * 0.12, top = y0 + 0.28 + rng() * 0.4;
+      const r = R * 0.62;
+      const elbow = new THREE.Vector3(0, y0, 0).addScaledVector(dir, reach);
+      const tip = elbow.clone().setY(Math.min(H - 0.1, top));
+      parts.push(makeLimb(new THREE.Vector3(0, y0, 0).addScaledVector(dir, R * 0.3), elbow, r, r, Math.max(5, ribs - 3), () => 0.85, 1));
+      parts.push(makeLimb(elbow.clone().setY(y0 - r * 0.6), tip, r, r * 0.92, Math.max(5, ribs - 3), (q) => 0.8 + 0.2 * Math.min(1, q.y / 1.5), 1));
+      const ac = new THREE.SphereGeometry(r * 0.92, Math.max(5, ribs - 3), 3, 0, Math.PI * 2, 0, Math.PI / 2);
+      ac.translate(tip.x, tip.y, tip.z);
+      parts.push(finalize(ac, 1, new THREE.Vector3(tip.x, 0, tip.z), () => [0.95, 0.95, 0.95]));
+    }
+    return mergeVeg(parts, 'saguaro');
+  }
+
+  const lobes: LobeSpec[] = [];
+  let crown: THREE.Vector3, crownR: number, squashY: number, stems: number, leafy = 0;
+  if (species === 'juniper') {
+    crown = new THREE.Vector3(0, 0.46, 0); crownR = 0.5; squashY = 0.92; stems = 1;
+    lobes.push({ c: crown.clone(), r: 0.42, tint: 0 });
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + rng() * 0.8, rr = 0.26 + rng() * 0.1;
+      lobes.push({ c: new THREE.Vector3(Math.cos(a) * rr, 0.36 + rng() * 0.2, Math.sin(a) * rr), r: 0.3 + rng() * 0.07, tint: (rng() - 0.5) * 0.12 });
+    }
+  } else if (species === 'mesquite') {
+    crown = new THREE.Vector3(0, 0.68, 0); crownR = 0.82; squashY = 0.58; stems = 2 + (rng() < 0.5 ? 1 : 0);
+    lobes.push({ c: new THREE.Vector3(0, crown.y + 0.1, 0), r: 0.46, tint: 0.03 });
+    const ring = 6;
+    for (let i = 0; i < ring; i++) {
+      const a = (i / ring) * Math.PI * 2 + rng() * 0.6, rr = 0.5 + rng() * 0.22;
+      lobes.push({ c: new THREE.Vector3(Math.cos(a) * rr, crown.y - 0.06 + rng() * 0.16, Math.sin(a) * rr), r: 0.3 + rng() * 0.08, tint: (rng() - 0.5) * 0.14 });
+    }
+  } else {
+    crown = new THREE.Vector3(0, 0.66, 0); crownR = 0.62; squashY = 0.78; stems = 3; leafy = 1;
+    lobes.push({ c: new THREE.Vector3(0, crown.y + 0.14, 0), r: 0.34, tint: 0.05 });
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 + rng() * 0.7, rr = 0.32 + rng() * 0.12;
+      lobes.push({ c: new THREE.Vector3(Math.cos(a) * rr, crown.y - 0.08 + rng() * 0.18, Math.sin(a) * rr), r: 0.25 + rng() * 0.06, tint: (rng() - 0.5) * 0.12 });
+    }
+  }
+  const seg: [number, number] = lod === 0 ? [9, 6] : lod === 1 ? [7, 5] : [6, 4];
+  parts.push(makeCrownShell(lobes, crown, seg[0], seg[1], seed, 0.2, false,
+    near ? { shrink: 0.88, holey: species !== 'juniper', squashY } : { squashY }));
+  if (lod < 2) {
+    const k = (species === 'juniper' ? 0.8 : species === 'mesquite' ? 1.1 : 0.9) * (near ? 1 : 0.25);
+    parts.push(makeLeafCards(lobes, crown, crownR, cardCount(detail, k), species === 'mesquite' ? 0.14 : 0.12 * (near ? 1 : 1.6), rng, { squashY, under: 0.3 }));
+  }
+  // trunk(s): lean out toward the crown, branch once into it
+  const bottom = crown.y - crownR * 0.7 * squashY;
+  const stemR = species === 'juniper' ? 0.075 : species === 'mesquite' ? 0.07 : 0.045;
+  for (let i = 0; i < stems; i++) {
+    const a = (i / stems) * Math.PI * 2 + rng() * 0.8;
+    const lean = stems === 1 ? 0.04 : 0.2 + rng() * 0.12;
+    const foot = new THREE.Vector3(Math.cos(a) * 0.03, -0.04, Math.sin(a) * 0.03);
+    const mid = new THREE.Vector3(Math.cos(a) * lean * 0.5, bottom * 0.55, Math.sin(a) * lean * 0.5);
+    const top = new THREE.Vector3(Math.cos(a) * lean, crown.y - 0.05, Math.sin(a) * lean);
+    parts.push(makeLimb(foot, mid, stemR * 1.2, stemR, sides, barkShade, leafy));
+    parts.push(makeLimb(mid, top, stemR, stemR * 0.55, sides, barkShade, leafy));
+    if (near && species !== 'juniper') {
+      const L = lobes[1 + ((i * 2) % (lobes.length - 1))];
+      parts.push(makeLimb(top, new THREE.Vector3(L.c.x * 0.9, L.c.y - L.r * 0.4, L.c.z * 0.9), stemR * 0.5, stemR * 0.2, 4, barkShade, leafy));
+    }
+  }
+  return mergeVeg(parts, species);
 }
 
 // ── Conifer ───────────────────────────────────────────────────────────────────

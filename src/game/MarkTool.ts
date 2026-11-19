@@ -10,6 +10,7 @@ import type { ParcelTree } from './parcel/parcelTrees';
 import { trunkRadius } from './forestry/woodsGeometry';
 import { useGameStore } from '../store/gameStore';
 import { isMarked } from '../sim/forestry';
+import type { FellJob } from '../sim/state';
 
 export class MarkTool {
   private readonly _ray = new THREE.Raycaster();
@@ -71,18 +72,19 @@ export class MarkTool {
     this._ring.position.set(t.x, this._world.groundAt(t.x, t.z) + 0.03, t.z);
     (this._ring.material as THREE.MeshBasicMaterial).color.set(own ? 0xffb04a : 0xe36a5a);
     this._ring.visible = true;
-    const name = t.kind === 'conifer' ? 'Ponderosa pine' : t.kind === 'oval' ? 'Aspen' : 'Cottonwood';
+    const name = t.kind === 'conifer' ? 'Ponderosa pine' : t.kind === 'oval' ? 'Aspen' : t.kind === 'juniper' ? 'Juniper' : t.kind === 'mesquite' ? 'Mesquite' : t.kind === 'paloverde' ? 'Palo verde' : t.kind === 'saguaro' ? 'Saguaro' : 'Cottonwood';
     const marked = isMarked(useGameStore.getState().game, t.id);
-    useGameStore.getState().setToolProblem(own ? `${name}: click to ${marked ? 'unmark' : 'mark for felling'}` : 'Not your land (a neighbor\'s tree)');
+    useGameStore.getState().setToolProblem(t.kind === 'saguaro' ? 'Saguaro: protected, it will not be felled' : own ? `${name}: click to ${marked ? 'unmark' : 'mark for felling'}` : 'Not your land (a neighbor\'s tree)');
   }
 
   /** Mark / unmark the hovered tree (also QA). */
   markHover(): void {
     const t = this._hover;
     if (!t) { useGameStore.getState().showToast('Point at a tree on your land and click to mark it for felling.'); return; }
+    if (t.kind === 'saguaro') { useGameStore.getState().showToast('A saguaro is protected and takes a century to grow. It stays.'); return; }
     if (!ownsAt(useGameStore.getState().game, t.x, t.z)) { useGameStore.getState().showToast('That tree is on a neighbor\'s land.'); return; }
     const y = this._world.access.yard;
-    useGameStore.getState().toggleMark({ id: t.id, x: t.x, z: t.z, kind: t.kind as 'conifer' | 'oval' | 'broad', scale: t.scale }, Math.hypot(t.x - y.x, t.z - y.z));
+    useGameStore.getState().toggleMark({ id: t.id, x: t.x, z: t.z, kind: t.kind as FellJob['kind'], scale: t.scale }, Math.hypot(t.x - y.x, t.z - y.z));
     this._setHover(t);
   }
 

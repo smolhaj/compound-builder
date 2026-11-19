@@ -21,7 +21,7 @@ import { tracksAt, triggerDisaster, type DisasterKind } from '../sim/disaster';
 import { bearingNudge } from './felt/cameraKick';
 import { getHitLive } from './felt/hitLive';
 import { useEffect, useRef } from 'react';
-import type { GameState } from '../sim/state';
+import type { GameState, FellJob } from '../sim/state';
 import { MushroomCloud } from './fx/MushroomCloud';
 import { collapseLook, withWeather } from '../sim/collapseLook';
 import { OasisState } from './atmosphere/OasisState';
@@ -180,7 +180,7 @@ export function GameCanvas() {
     useWorldStore.getState().setMarkNearestTrees((n, logs) => {
       const st = useGameStore.getState(), g = st.game, y = world.access.yard;
       const all = world.treeSpecs
-        .filter(t => t.x > -0.5 && t.z > -0.5 && t.x < PARCEL_SIZE + 0.5 && t.z < PARCEL_SIZE + 0.5 && t.scale >= 0.6 && ownsAt(g, t.x, t.z) && !isMarked(g, t.id) && !g.forestry.cleared.includes(t.id))
+        .filter(t => t.x > -0.5 && t.z > -0.5 && t.x < PARCEL_SIZE + 0.5 && t.z < PARCEL_SIZE + 0.5 && t.scale >= 0.6 && t.kind !== 'saguaro' && ownsAt(g, t.x, t.z) && !isMarked(g, t.id) && !g.forestry.cleared.includes(t.id))
         .map(t => ({ t, d: Math.hypot(t.x - y.x, t.z - y.z) }))
         .sort((a, b) => a.d - b.d);
       let near = all.slice(0, n);
@@ -188,13 +188,13 @@ export function GameCanvas() {
         near = [];
         let got = 0;
         for (const c of all) {
-          const lg = yieldOf(c.t.kind as 'conifer' | 'oval' | 'broad', c.t.scale).logs;
+          const lg = yieldOf(c.t.kind as FellJob['kind'], c.t.scale).logs;
           if (lg <= 0) continue;
           near.push(c); got += lg;
           if (got >= logs) break;
         }
       }
-      return st.markTrees(near.map(({ t, d }) => ({ tree: { id: t.id, x: t.x, z: t.z, kind: t.kind as 'conifer' | 'oval' | 'broad', scale: t.scale }, haulDist: d })));
+      return st.markTrees(near.map(({ t, d }) => ({ tree: { id: t.id, x: t.x, z: t.z, kind: t.kind as FellJob['kind'], scale: t.scale }, haulDist: d })));
     });
     // the weak-spots overlay (sim/wallTops.ts): trees on our land feed the scan, the markers show where a climber bypasses a wall
     const ownedTrees = () => {
