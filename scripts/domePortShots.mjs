@@ -41,7 +41,7 @@ try {
     cb.store.getState().setHudHidden?.(true);
     return { id: st.id, x: st.x, z: st.z, rot: ROT, port: st.portAngle ?? null, yard: [y.x, y.z], end };
   }, [KIND, ROT]);
-  if (!info) throw new Error('no spot for ' + KIND);
+  if (!info) { console.error('no spot for ' + KIND); await page.close(); continue; }
   lap(JSON.stringify(info));
   await frames(4);
   const dm = await page.evaluate(async id => { const s = await import('/src/sim/dome/standing.ts'); const d = s.domesOf(window.__cb.game.getState().game).find(x => x.id === id); const a = d.airlocks.find(l => l.role === 'vehicle'); return { r: d.r, x: d.x, z: d.z, a: a ? { angle: a.angle, x: a.x, z: a.z, inX: a.inX, inZ: a.inZ } : null, tier: d.tier }; }, info.id);
