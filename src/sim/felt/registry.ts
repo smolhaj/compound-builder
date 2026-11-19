@@ -30,6 +30,8 @@ import { felt as globalFamine } from './kinds/global_famine';
 import { felt as waterWar } from './kinds/water_war';
 import { felt as cultTakeover } from './kinds/cult_takeover';
 import { felt as massExodus } from './kinds/mass_exodus';
+import { felt as runawayHeat } from './kinds/runaway_heat';
+import { felt as iceAge } from './kinds/ice_age';
 
 export const FELT: Record<FeltKind, FeltSpec> = {
   grid_down: gridDown,
@@ -61,6 +63,8 @@ export const FELT: Record<FeltKind, FeltSpec> = {
   water_war: waterWar,
   cult_takeover: cultTakeover,
   mass_exodus: massExodus,
+  runaway_heat: runawayHeat,
+  ice_age: iceAge,
 };
 
 export const FELT_KINDS = Object.keys(FELT) as FeltKind[];

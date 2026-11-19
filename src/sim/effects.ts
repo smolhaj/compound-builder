@@ -7,6 +7,7 @@
  * timber, a sickness that comes in with strangers, neighbors who are simply
  * gone. Pure.
  */
+import { heatWellYield } from './slowClimate';
 import { waterWarYield } from './waterWar';
 import { medicalBay } from './richSinks';
 import { burnStructure, isFinished } from './construction';
@@ -35,6 +36,7 @@ const hit = (s: GameState, ...k: string[]) => !!s.disaster.kind && k.includes(s.
 /** Wells: share of their yield left (drought draws the water table down). */
 export function wellYield(s: GameState, kind: string): number {
   if (hit(s, 'water_war')) return waterWarYield(s.disaster.variant, kind, since(s));   // (the compact broke, or the aquifer fell: sim/waterWar.ts)
+  if (hit(s, 'runaway_heat')) return heatWellYield(s, kind);   // (the water table falls over years: sim/slowClimate.ts)
   if (!hit(s, 'drought')) return 1;
   const d = since(s);
   return kind === 'well_hand' ? Math.max(0, 1 - d / 45) : Math.max(0.35, 1 - d / 200);

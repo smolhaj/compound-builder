@@ -10,7 +10,7 @@ const hit = (kind: DisasterKind) => { const g = newGame(1, 105, 2027, { mode: 's
 
 describe('the per-kind hook seam', () => {
   it('has a module for every kind, and every kind has a ruleset', () => {
-    expect(KINDS.length).toBe(29);
+    expect(KINDS.length).toBe(31);
     for (const k of KINDS) expect(FX[k], k).toBeDefined();
     expect(Object.keys(FX).sort()).toEqual([...KINDS].sort());
   });

@@ -117,6 +117,18 @@ const CHAINS: Partial<Record<FeltKind, { title: string; steps: Def[] }>> = {
     ['bugout', {}],
     ['radio', { title: 'Keep a radio for word from the resistance' }],
   ] },
+  runaway_heat: { title: 'Find the cool places', steps: [
+    ['cellar', { title: 'Make a cool underground room', why: s => `The earth stays near 52 degrees all year; the house will not. A cellar or a bunker is where the family sleeps. ${clockWords(s)}` }],
+    ['cistern', { title: 'Store water against a falling well', why: 'The water table drops each summer. A covered cistern loses less than an open tank.' }],
+    ['water', {}],
+    ['food90', { title: 'Store a season of food: outdoor crops will fail' }],
+  ] },
+  ice_age: { title: 'Stack the winter and treat the fuel', steps: [
+    ['firewood', { title: 'Stack more wood than a winter used to need', why: s => `A cabin burns about twice the wood it used to in this cold. ${clockWords(s)}` }],
+    ['fuel', { title: 'Treat and store fuel against the cold', why: 'Untreated diesel gels near 10 degrees and a generator that will not start is no use in a blizzard.' }],
+    ['food90', { title: 'Store a year of food: the growing season is gone' }],
+    ['coldCrops', {}],
+  ] },
   mass_exodus: { title: 'Meet the people on the road', steps: [
     ['tents', {}],
     ['food90', { title: 'Stock for guests: a ration plan' }],

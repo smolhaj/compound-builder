@@ -320,8 +320,8 @@ All procedural, no external assets. **No performance budget is raised**: nothing
 | PR | Content | Size | Depends on | Parallel with |
 |---|---|---|---|---|
 | 1 (**done**, [#385](https://github.com/smolhaj/compound-builder/pull/385)) | `climateCurve.ts` (curves, regional tables, wet-bulb, work gate, grow factor) plus tests; `winter.ts` `coldScale` | S (about 350 lines) | this draft | none |
-| 2 | `runaway_heat` kind: `DisasterDef`, `KindFx`, blurbs, pool and fate, scenario card, look profile, no dome changes | M | 1 | 3 |
-| 3 | `ice_age` kind (same shape) | M | 1 | 2 |
+| 2 (**done**, [#386](https://github.com/smolhaj/compound-builder/pull/386)) | `runaway_heat` kind: `DisasterDef`, `KindFx`, blurbs, pool and fate, scenario card, look profile, no dome changes. Landed: variants `dry_furnace` / `humid_furnace`; heat lift to every night (`housing.meanLow`), outdoor work gated by wet-bulb (`heatWork.ts`, engine), grid seasonal failure, crops, wells, thirst, heat illness (PROPOSED), a wet cool-room card, cooked glasshouse film, sky row. Deferred: hens and livestock (no hook), a dawn-and-night schedule shift, the dome and plant (PR 4) | M | 1 | 3 |
+| 3 (**done**, [#386](https://github.com/smolhaj/compound-builder/pull/386), same branch as 2) | `ice_age` kind (same shape). Landed: variants `dimmed_sun` / `ocean_shutdown`; cold through `winterAt(..., coldScale)`, wood use 2x, battery and diesel-gel teeth (`utilities.ts`), solar follows the dim sun, roof snow load through a thin adapter on the `ashfall.ts` tables (shoveling card), ground load in `look`, southward neighbors. Deferred: full `snowLoad.ts` and dome snow (PR 5), livestock and wolves (no hook), frozen-well and airlock teeth | M | 1 | 2 |
 | 4 | `plantClimate.ts` and dome plant integration: COP, derate and trip, battery temperature, `heat` and `load` causes, repair lead scaling | M to L | 1 | 5 (different files, same `live.ts` seams: sequence the merge) |
 | 5 | `snowLoad.ts`, building roof loads, dome snow breach and shedding, shoveling, cold equipment teeth (diesel gel, batteries) | M | 1, 3 | 4, 7 |
 | 6 | UI: dome readouts, limit cards, setup and scenario text, collapse chip | M | 4, 5 | 7 |
@@ -330,3 +330,13 @@ All procedural, no external assets. **No performance budget is raised**: nothing
 | 9 (optional) | PROPOSED purchases: cooling tower, ground-loop heat pump, thermal curtains; save v104 | M | 4, 6 | none |
 
 Order: 1, then {2, 3} and {4, 5} and 7 in parallel, then 6, then 8, then 9. The only real conflict is 4 versus 5 inside `dome/live.ts`; keep 4 in `plantClimate.ts` and 5 in `snowLoad.ts` and touch `live.ts` in two small, separate hunks.
+
+### Notes from building PRs 2 and 3 (deviations from the draft)
+
+- **Era hold** is in `sim/slowClimate.eraHoldDays` (curve length times the difficulty stretch, plus one year) and read in `eras.ts`; zero for every other kind, so their timing is unchanged (tested).
+- **Difficulty** adds two `DIFFICULTY` fields, `climateStretch` (1.5 / 1 / 0.8) and `climateAmp` (0.7 / 1 / 1.2); Standard stays exactly 1.
+- **Heat lift** goes in through `housing.meanLow` (one place, so nights, the dome's `outside()`, cold and heating all see it) rather than a new term in `dome/live.outside()`. PR 4 should not add it again. The lift is 0.85 of the delta because `nightOf` already adds 12 F on hot nights.
+- **Grow factor** is normalized to the region's own normal summer (so year 0 starts at 1.0); the doc's absolute formula would cut crops in Hill Country before the hit.
+- **Surprise filter**: a first Surprise run (`newDisaster`) never rolls the two kinds; the era roll never follows one winter kind (`ash_winter`, `supervolcano`, `asteroid`, `runaway_heat`, `ice_age`) with another. Nuclear is not in the set.
+- The felt layer (`sim/felt`) needed rows for both kinds (radio, cards, hit moment, goals, theme).
+- Snow cover reuses `ashCover` with a white `ashColor`; `withWeather` thins ash cover in snow, so a snowfall slightly dims the white cover (cosmetic; fix with PR 7).
