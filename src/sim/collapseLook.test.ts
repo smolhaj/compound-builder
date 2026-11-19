@@ -122,7 +122,7 @@ const ALL_KINDS = (Object.keys(DISASTERS) as DisasterKind[]).filter(k => !PLACEH
 
 describe('every disaster has a look of its own', () => {
   it('covers every disaster in the engine, and each shows something at impact', () => {
-    expect(ALL_KINDS.length).toBe(16);
+    expect(ALL_KINDS.length).toBe(18);
     for (const k of ALL_KINDS) {
       const l = collapseLook(at(k, k === 'nuclear' ? 0.001 : 4, k === 'nuclear' ? 'distant' : undefined));
       expect(l.stage, k).not.toBe('none');

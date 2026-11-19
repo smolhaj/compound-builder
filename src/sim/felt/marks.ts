@@ -347,7 +347,7 @@ export const RECIPES: Partial<Record<FeltKind, Recipe>> = {
   zombies, invasion: warZone('invasion'), civil_war: warZone('civil_war'),
   grid_down: gridOut(30), solar_flare: gridOut(6), emp: gridOut(180), cyberattack: gridOut(40),
   pandemic: quarantine(false), bioweapon: quarantine(false), livestock_plague: quarantine(true),
-  drought: barren, crop_blight: barren, global_famine: barren,
+  drought: barren, crop_blight: barren, global_famine: barren, runaway_heat: barren, ice_age: barren,
   nuclear: blastOf(true), asteroid: blastOf(false), reactor_meltdown: blastOf(true),
   financial: supply, oil_shock: supply, satellite_loss: supply,
   mass_exodus: exodus, lawless: unrest, cult_takeover: cult,
@@ -369,6 +369,7 @@ export function cropLook(kind: FeltKind | null, day: number): { dead: number; em
     case 'nuclear': case 'reactor_meltdown': return { dead: 0.8 * ramp(day, 4), empty: day > 30 };
     case 'dam_flood': return { dead: 0.6 * ramp(day, 3) * decay(day, 60, 60), empty: day < 20 };
     case 'water_war': return { dead: 0.5 * ramp(day, 20), empty: false };
+    case 'runaway_heat': case 'ice_age': return { dead: 0.6 * ramp(day, 240), empty: day > 700 };
     case 'solar_flare': case 'asteroid': return { dead: 0.3 * ramp(day, 10), empty: false };
     default: return { dead: 0, empty: false };
   }

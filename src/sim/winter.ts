@@ -31,14 +31,15 @@ export function curveAt(days: number): number {
 
 /**
  * `severity` 1 = a supereruption (fMin 0.15, -10 F), 0.35 a VEI 7, 0 nothing. `days` counts from the start of the winter (the end of the main
- * dust or ash fall; the caller subtracts it).
+ * dust or ash fall; the caller subtracts it). `coldScale` (default 1: no change) multiplies only the temperature anomaly: at the
+ * regional k cap (1.2) 3.4 gives about -41 F, the ice age's mean cold; grow, solar and food stress keep their shape.
  */
-export function winterAt(days: number, severity: number, region: RegionId): WinterState {
+export function winterAt(days: number, severity: number, region: RegionId, coldScale = 1): WinterState {
   if (severity <= 0 || days < 0) return NO_WINTER;
   const k = Math.min(1.2, severity * REGION_WINTER[region]), c = curveAt(days);
   const fMin = 1 - 0.85 * k;
   const grow = 1 - (1 - fMin) * c;
-  const coldF = -10 * k * c;
+  const coldF = -10 * k * c * (Number.isFinite(coldScale) ? Math.max(0, coldScale) : 1);
   const solar = 1 - 0.4 * Math.min(1, k) * c;
   // stress follows the lost harvest over the last year, eased by what has been stored (the world has some)
   const foodStress = Math.max(0, Math.min(1, (1 - grow) * 1.15 - 0.05));

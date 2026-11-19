@@ -26,6 +26,7 @@
  * sleep quality (0–1) moves the morale target, wears health when it is
  * really bad (freezing, soaked) and builds up `Needs.tired`.
  */
+import { heatLiftF } from './slowClimate';
 import { homeAdvice, homeAdviceText } from './homeAdvice';
 import { calendarOf, dayIndex, type GameState } from './state';
 import { HOME_BEDS } from './blueprints';
@@ -104,7 +105,7 @@ const STORMY = new Set(['blizzard', 'ice_storm', 'flood', 'hurricane_remnants', 
 /** The mean overnight low (°F) for a day of the year here: January's low at mid-January, a summer low 26° under July's high. */
 export function meanLow(s: GameState, doy: number): number {
   const R = regionFor(s.site), a = R.janLowF, b = R.julyHighF - 26;
-  return (a + b) / 2 - (b - a) / 2 * Math.cos(2 * Math.PI * (doy - 15) / 365) - climate(s).cold * 40;
+  return (a + b) / 2 - (b - a) / 2 * Math.cos(2 * Math.PI * (doy - 15) / 365) - climate(s).cold * 40 + heatLiftF(s, doy);   // (a runaway-heat disaster lifts every night: sim/slowClimate.ts; 0 otherwise)
 }
 
 /** Tonight's weather. `calm` leaves out the day-to-day noise and any storm (the season's usual night: used to decide who goes where). */
