@@ -45,7 +45,7 @@ export function ringRadii(s: GameState, c: { x: number; z: number }, lineR: numb
   return out.slice(0, manned);
 }
 
-/** Seconds the crew spends at each inner ring before it gives (a sally port never shortens it; its worth is the sortie). */
+/** Seconds the crew spends at each inner ring before it gives (a sally port never shortens it; its worth is the counterattack). */
 export function ringDelay(_s: GameState, inner: number): number {
   if (inner <= 0) return 0;
   return RING.DELAY;

@@ -124,7 +124,7 @@ export interface Gate {
   w: number;
   /** The gap is filled by a gatehouse garage (sim/garage.ts): no gate leaves are drawn, and the garage holds the line here. */
   garage?: boolean;
-  /** A sally port: a small side door in a ring wall (sim/rings.ts SALLY): a weak spot a crew funnels to, and a way for the defenders to sortie. */
+  /** A sally port: a small side door in a ring wall (sim/rings.ts SALLY): a weak spot a crew funnels to, and a way for the defenders to counterattack. */
   sally?: boolean;
   /** A gap knocked through the wall for the cutscene (game/battle/liveBreach.ts): drawn as bare open ground, never saved. */
   breach?: boolean;
