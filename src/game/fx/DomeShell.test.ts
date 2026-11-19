@@ -23,4 +23,17 @@ describe('dome shell climate', () => {
     setShellClimate(NaN, Infinity);
     expect(shellClimateNow().frost).toBe(0); expect(kitMaterial('glass').opacity).toBe(house);
   });
+  it('the double-sided shells keep their inner skin clear: a back-face branch in the fragment shader, reading the base values', () => {
+    setShellClimate(0.5, 0);
+    for (const id of ['dome_polycarb', 'arcology'] as const) {
+      const m = kitMaterial(id), sh = { uniforms: {} as Record<string, { value: unknown }>, fragmentShader: '#include <color_fragment>\n#include <roughnessmap_fragment>\n#include <metalnessmap_fragment>' };
+      m.onBeforeCompile(sh as never, undefined as never);
+      expect(sh.fragmentShader).toContain('if ( !gl_FrontFacing ) diffuseColor');
+      expect(sh.fragmentShader).toContain('if ( !gl_FrontFacing ) roughnessFactor');
+      expect(sh.fragmentShader).toContain('if ( !gl_FrontFacing ) metalnessFactor');
+      expect(sh.uniforms.uShellIn).toBeDefined();
+    }
+    // (dome_glass is front-side only, so its inner skin is never drawn: nothing to patch)
+    expect(kitMaterial('dome_glass').customProgramCacheKey()).not.toBe('shell-inner-clear');
+  });
 });
