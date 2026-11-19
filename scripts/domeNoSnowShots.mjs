@@ -3,7 +3,7 @@
  * a heat year; the views are the owner's aerial (from above and the southwest), an eye-level shot inside the dome with a person, and a top-down.
  * One scene per run (software GL is slow); run under the render lock:
  *   flock /tmp/cb.lock node scripts/domeNoSnowShots.mjs --climate cold --region north_woods --years 3 --views sw,inside --state ok
- *   --state ok | dark (plant dark, 90 panels down, the protection eased for --days 2 | 12) ; --two adds an unprotected second dome ; --dome glass|arcology|geodesic
+ *   --state ok,dark:2,dark:12 (dark:N = plant dark and 90 panels down, N game days eased) ; --two adds an unprotected second dome ; --dome glass|arcology|geodesic
  *   flock /tmp/cb.lock node scripts/domeNoSnowShots.mjs --climate heat --region plains --years 4 --views sw,inside
  * Options: --quality high|medium, --doy (default 20 cold, 200 heat), --port 5973, --out docs/ux/dome-no-snow, --tag name.
  */
@@ -17,7 +17,7 @@ try { ({ chromium } = require('playwright')); } catch { ({ chromium } = await im
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const kind = 'dome';
-const stateOpt = opt('--state', 'ok'), two = args.includes('--two'), days = Number(opt('--days', 2));
+const states = opt('--state', 'ok').split(','), two = args.includes('--two');
 const region = opt('--region', 'north_woods');
 const years = opt('--years', '0,2,4').split(',').map(Number);
 const views = opt('--views', 'sw,inside').split(',');
@@ -29,7 +29,7 @@ const climate = opt('--climate', 'cold');                 // (dome scene) heat |
 const domeTier = opt('--dome', 'glass');
 const doy = Number(opt('--doy', kind === 'ice' || climate === 'cold' ? 20 : 200));
 const outDir = resolve(opt('--out', 'docs/ux/dome-no-snow'));
-const tag = opt('--tag', `${domeTier}-${climate}-${stateOpt}${two ? '-two' : ''}`);
+const tag = opt('--tag', `${domeTier}-${climate}${two ? '-two' : ''}`);
 mkdirSync(outDir, { recursive: true });
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise((ok, fail) => { vite.stdout.on('data', d => { if (/localhost:\d+/.test(String(d).replace(/\x1b\[[0-9;]*m/g, ''))) ok(); }); vite.on('exit', c => fail(new Error('vite ' + c))); });
@@ -53,7 +53,7 @@ try {
     const f = `${outDir}/${tag}-${name}.png`; await page.screenshot({ path: f }); lap(f);
   };
   // staging: a finished cabin, a person, and (for the dome scene) a dome with a house under it
-  const stage = await page.evaluate(async ([kind, domeTier]) => {
+  const stage = await page.evaluate(async ([kind, domeTier, two]) => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp;
     G.getState().setSpeed(0);
     G.setState(s => ({ game: { ...s.game, money: 500_000_000 } }));
@@ -72,7 +72,7 @@ try {
     G.setState(s => { const g = structuredClone(s.game); for (const st of g.structures) { st.stage = 99; st.done = 0; st.finishedAt = 0; st.supplied = true; } g.utilities.lit = ['x']; return { game: g }; });
     cb.store.getState().setHudHidden?.(true);
     return { spot, R };
-  }, [kind, domeTier]);
+  }, [kind, domeTier, two]);
   lap('staged ' + JSON.stringify(stage));
   if (!stage.spot) throw new Error('no spot');
   const sp = [stage.spot.x, stage.spot.z], R = stage.R;
@@ -114,14 +114,17 @@ try {
   // a person in the frame for scale: by the porch (outside the dome for the dome scene)
   await page.evaluate(([sp, R]) => { const w = window.__cb.world, [fx, fz] = w.openSpotNear(sp[0] - R * 0.2, sp[1] - R * 0.35, 0.3); w.qaFigure(fx, fz); }, [sp, R]);
   for (const hour of hours) for (const y of years) {
-    await setYear(y, hour, 'ok', 0);
-    // the protection is eased in game days: land on the protected value first (snap), then for a dark plant let `days` game days run with the plant dark and the shell breached
-    await frames(14); await page.evaluate(() => window.__cb.domeInterior.snap()); await frames(14);
-    if (stateOpt === 'dark') { await setYear(y, hour, 'dark', days); await frames(14); }
-    for (const mode of views) {
-      await view(mode);
-      const hn = Object.entries(HOURS).find(([, v]) => v === hour)?.[0] ?? `h${hour}`;
-      await shot(`y${y}-${hn}-${mode}`);
+    for (const stt of states) {
+      const [stName, stDays] = stt.split(':'), tagS = stt.replace(':', 'd');
+      await setYear(y, hour, 'ok', 0);
+      // the protection is eased in game days: land on the protected value first (snap), then for a dark plant let `days` game days run with the plant dark and the shell breached
+      await frames(14); await page.evaluate(() => window.__cb.domeInterior.snap()); await frames(14);
+      if (stName === 'dark') { await setYear(y, hour, 'dark', Number(stDays ?? 2)); await frames(14); }
+      for (const mode of views) {
+        await view(mode);
+        const hn = Object.entries(HOURS).find(([, v]) => v === hour)?.[0] ?? `h${hour}`;
+        await shot(`y${y}-${hn}-${mode}-${tagS}`);
+      }
     }
     const info = await page.evaluate(async () => {
       const { collapseLook } = await import('/src/sim/collapseLook.ts'); const l = collapseLook(window.__cb.game.getState().game);
