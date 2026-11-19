@@ -315,6 +315,7 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
             post(A.x, A.z, H + FLH, 0.045 * M, frame);                                               // rib post
             // the glazing, closed to the sill (no open mesh)
             beam(A.x, A.z, B.x, B.z, FLH, H - 0.1 * M, 0.014 * M, panel);
+            if (tier === 'glass') beam(A.x, A.z, B.x, B.z, FLH + 0.4 * M, H - 0.5 * M, 0.02 * M, 'polycarb');   // the laminate's milky interlayer: the glazing reads as a closed skin, not open frames
             if (tier === 'geodesic') {                                                               // triangulated braces: a diagonal in each panel, alternating
               const l = len, ang = Math.atan2(H - 0.2 * M, l);
               const g = new THREE.BoxGeometry(Math.hypot(l, H - 0.2 * M), 0.035 * M, 0.035 * M).rotateZ((u > 0 ? 1 : -1) * ang);
@@ -323,6 +324,7 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
             }
             if (tier === 'glass') beam(A.x, A.z, B.x, B.z, FLH + H * 0.25, 0.04 * M, 0.05 * M, frame); // a second parallel: the gridshell's meridian pattern
             if (big) beam(A.x, A.z, B.x, B.z, FLH, 0.9 * M, 0.06 * M, 'steel');                      // the armored band, solid to waist height
+            else beam(A.x, A.z, B.x, B.z, FLH, 0.4 * M, 0.05 * M, frame);                            // a solid sill panel under the glazing: the tube reads as closed
           } else {
             beam(A.x, A.z, B.x, B.z, FLH - 0.1 * M, H + 0.1 * M, 0.5 * M, panel);                    // a thick adobe wall, plastered
             beam(A.x, A.z, B.x, B.z, FLH + H * 0.55, 0.04 * M, 0.52 * M, frame);                     // a plaster course line
@@ -331,6 +333,7 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
         // the roof: a closed panel across the span, with a rib over it (an earth-covered corridor takes a deep sod roof)
         const span = iw + 0.2 * M;
         beam(a.x, a.z, b.x, b.z, FLH + H, 0.03 * M, span, panel);
+        if (tier === 'glass') beam(a.x, a.z, b.x, b.z, FLH + H - 0.02 * M, 0.02 * M, span, 'polycarb');
         beam(a.x, a.z, b.x, b.z, FLH + H + 0.03 * M, solid ? 0.16 * M : 0.03 * M, solid ? span + 0.1 * M : 0.09 * M, solid ? 'hedge' : frame);
         // the floor: chords, then a plank deck
         beam(a.x, a.z, b.x, b.z, FLH - 0.12 * M, 0.06 * M, span, tier === 'earthen' ? 'fieldstone' : 'steel');

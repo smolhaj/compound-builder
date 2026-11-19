@@ -55,15 +55,18 @@ export function makeLinkFixtures(ins: readonly LinkFixtureInput[], ground: (x: n
       const s = Math.sin(e.angle), c = Math.cos(e.angle);
       const len = 0.46, w = 0.34, h = 0.42, mx = e.x + s * (len / 2 - 0.04), mz = e.z + c * (len / 2 - 0.04), gy = ground(mx, mz);
       const y = (dy: number): number => gy + dy;
-      surface.push(box(w, h, len, mx, y(h / 2), mz, e.angle, STEEL));
-      // a framed door on the shell face and a lit window on the module's side faces
-      surface.push(box(w * 0.62, h * 0.88, 0.02, e.x - s * 0.01, y(h * 0.44), e.z - c * 0.01, e.angle, FRAME));
-      surface.push(box(w * 0.5, h * 0.74, 0.024, e.x - s * 0.012, y(h * 0.4), e.z - c * 0.012, e.angle, DARK));
-      surface.push(box(0.012, 0.1, 0.16, mx + c * (w / 2 + 0.002), y(h * 0.62), mz - s * (w / 2 + 0.002), e.angle, GLASS), box(0.012, 0.1, 0.16, mx - c * (w / 2 + 0.002), y(h * 0.62), mz + s * (w / 2 + 0.002), e.angle, GLASS));
-      surface.push(box(w + 0.03, 0.025, len + 0.03, mx, y(h + 0.0125), mz, e.angle, FRAME));   // roof cap
-      // the outer door at the link's end and the hazard stripe
+      // a hollow chamber (a person walks through it): two side walls, a roof cap and a deck, a framed door at each end (the shell door and the outer door), a lit window in each side wall
+      const side = (dx: number): [number, number] => [mx + c * dx, mz - s * dx];
+      for (const sg of [-1, 1]) { const [sx, sz] = side(sg * (w / 2 - 0.01)); surface.push(box(0.02, h, len, sx, y(h / 2), sz, e.angle, STEEL)); const [wx, wz] = side(sg * (w / 2 + 0.002)); surface.push(box(0.008, 0.1, 0.16, wx, y(h * 0.62), wz, e.angle, GLASS)); }
+      surface.push(box(w, 0.02, len, mx, y(h + 0.01), mz, e.angle, FRAME));
+      surface.push(box(w - 0.05, 0.01, len, mx, y(0.012), mz, e.angle, DARK));
+      const door = (cx: number, cz: number): void => {   // jambs and a lintel: an open doorway with its frame
+        for (const sg of [-1, 1]) { const [jx, jz] = [cx + c * sg * (w / 2 - 0.045), cz - s * sg * (w / 2 - 0.045)]; surface.push(box(0.035, h, 0.035, jx, y(h / 2), jz, e.angle, FRAME)); }
+        surface.push(box(w - 0.04, 0.04, 0.035, cx, y(h - 0.02), cz, e.angle, FRAME));
+      };
+      door(e.x + s * 0.02, e.z + c * 0.02);
       const ox = e.x + s * (len - 0.05), oz = e.z + c * (len - 0.05);
-      surface.push(box(w * 0.5, h * 0.8, 0.02, ox, y(h * 0.4), oz, e.angle, FRAME));
+      door(ox, oz);
       lamps.push({ x: ox + c * (w * 0.32), y: y(h * 0.9), z: oz - s * (w * 0.32), color: lampColor });
       // buried: the sleeve through the footing (a fat concrete tube), a cable tray and a pipe along the line
       const depth = Math.max(4, link.depthFt ?? 8) / 20, sx = e.x + s * 0.0, sz = e.z + c * 0.0;
