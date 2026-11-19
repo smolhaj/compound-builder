@@ -1,14 +1,11 @@
 /**
- * Draws a big dome's floor dressing (domeInteriorPlan.ts): gravel paths from each airlock to a plaza, benches, supply crates, signs, planters, and lamp posts at the
- * plaza with their warm pools of light. Two draw calls (one merged vertex-colored mesh; one instanced mesh of lamp heads) and one instanced mesh of pools: no real lights.
- * Rides in the world at the dome's origin (local frame: the dome's center). SCALE v2.
+ * The pieces of a big dome's floor dressing (domeInteriorPlan.ts): gravel paths with curbs, plaza, benches, supply crates, signs and planters, as vertex-colored geometry
+ * in the dome's local frame. `fx/DomePlant.ts` merges them into the plant's own mesh and its lamp instances (the lamp posts, heads and pools of light), so the dressing
+ * costs no draw call of its own (the dome scenes in scripts/perfBudget.json have no room for one). SCALE v2.
  */
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { kitMaterial } from '../buildkit/materials';
 import { BENCH, CRATE, PATH_W, type InteriorPlan } from './domeInteriorPlan';
 
-export interface DomeInteriorFx { /** What was laid out (QA reads it to put the camera on a free path). */ plan: InteriorPlan; group: THREE.Group; /** The signature the world compares to decide a redraw (set by the caller). */ key: string; setUnder(on: boolean): void; dispose(): void }
 
 const col = (g: THREE.BufferGeometry, hex: number, jitter = 0, seed = 0): THREE.BufferGeometry => {
   g = g.index ? g.toNonIndexed() : g; g.deleteAttribute('uv');
@@ -23,8 +20,8 @@ const box = (w: number, h: number, d: number, x: number, y0: number, z: number, 
   return col(g, hex, jitter, seed);
 };
 
-export function makeDomeInterior(plan: InteriorPlan, ground: (lx: number, lz: number) => number, dark = false): DomeInteriorFx {
-  const pieces: THREE.BufferGeometry[] = [], owned: Array<{ dispose(): void }> = [], gy = (x: number, z: number): number => ground(x, z);
+export function interiorPieces(plan: InteriorPlan, ground: (lx: number, lz: number) => number): THREE.BufferGeometry[] {
+  const pieces: THREE.BufferGeometry[] = [], gy = (x: number, z: number): number => ground(x, z);
   plan.segs.forEach((s, i) => {
     const y = gy(s.x, s.z) + 0.002;
     pieces.push(box(PATH_W, 0.02, s.len, s.x, y, s.z, s.rot, 0x8f846f, 0, 0, 0, 0.16, i));
@@ -59,28 +56,5 @@ export function makeDomeInterior(plan: InteriorPlan, ground: (lx: number, lz: nu
     pieces.push(box(0.17, 0.05, 0.08, p.x, y, p.z, p.rot, 0x6b6459));
     for (const k of [-1, 0, 1]) { const g = new THREE.IcosahedronGeometry(0.04 + 0.006 * ((i + k) % 2), 0); g.scale(1, 0.8, 1); g.translate(k * 0.05, 0.075, 0); g.rotateY(p.rot); g.translate(p.x, y, p.z); pieces.push(col(g, 0x4a7a3a, 0.3, i * 3 + k)); }
   });
-  for (const l of plan.lamps) { const g = new THREE.CylinderGeometry(0.012, 0.016, 0.62, 6); g.translate(l.x, gy(l.x, l.z) + 0.31, l.z); pieces.push(col(g, 0x30343a)); }
-  const group = new THREE.Group(); group.name = 'dome_interior';
-  if (pieces.length) {
-    const geo = mergeGeometries(pieces, false); pieces.forEach(g => g.dispose());
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0.05, flatShading: true });
-    const mesh = new THREE.Mesh(geo, mat); mesh.name = 'dome_interior_props'; mesh.matrixAutoUpdate = false; mesh.updateMatrix(); mesh.castShadow = false; mesh.receiveShadow = true;
-    group.add(mesh); owned.push(geo, mat);
-  }
-  if (plan.lamps.length && !dark) {
-    const n = plan.lamps.length, hg = new THREE.SphereGeometry(0.035, 8, 6), heads = new THREE.InstancedMesh(hg, kitMaterial('lamp'), n);
-    const pg = new THREE.CircleGeometry(0.95, 24); pg.rotateX(-Math.PI / 2);
-    const pools = new THREE.InstancedMesh(pg, kitMaterial('spill_electric'), n), m4 = new THREE.Matrix4();
-    plan.lamps.forEach((l, i) => { const y = gy(l.x, l.z); heads.setMatrixAt(i, m4.makeTranslation(l.x, y + 0.65, l.z)); pools.setMatrixAt(i, m4.makeTranslation(l.x, y + 0.03, l.z)); });
-    for (const m of [heads, pools]) { m.instanceMatrix.needsUpdate = true; m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; group.add(m); }
-    pools.renderOrder = 2; owned.push(hg, pg);
-  }
-  if (plan.glows.length && !dark) {
-    const g1 = new THREE.CircleGeometry(1, 28); g1.rotateX(-Math.PI / 2);
-    const gl = new THREE.InstancedMesh(g1, kitMaterial('spill_electric_b'), plan.glows.length), m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), q0 = new THREE.Quaternion();
-    plan.glows.forEach((o, i) => { m4.compose(new THREE.Vector3(o.x, gy(o.x, o.z) + 0.022, o.z), q0, sc.set(o.r, 1, o.r)); gl.setMatrixAt(i, m4); });
-    gl.instanceMatrix.needsUpdate = true; gl.frustumCulled = false; gl.castShadow = false; gl.receiveShadow = false; gl.renderOrder = 1; group.add(gl); owned.push(g1);
-  }
-  const key = `${plan.segs.length}:${plan.benches.length}:${plan.crates.length}:${plan.lamps.length}:${dark ? 1 : 0}`;
-  return { plan, group, key, setUnder: on => { group.visible = !on; }, dispose: () => { for (const o of owned) o.dispose(); } };
+  return pieces;
 }

@@ -13,13 +13,15 @@ import type { WaterLoop } from '../../sim/dome/waterLoop';
 import type { Filtering } from '../../sim/dome/air';
 import type { DomeTier } from '../../sim/dome/tiers';
 import { kitMaterial } from '../buildkit/materials';
+import type { InteriorPlan } from './domeInteriorPlan';
+import { interiorPieces } from './DomeInterior';
 
 export interface DomePlantFx { group: THREE.Group; key: string; /** Show the buried lines (the underground view). */ setUnder(on: boolean): void; /** The building view: in the cutaway and x-ray views the machinery turns see-through and the sealed passage shows. */ setView(v: 'full' | 'cutaway' | 'xray'): void; dispose(): void }
 
 /** What the renderer needs of the plant's state: the loop, the spares, the dome's turn, which units are hurt, and whether the dome is dark. */
-export interface PlantLook { loop?: WaterLoop; spares?: readonly PlantKind[]; rot?: number; hurt?: Readonly<Record<string, PlantCond>>; dark?: boolean }
+export interface PlantLook { loop?: WaterLoop; spares?: readonly PlantKind[]; rot?: number; hurt?: Readonly<Record<string, PlantCond>>; dark?: boolean; /** The dome floor's dressing (paths, benches, crates, lamps; fx/domeInteriorPlan), merged into the plant's own draw calls, and its signature. */ interior?: InteriorPlan; interiorKey?: string }
 export const plantKey = (tier: DomeTier, r: number, filtering: Filtering, o: PlantLook = {}): string =>
-  `${tier}:${r.toFixed(2)}:${filtering}:${o.loop ?? 'none'}:${(o.spares ?? []).join(',')}:${o.rot ?? 0}:${Object.entries(o.hurt ?? {}).filter(([, c]) => c !== 'ok').map(([k, c]) => k + c).sort().join(',')}:${o.dark ? 1 : 0}`;
+  `${tier}:${r.toFixed(2)}:${filtering}:${o.loop ?? 'none'}:${(o.spares ?? []).join(',')}:${o.rot ?? 0}:${Object.entries(o.hurt ?? {}).filter(([, c]) => c !== 'ok').map(([k, c]) => k + c).sort().join(',')}:${o.interiorKey ?? ''}:${o.dark ? 1 : 0}`;
 
 const LINE_COLOR: Record<PlantLine['kind'], number> = { power: 0xd9822b, chill: 0x4f9bd0, water: 0x2f7fb5, feeder: 0xe0a030, passage: 0x35e0c8 };
 const CHAR = 0x1c1a18;
@@ -69,7 +71,13 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
     geos.push(fl(0.05, 0, c === 'down' ? 0.45 : 0.25, c === 'down' ? 0.045 : 0.03, 0x4a4643, 0.7 * s), fl(0.07, 0.03, c === 'down' ? 0.35 : 0.2, c === 'down' ? 0.07 : 0.045, 0x6a655f, 1.1 * s));
   }
   // the lamp posts ride the machinery's own merged mesh (thin cylinders, one color)
-  for (const l of plant.lamps) geos.push(partGeometry({ shape: 'cyl', x: l.x, z: l.z, y0: 0, w: 0, h: l.y, d: 0, r: 0.014, rot: 0, color: 0x30343a }, ground, stem));
+  // the dome floor's dressing rides along: its pieces in the same merged mesh, its lamps and window-light pools in the same instances (no draw call of their own)
+  const lampList: Array<{ x: number; z: number; y: number; k: number }> = plant.lamps.map(l => ({ x: l.x, z: l.z, y: l.y, k: 1 }));
+  if (look.interior) {
+    for (const g of interiorPieces(look.interior, ground)) geos.push(g);
+    for (const l of look.interior.lamps) lampList.push({ x: l.x, z: l.z, y: 0.62, k: 1.7 });
+  }
+  for (const l of lampList) geos.push(partGeometry({ shape: 'cyl', x: l.x, z: l.z, y0: 0, w: 0, h: l.y, d: 0, r: 0.014, rot: 0, color: 0x30343a }, ground, stem));
   const merged = geos.length ? mergeGeometries(geos, false) : null;
   geos.forEach(g => g.dispose());
   if (merged) {
@@ -78,17 +86,19 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
     mesh.name = 'plant_machinery'; mesh.matrixAutoUpdate = false; mesh.updateMatrix();
     group.add(mesh); owned.push(merged, mat);
   }
-  if (plant.lamps.length && !look.dark) {
-    const n = plant.lamps.length;
+  const glows = look.interior?.glows ?? [];
+  if (lampList.length && !look.dark) {
+    const n = lampList.length, ng = glows.length;
     const headGeo = new THREE.SphereGeometry(0.035, 8, 6), heads = new THREE.InstancedMesh(headGeo, kitMaterial('lamp'), n);
     const poolGeo = new THREE.CircleGeometry(0.55, 20); poolGeo.rotateX(-Math.PI / 2);
-    const pools = new THREE.InstancedMesh(poolGeo, kitMaterial('spill_electric'), n);
-    const m4 = new THREE.Matrix4();
-    plant.lamps.forEach((l, i) => {
+    const pools = new THREE.InstancedMesh(poolGeo, kitMaterial('spill_electric'), n + ng);
+    const m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), q0 = new THREE.Quaternion(), pos = new THREE.Vector3();
+    lampList.forEach((l, i) => {
       const gy = ground(l.x, l.z);
       heads.setMatrixAt(i, m4.makeTranslation(l.x, gy + l.y + 0.03, l.z));
-      pools.setMatrixAt(i, m4.makeTranslation(l.x, gy + 0.012, l.z));
+      pools.setMatrixAt(i, m4.compose(pos.set(l.x, gy + 0.012, l.z), q0, sc.set(l.k, 1, l.k)));
     });
+    glows.forEach((o, i) => pools.setMatrixAt(n + i, m4.compose(pos.set(o.x, ground(o.x, o.z) + 0.02, o.z), q0, sc.set(o.r / 0.55, 1, o.r / 0.55))));
     for (const m of [heads, pools]) { m.instanceMatrix.needsUpdate = true; m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; group.add(m); }
     pools.renderOrder = 2;
     owned.push(headGeo, poolGeo);
