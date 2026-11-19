@@ -23,7 +23,7 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
   const out: InteriorPlan = { segs: [], benches: [], crates: [], planters: [], signs: [], lamps: [], plaza: null, glows: [] };
   if (tier !== 'glass' && tier !== 'arcology' && tier !== 'geodesic') return out;
   const free = (x: number, z: number, pad: number, inner = 0.9): boolean => Math.hypot(x, z) < r * inner && !obstacles.some(o => Math.abs(x - o.x) < o.hx + pad && Math.abs(z - o.z) < o.hz + pad);
-  for (const o of obstacles) if (o.home) out.glows.push({ x: o.x, z: o.z, r: Math.max(o.hx, o.hz) * 1.9 });
+  for (const o of obstacles) if (o.home) out.glows.push({ x: o.x, z: o.z, r: Math.max(o.hx, o.hz) * 3 });
   const plazaR = Math.min(0.9, r * 0.11);
   const plazaOk = free(0, 0, plazaR + 0.25, 1);
   if (plazaOk) out.plaza = { x: 0, z: 0, r: plazaR };
@@ -59,6 +59,8 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
     for (let i = 0; i < n; i++) {
       const a = (i + 0.5) * 2 * Math.PI / n, x = Math.sin(a) * rr, z = Math.cos(a) * rr, d = 2 * Math.PI / n * rr + 0.02;
       if (!free(x, z, PATH_W / 2 + 0.03)) continue;
+      // where a spoke crosses, the ring leaves a gap (the spoke's own curbs run through, with no dark bar across the path)
+      if (angles.some(an => Math.abs(Math.atan2(Math.sin(a - an), Math.cos(a - an))) * rr < PATH_W / 2 + d / 2 + 0.02)) continue;
       const a0 = i * 2 * Math.PI / n, a1 = (i + 1) * 2 * Math.PI / n;
       if (!free(Math.sin(a0) * rr, Math.cos(a0) * rr, PATH_W / 2) || !free(Math.sin(a1) * rr, Math.cos(a1) * rr, PATH_W / 2)) continue;
       out.segs.push({ x, z, rot: Math.atan2(Math.cos(a), -Math.sin(a)), len: d });
