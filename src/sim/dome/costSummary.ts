@@ -50,7 +50,7 @@ export function domeCostSummary(tier: DomeTier, cells: number = TIER[tier].cells
     { id: 'shell', label: 'Shell, frame and glazing, erected', usd: shell },
     { id: 'skirt', label: `Buried skirt, ${TIER[tier].skirtFt} ft deep: concrete and steel`, usd: skirt },
     { id: 'earthwork', label: 'Earthwork: crater, rock, shoring, dewatering, skirt forms', usd: earthUsd },
-    { id: 'airlocks', label: `${TIER[tier].airlocks || 'No'} airlocks`, usd: airlocks },
+    { id: 'airlocks', label: TIER[tier].airlocks ? `${TIER[tier].airlocks} person airlock${TIER[tier].airlocks > 1 ? 's' : ''} (the main entrance${TIER[tier].airlocks > 1 ? ' and a second' : ''})` : 'No airlocks', usd: airlocks },
     { id: 'plant', label: 'Air and climate plant (chillers, air handlers, controls)', usd: plant },
     { id: 'yard', label: 'Hardened plant yard, service airlock and passage', usd: yard },
     { id: 'finish', label: 'Finish: paths, drainage, beds, lighting', usd: fit },

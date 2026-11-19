@@ -127,20 +127,20 @@ export const MILITIA = { rifleShare: [0.55, 0.8] as const, skill: 1, soft: 0.2, 
 export const wallPostCover = (kind: string): number => (kind in PERIMETER ? 0.25 - 0.09 * wallToughness(kind as PerimeterKind) : 0.22);
 /** What a wall does to the crew getting over it, a chance per raider at the line each second, and how badly (hp). */
 const WALL_HAZARD: Record<string, { p: number; min: number; max: number; what: string; lines: string[] }> = {
-  barbed_wire: { p: 0.07, min: 10, max: 35, what: 'barbed wire', lines: ['AGH — the wire — it\'s in my — FUCK!', 'Cut — I\'m cut — get me off this —', 'The barbs — oh Jesus, my hands —'] },
-  woven_wire: { p: 0.04, min: 8, max: 25, what: 'wire', lines: ['Shit — it\'s got me — hold it, hold it —', 'The wire — I\'m caught!'] },
-  thorn_hedge: { p: 0.09, min: 8, max: 30, what: 'thorns', lines: ['The thorns — Jesus, they\'re like knives —', 'I can\'t get through this — AGH — my face!', 'It\'s all thorns — back, BACK —'] },
-  ditch: { p: 0.06, min: 15, max: 50, what: 'ditch', lines: ['I fell — my leg — I think it\'s broken —', 'The ditch — I can\'t climb out —'] },
-  log_palisade: { p: 0.02, min: 10, max: 30, what: 'sharpened logs', lines: ['Splinters — shit — the points —', 'Slipped — I slipped — my arm —'] },
-  chain_link: { p: 0.025, min: 6, max: 20, what: 'chain-link', lines: ['The fence — it\'s cutting my hands —', 'Shit — it\'s sharp at the top — AGH!'] },
-  wrought_iron: { p: 0.03, min: 10, max: 30, what: 'iron spikes', lines: ['The points — it\'s got me — oh God —', 'Slipped — the spikes — my leg!'] },
-  iron_barbed: { p: 0.08, min: 12, max: 38, what: 'barbed wire on iron', lines: ['The wire — and the spikes — I can\'t —', 'AGH — it\'s everywhere — get me off —'] },
-  concrete_wall: { p: 0.02, min: 8, max: 25, what: 'smooth concrete', lines: ['There\'s nothing to hold — it\'s smooth — I can\'t —', 'It\'s too high — it\'s just a wall —'] },
-  stone_wall: { p: 0.018, min: 8, max: 28, what: 'rough stone', lines: ['The stones — they\'re loose at the top — AGH —', 'Nothing to hold — I slipped — my hands —'] },
-  container_stack: { p: 0.02, min: 10, max: 35, what: 'stacked steel', lines: ['It\'s two boxes high — I can\'t reach the top —', 'The edge — it\'s razor sharp — AGH!'] },
-  steel_wall: { p: 0.015, min: 10, max: 35, what: 'razor wire', lines: ['Razor wire — Jesus — it\'s razor wire —', 'Can\'t climb it — it\'s smooth — my hands —'] },
-  electric_steel: { p: 0.22, min: 25, max: 75, what: 'live wire', lines: ['AAAGH — it\'s LIVE — it\'s electrified —', 'I can\'t let go — oh God — it\'s —', 'Don\'t touch it — don\'t TOUCH it!'] },
-  creek_bars: { p: 0.05, min: 8, max: 28, what: 'bars', lines: ['The bars — I can\'t get through — my hand —'] },
+  barbed_wire: { p: 0.07, min: 10, max: 35, what: 'barbed wire', lines: ['The wire! It\'s in my hands. Fuck!', 'I\'m cut. Get me off this.', 'Barbs. Oh Jesus, my hands.'] },
+  woven_wire: { p: 0.04, min: 8, max: 25, what: 'wire', lines: ['Shit. It\'s got me. Hold it, hold it.', 'The wire. I\'m caught.'] },
+  thorn_hedge: { p: 0.09, min: 8, max: 30, what: 'thorns', lines: ['The thorns. Jesus, they\'re like knives.', 'I can\'t get through. My face!', 'It\'s all thorns. Back. Go back.'] },
+  ditch: { p: 0.06, min: 15, max: 50, what: 'ditch', lines: ['I fell. My leg. I think it\'s broken.', 'The ditch. I can\'t climb out.'] },
+  log_palisade: { p: 0.02, min: 10, max: 30, what: 'sharpened logs', lines: ['Splinters. Shit. The points.', 'I slipped. My arm.'] },
+  chain_link: { p: 0.025, min: 6, max: 20, what: 'chain-link', lines: ['The fence is cutting my hands.', 'Shit. It\'s sharp at the top.'] },
+  wrought_iron: { p: 0.03, min: 10, max: 30, what: 'iron spikes', lines: ['The points. It\'s got me.', 'I slipped. The spikes. My leg!'] },
+  iron_barbed: { p: 0.08, min: 12, max: 38, what: 'barbed wire on iron', lines: ['The wire. And the spikes. I can\'t.', 'It\'s everywhere. Get me off.'] },
+  concrete_wall: { p: 0.02, min: 8, max: 25, what: 'smooth concrete', lines: ['Nothing to hold. It\'s smooth.', 'Too high. It\'s just a wall.'] },
+  stone_wall: { p: 0.018, min: 8, max: 28, what: 'rough stone', lines: ['The stones are loose at the top.', 'Nothing to hold. I slipped. My hands.'] },
+  container_stack: { p: 0.02, min: 10, max: 35, what: 'stacked steel', lines: ['Two boxes high. I can\'t reach the top.', 'The edge is razor sharp!'] },
+  steel_wall: { p: 0.015, min: 10, max: 35, what: 'razor wire', lines: ['Razor wire. Jesus. It\'s razor wire.', 'Can\'t climb it. It\'s smooth. My hands.'] },
+  electric_steel: { p: 0.22, min: 25, max: 75, what: 'live wire', lines: ['It\'s live! It\'s electrified!', 'I can\'t let go. Oh God.', 'Don\'t touch it! Don\'t touch it!'] },
+  creek_bars: { p: 0.05, min: 8, max: 28, what: 'bars', lines: ['The bars. I can\'t get through. My hand.'] },
 };
 /** Houses with an upper floor to shoot from (sill about 5 m up), and how high the muzzle is there. */
 const TWO_STOREY = new Set(['farmhouse', 'stone_house', 'timber_frame', 'moms_house', 'modular_home', 'lodge', 'lodge_solar', 'log_house']);
@@ -743,16 +743,16 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         }
       }
       const m = mate();
-      if (f.side === 'home' && m) say(t + 0.4, v(m, [`No! ${nameOf(f)}! NO!`, `Oh God — ${nameOf(f)}! ${nameOf(f)}, get up!`, `They shot ${nameOf(f)} — fuck, fuck, FUCK!`], [`${nameOf(f)}'s down. Keep firing.`, `Man down — ${nameOf(f)}.`]), m);
-      else if (f.side === 'raider' && by?.side === 'home' && !by.machine && r() < 0.5) say(t + 0.3, v(by, ['I got one — oh God, I got one.', 'He\'s down! Holy shit, he\'s down!', 'Did I — I think I hit him!'], ['One down.', 'Got him. Next.']), by);
+      if (f.side === 'home' && m) say(t + 0.4, v(m, [`No! ${nameOf(f)}! No!`, `${nameOf(f)}! ${nameOf(f)}, get up!`, `They shot ${nameOf(f)}. Fuck. Fuck!`], [`${nameOf(f)}'s down. Still shooting.`, `Man down. ${nameOf(f)}.`]), m);
+      else if (f.side === 'raider' && by?.side === 'home' && !by.machine && r() < 0.5) say(t + 0.3, v(by, ['I got one. Oh God. I got one.', 'He\'s down. Holy shit.', 'Did I hit him? I think I hit him.'], ['One down.', 'He\'s down.']), by);
       return;
     }
     ev.push({ t: r2(t + 0.05), kind: 'wound', unit: f.id, sev: Math.round(sev), ...(part ? { part } : {}) });
-    if (f.side === 'home' && part === 'leg') say(t + 0.3, sev > 60 ? v(f, ['It\'s pumping — oh God, it\'s pumping! I need a tourniquet!', 'My leg — fuck — there\'s so much blood!'], ['Leg — arterial. Tourniquet, on me, now!']) : v(f, ['Fuck! My leg! I can\'t — I can\'t stand —', 'AHH — shit — my leg!'], ['Hit in the leg. Still in it.']), f);
-    else if (f.side === 'home' && part === 'head') say(t + 0.3, v(f, ['Something hit my head — I can\'t see right —', 'My head — oh God, is it bad?'], ['Head wound. I\'m… I\'m okay.']), f);
-    else if (f.side === 'home' && !part) say(t + 0.3, v(f, ['AAGH — fuck — the blast!', 'I\'m hit — I\'m hit — shit!'], ['Frag got me. Still up.']), f);
-    else if (f.side === 'home') say(t + 0.3, sev < 30 ? v(f, ['Fuck! I\'m hit — I\'m okay, I\'m okay!', 'Shit — it grazed me —'], ['Grazed. I\'m good.']) : sev < 55 ? v(f, ['Ahh — fuck, my arm!', 'They got my arm — shit, shit!'], ['Hit in the arm. Still shooting.']) : v(f, ['I can\'t… can\'t breathe —', 'Help me — please — I\'m hit bad —'], ['I\'m hit bad.']), f);
-    else if (by?.side === 'home' && !by.machine && r() < 0.3) say(t + 0.3, v(by, ['I hit him! I think I hit him!', 'He\'s hit — he\'s hit!'], ['Hit.']), by);
+    if (f.side === 'home' && part === 'leg') say(t + 0.3, sev > 60 ? v(f, ['It\'s pumping. Oh God, it\'s pumping. Tourniquet!', 'My leg. Fuck. There\'s so much blood.'], ['Leg. Bleeding bad. Tourniquet, now.']) : v(f, ['Fuck! My leg! I can\'t stand.', 'Shit. My leg.'], ['Hit in the leg. Still in it.']), f);
+    else if (f.side === 'home' && part === 'head') say(t + 0.3, v(f, ['Something hit my head. I can\'t see right.', 'My head. Oh God, is it bad?'], ['Head. I\'m okay. I\'m okay.']), f);
+    else if (f.side === 'home' && !part) say(t + 0.3, v(f, ['Fuck! The blast!', 'I\'m hit. I\'m hit. Shit.'], ['Frag got me. Still up.']), f);
+    else if (f.side === 'home') say(t + 0.3, sev < 30 ? v(f, ['Fuck! I\'m hit. I\'m okay. I\'m okay.', 'Shit. It grazed me.'], ['Grazed. I\'m good.']) : sev < 55 ? v(f, ['Fuck, my arm!', 'They got my arm. Shit, shit.'], ['Arm. Still shooting.']) : v(f, ['I can\'t. I can\'t breathe.', 'Help me. Please. I\'m hit bad.'], ['I\'m hit bad.']), f);
+    else if (by?.side === 'home' && !by.machine && r() < 0.3) say(t + 0.3, v(by, ['I hit him. I think I hit him.', 'He\'s hit. He\'s hit.'], ['Hit.']), by);
     // an open wound to the body or a leg bleeds until someone stops it (the femoral artery fast)
     if (part === 'torso' || (part === 'leg' && sev >= 40) || (!part && sev >= 50)) {
       f.bleed = Math.max(f.bleed, part === 'leg' && sev >= 70 ? 3 : sev / 45);
@@ -765,7 +765,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     f.dead = true; f.out = true; f.bleed = 0;
     ev.push({ t: r2(t), kind: 'death', unit: f.id });
     const m = H.find(h => h !== f && !h.out && !h.shelter);
-    if (f.side === 'home' && m) say(t + 0.4, v(m, [`${nameOf(f)}? ${nameOf(f)}! Oh God, they're not breathing — they're not breathing!`, `No no no — ${nameOf(f)}, stay with me — STAY WITH ME —`], [`${nameOf(f)}'s gone. Bled out.`]), m);
+    if (f.side === 'home' && m) say(t + 0.4, v(m, [`${nameOf(f)}? ${nameOf(f)}! They're not breathing!`, `No no no. ${nameOf(f)}, stay with me. Stay with me.`], [`${nameOf(f)}'s gone.`]), m);
   };
   /** Stop the bleeding: a tourniquet on a limb, a chest seal or packing on the body. */
   const stopBleed = (f: Fighter, by: Fighter, t: number, medic: boolean) => {
@@ -812,10 +812,10 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       b.hp -= 4;
       if (b.side === 'home') say(t + 0.3, text, b);
     };
-    if (h.kind === 'stopped') return stop(h.by === 'plate' ? v(b, ['It hit my vest — holy shit, it held!', 'Jesus — the plate — I\'m okay, I\'m okay!'], ['Plate caught it. Good.']) : v(b, ['Oh God — the vest stopped it —', 'Something hit me — the vest — I\'m okay!'], ['Vest stopped it.']));
+    if (h.kind === 'stopped') return stop(h.by === 'plate' ? v(b, ['It hit my vest. Holy shit. It held.', 'The plate. Jesus. I\'m okay.'], ['Plate caught it.']) : v(b, ['The vest stopped it. Oh God.', 'Something hit me. The vest. I\'m okay.'], ['Vest stopped it.']));
     if (h.kind === 'helmet') {   // the helmet holds: a concussion, not a hole
       b.hp -= 15; ev.push({ t: r2(t + 0.05), kind: 'wound', unit: b.id, sev: 15, part });
-      if (b.side === 'home') say(t + 0.4, v(b, ['Jesus Christ — it hit my helmet — my ears —', 'What the — my head — the helmet, it — I\'m okay —'], ['Helmet took it. Ears ringing.']), b);
+      if (b.side === 'home') say(t + 0.4, v(b, ['Jesus Christ. It hit my helmet. My ears.', 'My head. The helmet. I\'m okay.'], ['Helmet took it. Ears ringing.']), b);
       return;
     }
     return hurt(b, h.kind === 'kill' ? b.hp + 1 : h.sev, t, a, part);
@@ -833,19 +833,19 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       const secs = a.arm.feed === 'tube' ? a.arm.mag * (a.vet ? 0.5 : 0.9) : a.vet ? 2 : 3 + r() * 3;
       a.readyAt = t + secs;
       ev.push({ t: r2(t), kind: 'reload', unit: a.id, secs: r2(secs) });
-      if (a.side === 'home' && r() < 0.7) sayF(a, t, ['Reloading — reloading! Cover me!', 'I\'m empty — shit — hang on —', 'Mag — where\'s my — got it, got it —', 'Out — loading — come on, come ON —'], ['Reloading!', 'Changing mags.', 'Loading.']);
-      else if (a.side === 'raider' && r() < 0.15) say(t, pick(['Reloading!', 'Cover me, I\'m out!']), a);
+      if (a.side === 'home' && r() < 0.7) sayF(a, t, ['Reloading! Cover me!', 'I\'m empty. Shit. Hang on.', 'Mag. Where\'s my mag. Got it.', 'Out. Loading. Come on.'], ['Reloading.', 'Changing mags.', 'Loading.']);
+      else if (a.side === 'raider' && r() < 0.15) say(t, pick(['Reloading!', 'Cover me. I\'m out.']), a);
       return;
     }
     if (a.side === 'home' && cal && (ammo[cal] ?? 0) >= a.arm.mag) {
       a.spare = 2; a.readyAt = t + 12 + r() * 6;
-      sayF(a, t, ['I\'m out of mags — I need ammo! I\'m going in for more!', 'That\'s my last one — I\'ve got nothing — getting more from the house!'], ['Last mag. Getting more from the house — cover my sector.'], 0);
+      sayF(a, t, ['I\'m out of mags. Going in for more.', 'That was my last one. Getting more from the house.'], ['Last mag. Getting more from the house. Cover my side.'], 0);
       ev.push({ t: r2(t + 0.3), kind: 'move', unit: a.id, x: r2(C.x), z: r2(C.z) });
       ev.push({ t: r2(a.readyAt - 2), kind: 'move', unit: a.id, x: r2(a.x), z: r2(a.z), ...(a.y ? { y: a.y } : {}) });
       return;
     }
     a.dry = true;
-    if (a.side === 'home') sayF(a, t, ['I\'m out! I\'m OUT! I\'ve got nothing left!', 'No more — there\'s no more ammo — oh God —'], ['I\'m dry. Out of ammo.'], 0);
+    if (a.side === 'home') sayF(a, t, ['I\'m out! I\'ve got nothing left!', 'No more ammo. Oh God.'], ['I\'m dry. Out of ammo.'], 0);
   };
 
   const shoot = (a: Fighter, b: Fighter, t: number) => {
@@ -862,7 +862,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       const secs = a.vet ? 2 + r() : 4 + r() * 6;
       a.readyAt = t + secs;
       ev.push({ t: r2(t), kind: 'jam', unit: a.id, secs: r2(secs) });
-      if (a.side === 'home') sayF(a, t, ['It\'s jammed — it won\'t fire — fuck! FUCK!', 'Come on, come on — it\'s stuck — why won\'t it —', 'It just clicked — it\'s not working!'], ['Malfunction. Clearing.', 'Jam — tap, rack — good.'], 0);
+      if (a.side === 'home') sayF(a, t, ['It\'s jammed. It won\'t fire. Fuck!', 'Come on, come on. It\'s stuck.', 'It just clicked. It\'s not working.'], ['Malfunction. Clearing.', 'Jam. Tap, rack. Good.'], 0);
       return;
     }
     a.inGun -= cost;
@@ -902,7 +902,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       if (seen > bestN || (seen > 0 && seen === bestN && best && p.value > best.value)) { best = p; bestN = seen; }
     }
     if (!best) return;
-    if (r() < 0.6) sayF(f, t, ['I can\'t hit anything from here — moving!', 'The wall is in the way — I\'m going up!'], ['No line from here. Relocating.'], 8);
+    if (r() < 0.6) sayF(f, t, ['I can\'t hit anything from here. Moving.', 'The wall\'s in the way. Going up.'], ['No line from here. Moving.'], 8);
     takePost(f, t, best);
   };
   /** A raider with no line of fire to any defender steps along the wall (or closer) to a spot that has one, instead of shooting at it. */
@@ -952,15 +952,15 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       if (gd.n) for (const f of rUp.sort((a, b) => dist(a, C) - dist(b, C)).slice(0, gd.n)) {
         f.readyAt = Math.max(f.readyAt, t) + gd.hold;
         if (r() < 0.6) hurt(f, gd.bite + r() * 10, t + 1, undefined, 'arm');
-        if (r() < 0.5) say(t + 0.6, pick(['Dog! Get it off — GET IT OFF!', 'The dog — aah — shoot it, shoot the dog!']), f);
+        if (r() < 0.5) say(t + 0.6, pick(['The dog! Get it off me!', 'Dog! Shoot it. Shoot the dog!']), f);
       }
-      say(t, v(lead(), ['They\'re inside the fence — fuck! Get to the house!', 'They\'re through — they\'re through! Oh God —'], ['They\'re through the line. Fall back to the house.']), lead());
+      say(t, v(lead(), ['They\'re inside the fence. Fuck. Get to the house!', 'They\'re through. They\'re through!'], ['They\'re through the line. Fall back to the house.']), lead());
       // the escape tunnel: whoever's sheltering gets out, away from the fighting
       const tunnel = s.perimeter.find(x => x.kind === 'escape_tunnel' && runFinished(x));
       const out = tunnel?.pts[tunnel.pts.length - 1];
       const fleeing = H.filter(h => h.shelter && !h.dead);
       if (out && fleeing.length) {
-        say(t + 1, v(lead(), ['Take the kids — the tunnel — go, go, GO! Don\'t look back!', 'Get them out through the tunnel — NOW!'], ['Shelter group: out through the tunnel. Go.']), lead());
+        say(t + 1, v(lead(), ['Take the kids. The tunnel. Go, go. Don\'t look back!', 'Get them out through the tunnel. Now!'], ['Shelter group, out through the tunnel. Go.']), lead());
         for (const h of fleeing) { h.escaped = true; h.x = out[0]; h.z = out[1]; ev.push({ t: r2(t + 2 + r()), kind: 'move', unit: h.id, x: r2(out[0]), z: r2(out[1]) }); }
       }
   };
@@ -978,7 +978,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     lineR = ring.r; wallKind = ring.kind; wallClimbK = ring.kind in PERIMETER ? climbRateK(ring.kind as PerimeterKind) : 1; wallClimbHold = ring.kind in PERIMETER ? climbHoldS(ring.kind as PerimeterKind) : 0; wallDown = false; gapOnly = false; pendingHow = 'climb'; lineSince = -1;
     const here = at(lineR, 0);
     ev.push({ t, kind: 'fallback', ring: ringK, of: ringRs.length, x: r2(here.x), z: r2(here.z) });
-    say(t, v(lead(), ['Fall back! Fall back to the inner wall — go, go!', 'They\'re over the outer wall — back, BACK to the next gate!'], ['Outer line is gone. Fall back to the inner ring.']), lead());
+    say(t, v(lead(), ['Fall back to the inner wall! Go!', 'They\'re over the outer wall. Back to the next gate!'], ['Outer line\'s gone. Fall back to the inner ring.']), lead());
     for (const p of posts) if (p.kind === 'wall') p.wrecked = true;
     for (let i = 0; i < 3; i++) { const p = behindWall(at(Math.max(1.5, lineR - 0.4), (i - 1) * Math.min(3, lineR * 0.6))); posts.push({ kind: 'wall', ...p, y: stepY(p), cover: 0.22, value: 2, cap: 1, wrecked: false, fire: 0 }); }
     for (const p of posts) if (!p.wrecked) p.view = viewOf(p);
@@ -991,7 +991,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       h.carried = true; h.shelter = true; h.x = shelterAt.x; h.z = shelterAt.z; h.post = null;
       ev.push({ t: r2(t + 1.2), kind: 'move', unit: h.id, x: r2(shelterAt.x), z: r2(shelterAt.z) });
       ev.push({ t: r2(t + 1.2), kind: 'carry', unit: h.id, ...(by ? { by: by.id } : {}) });
-      if (by) { by.readyAt = Math.max(by.readyAt, t + 5); say(t + 0.5, v(by, [`Got you — I've got you, ${nameOf(h)}, hang on!`, `Come on — up — we're getting you inside!`], [`Moving ${nameOf(h)} to the sickbay.`]), by); }
+      if (by) { by.readyAt = Math.max(by.readyAt, t + 5); say(t + 0.5, v(by, [`I've got you, ${nameOf(h)}. Hang on.`, `Come on. Up. We're getting you inside.`], [`Moving ${nameOf(h)} to the sickbay.`]), by); }
       if (h.bleed > 0 && by) stopBleed(h, by, t + 1.5, !!by.medic);
     }
     for (const f of H) if (!f.out && !f.shelter) assignPost(f, t + 1);
@@ -1008,8 +1008,8 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     fled = true;
     const t = t0 + 1;
     const l1 = lead(), spokesman = R[0].out ? rUp[0] : R[0];
-    say(t, v(l1, ['They\'re putting their guns down! They\'re giving up!', 'Hold your fire! Hold your fire — they\'re surrendering!'], ['They\'re surrendering. Hold fire. Watch their hands.']), l1);
-    say(t + 0.4, pick(['Don\'t shoot! Don\'t shoot! We give up!', 'We\'re done! We\'re done, don\'t shoot!', 'Okay, okay! Hands up! Hands up!']), spokesman);
+    say(t, v(l1, ['They\'re putting their guns down!', 'Hold your fire. They\'re surrendering.'], ['They\'re surrendering. Hold fire. Watch their hands.']), l1);
+    say(t + 0.4, pick(['Don\'t shoot! We give up!', 'We\'re done! Don\'t shoot!', 'Okay, okay. Hands up. Hands up!']), spokesman);
     rUp.forEach((f, i) => markSurrender(f, t + 0.6 + i * 0.25));
     for (const f of R) if (f.out && !f.dead && !f.fled && !f.surrendered) markSurrender(f, t + 1.4);
     // each defender answers a surrender for himself: the calm hold fire, the grieving and the angry may not (sim/crewMercy.ts `snapOdds`)
@@ -1024,11 +1024,11 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         vic.surrendered = false; vic.dead = true; vic.out = true; vic.hp = 0;
         ev.push({ t: r2(t + 1.7 + snaps.length * 0.6), kind: 'shot', from: h.id, to: vic.id, hit: true });
         ev.push({ t: r2(t + 1.75 + snaps.length * 0.6), kind: 'death', unit: vic.id });
-        say(t + 1.9 + snaps.length * 0.6, pick(['They killed Dad — I don\'t care if his hands are up —', 'You took him from us — you don\'t get to surrender —', 'No. No, you don\'t get to give up.']), h);
+        say(t + 1.9 + snaps.length * 0.6, pick(['They killed Dad. I don\'t care if his hands are up.', 'You took him from us. No.', 'No. No, you don\'t get to give up.']), h);
         snaps.push({ shooter: h.id, victim: vic.id });
       }
     }
-    say(t + 2.2, v(l1, ['On your knees! Hands where I can see them! Nobody move!', 'Drop it! Down — get down on the ground!'], ['Weapons on the ground. Down on your knees. Now.']), l1);
+    say(t + 2.2, v(l1, ['On your knees! Hands where I can see them!', 'Drop it! Get down on the ground!'], ['Weapons down. On your knees. Now.']), l1);
     end = 'repelled'; endT = t + 6;
   };
   // ── orders, stages and the extras ──
@@ -1049,7 +1049,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     stage = st; synth = true; lineR = stageRadius(st, wallR0); wallKind = ''; wallClimbK = 1; wallClimbHold = 0; wallDown = false; gapOnly = false; pendingHow = 'climb'; lineSince = -1;
     const here = at(lineR, 0);
     ev.push({ t, kind: 'fallback', ring: st === 'yard' ? 1 : 2, of: 2, x: r2(here.x), z: r2(here.z) });
-    say(t, st === 'yard' ? v(lead(), ['Back to the yard — behind the cars, the woodpile, GO!', 'Leave the wall — fall back to the yard cover!'], ['Fall back to the yard cover. Keep your lanes.']) : v(lead(), ['Everybody in the house! Bar the doors — NOW!', 'Into the house! Furniture against the doors!'], ['Final line is the house. Barricade the doors.']), lead());
+    say(t, st === 'yard' ? v(lead(), ['Back to the yard. Cars, woodpile. Go!', 'Leave the wall. Back to the yard!'], ['Fall back to the yard cover. Keep your lanes.']) : v(lead(), ['Everybody in the house! Bar the doors!', 'Into the house! Furniture against the doors!'], ['Final line is the house. Barricade the doors.']), lead());
     for (const p of posts) if (p.kind === 'wall' || (st === 'house' && p.kind === 'sandbags')) p.wrecked = true;
     if (st === 'yard') for (let i = 0; i < 3; i++) { const q = at(Math.max(1.5, lineR - 0.4), (i - 1) * Math.min(2.6, lineR * 0.7)); posts.push({ kind: 'sandbags', x: q.x, z: q.z, y: 0, cover: 0.24, value: 2.5, cap: 1, wrecked: false, fire: 0 }); }
     for (const p of posts) if (!p.wrecked) p.view = viewOf(p);
@@ -1099,7 +1099,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         dr.x = stop.x; dr.z = stop.z;
         ev.push({ t: 0, kind: 'ram', fromX: r2(tk.from.x), fromZ: r2(tk.from.z), x: r2(target!.x), z: r2(target!.z), secs: secs(t + 1.2), ok: false, why: 'driver_down', stopX: r2(stop.x), stopZ: r2(stop.z), driver: dr.id });
         attempts.push({ how: 'ram', ok: false, why: 'driver_down', t, odds: tk.odds });
-        say(t + 0.3, pick(['The driver\'s hit — the truck\'s dead in the road!', 'He got the driver! The truck\'s stopping!']), lead());
+        say(t + 0.3, pick(['Driver\'s hit. Truck\'s dead in the road.', 'He got the driver. It\'s stopping.']), lead());
       } else if (t >= tk.arriveT) {
         tk.done = true; dr.veh = false; dr.cover = 0.4; dr.x = tk.to.x; dr.z = tk.to.z;
         const ok = mr() < tk.odds, why = ok ? 'ok' : whyRamFailed(countersOf(s, target!, C, target!.runId), target!.gate);
@@ -1107,7 +1107,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         attempts.push({ how: 'ram', ok, why, t, odds: tk.odds });
         ev.push({ t: r2(t), kind: 'move', unit: dr.id, x: r2(dr.x), z: r2(dr.z) });
         if (ok) breakThrough(t, 'ram');
-        else { hurt(dr, 12 + r() * 25, t + 0.2, undefined, 'arm'); say(t + 0.5, pick(['It didn\'t go — the truck\'s wedged!', 'We\'re stuck on it — get out, get OUT!']), dr); }
+        else { hurt(dr, 12 + r() * 25, t + 0.2, undefined, 'arm'); say(t + 0.5, pick(['It didn\'t go. Truck\'s wedged.', 'We\'re stuck on it. Get out. Get out!']), dr); }
       } else { dr.x = at0.x; dr.z = at0.z; }
     }
     if (sapper && blowAt < 0 && !breached) {
@@ -1125,7 +1125,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         attempts.push({ how: 'charge', ok, why: ok ? 'ok' : target!.gate ? 'gate_held' : 'wall_held', t: t + FUSE_S, odds: chargeOdds });
         const back = { x: pad.x + target!.out.x * 1.4, z: pad.z + target!.out.z * 1.4 };
         sp.x = back.x; sp.z = back.z; ev.push({ t: r2(t + 0.6), kind: 'cover', unit: sp.id, x: r2(back.x), z: r2(back.z) });
-        say(t + 0.3, pick(['Fire in the hole! Back, BACK!', 'It\'s set — get away from the wall!']), sp);
+        say(t + 0.3, pick(['Charge! Back from the wall!', 'It\'s set. Get away from the wall.']), sp);
       }
     } else if (sapper && blowAt > 0 && t >= blowAt) {
       const a = attempts[attempts.length - 1], ok = !!a && a.how === 'charge' && a.ok;
@@ -1140,8 +1140,8 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         curOrder = want; ordFx = ORDER_FX[want]; fbFrom = want === 'fallback' ? t : -1;
         orderLog.push({ t, order: want, stage });
         ev.push({ t: r2(t), kind: 'order', order: want, stage, units: hUp.map(h => h.id) });
-        if (want === 'counter' && !peace) say(t + 0.3, v(lead(), ['We\'re going at them — everybody FORWARD!', 'Push them back — now, NOW — go!'], ['Counterattack. On me. Move.']), lead());
-        else if (want === 'hold') say(t + 0.3, v(lead(), ['Hold your ground — nobody leaves the line!', 'Stay where you are! Hold!'], ['Hold the line. Hold your sectors.']), lead());
+        if (want === 'counter' && !peace) say(t + 0.3, v(lead(), ['We\'re going at them. Everybody forward!', 'Push them back. Now. Go!'], ['Counterattack. On me. Move.']), lead());
+        else if (want === 'hold') say(t + 0.3, v(lead(), ['Hold your ground. Nobody leaves the line.', 'Stay where you are. Hold.'], ['Hold the line. Hold your sectors.']), lead());
       }
       if (curOrder === 'fallback' && alarmed && !breached && stage !== 'house' && t >= Math.max(fbFrom, 0) && t - stageT >= 10) fallToStage(t, nextStage(stage));
     }
@@ -1158,7 +1158,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         if ((mainSeenT >= 0 && t >= mainSeenT + 3) || t >= (opener?.decoy?.until ?? 30) + 25) {   // (the noise stopped, but they only know it was a feint when the main body shows)
           pulledBack = true;
           for (const f of pulled) if (!f.out && !f.shelter) { assignPost(f, t + 1); f.readyAt = Math.max(f.readyAt, t + 9); }
-          say(t, v(lead(), ['It was a feint — they\'re coming from the road! Back, BACK!', 'The shooting was a decoy — get back to the front!'], ['Feint. Main body from the front. Everybody back to your lanes.']), lead());
+          say(t, v(lead(), ['It was a feint. They\'re coming from the road! Back!', 'That shooting was a decoy. Get back to the front!'], ['Feint. Main body from the front. Back to your lanes.']), lead());
         }
       }
     }
@@ -1178,26 +1178,26 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
           flareFrom = t + 2; flareUntil = t + 2 + FLARE.secs;
           if (ours) flaresUsed++;
           ev.push({ t: r2(t + 2), kind: 'flare', x: r2(fp.x), z: r2(fp.z), by: by.id, secs: FLARE.secs });
-          say(t + 2, ours ? v(by, ['Flare! Everybody look — there they are!', 'Lighting it up — flare going up!'], ['Flare up. Sectors.']) : pick(['Flare — light \'em up!', 'Put one up so we can see!']), by);
+          say(t + 2, ours ? v(by, ['Flare! There they are!', 'Flare going up!'], ['Flare up. Sectors.']) : pick(['Flare. Put it up.', 'Put one up so we can see.']), by);
         }
       }
-      if (doorNoise && nearest > detectAt) say(t + 0.4, v(lead(), ['That noise — the door! Somebody\'s at the door!', 'Oh God, that banging — they\'re on the gate!'], ['Contact at the tunnel door. Everyone up.']), lead());
+      if (doorNoise && nearest > detectAt) say(t + 0.4, v(lead(), ['That noise. The door! Somebody\'s at the door!', 'Oh God, that banging. They\'re on the gate!'], ['Contact at the tunnel door. Everyone up.']), lead());
       if (lightsOn) {
         const masts = mast ? towerPosts(s).filter(x => x.def?.flood && mastIds.includes(x.st.id)).slice(0, 3).map(x => ({ x: r2(x.st.x), z: r2(x.st.z), y: x.post.y + 0.1 })) : [];
         const aimAt = at(lineR + 8, 0);
         ev.push({ t: t + 1, kind: 'lights', ...(masts.length ? { masts, aim: { x: r2(aimAt.x), z: r2(aimAt.z) } } : {}) });
       }
       const l0 = lead();
-      say(t, peace ? v(l0, ['Who\'s there?! Someone\'s in the house — oh God —', 'I hear you down there — I have a gun!'], ['Intruder, downstairs. Everyone stay put.']) : l0?.vet ? (what === 'dog' ? 'Dog\'s alerting. Contact on the drive — everyone to your spots.' : 'Contact. Everyone up, to your spots. Now.')
-        : what === 'dog' ? pick(['The dog — shit, there\'s people out there! Get up, get UP!', 'Why is the dog — oh fuck. Fuck! They\'re coming!'])
-        : what === 'camera' ? pick(['There\'s people on the camera — oh shit, they\'ve got guns!', 'Fuck — look at the camera — they\'re coming up the drive!'])
-        : what === 'tripwire' ? 'That\'s the tripwire — shit — they\'re in the trees!' : pick(['Shit, shit — there\'s people coming up the drive!', 'Fuck! They\'re coming! Everybody up!']), l0);
+      say(t, peace ? v(l0, ['Who\'s there? Someone\'s in the house. Oh God.', 'I hear you down there. I have a gun!'], ['Intruder downstairs. Everyone stay put.']) : l0?.vet ? (what === 'dog' ? 'Dog\'s alerting. Contact on the drive — everyone to your spots.' : 'Contact. Everyone up, to your spots. Now.')
+        : what === 'dog' ? pick(['The dog. Shit, there\'s people out there. Get up!', 'Why is the dog barking? Oh fuck. They\'re coming.'])
+        : what === 'camera' ? pick(['People on the camera. Oh shit, they\'ve got guns.', 'Look at the camera. They\'re coming up the drive.'])
+        : what === 'tripwire' ? 'That\'s the tripwire. Shit. They\'re in the trees.' : pick(['Shit. People coming up the drive.', 'Fuck. They\'re coming. Everybody up!']), l0);
       if (H.some(h => h.shelter && h.kid)) {
-        say(t + 1, v(l0, ['Kids — downstairs, NOW! Don\'t come out till I say!', 'Get the kids in the back — go, go, GO!'], ['Kids to the shelter. Stay down, stay quiet.']), l0);
-        say(t + 2.2, pick(['What\'s happening?! Is that — are those guns?!', 'I\'m scared — I\'m scared —', 'Is somebody coming?']), H.find(h => h.shelter && h.kid));
+        say(t + 1, v(l0, ['Kids, downstairs. Now. Stay there till I say.', 'Get the kids in the back. Go.'], ['Kids to the shelter. Stay down, stay quiet.']), l0);
+        say(t + 2.2, pick(['What\'s happening? Are those guns?', 'I\'m scared.', 'Is somebody coming?']), H.find(h => h.shelter && h.kid));
       }
-      if (peace) say(t + 1.5, v(l0, ['I called 911! The police are on their way! GET OUT OF MY HOUSE!', 'The sheriff\'s coming — get out, GET OUT!'], ['Sheriff\'s on the way. Leave. Now.']), l0);
-      if (peace) say(t + 2, pick(['Shit — somebody\'s home!', 'Go, go — he\'s got a gun!']), R[0]); else say(t + 2, pick(['Spread out! Hit the house!', 'Go, go — flank \'em!', 'Come out and nobody gets hurt! We just want the food!', 'Light \'em up!']), R[0]);
+      if (peace) say(t + 1.5, v(l0, ['I called 911! They\'re on the way! Get out of my house!', 'The sheriff\'s coming. Get out!'], ['Sheriff\'s on the way. Leave. Now.']), l0);
+      if (peace) say(t + 2, pick(['Shit. Somebody\'s home.', 'Go, go. He\'s got a gun.']), R[0]); else say(t + 2, pick(['Spread out. Go.', 'Go, go. Left side.', 'Come out! Nobody gets hurt. We want the food!', 'Get on the house.']), R[0]);
       // where each one sleeps (sim/quarters.ts): guards by the gate are up sooner, those housed far from the house are slower to a post or to the shelter
       const gateAt = gatePoint(s);
       const qDelta = (f: Fighter): number => {
@@ -1217,7 +1217,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         pulled.forEach((f, j2) => takePost(f, t, dp[j2 % 3]));
         const from = atD(lineR + 6, 0);
         ev.push({ t: r2(t + 0.5), kind: 'diversion', decoys: decoys.map(d => d.id), from: { x: r2(from.x), z: r2(from.z) }, until: opener?.decoy?.until ?? 30, pulled: pulled.map(f => f.id) });
-        if (pulled.length) say(t + 1, v(lead(), ['They\'re on the other side — go, go, GO!', 'That\'s the east fence! Everybody to the east!'], ['Contact east. Shift two to the east wall.']), lead());
+        if (pulled.length) say(t + 1, v(lead(), ['They\'re on the other side. Go!', 'That\'s the east fence! Everybody east!'], ['Contact east. Two to the east wall.']), lead());
       }
     }
     for (const p of posts) p.fire *= 0.7;
@@ -1232,7 +1232,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       if (!f.out && !f.aided && f.side === 'home' && t - (f.bleedAt ?? t) >= (f.vet ? 2 : 6) && ifaks > 0) {
         f.aided = true;   // one go at it: what's left of the bleeding is for the medic
         stopBleed(f, f, t, !!f.vet);
-        sayF(f, t, f.bleedPart === 'leg' || f.bleedPart === 'arm' ? ['Tourniquet — I got it on — oh God, oh God, tighter —', 'I\'m putting the tourniquet on — fuck, it hurts —'] : ['Pressing on it — I\'m pressing on it —', 'There\'s a hole in me — the seal, where\'s the seal —'], ['Tourniquet\'s on. Back in it.', 'Sealed it. I\'m good.'], 0);
+        sayF(f, t, f.bleedPart === 'leg' || f.bleedPart === 'arm' ? ['Tourniquet. It\'s on. Tighter. Oh God.', 'Putting the tourniquet on. Fuck, it hurts.'] : ['Pressing on it. I\'m pressing on it.', 'There\'s a hole in me. The seal. Where\'s the seal?'], ['Tourniquet\'s on. Back in it.', 'Sealed it. I\'m good.'], 0);
       } else if (!f.out && f.side === 'raider' && t - (f.bleedAt ?? t) >= 5 && r() < 0.15) f.bleed *= 0.3;
     }
 
@@ -1261,10 +1261,10 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       if (f.mounted && f.dry) armFor(f, null);
       if (t < f.readyAt) continue;
       // a wrecked post is left at once; one under heavy fire only now and then (moving under fire is worse than staying behind cover)
-      if (f.post && f.post.kind !== 'open' && (f.post.wrecked || (f.post.fire > (f.vet ? 14 : 9) && t - (f.movedAt ?? -99) > 20 && r() < 0.15))) { const old = f.post; old.fire = 0; say(t, old.wrecked ? v(f, ['It\'s gone — the whole thing\'s gone — I\'m getting out of here!', 'Shit — it\'s on fire — moving back!'], ['Position\'s gone. Falling back.']) : v(f, ['They\'re all shooting at me — fuck — I\'m moving!', 'I can\'t stay here — I can\'t — moving back!'], ['Too hot. Moving. Cover me.']), f); assignPost(f, t, old); continue; }
+      if (f.post && f.post.kind !== 'open' && (f.post.wrecked || (f.post.fire > (f.vet ? 14 : 9) && t - (f.movedAt ?? -99) > 20 && r() < 0.15))) { const old = f.post; old.fire = 0; say(t, old.wrecked ? v(f, ['It\'s gone. The whole thing. I\'m getting out of here!', 'Shit. It\'s on fire. Moving back.'], ['Position\'s gone. Falling back.']) : v(f, ['They\'re all shooting at me. Fuck. Moving!', 'I can\'t stay here. Moving back.'], ['Too hot. Moving. Cover me.']), f); assignPost(f, t, old); continue; }
       if (f.grenades > 0) {
         const tg = rUp.find(x => dist(x, f) <= GRENADE_RANGE);
-        if (tg) { f.grenades--; say(t, v(f, ['Throwing it — get down, get DOWN!', 'Here goes — everybody down!'], ['Frag out!']), f); ev.push({ t, kind: 'throw', from: f.id, x: r2(tg.x), z: r2(tg.z), what: 'grenade' }); explode(tg.x + (r() - 0.5), tg.z + (r() - 0.5), t + 2, 1.5); continue; }
+        if (tg) { f.grenades--; say(t, v(f, ['Throwing it. Get down!', 'Here it goes. Everybody down.'], ['Frag out.']), f); ev.push({ t, kind: 'throw', from: f.id, x: r2(tg.x), z: r2(tg.z), what: 'grenade' }); explode(tg.x + (r() - 0.5), tg.z + (r() - 0.5), t + 2, 1.5); continue; }
       }
       if (r() > f.arm.rate * (0.5 + 0.5 * eff(f))) continue;     // and slower
       // threat: close, carrying explosives, caught in the open; only those in front of the post and in range
@@ -1286,8 +1286,8 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       down.rescued = true;
       if (med === hero) { ev.push({ t: r2(t + 0.3), kind: 'heroic', unit: med.id, act: med.supp > 1 ? 'cover' : 'drag', for: down.id }); moments.push({ t: r2(t + 0.3), kind: 'heroic', unit: med.id }); }
       ev.push({ t: r2(t + 0.4), kind: 'move', unit: med.id, x: r2(down.x), z: r2(down.z) });
-      say(t + 0.5, v(med, [`${nameOf(down)}!! Oh God — hold on, I'm coming! Somebody shoot!`, `I've got ${nameOf(down)} — I don't know what I'm doing — just keep them back!`], [`Cover me. Getting ${nameOf(down)}.`]), med);
-      say(t + 4, v(med, [`Where's it coming from — oh God — I'm pressing, I'm pressing —`, `You're okay, you're okay — look at me — LOOK AT ME —`], [`Pressure's on. You're going to be fine.`]), med);
+      say(t + 0.5, v(med, [`${nameOf(down)}! Oh God. Hold on, I'm coming. Somebody shoot!`, `I've got ${nameOf(down)}. I don't know what I'm doing. Keep them back!`], [`Cover me. Getting ${nameOf(down)}.`]), med);
+      say(t + 4, v(med, [`Where's it coming from? Oh God. I'm pressing. I'm pressing.`, `You're okay. You're okay. Look at me.`], [`Pressure's on. Stay with me.`]), med);
       stopBleed(down, med, t + 4, !!med.vet);
       toShelter(down, t + 4.5);
       med.readyAt = t + 8;
@@ -1295,8 +1295,8 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     } else if (alarmed && med && down && !breached) {
       down.rescued = true;
       ev.push({ t: r2(t + 0.4), kind: 'move', unit: med.id, x: r2(down.x), z: r2(down.z) });
-      say(t + 0.5, v(med, [`${nameOf(down)}! Hold on — I'm coming! Somebody cover me!`, `I'm getting ${nameOf(down)} — shoot at them, keep them down!`], [`Cover me. Getting ${nameOf(down)}.`]), med);
-      say(t + 3.2, v(med, [`Stay with me, ${nameOf(down)}. Stay with me. Press here — hard — HARD.`, `I've got you — you're gonna be okay — oh God, there's so much —`], [`Got you, ${nameOf(down)}. Pressure on it. Don't move.`]), med);
+      say(t + 0.5, v(med, [`${nameOf(down)}! Hold on. I'm coming. Somebody cover me!`, `Getting ${nameOf(down)}. Shoot at them. Keep them down!`], [`Cover me. Getting ${nameOf(down)}.`]), med);
+      say(t + 3.2, v(med, [`Stay with me, ${nameOf(down)}. Stay with me. Press here. Hard.`, `I've got you. You're gonna be okay. Oh God, there's so much.`], [`Got you, ${nameOf(down)}. Pressure on it. Don't move.`]), med);
       stopBleed(down, med, t + 3, true);
       toShelter(down, t + 3);
       med.readyAt = t + 6;
@@ -1316,7 +1316,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     const lossLimit = Math.max(1, raiders * (0.25 + 0.3 * org + (crewKind === 'militia' ? MILITIA.morale : 0) + (temper === 'savage' ? 0.2 : 0) + (breached ? 0.2 : 0) + (opts.angry ? 0.15 : 0)) * ordFx.morale * nerveK(opts.deter ?? 0));
     const leaderBreak = R[0].out && temper !== 'savage' && (!breached || losses >= Math.ceil(raiders * 0.3));
     let rallied = false;
-    if (leaderBreak && !leaderRallied && !fled && org > 0.3 && mr() < 0.3 + 0.3 * org) { leaderRallied = true; rallied = true; const lt = rUp.find(f => f !== R[0]); if (lt) { ev.push({ t, kind: 'rally', unit: lt.id }); say(t + 0.3, pick(['I\'ve got them! Hold, HOLD — we\'re not leaving!', 'Stay on it! He\'s down, I\'m in charge — keep moving!']), lt); } }
+    if (leaderBreak && !leaderRallied && !fled && org > 0.3 && mr() < 0.3 + 0.3 * org) { leaderRallied = true; rallied = true; const lt = rUp.find(f => f !== R[0]); if (lt) { ev.push({ t, kind: 'rally', unit: lt.id }); say(t + 0.3, pick(['I\'ve got them. Hold. We\'re not leaving.', 'Stay on it. He\'s down. I\'m in charge. Keep moving.']), lt); } }
     if (!fled && (!breached || upArmed > 0) && rUp.length && (losses >= lossLimit || (leaderBreak && !rallied && !leaderRallied) || (!breached && firstBlood && temper === 'desperate' && crewKind !== 'militia') || peaceBreak)) {
       // a crew that has lost heavily and has no way out (cut off, pinned, outgunned) may lay down its arms instead of running (sim/surrender.ts)
       if (!peace && crewSurrenders({ temper, kind: crewKind, lossShare: losses / Math.max(1, R.length), pinnedShare: rUp.filter(f => f.supp > 3).length / Math.max(1, rUp.length), outnumbered: upArmed / Math.max(1, rUp.length), trapped: opts.ambush !== undefined || !!opts.insideBreach, leaderDown: R[0].out }, r)) { giveUp(t, rUp); break; }
@@ -1328,22 +1328,22 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         if (offer) {
           const ok = parleyAccepted(ctx, mr), tt = t + 1;
           ev.push({ t: r2(tt), kind: 'parley', offer, accepted: ok, ...(offer === 'tribute' ? { what: 'a share of the food and fuel' } : { what: 'to go through' }) });
-          say(tt, offer === 'tribute' ? pick(['Give us food and fuel and we walk. Nobody else has to get hurt.', 'Hold your fire! We\'ll go — leave a share at the gate and we\'re gone!']) : pick(['We\'re just passing through! Let us by and we\'ll leave you be!', 'Hold fire! We want the road, not your place!']), R[0].out ? rUp[0] : R[0]);
+          say(tt, offer === 'tribute' ? pick(['Food and fuel and we walk. Nobody else gets hurt.', 'Hold your fire! Leave a share at the gate and we go.']) : pick(['We\'re passing through. Let us by.', 'Hold fire! We want the road, not your place.']), R[0].out ? rUp[0] : R[0]);
           if (ok) {
-            say(tt + 1.4, v(lead(), ['Okay — okay! Take it and go! Just GO!', 'Don\'t shoot! Let them go — let them take it and go!'], ['Terms accepted. Weapons down. They walk.']), lead());
+            say(tt + 1.4, v(lead(), ['Okay. Okay. Take it and go.', 'Don\'t shoot. Let them take it and go.'], ['Terms accepted. Weapons down. They walk.']), lead());
             fled = true;
             for (const f of rUp) { f.fled = true; const q = at(34, (r() - 0.5) * 10); ev.push({ t: r2(tt + 2 + r()), kind: 'move', unit: f.id, x: r2(q.x), z: r2(q.z), walk: true }); }
             parleyEnd = { kind: offer, at: tt, what: offer === 'tribute' ? 'tribute' : 'passage', units: rUp.map(f => f.id) };
             end = 'fled'; endT = tt + 9; break;
           }
-          say(tt + 1.2, v(lead(), ['No! Get off my land!', 'We\'re not paying you anything!'], ['Refused. Stay on your spots.']), lead());
+          say(tt + 1.2, v(lead(), ['No. Get off my land.', 'We\'re not paying you anything.'], ['Refused. Stay on your spots.']), lead());
         }
       }
       fled = true;
       const l1 = lead();
       t += 1;   // after this second's shots land
-      say(t, v(l1, R[0].out ? ['Their guy\'s down — they\'re running! They\'re RUNNING!', 'They\'re leaving — oh thank God, they\'re leaving —'] : ['They\'re running — they\'re running!', 'Are they — they\'re pulling back!'], ['They\'re breaking contact. Hold your fire, stay on your spots.']), l1);
-      if (!R[0].out) say(t + 0.5, pick(['Fall back! Fall back!', 'Fuck this — it\'s not worth it, go!']), R[0]);
+      say(t, v(l1, R[0].out ? ['Their guy\'s down. They\'re running!', 'They\'re leaving. Oh thank God.'] : ['They\'re running. They\'re running!', 'They\'re pulling back.'], ['They\'re breaking contact. Hold your fire, stay on your spots.']), l1);
+      if (!R[0].out) say(t + 0.5, pick(['Fall back! Fall back!', 'Fuck this. Not worth it. Go!']), R[0]);
       for (const f of rUp) { f.fled = true; const p = at(36, (r() - 0.5) * 10); ev.push({ t: r2(t + r()), kind: 'flee', unit: f.id }); ev.push({ t: r2(t + 1), kind: 'move', unit: f.id, x: r2(p.x), z: r2(p.z) }); }
       // a crew that holds together carries its hurt out with it; the rest are left on the drive
       const hurtOnes = R.filter(f => f.out && !f.dead && !f.surrendered && !f.fled);
@@ -1359,13 +1359,13 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     // a door that will not give: the crew has been at it as long as it will stay
     if (door?.gaveUp && t >= door.secs && !breached && rUp.length) {
       const l1 = lead();
-      say(t, v(l1, ['They\'re leaving — they couldn\'t get through the door!', 'They gave up on the door — oh thank God —'], ['They\'re pulling back from the door.']), l1);
+      say(t, v(l1, ['They\'re leaving. They couldn\'t get through the door.', 'They gave up on the door. Oh thank God.'], ['They\'re pulling back from the door.']), l1);
       for (const f of rUp) { f.fled = true; const p = at(36, (r() - 0.5) * 10); ev.push({ t: r2(t + r()), kind: 'flee', unit: f.id }); ev.push({ t: r2(t + 1), kind: 'move', unit: f.id, x: r2(p.x), z: r2(p.z) }); }
       end = 'fled'; endT = t + 6; break;
     }
     if (!rUp.length) { end = 'repelled'; endT = t + 3; break; }
     // they can't get over the wall and give up
-    if (!breached && wallR && !synth && !wallDown && opts.ambush === undefined && lineSince >= 0 && t - lineSince > 40 && (lineClosed || !propLine.onLine.size)) { say(t, v(lead(), ['They can\'t get over the wall — they\'re giving up — oh my God —'], ['They can\'t breach. They\'re pulling out.']), lead()); for (const f of rUp) { f.fled = true; ev.push({ t: r2(t + r()), kind: 'flee', unit: f.id }); } end = 'repelled'; endT = t + 6; break; }   // (the wall held: nobody was across, so it is a repelled raid, not just a crew that ran)
+    if (!breached && wallR && !synth && !wallDown && opts.ambush === undefined && lineSince >= 0 && t - lineSince > 40 && (lineClosed || !propLine.onLine.size)) { say(t, v(lead(), ['They can\'t get over the wall. They\'re giving up. Oh my God.'], ['They can\'t breach. They\'re pulling out.']), lead()); for (const f of rUp) { f.fled = true; ev.push({ t: r2(t + r()), kind: 'flee', unit: f.id }); } end = 'repelled'; endT = t + 6; break; }   // (the wall held: nobody was across, so it is a repelled raid, not just a crew that ran)
     const climbing0 = wallR > 0 && !synth && !wallDown && opts.ambush === undefined && (lineClosed || !propLine.onLine.size);
     // the weak side: which flank has fewer defenders
     const leftDef = hUp.filter(h => (h.x - C.x) * lx + (h.z - C.z) * lz > 0).length;
@@ -1373,7 +1373,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     for (const [k, f] of rUp.entries()) {
       const d = dist(f, C);
       if (f.veh) continue;   // still in the cab
-      if (f.dry) { f.fled = true; ev.push({ t, kind: 'flee', unit: f.id }); if (r() < 0.5) say(t, pick(['I\'m dry! I\'m out!', 'No ammo — I\'m outta here!']), f); continue; }
+      if (f.dry) { f.fled = true; ev.push({ t, kind: 'flee', unit: f.id }); if (r() < 0.5) say(t, pick(['I\'m dry. I\'m out.', 'No ammo. I\'m outta here.']), f); continue; }
       if (t < f.readyAt) continue;
       if (breached) {
         f.y = 0;
@@ -1392,7 +1392,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
           downed.dead = true; downed.bleed = 0;
           ev.push({ t: r2(t + 0.4), kind: 'shot', from: f.id, to: downed.id, hit: true });
           ev.push({ t: r2(t + 0.45), kind: 'death', unit: downed.id, executed: true });
-          if (r() < 0.5) say(t, pick(savage ? ['Nobody gets up.', 'Leave nobody.'] : ['That one\'s still moving.']), f);
+          if (r() < 0.5) say(t, pick(savage ? ['Finish it.', 'Check him.'] : ['That one\'s still moving.']), f);
           continue;
         }
         // (the people hiding in the house are judged when the fight is over, by the crew's temper and by how long the doors held: sim/crewMercy.ts)
@@ -1401,9 +1401,9 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         if (tg && r() < f.arm.rate) { if (tg.shelter) tg.cover = 0.5; shoot(f, tg, t + r() * 0.9); }
         if (!fighting && !heldUp && !savage && d <= 2 && r() < 0.3 && H.some(h => h.shelter && !h.dead && !h.escaped && !hardShelter)) {
           heldUp = true;
-          say(t, pick(['Hands where I can see them! Don\'t move!', 'On the floor! Nobody be a hero!', 'Where\'s the food? WHERE\'S THE FOOD?']), f);
+          say(t, pick(['Hands where I can see them! Don\'t move!', 'On the floor! Everybody on the floor!', 'Where\'s the food? Where is it?']), f);
           const kid = H.find(h => h.shelter && h.kid && !h.dead && !h.escaped);
-          if (kid) say(t + 1, pick(['Please don\'t hurt us — please —', 'Mom? Dad? DAD?', 'Take it, take it all, just go —']), kid);
+          if (kid) say(t + 1, pick(['Please don\'t hurt us.', 'Mom? Dad? Dad!', 'Take it. Take it all. Just go.']), kid);
         }
         continue;
       }
@@ -1411,7 +1411,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       if (f.rockets > 0 && alarmed) {
         const pt = posts.find(p => !p.wrecked && p.kind !== 'open' && H.some(h => h.post === p && !h.out) && dist(p, f) <= ROCKET_RANGE);
         if (pt) {
-          f.rockets--; say(t - 0.3, v(lead(), ['Is that — RPG! RPG! GET DOWN!', 'Oh shit — they\'ve got a rocket —'], ['RPG! Get off the tower!']), lead()); ev.push({ t, kind: 'rocket', from: f.id, x: r2(pt.x), z: r2(pt.z), ...(pt.y ? { y: pt.y } : {}) });
+          f.rockets--; say(t - 0.3, v(lead(), ['RPG! RPG! Get down!', 'Oh shit. They\'ve got a rocket.'], ['RPG. Get off the tower.']), lead()); ev.push({ t, kind: 'rocket', from: f.id, x: r2(pt.x), z: r2(pt.z), ...(pt.y ? { y: pt.y } : {}) });
           const onTarget = r() < 0.6;
           explode(pt.x + (onTarget ? 0 : (r() - 0.5) * 3), pt.z + (onTarget ? 0 : (r() - 0.5) * 3), t + 1, 1.2, onTarget ? pt : undefined);
           continue;
@@ -1420,7 +1420,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       // grenades within ~30 m
       if (f.grenades > 0) {
         const tg = hUp.find(h => dist(h, f) <= GRENADE_RANGE);
-        if (tg) { f.grenades--; say(t + 0.3, v(tg, ['GRENADE! Oh fuck — get DOWN!', 'Something landed — GRENADE!'], ['Grenade!']), tg); ev.push({ t, kind: 'throw', from: f.id, x: r2(tg.x), z: r2(tg.z), what: 'grenade' }); explode(tg.x + (r() - 0.5), tg.z + (r() - 0.5), t + 2, 1.5, tg.post && r() < 0.4 ? tg.post : undefined); continue; }
+        if (tg) { f.grenades--; say(t + 0.3, v(tg, ['Grenade! Oh fuck. Get down!', 'Something landed. Grenade!'], ['Grenade!']), tg); ev.push({ t, kind: 'throw', from: f.id, x: r2(tg.x), z: r2(tg.z), what: 'grenade' }); explode(tg.x + (r() - 0.5), tg.z + (r() - 0.5), t + 2, 1.5, tg.post && r() < 0.4 ? tg.post : undefined); continue; }
       }
       // bounding: half move while half suppress; swap each bound
       const movers = Math.floor(t / 4) % 2 === k % 2;
@@ -1481,18 +1481,18 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         bitten++;
         ev.push({ t: r2(t + 0.1), kind: 'snag', unit: f.id, x: r2(f.x), z: r2(f.z), what: moat.hazard.what });
         hurt(f, moat.hazard.min + r() * (moat.hazard.max - moat.hazard.min), t + 0.1, undefined, 'leg');
-        if (!f.dead && r() < 0.7) say(t + 0.3, pick(moat.frozen ? ['The ice — it went — it went under me —', 'It cracked — get me out — GET ME OUT —'] : ['Cold — Christ, it\'s cold — I can\'t feel my — ', 'It\'s over my head — I\'ve lost the rifle —', 'The bank is slick — I can\'t climb out —']), f);
+        if (!f.dead && r() < 0.7) say(t + 0.3, pick(moat.frozen ? ['The ice went. It went under me.', 'It cracked. Get me out. Get me out!'] : ['Christ, it\'s cold. I can\'t feel my legs.', 'It\'s over my head. I lost the rifle.', 'The bank\'s slick. I can\'t climb out.']), f);
       }
       // the guard dogs posted at the wall bite whoever is on the ladder, and the crew loses heart (sim/defenseTune.ts)
       if (wallDogs.n) for (const f of atLine) if (r() < wallDogs.bitePerS) {
         bitten++;
         ev.push({ t: r2(t + 0.1), kind: 'snag', unit: f.id, x: r2(f.x), z: r2(f.z), what: 'a guard dog' });
         hurt(f, wallDogs.minHurt + r() * wallDogs.spanHurt, t + 0.1, undefined, 'leg');
-        if (!f.dead && r() < 0.6) say(t + 0.3, pick(['The dog — get it off me — GET IT OFF!', 'Dog! It\'s got my leg — aah —']), f);
+        if (!f.dead && r() < 0.6) say(t + 0.3, pick(['The dog! Get it off me!', 'Dog! It\'s got my leg!']), f);
       }
       if (temper !== 'savage' && !peace && t - lineSince >= 6) for (const f of atLine) if (!f.fled && !f.out && r() < (0.03 + 0.05 * Math.min(1, losses / Math.max(1, raiders)) + 0.03 * bitten) * (1 + 3 * (opts.deter ?? 0))) {
         f.fled = true; ev.push({ t, kind: 'flee', unit: f.id });
-        if (r() < 0.5) say(t + 0.2, pick(['Fuck this — I\'m not going over that.', 'It\'s not worth it — back, get BACK!', 'No way — I\'m out — I\'m out of here!']), f);
+        if (r() < 0.5) say(t + 0.2, pick(['Fuck this. I\'m not going over that.', 'Not worth it. Back. Get back!', 'No way. I\'m out of here.']), f);
       }
     }
     // (round 4) clubs against rifles need far more of them to rush the line; going over a wall, every rifle at a post on it slows them
@@ -1551,12 +1551,12 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         hurt(h, (h.hp + 1) / Math.max(0.1, diffOf(s.disaster).wound), tt, by, 'torso');
         if (h.dead && disposition === 'hostile') { const de = ev.slice().reverse().find(e => e.kind === 'death' && e.unit === h.id); if (de && de.kind === 'death') de.executed = true; }   // a hostile crew's kill after the fight is lost is an execution
         if (!h.dead) { done = 'wounded'; h.out = true; }
-        if (h.dead && by && !horde && r() < 0.5) say(tt + 0.3, pick(savage ? ['Nobody leaves.', 'Leave nobody.', 'Done.'] : ['I said stay down!', 'Should have stayed down.']), by);
+        if (h.dead && by && !horde && r() < 0.5) say(tt + 0.3, pick(savage ? ['Finish it.', 'Check them.', 'Done.'] : ['I said stay down!', 'Stay down. Stay down.']), by);
       } else if (fate === 'finished') {
         h.dead = true; h.bleed = 0;
         if (by) ev.push({ t: r2(tt), kind: 'shot', from: by.id, to: h.id, hit: true });
         ev.push({ t: r2(tt + 0.05), kind: 'death', unit: h.id, executed: true });
-        if (by && !horde && r() < 0.5) say(tt + 0.3, pick(['That one\'s still moving.', 'Nobody gets up.']), by);
+        if (by && !horde && r() < 0.5) say(tt + 0.3, pick(['That one\'s still moving.', 'Check him.']), by);
       } else if (fate === 'wounded') {
         if (!h.out) {
           if (by) ev.push({ t: r2(tt), kind: 'shot', from: by.id, to: h.id, hit: true });
@@ -1565,16 +1565,16 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
         }
       } else if (fate === 'taken') {
         h.escaped = true; h.taken = true;
-        if (by) { ev.push({ t: r2(tt), kind: 'taken', unit: h.id, by: by.id }); ev.push({ t: r2(tt + 0.01), kind: 'hostage', unit: h.id, by: by.id }); say(tt, pick(h.kid ? ['Grab the kid. Put it in the truck.', 'This one comes with us.'] : ['This one can work. Tie his hands.', 'Up. You\'re coming with us. You can dig.']), by); }
-        if (!h.kid) say(tt + 0.8, pick(['No — my family — please —', 'Take the food, take it, just leave me —']), h);
+        if (by) { ev.push({ t: r2(tt), kind: 'taken', unit: h.id, by: by.id }); ev.push({ t: r2(tt + 0.01), kind: 'hostage', unit: h.id, by: by.id }); say(tt, pick(h.kid ? ['Grab the kid. Truck.', 'This one comes with us.'] : ['This one can work. Tie his hands.', 'Up. You\'re coming with us.']), by); }
+        if (!h.kid) say(tt + 0.8, pick(['No. My family. Please.', 'Take the food. Take it. Just leave me.']), h);
       } else if (fate === 'spared') {
-        if (by) { ev.push({ t: r2(tt), kind: 'spare', unit: h.id, by: by.id, why: h.kid ? 'child' : 'complied' }); if (!spareSaid.has(by.id) && r() < 0.5) { spareSaid.add(by.id); say(tt, pick(h.kid ? ['Not the kid. Leave the kid.', 'Get the little one out of the way.'] : ['Stay down and nobody else gets hurt.', 'You. Stay put. We\'re not here for you.']), by); } }
+        if (by) { ev.push({ t: r2(tt), kind: 'spare', unit: h.id, by: by.id, why: h.kid ? 'child' : 'complied' }); if (!spareSaid.has(by.id) && r() < 0.5) { spareSaid.add(by.id); say(tt, pick(h.kid ? ['Not the kid. Leave the kid.', 'Get the little one out of the way.'] : ['Stay down. Nobody else gets hurt.', 'You. Stay put. Not here for you.']), by); } }
       } else if (fate === 'hid') {
         // never found: nothing happens to them
       } else if (fate === 'held') {
         h.surrendered = true;
         ev.push({ t: r2(tt), kind: 'surrender', unit: h.id });
-        if (by && r() < 0.6) say(tt, pick(['Hands where I can see them! Don\'t move!', 'Drop it! On your knees!', 'Nobody be a hero!']), by);
+        if (by && r() < 0.6) say(tt, pick(['Hands where I can see them!', 'Drop it! On your knees!', 'Stay down. Stay down.']), by);
       } else {   // got away: out the tunnel if there is one, else to the shelter
         if (tunnelOut) { h.escaped = true; h.x = tunnelOut[0]; h.z = tunnelOut[1]; ev.push({ t: r2(tt), kind: 'flee', unit: h.id }); ev.push({ t: r2(tt + 0.2), kind: 'move', unit: h.id, x: r2(tunnelOut[0]), z: r2(tunnelOut[1]) }); }
         else { ev.push({ t: r2(tt), kind: 'flee', unit: h.id }); toShelter(h, tt); }

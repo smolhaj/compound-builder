@@ -17,7 +17,7 @@ import type { Rect } from './siting';
 const isBunkerKind = (k: string): boolean => k.startsWith('bunker_');
 export const isDomeStructure = (st: Structure): boolean => tierOfKind(st.kind) !== null;
 
-const at = (st: Structure): DomeAt => domeAt(st.kind, st.x, st.z, st.rot)!;
+const at = (st: Structure): DomeAt => domeAt(st.kind, st.x, st.z, st.rot, st.portAngle)!;
 /** Pieces staked for this dome (they remember it). */
 const pieces = (s: GameState, domeId: string): Structure[] => s.structures.filter(x => x.underDome?.id === domeId);
 /** Every bunker piece standing inside a dome's ring, staked with it or not (derived from where it stands: nothing is saved for a bunker that was there first). */

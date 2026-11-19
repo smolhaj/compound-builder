@@ -54,7 +54,7 @@ export interface TierSpec {
   skirtThickFt: number;
   /** Width of the earth berm banked round the shell inside the footprint (ft each side): the footprint is the shell plus its berm. */
   bermFt: number;
-  /** Person-airlocks fitted (the only openings people use). */
+  /** Person airlocks fitted, the public entrances people use (PROPOSED, owner: one entrance, two at most): geodesic 1, glass 1, arcology 2. The main one stands in one gate complex with the vehicle port (sim/dome/vehiclePort.ts); the second (arcology only) stands opposite. The plant's service airlock and link airlocks are not public entrances and are not counted. */
   airlocks: number;
   /** Hand and crew labor on site (person-hours); the supplier's erectors are in the kit's price. */
   hours: number;
@@ -67,14 +67,20 @@ export interface TierSpec {
   blurb: string;
 }
 
+/**
+ * The reference frame the plant, the yard and the buried sleeves are laid out on (the old person-airlock count: 2, 3 and 6 evenly spread spans). Since the owner cut the public
+ * entrances to one or two (TIER.airlocks), the spans are only a frame for the machinery; no door stands on their boundaries any more. PROPOSED (docs/DECISIONS.md 2026-11-19).
+ */
+export const FRAME_SPANS: Record<DomeTier, number> = { earthen: 1, geodesic: 2, glass: 3, arcology: 6 };
+
 export const TIER: Record<DomeTier, TierSpec> = {
   earthen: { tier: 'earthen', bermFt: 0, name: 'Earthen dome', cells: 2, minCells: 2, maxCells: 4, heightRatio: 0.5, skirtFt: 4, skirtThickFt: 1, airlocks: 0, hours: 700, permitFee: 0, reviewDays: 0, gateUsd: 0,
     blurb: 'A 20 ft earthbag-and-plaster dome with a sod crown and one low door: a cool summer kitchen, a storm room, a hideout that looks like a haystack.' },
-  geodesic: { tier: 'geodesic', bermFt: 5, name: 'Geodesic dome', cells: 7, minCells: 4, maxCells: 12, heightRatio: 0.5, skirtFt: 30, skirtThickFt: 2, airlocks: 2, hours: 6000, permitFee: 12000, reviewDays: 30, gateUsd: 0,
+  geodesic: { tier: 'geodesic', bermFt: 5, name: 'Geodesic dome', cells: 7, minCells: 4, maxCells: 12, heightRatio: 0.5, skirtFt: 30, skirtThickFt: 2, airlocks: 1, hours: 6000, permitFee: 12000, reviewDays: 30, gateUsd: 0,
     blurb: 'A 60 ft geodesic dome of steel struts glazed in twin-wall polycarbonate, berm-footed, two airlocks: one climate under one skin, frost-free greens all winter.' },
-  glass: { tier: 'glass', bermFt: 0, name: 'Glass & steel dome', cells: 15, minCells: 10, maxCells: 24, heightRatio: 0.5, skirtFt: 30, skirtThickFt: 3, airlocks: 3, hours: 40000, permitFee: 350000, reviewDays: 120, gateUsd: 15_000_000,
+  glass: { tier: 'glass', bermFt: 0, name: 'Glass & steel dome', cells: 15, minCells: 10, maxCells: 24, heightRatio: 0.5, skirtFt: 30, skirtThickFt: 3, airlocks: 1, hours: 40000, permitFee: 350000, reviewDays: 120, gateUsd: 15_000_000,
     blurb: 'A 150 ft steel gridshell glazed in laminated glass on a concrete ring beam: a conservatory over a whole yard, house, beds and well. Needs Founder money and an engineer\'s stamp.' },
-  arcology: { tier: 'arcology', bermFt: 0, name: 'Arcology dome', cells: 36, minCells: 24, maxCells: 60, heightRatio: 0.5, skirtFt: 60, skirtThickFt: 4, airlocks: 6, hours: 150000, permitFee: 15_000_000, reviewDays: 420, gateUsd: 500_000_000,
+  arcology: { tier: 'arcology', bermFt: 0, name: 'Arcology dome', cells: 36, minCells: 24, maxCells: 60, heightRatio: 0.5, skirtFt: 60, skirtThickFt: 4, airlocks: 2, hours: 150000, permitFee: 15_000_000, reviewDays: 420, gateUsd: 500_000_000,
     blurb: 'A 360 ft space-frame dome of clear polycarbonate-composite panels that rifle fire, rockets and shrapnel cannot get through. A small town under a sky of its own. Magnate money, a contractor firm and about a year of review.' },
 };
 
