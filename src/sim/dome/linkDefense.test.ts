@@ -38,7 +38,7 @@ describe('detection (the same counters as any dig)', () => {
     expect(combine(detectChances(def({ tower: true })))).toBeGreaterThan(base);
   });
   it('with ground sensors a dig toward the tunnel is noticed far sooner than without', () => {
-    const noticed = (sets: number): number => { let n = 0; for (let seed = 0; seed < 60; seed++) { const g = world('geodesic', 'glass', 8); g.stock.ground_sensor = sets; g.gear = g.gear ?? ({} as never); const d = dig(g, { days: 14 }); d.skirtChecked = true; g.clock.t += 1; for (let day = 0; day < 10 && d.detectedDay === null; day++) { g.seed = seed * 17 + day; g.gate.pending = null; digDay(g); g.clock.t += 1; if (!g.digs?.active) break; } if (d.detectedDay !== null) n++; } return n; };
+    const noticed = (sets: number): number => { let n = 0; for (let seed = 0; seed < 60; seed++) { const g = world('geodesic', 'glass', 8); g.stock.ground_sensor = sets; const d = dig(g, { days: 14 }); d.skirtChecked = true; g.clock.t += 1; for (let day = 0; day < 10 && d.detectedDay === null; day++) { g.seed = seed * 17 + day; g.gate.pending = null; digDay(g); g.clock.t += 1; if (!g.digs?.active) break; } if (d.detectedDay !== null) n++; } return n; };
     expect(noticed(4)).toBeGreaterThanOrEqual(noticed(0));
   });
 });

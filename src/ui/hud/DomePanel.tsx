@@ -13,6 +13,7 @@ import { FILTERING, LIMIT_PPM, type Filtering } from '../../sim/dome/air';
 import { outside, dayLoad, planPowered, buyFiltering, buyLoop, loopBill, loopProblem, domeClean, domeClock, domeViews, filteringBill, filteringProblem, freshClock, replaceFilters, setClimateMode, setLockdown, spareFiltersUsd, tendCostUsd, tendEcology, type DomeView } from '../../sim/dome/live';
 import { pluralize } from '../../sim/words';
 import { DomePlantSection } from './DomePlantSection';
+import { DomeLinksSection } from './DomeLinksSection';
 
 const NAME: Record<Filtering, string> = { none: 'None (shell leakage only)', scrubber: 'CO2 scrubbers', advanced: 'Advanced air bank', closed: 'Closed ecology' };
 const BUY: Record<Filtering, string> = { none: '', scrubber: 'Fit CO2 scrubbers', advanced: 'Fit the advanced air bank', closed: 'Build the closed ecology' };
@@ -129,6 +130,7 @@ export function DomePanel() {
       </div>
     </Section>
     <DomePlantSection v={v} />
+    <DomeLinksSection v={v} />
     <div style={{ fontSize: 11, color: DIM }}>The {TIER_NAME(v).toLowerCase()} sits over the bunker, which keeps its own fallout protection. It keeps weather, ash and fallout dust off the ground under it, and it can be seen for miles.</div>
   </div>;
 }
