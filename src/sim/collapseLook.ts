@@ -39,6 +39,12 @@ export interface CollapseLook {
   ashCover: number;
   /** Multiplier on the sun (1 = none). */
   dim: number;
+  /**
+   * The slow climate kinds (sim/climateLook.ts), all 0-1 and eased with the anomaly: `snowCover` is the white pack on the ground and roofs (it is
+   * NOT ash, so a snowfall does not thin it); `scorch` the heat's bleached, dry look; `freeze` the cold's ice on water; `sunScale` the sun's size
+   * (1 = normal) and `sunLower` how far its arc is pulled down.
+   */
+  snowCover: number; scorch: number; freeze: number; sunScale: number; sunLower: number;
   /** The sky is pulled toward this colour by `skyAmt`; `skyNight` = only at night (an aurora). */
   skyTint: RGB; skyAmt: number; skyNight: boolean;
   /** The grade: a whole-frame colour cast, a saturation multiplier, and a contrast change. */
@@ -86,7 +92,7 @@ export function skylineAz(seed: number): CollapseLook['az'] {
 }
 
 export const NO_LOOK: CollapseLook = {
-  stage: 'none', k: 0, cloud: 0, fog: 0, haze: 0, ash: 0, ashColor: [0.5, 0.48, 0.46], flash: 0, ashCover: 0, dim: 1,
+  stage: 'none', k: 0, cloud: 0, fog: 0, haze: 0, ash: 0, ashColor: [0.5, 0.48, 0.46], flash: 0, ashCover: 0, dim: 1, snowCover: 0, scorch: 0, freeze: 0, sunScale: 1, sunLower: 0,
   skyTint: [0.5, 0.5, 0.5], skyAmt: 0, skyNight: false, cast: [1, 1, 1], sat: 1, contrast: 0, blackout: 0,
   townGlow: 1, flicker: 0, fireGlow: 0, smoke: 0, nightLift: 0,
   nightGlow: [0, 0, 0], townLights: 0, traffic: 0, convoy: 0, flashes: 0, aurora: 0, comet: 0, az: { town: 3.14, road: 3.09, fire: 3.14, war: 3.14 },
@@ -149,9 +155,9 @@ const PROFILES: Partial<Record<DisasterKind, Profile>> = {
   asteroid: { glow: [0.055, 0.016, 0.01], comet: 1, road: 0.3, flee: 1, fire: 0.35, smoke: 0.5, town: 0.4, townDays: 40, warn: 0.3, rise: 1, hold: 700, fade: 400, floor: 0.2, pulse: 1, cloud: 0.85, fog: 0.4, haze: 1, ash: 0.5, ashColor: GREY_ASH, dim: 0.42, tint: [0.42, 0.26, 0.16], tintAmt: 0.7, cast: [1.04, 0.94, 0.84], sat: 0.6 },
   // the slow climate kinds (years, not weeks: the look rises over about two years and holds for the run)
   // heat: a washed, yellow-white sky, a pale big sun, a low haze band at the horizon and a bleached, flat light
-  runaway_heat: { glow: [0.028, 0.02, 0.008], road: 0.4, flee: 0.5, fire: 0.2, smoke: 0.2, town: 0.6, townDays: 500, warn: 0.3, rise: 730, hold: 4000, fade: 400, floor: 0.7, cloud: 0.02, haze: 0.85, fog: 0.12, dim: 0.97, tint: [0.96, 0.92, 0.74], tintAmt: 0.5, cast: [1.1, 1.03, 0.88], sat: 0.7, contrast: -0.1 },
+  runaway_heat: { glow: [0.028, 0.02, 0.008], road: 0.4, flee: 0.5, fire: 0.2, smoke: 0.2, town: 0.6, townDays: 500, warn: 0.3, rise: 730, hold: 4000, fade: 400, floor: 0.7, cloud: 0.02, haze: 0.85, fog: 0.12, dim: 0.97, tint: [0.96, 0.92, 0.74], tintAmt: 0.5, cast: [1.15, 1.04, 0.84], sat: 0.85, contrast: -0.1 },
   // cold: a dim grey-blue sky, a low pale sun, ice fog, a cold blue horizon at night and a faint aurora
-  ice_age: { glow: [0.01, 0.022, 0.045], road: 0.3, flee: 0.7, town: 0.5, townDays: 400, aurora: 0.25, warn: 0.3, rise: 700, hold: 4000, fade: 400, floor: 0.7, cloud: 0.8, haze: 0.6, fog: 0.3, dim: 0.62, tint: [0.44, 0.54, 0.7], tintAmt: 0.65, cast: [0.9, 0.98, 1.1], sat: 0.55, contrast: 0.02 },
+  ice_age: { glow: [0.01, 0.022, 0.045], road: 0.3, flee: 0.7, town: 0.5, townDays: 400, aurora: 0.8, warn: 0.3, rise: 700, hold: 4000, fade: 400, floor: 0.7, cloud: 0.8, haze: 0.6, fog: 0.3, dim: 0.62, tint: [0.44, 0.54, 0.7], tintAmt: 0.65, cast: [0.9, 0.98, 1.1], sat: 0.55, contrast: 0.02 },
   unknown: { glow: [0.03, 0.012, 0.055], road: 0, town: 0.5, townDays: 3, warn: 0.4, rise: 1, hold: 30, fade: 90, floor: 0.1, haze: 0.5, tint: [0.5, 0.32, 0.72], tintAmt: 0.5, cast: [1, 0.95, 1.08], sat: 0.85 },
 };
 
@@ -249,6 +255,7 @@ function collapseLookBase(s: Pick<GameState, 'disaster' | 'clock'> & Partial<Gam
     return {
       stage: after ? (days < 3 ? 'impact' : 'survival') : 'warning', k,
       cloud: 0.55 * n.haze, fog: 0.35 * n.haze + 0.4 * n.dust, haze: 0.9 * n.haze, ash: 0.6 * n.dust, ashColor: GREY_ASH, flash: n.flash, ashCover: 0.5 * n.dust,
+      snowCover: 0, scorch: 0, freeze: 0, sunScale: 1, sunLower: 0,
       dim: 1 - 0.42 * k, skyTint: [0.6, 0.54, 0.3], skyAmt: 0.75 * k, skyNight: false,
       cast: mix(ONE, [1.07, 1.04, 0.8], k), sat: 1 - 0.42 * k, contrast: -0.04 * k, blackout,
       ...dark, fireGlow: burn, smoke: after ? 0.35 * k : 0,
@@ -276,6 +283,7 @@ function collapseLookBase(s: Pick<GameState, 'disaster' | 'clock'> & Partial<Gam
     ash: fall, ashColor: p.ashColor ?? GREY_ASH, flash: 0,
     ashCover: p.ash && after ? Math.min(1, p.ash * 1.15) * k * smooth(days / 4) : 0,
     dim: 1 - (1 - (p.dim ?? 1)) * k - 0.3 * pulse,
+    snowCover: 0, scorch: 0, freeze: 0, sunScale: 1, sunLower: 0,
     skyTint: p.tint ?? NO_LOOK.skyTint, skyAmt: tintAmt, skyNight: !!p.tintNight,
     cast: mix(ONE, p.cast ?? ONE, k), sat: 1 + ((p.sat ?? 1) - 1) * k, contrast: (p.contrast ?? 0) * k,
     blackout,

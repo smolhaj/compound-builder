@@ -126,6 +126,8 @@ const FRAG = /* glsl */`
   uniform vec3  uCloudShade;
   uniform float uSunDisc;
   uniform float uSunGlow;
+  // the sun's apparent size (1 = normal; a swollen pale disc in a heat wave, a small cold coin in an ice age)
+  uniform float uSunScale;
   uniform float uCloudCover;
   uniform float uNight;
   uniform float uTime;
@@ -282,7 +284,7 @@ const FRAG = /* glsl */`
     // Mie forward scatter around the sun.
     float cosS = dot(d, uSunDir);
     float mu   = max(cosS, 0.0);
-    sky += uSunColor * uSunGlow * (0.30 * pow(mu, 10.0) + 0.90 * pow(mu, 160.0));
+    sky += uSunColor * uSunGlow * (0.30 * pow(mu, 10.0 / max(uSunScale, 0.3)) + 0.90 * pow(mu, 160.0 / (uSunScale * uSunScale)));
 
   #ifndef BAKE
     float cloudOcc = 0.0;
@@ -409,7 +411,8 @@ const FRAG = /* glsl */`
       }
     }
     // Sun disc (limb-darkened), hidden behind cloud.
-    float disc = smoothstep(0.99962, 0.99985, cosS);
+    float dsc = uSunScale * uSunScale;
+    float disc = smoothstep(1.0 - 0.00038 * dsc, 1.0 - 0.00015 * dsc, cosS);
     sky += uSunColor * uSunDisc * disc * (1.0 - cloudOcc * 0.95);
 
     // ── Night: stars, the Milky Way (dark sites), the moon with its phase ──
@@ -443,7 +446,7 @@ const FRAG = /* glsl */`
         float bq = (hp - (0.26 + 0.14 * sin(az3 * 1.7 + uTime * 0.04))) / 0.15;
         float band = exp(-bq * bq);
         vec3 ac = mix(vec3(0.12, 1.0, 0.42), vec3(0.85, 0.12, 0.38), smoothstep(0.32, 0.62, hp));
-        sky += ac * rays * band * (0.3 + 0.7 * wob) * uSkyB.z * 0.38 * (1.0 - cloudOcc) * smoothstep(0.0, 0.12, h) * (0.35 + 0.65 * uNight);
+        sky += ac * rays * band * (0.3 + 0.7 * wob) * uSkyB.z * 0.55 * (1.0 - 0.4 * cloudOcc) * smoothstep(0.0, 0.12, h) * (0.35 + 0.65 * uNight);
       }
       // Moon disc: lit from the sun's side, phase from the terminator, maria.
       vec3 md = normalize(uMoonDir);
@@ -648,6 +651,7 @@ export class ProceduralSky {
       uCloudShade:  { value: new THREE.Color() },
       uSunDisc:     { value: 0 },
       uSunGlow:     { value: 0 },
+      uSunScale:    { value: 1 },
       uCloudCover:  { value: 0 },
       uNight:       { value: 0 },
       uTime:        { value: 0 },
@@ -731,6 +735,9 @@ export class ProceduralSky {
   setMoonDirection(dir: THREE.Vector3): void {
     (this.uniforms['uMoonDir'].value as THREE.Vector3).copy(dir);
   }
+
+  /** The sun's apparent size (1 = normal; sim/climateLook.ts). One uniform write. */
+  setSunScale(k: number): void { this.uniforms['uSunScale'].value = Math.max(0.3, Math.min(3, Number.isFinite(k) ? k : 1)); }
 
   /** Columns of smoke on the skyline (0 = none). */
   setSmoke(k: number): void { this.uniforms['uSmoke'].value = k; }

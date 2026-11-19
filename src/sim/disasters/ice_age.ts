@@ -22,6 +22,7 @@ import { bulletin, clamp01, shelf, warnFrac, type Line } from './kit';
 import { COLD_RAMP_YEARS } from '../climateCurve';
 import { ROOF_SNOW_SHARE, SNOW_IN_PER_PSF, iceColdF, iceGroundPsf, iceProgress, iceWinter, slowYears, winterness } from '../slowClimate';
 import { REGIONS } from '../regions';
+import { snowCoverOf, sunLowerOf, sunScaleOf } from '../climateLook';
 
 export interface IceState { base: Record<string, number>; roofs: number; told: string[]; strain: Record<string, number> }
 export const iceOf = (s: GameState): IceState => kindBag<IceState>(s, 'ice_age', () => ({ base: {}, roofs: 0, told: [], strain: {} }));
@@ -152,9 +153,10 @@ export const fx: KindFx = {
     return bulletin(LINES, ctx);
   },
   look(s, look) {
-    const g = groundPsf(s), pack = clamp01(g / 60);
-    // the snow rides the ash path: a white cover on roofs and ground (collapseLook ashCover / ashColor), the dim sun is the profile row
-    return pack > look.ashCover ? { ashCover: pack, ashColor: [0.92, 0.94, 0.98] } : {};
+    // the snow pack is its own field (`snowCover`, white, the season ground and roofs read it), so a snowfall never thins it the way it thins ash;
+    // the dim sun is the profile row, and the sun is smaller and lower
+    const pack = snowCoverOf(groundPsf(s)), fz = clamp01(iceProgress(s));
+    return { snowCover: Math.max(look.snowCover, pack), freeze: fz, sunScale: sunScaleOf(0, fz), sunLower: sunLowerOf(fz) };
   },
   oasisWeight(s) { return 0.35 * clamp01(iceProgress(s)) * (1 - Math.min(s.disaster.tracks.grid, s.disaster.tracks.stores)); },
   cards(s): FxCard[] {

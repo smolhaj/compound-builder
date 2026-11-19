@@ -199,7 +199,7 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
   }
   // the surround: steel plates in the shell's plane round the outer door, as wide as the hole the doorway took out of the lattice
   const lam0 = Math.min(hole.lam0, -(v.cw / 2 + v.t + SURROUND_PAD)), lam1 = Math.max(hole.lam1, v.cw / 2 + v.t + SURROUND_PAD), top = Math.max(hole.y1, y0 + v.h) + 0.02;
-  const n = Math.max(2, Math.ceil((lam1 - lam0) / 0.11)), skin = tier === 'geodesic' ? 'aluminum' : 'steel', glaze = tier === 'geodesic' ? 'polycarb' : tier === 'glass' ? 'glass' : 'arcology', capY = y0 + v.h + 0.02;
+  const n = Math.max(2, Math.ceil((lam1 - lam0) / 0.11)), skin = tier === 'geodesic' ? 'aluminum' : 'steel', glaze = tier === 'geodesic' ? 'dome_polycarb' : tier === 'glass' ? 'dome_glass' : 'arcology', capY = y0 + v.h + 0.02;
   for (let i = 0; i < n; i++) {
     const l = lam0 + (lam1 - lam0) * (i + 0.5) / n, w = (lam1 - lam0) / n + 0.004, rho = doors.shellRho(l) + 0.017, lo = Math.abs(l) < v.dw / 2 ? y0 + v.dh + 0.004 : y0;
     p.add(skin, place(box(w, capY - lo, 0.026, l, lo, rho)));                                                                    // the plate, up to the chamber's roof line
@@ -207,7 +207,7 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
   }
   p.add('trim', place(box(lam1 - lam0, 0.016, 0.03, (lam0 + lam1) / 2, capY, doors.shellRho(0) + 0.017)));                       // the cap along the roof line
   p.layer = 'roof';
-  p.add(tier === 'geodesic' ? 'polycarb' : tier === 'glass' ? 'glass' : 'arcology', place(box(v.cw + 2 * v.t, 0.012, outer - inner + v.t, 0, y0 + v.h, mid)));   // a glazed ceiling: the chamber reads from above
+  p.add(tier === 'geodesic' ? 'dome_polycarb' : tier === 'glass' ? 'dome_glass' : 'arcology', place(box(v.cw + 2 * v.t, 0.012, outer - inner + v.t, 0, y0 + v.h, mid)));   // a glazed ceiling: the chamber reads from above
   for (const k of [0.1, 0.5, 0.9]) p.add('trim', place(box(v.cw + 2 * v.t + 0.01, 0.016, 0.02, 0, y0 + v.h, inner + (outer - inner) * k)));
   p.layer = 'openings';
   // each door leaf stands ajar, swung into the chamber about the jamb on the right as you face it
@@ -282,7 +282,7 @@ function earthen(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
 }
 
 /** The shared build of a triangulated dome (geodesic and arcology). */
-function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number, opts: BuildOpts, N: number, airlocks: number, panelMat: 'polycarb' | 'arcology', frameMat: 'aluminum' | 'steel'): THREE.Group {
+function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number, opts: BuildOpts, N: number, airlocks: number, panelMat: 'dome_polycarb' | 'arcology', frameMat: 'aluminum' | 'steel'): THREE.Group {
   const p = new Parts(seed, opts), L = LOOK[tier], R = def.cellsX * CELL / 2 - 0.03 - bermU(tier), y0 = L.stem, g = opts.ground ?? (() => 0);
   const rim = (a: number) => g(R * Math.sin(a), R * Math.cos(a));
   const nWall = Math.max(36, Math.min(120, Math.round(R * 14)));
@@ -335,7 +335,7 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
   return out;
 }
 
-function geodesic(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group { return triShell(def, 'geodesic', seed, opts, 5, 2, 'polycarb', 'aluminum'); }
+function geodesic(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group { return triShell(def, 'geodesic', seed, opts, 5, 2, 'dome_polycarb', 'aluminum'); }
 /**
  * The arcology lattice's frequency by detail tier: 12 on High (a strut every ~30 ft at the default size), 8 on Medium and Low. The struts are the arcology's
  * biggest shadow caster (about 1,300 of them), and Medium's shadow-triangle budget (scripts/perfBudget.json, never raised) has room for the coarser lattice only.
@@ -371,8 +371,8 @@ function glass(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   for (let m = 0; m < M; m += 2) p.add('steel', strut(top, V(1, m), L.strut, 4));                       // the oculus spokes
   p.add('steel', new THREE.TorusGeometry(0.1, 0.012, 5, 16).rotateX(Math.PI / 2).translate(0, y0 + R - 0.03 - 0.01, 0));      // the crown ring
   p.layer = 'roof';
-  for (const [i, m] of keptCells) p.add('glass', quad(...(cell(i, m) as [Pt3, Pt3, Pt3, Pt3]), centre, 0.06));
-  for (let m = 0; m < M; m++) p.add('glass', tri(top, V(1, m), V(1, m + 1), centre, 0.06));
+  for (const [i, m] of keptCells) p.add('dome_glass', quad(...(cell(i, m) as [Pt3, Pt3, Pt3, Pt3]), centre, 0.06));
+  for (let m = 0; m < M; m++) p.add('dome_glass', tri(top, V(1, m), V(1, m + 1), centre, 0.06));
   p.layer = 'walls';
   // the ring beam's glazed kerb: a low opaque band so the foot of the glass reads
   for (const m of kerb) p.add('steel', quad(V(P, m), V(P, m + 1), [V(P, m + 1)[0], y0 + 0.07, V(P, m + 1)[2]], [V(P, m)[0], y0 + 0.07, V(P, m)[2]], centre));

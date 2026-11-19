@@ -325,7 +325,7 @@ All procedural, no external assets. **No performance budget is raised**: nothing
 | 4 | `plantClimate.ts` and dome plant integration: COP, derate and trip, battery temperature, `heat` and `load` causes, repair lead scaling | M to L | 1 | 5 (different files, same `live.ts` seams: sequence the merge) |
 | 5 | `snowLoad.ts`, building roof loads, dome snow breach and shedding, shoveling, cold equipment teeth (diesel gel, batteries) | M | 1, 3 | 4, 7 |
 | 6 | UI: dome readouts, limit cards, setup and scenario text, collapse chip | M | 4, 5 | 7 |
-| 7 | Rendering: sky profiles, snow through the ash path, frost on the shell, shimmer (optional) | M | 1 | 4, 5, 6 |
+| 7 (**done**, [#391](https://github.com/smolhaj/compound-builder/pull/391)) | Rendering: sky profiles, snow cover, frost on the shell, shimmer (optional). Landed: see the PR 7 notes. Cut: true shimmer distortion, icicles and drifts, frost on props | M | 1 | 4, 5, 6 |
 | 8 | Balance and QA: bot playtest, survival table vs targets, tuning, perf census confirms no budget change | S to M | 2 to 7 | none |
 | 9 (optional) | PROPOSED purchases: cooling tower, ground-loop heat pump, thermal curtains; save v104 | M | 4, 6 | none |
 
@@ -340,3 +340,12 @@ Order: 1, then {2, 3} and {4, 5} and 7 in parallel, then 6, then 8, then 9. The 
 - **Surprise filter**: a first Surprise run (`newDisaster`) never rolls the two kinds; the era roll never follows one winter kind (`ash_winter`, `supervolcano`, `asteroid`, `runaway_heat`, `ice_age`) with another. Nuclear is not in the set.
 - The felt layer (`sim/felt`) needed rows for both kinds (radio, cards, hit moment, goals, theme).
 - Snow cover reuses `ashCover` with a white `ashColor`; `withWeather` thins ash cover in snow, so a snowfall slightly dims the white cover (cosmetic; fix with PR 7).
+
+### Notes from building PR 7 (rendering)
+
+- **Snow is its own field, not ash.** The PR 2/3 note was wrong in one more way: `ashCover` never reached the ground as white (the surface shader draws ash cover dark brown-grey, and `ashColor` only tints falling flakes). Ice-age snow now goes through `CollapseLook.snowCover` into the season ground (`applyClimateOverlay` in `seasonState.ts`), so it uses the real snow shader (plowed roads, bare crowns, drifts) and a snowfall never thins it. Glass is excluded from lying snow by the shader, so deep snow whitens roofs and leaves windows alone.
+- **One overlay on the season targets** (heat: dry and dormant lawn, thinner crowns, no spring flush; cold: a perennial pack, frozen water, dead grass, bare crowns). It eases through the controller's own smoothing, so no popping. Frozen water locks (open creek lead closes, ice turns white-blue) through one new shared uniform, `uSeaX`.
+- **Sky:** sun size (`uSunScale`: 2.1x in the heat, 0.8x in the cold), a lower sun arc in the cold, and a washed pale-yellow sky in the heat. All other sky work was already profile rows. Long twilights were not done.
+- **Dome shells** use their own materials (`dome_glass`, `dome_polycarb`; `arcology` was already dome-only) so `game/fx/DomeShell.ts` can frost (milky, rough) and bleach them with one write; house windows and glasshouses are untouched. Input now: the main dome's last outside and inside readings (`sim/climateLook.shellFrostOf`). PR 4 and 6 can feed richer values. One value shared by all domes (no per-dome frost yet).
+- **Shimmer cut:** the haze is a sky and fog uniform, not a mesh, so a distortion term would need a refraction pass. The existing midday heat haze now rides the heat anomaly instead.
+- Pure curves and tests: `sim/climateLook.ts`, `climateLook.test.ts`, `engine/world/season/climateOverlay.test.ts`, `game/fx/DomeShell.test.ts`.

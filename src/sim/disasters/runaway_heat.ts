@@ -19,6 +19,7 @@ import { startCase } from '../medical';
 import { bulletin, clamp01, shelf, warnFrac, type Line } from './kit';
 import { climateTune, dayPeakF, heatPeakDeltaF, summerness, slowYears, HEAT_ILLNESS_INDOOR_F, HEAT_ILLNESS_P, HOUSE_SHADE_F, heatGrow, wetBulbNow } from '../slowClimate';
 import { HEAT_PEAK_F, HEAT_RAMP_YEARS, NO_OUTDOOR_SLEEP_WB_F, outdoorWorkShare } from '../climateCurve';
+import { scorchOf, sunScaleOf } from '../climateLook';
 
 export interface HeatState { coolUntil: number; ill: number; told: string[] }
 export const heatOf = (s: GameState): HeatState => kindBag<HeatState>(s, 'runaway_heat', () => ({ coolUntil: -1, ill: 0, told: [] }));
@@ -139,7 +140,9 @@ export const fx: KindFx = {
   look(s, look) {
     // (the washed, hot sky is the profile row in collapseLook; this adds the haze the day's heat deserves)
     const k = clamp01(heatPeakDeltaF(s) / Math.max(1, HEAT_PEAK_F[s.site.region][2] - HEAT_PEAK_F[s.site.region][0]));
-    return { haze: Math.max(look.haze, 0.35 + 0.5 * k), sat: look.sat * (1 - 0.1 * k), contrast: look.contrast - 0.04 * k };
+    // (the render side reads the anomaly through sim/climateLook.ts: the sun swells, the lawns and crowns scorch, the dome glass bleaches)
+    const sc = scorchOf(k);
+    return { haze: Math.max(look.haze, 0.35 + 0.5 * k), sat: look.sat * (1 - 0.1 * k), contrast: look.contrast - 0.04 * k, scorch: sc, sunScale: sunScaleOf(sc, 0) };
   },
   oasisWeight(s) { return 0.35 * clamp01(slowYears(s) / HEAT_RAMP_YEARS) * (1 - Math.min(s.disaster.tracks.grid, s.disaster.tracks.stores)); },
   cards(s): FxCard[] {

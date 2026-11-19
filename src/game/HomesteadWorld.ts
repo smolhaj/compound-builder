@@ -121,8 +121,8 @@ import { SmokePlume } from '../engine/world/fx/SmokePlume';
 import { ContactShadows, groundNormal } from '../engine/world/fx/ContactShadows';
 import type { Pad, Pit } from './parcel/parcelTerrain';
 import { pitReach } from './parcel/parcelTerrain';
-import { SeasonController, climateFor, type SeasonMode } from '../engine/world/season/seasonState';
-import { writeSeasonUniforms } from '../engine/world/season/seasonShader';
+import { SeasonController, climateFor, type ClimateOverlay, type SeasonMode } from '../engine/world/season/seasonState';
+import { writeSeasonUniforms, writeWaterLock } from '../engine/world/season/seasonShader';
 import { PARCEL_SIZE, ParcelTerrain } from './parcel/parcelTerrain';
 import { CLASSIC, type Site as LandSite } from '../sim/site';
 import { pickCamp } from './parcel/campSpot';
@@ -2549,7 +2549,7 @@ export class HomesteadWorld {
       m.material = see ? xrayOf(ud.baseMat) : ud.baseMat;
       if (this._section?.id === b.placed.id) m.material = this._clipped(m.material, this._section.plane);
       // (a foundation's banked earth and a dome's stem wall, berm and embankment hug the ground: no shadow pass cost)
-      m.castShadow = !see && !['kit_glass', 'kit_string'].includes(ud.baseMat.name) && !ud.baseMat.name.startsWith('kit_glow') && !(layer === 'foundation' && (ud.baseMat.name === 'kit_earth' || b.cover)) && !(b.cover && layer === 'walls');
+      m.castShadow = !see && !['kit_glass', 'kit_dome_glass', 'kit_dome_polycarb', 'kit_string'].includes(ud.baseMat.name) && !ud.baseMat.name.startsWith('kit_glow') && !(layer === 'foundation' && (ud.baseMat.name === 'kit_earth' || b.cover)) && !(b.cover && layer === 'walls');
       if (layer === 'cutwalls') m.visible = v === 'cutaway' && b.finished;
       else if (v === 'cutaway' && CUTAWAY_HIDE.includes(layer) && (b.finished || layer !== 'walls')) m.visible = false;
       // seen from far off, the inside of an enclosed building is hidden (no draw, no shadow); only in the plain exterior view
@@ -3355,15 +3355,16 @@ export class HomesteadWorld {
   /** The day of the year the seasons are drawn for (the wildlife wears its winter coat and its antlers by it). */
   private _seasonDoy = 180;
   /** Per frame: seasons (eased toward the calendar / pinned season) then terrain uniforms. */
-  tick(dt: number, doy: number, totalDays: number, mode: SeasonMode): void {
+  tick(dt: number, doy: number, totalDays: number, mode: SeasonMode, overlay?: ClimateOverlay, waterLock = 0): void {
     this._seasonDoy = doy;
     this._poolTunnelLights();
     // underground (walking in a bunker, a QA pose inside a room): no daylight, only the lamps
     const cam = this._ws.camera.position;
     const below = cam.y < this.groundAt(cam.x, cam.z) - 0.12;
     this._ws.outdoorLight += ((below ? 0.04 : 1) - this._ws.outdoorLight) * Math.min(1, dt * 6);
-    const p = this.seasons.update({ locationId: this.climate, doy, totalDays, mode, dt });
+    const p = this.seasons.update({ locationId: this.climate, doy, totalDays, mode, dt, overlay });
     writeSeasonUniforms(p, climateFor(this.climate));
+    writeWaterLock(waterLock);
     this.terrain.update();
     this.ridges.update();
     this._clock += dt;
