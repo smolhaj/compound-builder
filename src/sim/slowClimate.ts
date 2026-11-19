@@ -202,10 +202,8 @@ export function iceGroundPsf(s: S, doy: number): number {
   const base = snowLoadPsf(region, slowYears(s), amp * iceVariantK(d.variant, region));
   return base * (0.25 + 0.75 * winterness(doy));   // (the summer pack is not bare: a seasonal floor of a quarter)
 }
-/** A roof carries about this share of the ground load (an unheated roof, doc 2.2). */
-export const ROOF_SNOW_SHARE = 0.7;
-/** Inches of settled snow per pound per square foot (about 1.25 inches a psf), for shoveling hours. */
-export const SNOW_IN_PER_PSF = 0.8;
+/** A roof carries about this share of the ground load (an unheated roof, doc 2.2), and the inches of settled snow per psf: see snowLoad.ts. */
+export { ROOF_SNOW_SHARE, SNOW_IN_PER_PSF } from './snowLoad';
 
 /**
  * Battery capacity in the cold (doc 2.2: about half at 0 F): the share left at this cold anomaly. The anomaly stands in for the air, so it

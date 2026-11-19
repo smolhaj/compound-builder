@@ -31,7 +31,7 @@ export type PlantKind = 'chiller' | 'air' | 'substation' | 'water' | 'battery' |
 export const PLANT_KINDS: readonly PlantKind[] = ['chiller', 'air', 'substation', 'water', 'battery', 'vents'];
 export type PlantPlace = 'inside' | 'gallery' | 'yard';
 export type PlantCond = 'ok' | 'damaged' | 'down';
-export type PlantCause = 'raid' | 'fire' | 'storm';
+export type PlantCause = 'raid' | 'fire' | 'storm' | 'heat' | 'load' | 'cold';
 
 export const PLANT_NAME: Record<PlantKind, string> = { chiller: 'Chillers and heat pumps', air: 'Air-handling and scrubber house', substation: 'Substation and transformers', water: 'Water recycling plant', battery: 'Battery block', vents: 'Roof vent hatches' };
 export const PLANT_SHORT: Record<PlantKind, string> = { chiller: 'chiller', air: 'scrubber house', substation: 'substation', water: 'water plant', battery: 'battery block', vents: 'roof vents' };
@@ -131,10 +131,11 @@ export interface PlantFx {
 }
 
 /** The effects of the plant's units at game time `now` (days). */
-export function plantFx(units: readonly PlantUnit[], now: number): PlantFx {
+/** `batteryK` (0..1, default 1) is the battery block's capacity at its temperature (sim/dome/plantClimate.ts): only the bank's hours shrink, never the UPS. */
+export function plantFx(units: readonly PlantUnit[], now: number, batteryK = 1): PlantFx {
   const sub = capOf(units, 'substation'), bank = units.some(u => u.kind === 'battery') ? capOf(units, 'battery') : 0;
   const lossAt = Math.max(-1e9, ...units.filter(u => u.kind === 'substation' && u.cap < 1 && u.at !== undefined).map(u => u.at!));
-  const rideH = RIDE_UPS_H + RIDE_BANK_H * bank, since = Math.max(0, (now - lossAt) * 24);
+  const rideH = RIDE_UPS_H + RIDE_BANK_H * bank * Math.max(0, Math.min(1, batteryK)), since = Math.max(0, (now - lossAt) * 24);
   const power: PowerMode = sub >= 1 ? 'grid' : sub > 0 ? 'derated' : since < rideH ? 'battery' : 'dark';
   return {
     climate: capOf(units, 'chiller') * POWER_CLIMATE[power],
