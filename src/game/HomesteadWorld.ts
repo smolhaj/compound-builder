@@ -455,7 +455,8 @@ export class HomesteadWorld {
   updateAtmosphere(f: AtmosFrame, game: GameState, doy: number): void {
     this.atmos.update(f, game, doy);
     this._underfoot = { mud: this.atmos.mud, snow: f.snow, rain: f.rain };
-    this.lived.update(game, performance.now(), { night: f.night, lightsOut: lightsOutNow(game) });
+    this._blackout = lightsOutNow(game);
+    this.lived.update(game, performance.now(), { night: f.night, lightsOut: this._blackout });
     this._domeAir(game);
     this._syncLinks(game);
   }
@@ -1872,6 +1873,8 @@ export class HomesteadWorld {
     if (this._batchDepth === 0 && this._plantDirty) { this._plantDirty = false; if (this._quality) this._plant(this._quality); }
   }
   private _plantDirty = false;
+  /** Lights out (sim/blackout): the bunker lamps drop to a dim emergency glow. */
+  private _blackout = false;
   private readonly _naturalH = (x: number, z: number) => this.parcel.natural(x, z).h;
 
   /** A bunker room's doorways (its neighbors) and the ground above its surface point. */
@@ -2639,8 +2642,8 @@ export class HomesteadWorld {
         // scaled to the room: the same lamps light a small vestibule and a big bunkroom alike
         const def = KIT[b.placed.kind], area = def.cellsX * def.cellsZ / 4;
         // warm, low lamplight (incandescent-ish), not a bright work light
-        b.light.intensity = (this._under ? 0.25 : 0.48) * Math.min(1, 0.2 + 0.8 * area);
-        b.light.color.set(0xffd49e);
+        b.light.intensity = (this._blackout ? 0.05 : this._under ? 0.25 : 0.4) * Math.min(1, 0.2 + 0.8 * area);
+        b.light.color.set(this._blackout ? 0xff8a5c : 0xffd49e);
         if (pick) this._noteLight(cands, b, above);
         continue;
       }

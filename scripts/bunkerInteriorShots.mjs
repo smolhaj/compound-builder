@@ -23,7 +23,7 @@ try {
   await page.waitForFunction(() => window.__cb?.qa?.lowrender, null, { timeout: 300000 });
   await page.evaluate(q => window.__cb.store.getState().setQuality(q), QUAL);
   const frames = async (n = 1) => { for (let i = 0; i < n; i++) await page.evaluate(() => window.__cb.qa.renderNow()); };
-  const shot = async (name) => { if (only && !name.includes(only)) return; await frames(3); await page.evaluate(q => window.__cb.qa.renderFull(q), QUAL); await page.screenshot({ path: `${out}/${name}.png` }); lap(name); };
+  const shot = async (name) => { if (only && !name.includes(only)) return; await frames(3); await page.evaluate(() => { window.__cb.world._updateLights(0.3); }); await frames(2); await page.evaluate(q => window.__cb.qa.renderFull(q), QUAL); await page.screenshot({ path: `${out}/${name}.png` }); lap(name); };
 
   // the compound: a house, a garden, solar; the bunker with every room; the family's gear
   await page.evaluate(t => { window.__tier = t; }, TIER);
@@ -54,7 +54,7 @@ try {
   const set = (js) => page.evaluate(js => new Function("cb", js)(window.__cb), js);
 
   const tag = `t${TIER}`;
-  const lights = on => page.evaluate(on => window.__cb.game.setState(s => ({ game: { ...s.game, utilities: { ...s.game.utilities, lit: on ? ['x'] : [] } } })), on);
+  const lights = on => page.evaluate(on => window.__cb.game.setState(s => ({ game: { ...s.game, opsec: { ...(s.game.opsec ?? {}), blackout: !on } } })), on);
   await set("cb.store.getState().setUnderground(false); cb.store.getState().setBuildingView('full'); cb.ws.outdoorLight = 0.04; cb.store.getState().setTimeOfDay(12);");
   await page.evaluate(() => window.__cb.world.bunkerFolk.setDebug([{ room: 'bunker_dorm', role: 'bed' }, { room: 'bunker_dorm', role: 'bed' }, { room: 'bunker_dorm', role: 'seat' }, { room: 'bunker_galley', role: 'seat' }, { room: 'bunker_comms', role: 'console' }, { room: 'bunker_medical', role: 'bed' }]));
   for (const on of [true, false]) {
