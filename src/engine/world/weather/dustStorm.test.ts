@@ -43,4 +43,17 @@ describe('the weather sim reaches the dust storm', () => {
     expect(blowCurve(4)).toBe(0); expect(blowCurve(15)).toBe(1); expect(blowCurve(22)).toBe(0);
     expect(blowCurve(11)).toBeGreaterThan(0); expect(blowCurve(11)).toBeLessThan(1);
   });
+  it('eases in and out: dust and the look it lays on never jump as the wind rises and falls', () => {
+    let prev = 0, rose = 0;
+    for (let w = 0; w <= 1.0001; w += 0.02) {
+      const d = dustStorm({ ...base, wind: w }), a = applyDust(NO_LOOK, d).ash;
+      expect(Math.abs(d.dust - prev)).toBeLessThan(0.12);
+      expect(a).toBeLessThanOrEqual(1);
+      rose = Math.max(rose, d.dust); prev = d.dust;
+    }
+    expect(rose).toBeGreaterThan(0.8);
+    // and back down: the same curve, so it fades the way it came
+    for (let w = 1; w >= -0.0001; w -= 0.02) { const d = dustStorm({ ...base, wind: Math.max(0, w) }); expect(Math.abs(d.dust - prev)).toBeLessThan(0.12); prev = d.dust; }
+    expect(prev).toBe(0);
+  });
 });
