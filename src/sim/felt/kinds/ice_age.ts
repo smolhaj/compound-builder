@@ -12,12 +12,19 @@ export const felt: FeltSpec = {
         { id: 'cut', label: 'Cut and split your own, every day the weather allows', hint: 'Free in cash, and it takes a lot of hours and a sharp saw.', cost: () => ({ hours: 14 }), now: [{ k: 'stock', id: 'firewood', n: 3 }], risk: { p: 0.35, good: 'The stack grew steadily.', bad: 'A slip with the axe.', lose: [hurtOne('a deep cut', 20)] }, line: 'You cut and split wood.' },
         { id: 'pool', label: 'Pool wood and work with the neighbors', hint: 'A shared crew cuts faster. You owe them a share.', cost: () => ({ hours: 8 }), off: noNeighbors, now: [{ k: 'stock', id: 'firewood', n: 4 }, { k: 'standing', n: 5 }], risk: { p: 0.2, good: 'The crew worked well together.', bad: 'A neighbor left early with his share.', lose: [{ k: 'standing', n: -3 }] }, line: 'You pooled wood with the neighbors.' },
       ] },
-    { id: 'seed', phase: 'month', title: 'A growing season with no summer', fallback: 'frame',
+    { id: 'seed', phase: 'month', title: 'A growing season with no summer', fallback: 'hold',
       text: 'The frost came back in July. Anything outdoors is a gamble, and the seed you have will not keep forever.',
       options: [
         { id: 'frame', label: 'Build cold frames and plant hardy greens and roots', hint: 'Low and glazed, banked with straw. Cheap and slow.', cost: s => ({ stock: { lumber: 2 }, hours: 8 + N(s) }), now: [{ k: 'morale', n: 1 }], risk: { p: 0.25, good: 'The frames kept the frost off.', bad: 'A hard freeze got in anyway.', lose: [{ k: 'morale', n: -2 }] }, line: 'You built cold frames.' },
         { id: 'hold', label: 'Hold the seed and live on the stores', hint: 'Safest for the seed, hardest on the pantry.', now: [{ k: 'morale', n: -2 }], risk: { p: 0.3, good: 'The pantry held a while longer.', bad: 'The stores are lower than you thought.', lose: [{ k: 'morale', n: -2 }] }, line: 'You held the seed back.' },
         { id: 'trade', label: 'Trade seed and food with the neighbors', hint: 'Spreads the risk across the farms on the road.', cost: () => ({ stock: { seed: 1 } }), off: noNeighbors, now: [{ k: 'standing', n: 5 }, { k: 'humanity', n: 2 }], risk: { p: 0.2, good: 'Everyone came out a little ahead.', bad: 'A neighbor kept the best for himself.', lose: [{ k: 'standing', n: -4 }] }, line: 'You traded seed with the neighbors.' },
+      ] },
+    { id: 'roofs', phase: 'season', title: 'The roofs are loading up', fallback: 'shovel',
+      text: 'There is a yard of snow on the barn roof and the ridge is sagging. Shoveling is slow and a slip off a ladder in this cold is serious.',
+      options: [
+        { id: 'crew', label: 'Pay a crew to clear the barn and the house roofs', hint: 'They bring ladders and ropes and they are quick. Not cheap.', cost: s => ({ money: r25(500 + N(s) * 60) }), now: [{ k: 'morale', n: 2 }], risk: { p: 0.1, good: 'The roofs are clear.', bad: 'A ladder slipped and a man was hurt.', lose: [hurtOne('a bruised hip', 15)] }, line: 'A crew cleared the roofs.' },
+        { id: 'shovel', label: 'Shovel them yourselves, in short shifts, roped on', hint: 'Free in cash. A real risk of a fall.', cost: () => ({ hours: 10 }), now: [{ k: 'raidDelay', days: 1 }], risk: { p: 0.35, good: 'Everyone came down safe.', bad: 'A fall from the ladder.', lose: [hurtOne('a bad fall', 25)] }, line: 'You shoveled the roofs.' },
+        { id: 'prop', label: 'Prop the ridge from inside and wait for a thaw', hint: 'No climbing. A bad gamble if more snow comes.', cost: () => ({ stock: { lumber: 2 } }), now: [{ k: 'morale', n: -2 }], risk: { p: 0.45, good: 'The posts held.', bad: 'More snow came and the roof sagged.', lose: [{ k: 'morale', n: -3 }] }, line: 'You propped the ridge.' },
       ] },
   ]),
 };
