@@ -39,7 +39,9 @@ function drape(cx: number, cz: number, u: [number, number], hl: number, hw: numb
     const A = P(a0, b0), B = P(a1, b0), C = P(a1, b1), D = P(a0, b1);
     pos.push(...A, ...C, ...B, ...A, ...D, ...C);
   }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals();
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const nrm = new Float32Array(pos.length); for (let i = 1; i < nrm.length; i += 3) nrm[i] = 1;   // (a slab faces up whichever way its triangles wind)
+  g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
   return paint(g, color);
 }
 
@@ -81,7 +83,7 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
   const owned: Array<{ dispose(): void }> = [];
   if (geos.length) {
     const merged = mergeGeometries(geos, false); geos.forEach(g => g.dispose());
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0.1, flatShading: true });
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0.1, flatShading: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
     const m = new THREE.Mesh(merged, mat); m.name = 'vehicle_port_fixtures'; m.matrixAutoUpdate = false; m.updateMatrix(); m.castShadow = true; m.receiveShadow = true;
     group.add(m); owned.push(merged, mat);
   }

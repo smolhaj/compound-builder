@@ -62,6 +62,7 @@ try {
   if (want('closeup')) { await pr(E(R + 6.5 * S, -3.5 * S, 2.2 * S), gate, 52); await shot('port-closeup'); }
   if (want('eye')) {
     await page.evaluate(() => { const w = window.__cb.world; const tl = w.truck.tail.reduce((a, p, i, l) => a + (i ? Math.hypot(p[0] - l[i - 1][0], p[1] - l[i - 1][1]) : 0), 0); w.truck.qaHold([{ material: 'lumber', qty: 6 }], w.truck.inLength - tl - 2.7); });
+    lap('truck ' + JSON.stringify(await page.evaluate(() => { const w = window.__cb.world; return { short: w.truck.stopsShort, inLen: w.truck.inLength, driveLen: w.truck.driveLength, tail: w.truck.tail.length }; })));
     await person(...[E(R + 2.6 * S, 0.9 * S, 0)].map(p => [p[0], p[2]])[0]);
     await frames(2);
     await pr(E(R + 5.2 * S, -1.9 * S, 0.5), [gate[0], 0.3 * S, gate[2]], 58); await shot('eye-at-port-truck-person');

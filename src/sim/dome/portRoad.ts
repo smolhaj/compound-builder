@@ -9,6 +9,11 @@ import { UNIT_M, M_TO_FT } from '../roadStyle';
 import { approachRoute, inKeepout, insideLane, portFrame, yardCorners, type Approach, type Keepout, type PortFrame, type Pt } from './vehiclePort';
 import type { Dome } from './standing';
 
+/** The steepest the new stretch of road runs (rise over run): well under the truck's 12 percent and the 7 percent it takes in snow. */
+export const MAX_GRADE = 0.06;
+/** How far back from the join the old drive's profile is eased (units). */
+export const BACK = 30;
+
 export interface PortRoad { plan: RoadPlan; frame: PortFrame; approach: Approach; dome: Dome }
 
 /** The first dome (nearest the old yard) whose port the road is re-planned to, with the plan it makes; null when no dome with a port lies on or near the drive. */
@@ -36,7 +41,20 @@ export function derive(plan: RoadPlan, a: Approach, yard: Pt, height: (x: number
   let s = keep[keep.length - 1].s, prev = keep[keep.length - 1];
   const tail: RoadPt[] = [];
   for (const [x, z] of a.route.slice(a.joinAt + 1)) { s += Math.hypot(x - prev.x, z - prev.z); const pt: RoadPt = { x, z, y: height(x, z), s, bank: 0 }; tail.push(pt); prev = pt; }
-  const pts = [...keep, ...tail], lengthU = pts[pts.length - 1].s, cutS = keep[keep.length - 1].s;
+  // the road's own profile: the natural height where it is gentle, never steeper than MAX_GRADE from a point `BACK` units before the join to the port (a truck cannot take
+  // the embankment at the dome's pad: the bed is cut and filled to this line). The old drive's last stretch is eased the same way so the climb has room
+  const all = [...keep.map(k => ({ ...k })), ...tail];
+  let k0 = keep.length - 1;
+  while (k0 > Math.max(0, plan.gateAt + 1) && keep[keep.length - 1].s - keep[k0].s < BACK) k0--;
+  {
+    const yA = all[k0].y, sA = all[k0].s, yO = all[all.length - 1].y, L = all[all.length - 1].s - sA;
+    for (let i = k0 + 1; i < all.length; i++) {
+      const d = all[i].s - sA, lo = Math.max(yA - MAX_GRADE * d, yO - MAX_GRADE * (L - d)), hi = Math.min(yA + MAX_GRADE * d, yO + MAX_GRADE * (L - d));
+      all[i].y = lo <= hi ? Math.min(hi, Math.max(lo, all[i].y)) : (lo + hi) / 2;
+    }
+  }
+  const keepOut = all.slice(0, keep.length), tailOut = all.slice(keep.length);
+  const pts = [...keepOut, ...tailOut], lengthU = pts[pts.length - 1].s, cutS = keep[keep.length - 1].s;
   const lengthM = lengthU * UNIT_M;
   return {
     ...plan, pts, yard, lengthU, lengthM, lengthFt: lengthM * M_TO_FT,

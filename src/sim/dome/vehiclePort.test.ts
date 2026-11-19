@@ -189,3 +189,17 @@ describe('the earthen dome keeps its low door: the road ends on a gravel apron i
     expect(vehicleTail(f)).toEqual([f.outer]);
   });
 });
+
+describe('the new stretch of road is graded for a truck', () => {
+  it('a 40 percent embankment at the dome pad is cut into a road no steeper than 6 percent', async () => {
+    const { planToPort, MAX_GRADE } = await import('./portRoad');
+    const pts = Array.from({ length: 81 }, (_, i) => ({ x: 70 - i * 0.5, z: 40 + (70 - i * 0.5 - 40) * 0.2, y: 0, s: i * 0.5, bank: 0 }));
+    const plan = { pts, gateAt: 2, gate: { x: 70, z: 46, rot: 0 }, yard: [40, 40] as [number, number], structures: [], walls: [], rails: [], hairpins: [], lengthU: 40, lengthM: 240, lengthFt: 800 } as unknown as import('../roadPlan').RoadPlan;
+    const d = domeFrom({ id: 'd', kind: DOME_KIND.glass, x: 40, z: 40, rot: 1, stage: 99, done: 0, supplied: true, finishedAt: 0, portAngle: 1.2 })!;
+    // the ground: level at 0, then a step up to the pad (1.2 high) within 3 units of the shell
+    const h = (x: number, z: number): number => { const e = Math.hypot(x - 40, z - 40) - d.r; return e < 0.3 ? 1.2 : e < 3 ? 1.2 * (3 - e) / 2.7 : 0; };
+    const pr = planToPort(plan, [d], h)!, tail = pr.plan.pts.slice(Math.max(0, pr.approach.joinAt - 55));
+    for (let i = 1; i < tail.length; i++) expect(Math.abs(tail[i].y - tail[i - 1].y) / Math.hypot(tail[i].x - tail[i - 1].x, tail[i].z - tail[i - 1].z)).toBeLessThanOrEqual(MAX_GRADE + 1e-6);
+    expect(tail[tail.length - 1].y).toBeCloseTo(1.2, 6);   // the apron sits at the pad's level
+  });
+});
