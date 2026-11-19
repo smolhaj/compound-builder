@@ -68,10 +68,9 @@ try {
   };
   await set(`const s = cb.store.getState(); s.setBuildingView('full'); s.setSeasonMode?.('summer');`);
   const h = 0.3;
-  console.error('INTERIOR', JSON.stringify(await page.evaluate(() => [...window.__cb.world._domeInteriors.values()].map(f => ({ key: f.key.slice(0, 80), kids: f.group.children.map(c => [c.name || c.type, c.isInstancedMesh ? c.count : c.geometry?.attributes?.position?.count, c.visible]), vis: f.group.visible, pos: f.group.position.toArray() })))));
   await pair('00-aerial-inside', L(0.0, -1.35, 3.2), L(0, 0.15, 0), 60, [[0.02, 0.5]]);
   // the standing views: the camera stands on the plan's free paths (QA reads the plan the world drew), so it is never inside a building
-  const plan = await page.evaluate(() => { const f = [...window.__cb.world._domeInteriors.values()][0]; return f ? { segs: f.plan.segs, benches: f.plan.benches, plaza: f.plan.plaza, crates: f.plan.crates, signs: f.plan.signs } : null; });
+  const plan = await page.evaluate(() => { const f = [...window.__cb.world._interiorCache.values()][0]; return f ? { segs: f.plan.segs, benches: f.plan.benches, plaza: f.plan.plaza, crates: f.plan.crates, signs: f.plan.signs } : null; });
   const airlocks = info.airlocks.map(a => a[2]);
   const along = (a, rho, off = 0, h = 0) => L(Math.sin(a) * rho + Math.cos(a) * off, Math.cos(a) * rho - Math.sin(a) * off, h);   // rho in fractions of R, off across the path (fractions of R)
   const segsOf = a => plan.segs.filter(s => Math.abs(Math.atan2(Math.sin(Math.atan2(s.x, s.z) - a), Math.cos(Math.atan2(s.x, s.z) - a))) < 0.08);
