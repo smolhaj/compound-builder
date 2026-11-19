@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { DOME_TIERS, TIER, kindOfCells } from './tiers';
 import { digStops, DIG_DEEPER } from './crossing';
+import { domeCost } from './cost';
 import { BLUEPRINTS } from '../blueprints';
 import {
-  inUtilityLane, BUNKER_DOME, LEARNED_DEEPER_FT, againstSkirt, bunkerBlueprint, bunkerProblemUnder, bunkerShellShare, coverOf, craterOpen, digReach, domeAt, floorFt,
+  footingBill, inUtilityLane, BUNKER_DOME, LEARNED_DEEPER_FT, againstSkirt, bunkerBlueprint, bunkerProblemUnder, bunkerShellShare, coverOf, craterOpen, digReach, domeAt, floorFt,
   footingYd, holdDome, holdFor, inAirlockLane, projectHours, refuge, shellR, skirtNeedFt, skirtTurns, usableR, bpHours, type UnderDome,
 } from './bunker';
 
@@ -141,9 +142,26 @@ describe('with the dome or after it', () => {
     const bp = BLUEPRINTS.bunker_dorm, f = (b: typeof bp) => b.stages.find(s => s.id === 'foundation')!;
     expect(f(bunkerBlueprint(bp, ud(true))).materials.excavator ?? 0).toBeLessThanOrEqual(f(bp).materials.excavator ?? 0);
     expect(f(bunkerBlueprint(bp, ud(false))).materials.lumber ?? 0).toBeGreaterThan(f(bp).materials.lumber ?? 0);
-    const foot = f(bunkerBlueprint(bp, ud(true, 40)));
-    expect(foot.materials.concrete!).toBe(f(bp).materials.concrete! + 40);
+    const fb = footingBill({ tier: 'geodesic', cells: 7 }, 8), withFoot = { ...ud(true, 12), footGoods: fb.goods, footUsd: fb.usd };
+    const foot = f(bunkerBlueprint(bp, withFoot));
+    expect(foot.materials.concrete!).toBeGreaterThan(f(bunkerBlueprint(bp, ud(true))).materials.concrete!);
     expect(foot.hours).toBeGreaterThan(f(bunkerBlueprint(bp, ud(true))).hours);
+  });
+  it('the footing is priced as the dome prices its own skirt: the dome at the deeper skirt costs the base dome plus the footing, so nothing is charged twice', () => {
+    for (const tier of ['geodesic', 'glass', 'arcology'] as const) {
+      const cells = TIER[tier].cells, fb = footingBill({ tier, cells }, 10), base = domeCost(tier, cells), deep = domeCost(tier, cells, { skirtFt: TIER[tier].skirtFt + 10 });
+      expect(fb.usd).toBeGreaterThan(0);
+      expect(base.materialsUsd + fb.usd).toBeCloseTo(deep.materialsUsd, 0);
+      // monotone: more depth never costs less
+      expect(footingBill({ tier, cells }, 12).usd).toBeGreaterThanOrEqual(fb.usd);
+    }
+    expect(footingBill({ tier: 'geodesic', cells: 7 }, 0).usd).toBe(0);
+  });
+  it('a bunker room is a hardened-concrete job: it carries the works good, so it costs more per cubic yard of concrete than the plain concrete', () => {
+    for (const k of ['bunker_dorm', 'bunker_galley', 'bunker_plant']) {
+      const bp = bunkerBlueprint(BLUEPRINTS[k], { id: 'd', with: true, footFt: 0, footYd: 0, floorFt: 17 });
+      expect(bp.stages.some(st => (st.materials as Record<string, number>).bunker_works > 0)).toBe(true);
+    }
   });
 });
 
