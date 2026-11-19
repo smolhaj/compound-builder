@@ -168,6 +168,9 @@ import { TIER, cellsOfKind, shellFt, tierOfKind } from '../sim/dome/tiers';
 import { inYard, yardGeometry } from '../sim/dome/plantYard';
 import { isGradedTier } from '../sim/dome/grading';
 import { makeDomePlant, plantKey, type DomePlantFx, type PlantLook } from './fx/DomePlant';
+import { makeLinkFixtures, linksKey, type LinkFixtureInput, type LinkFixtures } from './fx/DomeLinks';
+import { domesOf as standingDomes } from '../sim/dome/standing';
+import { linkState, linksOf } from '../sim/dome/linkGraph';
 import { stateOf as domeStateOf } from '../sim/dome/live';
 import { fxOf as plantFxOf, unitsOf as plantUnitsOf } from '../sim/dome/plantLive';
 import { makeDomeAir, type DomeAirFx } from './fx/DomeAir';
@@ -448,6 +451,7 @@ export class HomesteadWorld {
     this._underfoot = { mud: this.atmos.mud, snow: f.snow, rain: f.rain };
     this.lived.update(game, performance.now(), { night: f.night, lightsOut: lightsOutNow(game) });
     this._domeAir(game);
+    this._syncLinks(game);
   }
 
   /** The main dome's inner haze and closed-ecology plants (sim/dome/live.ts domeLook), kept on its own group. */
@@ -466,6 +470,24 @@ export class HomesteadWorld {
       f.group.visible = true;
       f.apply(look);
     }
+  }
+
+  private _links: LinkFixtures | null = null;
+  /** The link airlocks, vent stacks and buried sleeves of the dome links (game/fx/DomeLinks), redrawn when a link is built or changes state. */
+  private _syncLinks(game: GameState): void {
+    const ls = linksOf(game);
+    if (!ls.length && !this._links) return;
+    const domes = standingDomes(game), ins: LinkFixtureInput[] = ls.map(link => ({
+      link, state: linkState(game, link),
+      ends: link.ends.map(e => { const a = e.type === 'dome' ? domes.find(d => d.id === e.id)?.airlocks.find(x => x.role === 'link' && x.linkId === link.id) : null; return a ? { x: a.x, z: a.z, angle: a.angle } : null; }),
+    }));
+    const key = linksKey(ins);
+    if (this._links && this._links.key === key) return;
+    if (this._links) { this._root.remove(this._links.group); this._links.dispose(); this._links = null; }
+    if (!ins.length) return;
+    const f = makeLinkFixtures(ins, (x, z) => this.parcel.height(x, z) + 0.01);
+    f.setUnder(this._under); f.setView(this._view);
+    this._root.add(f.group); this._links = f;
   }
 
   /** The plant of one finished big dome (every dome has its own: its machinery, yard, roof hatches and lamps; sim/dome/plant.ts), redrawn when its equipment or damage changes. */
@@ -2022,6 +2044,7 @@ export class HomesteadWorld {
     this._under = on;
     this.terrain.setOpacity(on ? 0.3 : 1);
     for (const pf of this._domePlants.values()) pf.setUnder(on);   // the buried plant lines (sim/dome/plant.ts)
+    this._links?.setUnder(on);
     this.forest.visible = !on;
     this.sage.visible = !on;
     this.willow.visible = !on;
@@ -2403,6 +2426,7 @@ export class HomesteadWorld {
   setBuildingView(v: BuildingView): void {
     if (v === this._view) return;
     this._view = v;
+    this._links?.setView(v);
     for (const b of this._built.values()) { b.key = ''; this._applyView(b); }
     this._digKeys.clear(); if (this._lastStructures.length) this._syncDomeDigs(this._lastStructures);
     this._ws.invalidateShadows();
