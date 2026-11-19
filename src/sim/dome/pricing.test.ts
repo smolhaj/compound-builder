@@ -41,7 +41,7 @@ describe('dome pricing (docs/design/dome_pricing.md)', () => {
   it('the crater is in the bill, with rock and dewatering only where the ground makes them', () => {
     expect(earthwork('earthen', 2).usd).toBe(0);
     const g = earthwork('geodesic', 7), gl = earthwork('glass', 15), ar = earthwork('arcology', 36);
-    expect(g.rockCy).toBe(0); expect(g.wells).toBe(0);                   // 20 ft: above the rock and the water table
+    expect(g.rockCy).toBe(0); expect(g.wells).toBeGreaterThan(0);        // 30 ft (the geodesic skirt was deepened from 20 for the raid ladder): two feet into the water, no rock
     expect(gl.rockCy).toBe(0); expect(gl.wells).toBeGreaterThan(0);      // 30 ft: two feet into the water
     expect(ar.rockCy).toBeGreaterThan(0); expect(ar.wells).toBeGreaterThan(gl.wells); expect(ar.faceSf).toBeGreaterThan(gl.faceSf);
     expect(earthwork('arcology', 36, { waterFt: 200 }).wells).toBe(0);   // a dry site

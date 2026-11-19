@@ -64,30 +64,27 @@ Measured breach rate (line passed, 24 seeds, Hardcore, a truck and satchels as l
 ## PROPOSED ladder, as applied
 
 Owner ladder: arcology 0 percent (raiders never open the shell or its doors; the plant yard wall and a siege remain its real threats), glass about 5 percent for ordinary crews and about 20 for
-heavy late-game crews, geodesic about 35, earthen about 60. What changed:
+heavy late-game crews, geodesic about 35, earthen about 60 for a heavy late crew. What changed:
 
-* `SHELL_ODDS` (ram / satchel on a panel): earthen .2/.4, geodesic .1/.25, glass .03/.15, arcology **0/0** (was .3/.5, .3/.9, .25/.8, 0/.02).
-* `AIRLOCK_DOOR`: earthen .4/.6, geodesic .15/.4, glass .05/.3, arcology **0/0** (was .55/.85, .45/.88, .35/.7, .03/.12).
-* `HEAVY_BLAST`: a glass dome's satchel odds count in full only for a crew 50 percent or more of the way into the collapse with 2 or more satchels; anyone else's is a tenth (`blastOdds(heavy)`).
-* Hand work (the existing `climb`, `SHELL_CLIMB_K` in `perimeter.ts`, replaces the hit-point rule for shells): earthen .12, geodesic .06, glass .012 of the old 1.0 (the old rule let a 16-man crew cut laminated glass in about a minute).
-  The crew-size time `cutSeconds` is retuned to match (earthen 1500, geodesic 450, glass 1500 s base, over the square root of the crew).
-* Two bypasses closed for shells: a crew more than twice the defenders no longer "overwhelms" a shell (it did, for every wall, at about 48 s); and a grenade or rocket that wrecks a wall post only opens a shell with that tier's satchel odds (it always did).
-* Smaller crews are strictly worse (tested): every route scales with men or needs a living sapper or driver.
+* `SHELL_ODDS` (ram / satchel on a panel): earthen .6/.8, geodesic .15/.4, glass .04/.2, arcology **0/0**.
+* `AIRLOCK_DOOR`: earthen .7/.9, geodesic .3/.6, glass .08/.3, arcology **0/0**.
+* `HEAVY_BLAST`: a glass dome's satchel odds count in full only for a crew 50 percent or more of the way into the collapse with 2 or more satchels; anyone else's is a tenth.
+* Hand work (`SHELL_CLIMB_K` in `perimeter.ts`; the hit-point rule let a 16-man crew cut laminated glass in about a minute): earthen .5, geodesic .25, glass .05 of the old 1.0 rate; `cutSeconds` is retuned to match (1500 / 450 / 1500 s base).
+* Three bypasses closed for shells that are still whole: a crew over twice the defenders no longer "overwhelms" them (it did, for every wall, at about 48 s), defenders all down no longer opens them, and a grenade or rocket that wrecks a wall post opens one only with that tier's satchel odds. Once a ram or charge has opened a gap, the old rules apply.
+* The earthen hut counts as a wall: `wallTarget` accepts a shell run 0.3 units from the house (other walls need 1).
+* **Geodesic skirt 30 ft** (was 20): a crew that has learned the place no longer digs under it. Costs follow the real cost functions: the geodesic crater now reaches the water table (wells, like glass). Test assertions updated in `dig`, `bunkerLive` (floor 35 ft for the footing demos), `pricing` and `siege`.
+* Smaller crews are worse (tested).
 
 Achieved (Hardcore, 40 seeds per cell, farmhouse at the dome centre, truck T and satchels as marked, days after the collapse):
 
 | tier | 4 men, no means, 60 d | 8 men T+1, 60 d | 8 men T+2, 300 d | 12 men T+2, 300 d | 16 men T+2, 300 d |
 |---|---|---|---|---|---|
-| earthen | 20% | 63% | 78% | 93% | 100% |
-| geodesic | 0% | 5% | 18% | 40% | 53% |
-| glass | 0% | 0% | 10% | 13% | 23% |
+| earthen | 0% | 35% | 53% | 65% | 78% |
+| geodesic | 0% | 15% | 25% | 48% | 45% |
+| glass | 0% | 0% | 15% | 23% | 25% |
 | arcology | 0% | 0% | 0% | 0% | 0% |
 
-Reading it against the ladder: arcology exactly 0 (the odds are 0 and the hand-cut rate is 0). Glass: ordinary crews 0 to 5, heavy late crews 10 to 23, mean about 15. Geodesic: 18 to 53 across 8 to 16 organized men, mean about 37.
-**Earthen does not follow the ladder through the odds**: its shell is 20 to 40 ft across, smaller than the one unit the raid sim needs between the house and a wall, so the fight is the plain house fight and the shell is not a barrier
-(63 percent at 8 men matches "about 60", but 12 to 16 men get in 93 to 100). Making the hut count as a wall needs a rule change in `wallTarget` and was left to the owner.
-**Not applied: the 30 ft geodesic skirt.** `TIER.skirtFt` also prices the crater, sizes the bunker footing and the dig-site cutaway (tests in `dig`, `bunkerLive`, `pricing` assume 20), and other PRs are editing those. A crew that has learned the place
-still digs under the 20 ft skirt (0 percent stopped at full adaptation). If the owner wants it stopped: set the geodesic skirt to 30 ft with those costs updated, or cut `DIG_DEEPER` from 12 to 7 ft (partial stop only).
+Arcology exactly 0. Glass: ordinary 0 to 5, heavy late crews 15 to 25 (mean about 21). Geodesic: 25 to 48 across 8 to 16 organized men (mean about 39). Earthen: 53 to 78 for heavy late crews (mean about 65). Geodesic 16 men is a point below 12 men (sampling).
 
 ## Flags for the owner (the earlier audit; items 1 to 3 are answered by the ladder above)
 

@@ -78,7 +78,8 @@ describe('the skirt against a dig', () => {
   it('the tiers: a berm shell is deep enough for a plain crew and partial cover for one that has learned the place; the arcology is total', () => {
     expect(digStops(skirtOf('earthen'))).toBe(0);
     expect(digStops(skirtOf('geodesic'))).toBeGreaterThanOrEqual(0.99);
-    expect(digStops(skirtOf('geodesic'), 0.5)).toBeGreaterThan(0.2); expect(digStops(skirtOf('geodesic'), 0.5)).toBeLessThan(0.9);
+    expect(digStops(skirtOf('geodesic'), 1)).toBeGreaterThan(0.9);   // 30 ft: a crew that has learned the place is stopped too (raid ladder)
+    expect(digStops(20, 1)).toBeLessThan(0.1);
     expect(digStops(skirtOf('glass'), 1)).toBeGreaterThan(0.9); expect(digStops(skirtOf('arcology'), 1)).toBeGreaterThanOrEqual(0.99);
   });
   it('a crew on a skirt-protected dome is turned and goes to the airlocks, and it is logged', () => {

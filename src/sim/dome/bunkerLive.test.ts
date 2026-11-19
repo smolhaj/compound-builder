@@ -24,8 +24,8 @@ describe('what the placing card says', () => {
       expect(s.line).toContain(`${TIER[t].skirtFt}`);
       expect(s.line).toContain(`${Math.round(FL)} ft down`);
     }
-    // a skirt taken deeper: a floor 25 ft down under the geodesic dome needs 28 ft of skirt
-    const e = bunkerSite(game('geodesic'), 'bunker_hatch', rect(0, 0), 25)!;
+    // a skirt taken deeper: a floor 35 ft down under the geodesic dome (30 ft skirt) needs 38 ft of skirt
+    const e = bunkerSite(game('geodesic'), 'bunker_hatch', rect(0, 0), 35)!;
     expect(e.cover.state).toBe('footing');
     expect(e.footYd).toBeGreaterThan(0);
     expect(e.line).toMatch(/deep footing/);
@@ -65,13 +65,13 @@ describe('a staked piece and its bill', () => {
     expect(bpHours(blueprintOf(a))).toBeLessThan(bpHours(BLUEPRINTS.bunker_dorm));
     expect(bpHours(blueprintOf(b))).toBeGreaterThan(bpHours(BLUEPRINTS.bunker_dorm));
     const ge = game('geodesic', 0), c = S('c', 'bunker_hatch', 0, 0); ge.structures.push(c);
-    stampUnderDome(ge, c, { dome: 'dm', floorFt: 25 }, true);
+    stampUnderDome(ge, c, { dome: 'dm', floorFt: 35 }, true);
     expect(c.underDome!.footYd).toBeGreaterThan(0);
     expect(blueprintOf(c).stages[1].materials.concrete!).toBeGreaterThan(BLUEPRINTS.bunker_hatch.stages[1].materials.concrete!);
   });
   it('the footing is paid once: a second piece under the same dome owes only what is left', () => {
     const g = game('geodesic', 0), a = S('a', 'bunker_hatch', 0, 0), b = S('b', 'bunker_hatch', 0.3, 0.3); g.structures.push(a, b);
-    stampUnderDome(g, a, { dome: 'dm', floorFt: 25 }, true); stampUnderDome(g, b, { dome: 'dm', floorFt: 25 }, true);
+    stampUnderDome(g, a, { dome: 'dm', floorFt: 35 }, true); stampUnderDome(g, b, { dome: 'dm', floorFt: 35 }, true);
     expect(a.underDome!.footFt).toBeGreaterThan(0); expect(b.underDome!.footFt).toBe(0);
   });
 });
@@ -79,7 +79,7 @@ describe('a staked piece and its bill', () => {
 describe('the skirt really goes deeper once the footing is poured', () => {
   it('only finished pieces count, and a deeper skirt never turns fewer digs', () => {
     const g = game('geodesic', 99), a = S('a', 'bunker_hatch', 0, 0, 0); g.structures.push(a);
-    stampUnderDome(g, a, { dome: 'dm', floorFt: 25 }, false);
+    stampUnderDome(g, a, { dome: 'dm', floorFt: 35 }, false);
     expect(skirtDepthFt(g, g.structures[0])).toBe(TIER.geodesic.skirtFt);
     a.stage = 99; a.finishedAt = 1;
     const d = skirtDepthFt(g, g.structures[0]);
