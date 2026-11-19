@@ -546,7 +546,7 @@ export const GATEHOUSE_ORDER: readonly string[] = ['gate_garage', 'motor_court',
 const room = (id: string, name: string, cx: number, cz: number, blurb: string, shelters = 0, level: 'underground' | 'both' = 'underground'): KitPieceDef => ({
   id, name, category: 'bunker', blurb, cellsX: cx, cellsZ: cz, frontCells: 0,
   parts: { foundation: 'concrete', walls: 'concrete', roof: 'concrete' },
-  maxSlope: level === 'both' ? 0.3 : 9, floorY: 0, porch: 0, sleeps: 0, light: [0, 0.24, 0], level, shelters,
+  maxSlope: level === 'both' ? 0.3 : 9, floorY: 0, porch: 0, sleeps: 0, light: [0, 0.32, 0], level, shelters,
 });
 export const BUNKER_KIT: KitPieceDef[] = [
   room('bunker_hatch', 'Bunker hatch', 1, 1, 'The way down: a steel hatch in a concrete collar, a ladder down a 16 ft shaft, a blast door at the bottom. Easy to hide under a woodpile.', 0, 'both'),
