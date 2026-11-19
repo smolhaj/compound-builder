@@ -68,6 +68,8 @@ try {
   }
   console.error('order tunnel:', await order(Gl.id, Ge.id, 'tunnel')); if (Ea) console.error('order earth tunnel:', await order(Ge.id, Ea.id, 'tunnel', 4));
   await finishAll(); await frames(4);
+  // walkers: the route from inside the glass dome to inside the geodesic dome goes through a link (door tags and deck points), not across the open ground
+  console.error('ROUTE', JSON.stringify(await page.evaluate(([a, b]) => { const w = window.__cb.world, r = w._walkVia(a.x - 1, a.z + 1, b.x + 1, b.z + 1); return { points: r.length, doors: r.filter(p => p[3] !== undefined).length, deck: r.filter(p => p[2] !== undefined).length, minY: Math.min(...r.filter(p => p[2] !== undefined).map(p => p[2])) , groundY: w.groundAt(a.x, a.z) }; }, [Gl, Ge])));
   if (want('both')) { await pose([mid[0] + side[0] * 2, gm + 10, mid[1] + side[1] * 28], [mid[0] + 2, gm + 0.5, mid[1] + 6], 56); await shot('hero-aerial-both-links-three-domes'); }
   if (want('under')) { await set(`cb.world.setUnderground(true)`); await frames(2); await pose([mid[0] + side[0] * 2 - u[0] * 4, 5.5, mid[1] + side[1] * 2 - u[1] * 4], [mid[0] + u[0] * 2, -0.3, mid[1] + u[1] * 2], 58); await shot('underground-view-tunnel-and-sleeves'); await set(`cb.world.setUnderground(false)`); }
   if (want('cut')) { await set(`cb.store.getState().setBuildingView('cutaway')`); await frames(3); await pose([mid[0] + side[0] * 2 - u[0] * 5, 4.5, mid[1] + side[1] * 2 - u[1] * 5], [mid[0] + u[0] * 2, 0.2, mid[1] + u[1] * 2], 58); await shot('cutaway-both-links'); await set(`cb.store.getState().setBuildingView('xray')`); await frames(3); await shot('xray-both-links'); await set(`cb.store.getState().setBuildingView('full')`); }
