@@ -32,7 +32,7 @@ try {
     window.__b = {};
     const place = (key, kind, dx, dz, rot = 0) => { const sp = cb.tool.findSpot(kind, c.x + dx, c.z + dz, rot, 6); if (!sp) { console.warn('no spot', key); return; } G.getState().plan(kind, sp[0], sp[1], rot); window.__b[key] = G.getState().game.structures.at(-1); };
     place('log_house', 'log_house', -4, -3); place('garden', 'garden', -2, 4); place('solar_array', 'solar_array', 6, 3);
-    place('bunker_hatch', 'bunker_hatch', 0.25, -6.75); place('bunker_corridor', 'bunker_corridor', 1.0, -6.75, 1); place('bunker_galley', 'bunker_galley', 2.25, -6.5); place('bunker_dorm', 'bunker_dorm', 2.25, -7.75);
+    place('bunker_hatch', 'bunker_hatch', 0.25, -6.75); place('bunker_stairs', 'bunker_stairs', -1.5, -6.75); place('bunker_corridor', 'bunker_corridor', 1.0, -6.75, 1); place('bunker_galley', 'bunker_galley', 2.25, -6.5); place('bunker_dorm', 'bunker_dorm', 2.25, -7.75);
     place('bunker_stores', 'bunker_stores', 3.25, -6.5); place('bunker_plant', 'bunker_plant', 3.25, -7.75); place('bunker_medical', 'bunker_medical', 2.25, -5.5); place('bunker_comms', 'bunker_comms', 1.0, -5.75, 1);
     G.setState(s => {
       const g = structuredClone(s.game);
@@ -68,6 +68,7 @@ try {
     await room('bunker_comms', 0.1, 0.27, 0.38, -0.1, 0.16, -0.35, 80); await shot(`${tag}-control-${L}`);
   }
   await lights(true);
-  await room('bunker_hatch', 0.0, 0.3, 0.6, 0.0, 0.1, 0.0, 75); await shot(`${tag}-hatch-shaft`);
+  await room('bunker_stairs', 0.0, 0.27, -0.26, 0.0, 0.5, 0.5, 70); await shot(`${tag}-stairs-up-to-hatch`);
+  await room('bunker_stairs', 0.0, 0.3, -0.35, 0.0, 0.12, -0.7, 70); await shot(`${tag}-stairs-blast-door`);
   await room('bunker_corridor', 0.0, 0.25, 0.4, 0.0, 0.15, -0.4, 80); await shot(`${tag}-escape-tunnel-end`);
 } finally { await browser.close(); vite.kill(); setTimeout(() => process.exit(0), 200); }
