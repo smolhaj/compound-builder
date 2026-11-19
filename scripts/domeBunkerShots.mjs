@@ -85,7 +85,7 @@ try {
     await pose([D.x + R * 0.5, ground + R * 0.9, D.z + R * 0.9], [D.x - R * 0.1, ground - 0.3, D.z], 58); await shot('cutaway');
     await pose([D.x + R * 1.3, ground + R * 1.0, D.z + R * 1.8], [D.x, ground - R * 0.1, D.z], 55); await shot('cutaway-moat');
     await page.evaluate(() => window.__cb.store.getState().setBuildingView('full'));
-    await pose([D.x + 0.3, ground + R * 0.7, D.z + R * 1.2], [D.x, ground - R * 0.1, D.z], 56); await frames(2);
+    await pose([D.x + 0.3, ground + R * 0.55, D.z + R * 2.3], [D.x, ground - R * 0.25, D.z], 58); await frames(2);
     await page.evaluate(id => window.__cb.store.getState().setDomeSection(id), D.dome); await frames(3); await shot('section');
     await page.evaluate(() => window.__cb.store.getState().setDomeSection(null));
     // eye level in the dome: the hatch with a person beside it
