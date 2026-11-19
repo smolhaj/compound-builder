@@ -75,7 +75,11 @@ export function planParcelTrees(t: ParcelTerrain, o: PlantOptions): ParcelTree[]
         const mix = t.world.trees;
         const wash = t.wash && Math.abs(z - t.wash(x)) < 5;
         let sx = 0.88 + sxR * 0.24, sy = 0.9 + syR * 0.25;
-        if (riparian || wash) { kind = mix.riparian.kind; scale = mix.riparian.scale[0] + sRoll * (mix.riparian.scale[1] - mix.riparian.scale[0]); }
+        if (riparian || wash) {
+          // a dry wash takes its own mix (desert); a real creek keeps the riparian kind
+          const rm = wash && !riparian && mix.wash ? mix.wash : mix.riparian;
+          kind = rm.kind; scale = rm.scale[0] + sRoll * (rm.scale[1] - rm.scale[0]);
+        }
         else {
           const tot = mix.timber.reduce((a, m) => a + m.w, 0);
           let acc = 0, pickM = mix.timber[mix.timber.length - 1];
@@ -146,7 +150,7 @@ export function planUnderstory(t: ParcelTerrain, o: PlantOptions): ParcelTree[] 
       const under = t.world.trees.under;
       const kind: ForestTreeSpec['kind'] | null = t.relief === 'benches' ? (thick ? 'conifer' : 'oval') : thick ? under.thick : under.edge;
       if (!kind) continue;
-      const scale = kind === 'conifer' ? 0.32 + sRoll * 0.3 : 0.4 + sRoll * 0.25;
+      const scale = kind === 'conifer' ? 0.32 + sRoll * 0.3 : kind === 'juniper' ? 0.5 + sRoll * 0.3 : 0.4 + sRoll * 0.25;
       out.push({ id: (o.idBase ?? 0) + 500_000 + cell, x, y: s.h, z, kind, scale, sx: 0.85 + sxR * 0.25, sy: kind === 'oval' ? 1.15 + syR * 0.3 : 0.95 + syR * 0.2, rotY, cr });
     }
   }

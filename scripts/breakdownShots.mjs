@@ -18,7 +18,7 @@ try { ({ chromium } = require('playwright')); }
 catch { ({ chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs')); }
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
-const bare = args.includes('--bare');
+const bare = args.includes('--bare'), fight = args.includes('--fight');   // --fight: a big savage crew that does not turn back, so the report carries the breakdown rows
 const port = Number(opt('--port', 5961)), quality = opt('--quality', 'medium');
 const outDir = resolve(opt('--out', 'shots/cutscene'));
 mkdirSync(outDir, { recursive: true });
@@ -31,15 +31,15 @@ const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=sw
 let n = 0;
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 810 } });
-  page.setDefaultTimeout(900000);
+  page.setDefaultTimeout(240000);
   page.on('pageerror', e => console.error('pageerror:', e.message));
-  await page.goto(`http://localhost:${port}/?seed=7`);
+  await page.goto(`http://localhost:${port}/?seed=7&layout=classic&lowrender`);
   await page.waitForFunction(() => window.__cb, null, { timeout: 180000 });
   await page.evaluate(q => window.__cb.store.getState().setQuality(q), quality);
-  const frames = async (k) => { const f0 = await page.evaluate(() => window.__cb.qa.frames); await page.waitForFunction(x => window.__cb.qa.frames >= x, f0 + k, { polling: 200 }); };
+  const frames = async (k) => { for (let i = 0; i < Math.max(1, Math.min(k, 3)); i++) { await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(250); } };
   const shot = async (name, k = 4) => { await frames(k); const f = `${outDir}/${String(++n).padStart(2, '0')}-${name}.png`; await page.screenshot({ path: f }); console.log(f); };
 
-  const info = await page.evaluate(async (bare) => {
+  const info = await page.evaluate(async ([bare, fight]) => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp;
     const { planSiege } = await import('/src/sim/siege.ts');
     const { hireGuard } = await import('/src/sim/guards.ts');
@@ -69,10 +69,10 @@ try {
     for (const [i, p] of g.people.entries()) if (!p.kid || p.age >= 15) { g.armory.guns.push({ id: `g${i}`, model: 'sw_mp15', condition: 1, fired: 0, where: 'house', carrier: p.id }); g.armory.skill[p.id] = 6; }
     let ed = 0;
     for (let d = 1; d < 300; d++) {
-      const p = planSiege({ kind: 'gang', size: 8, temper: 'hard', hour: 14, seed: g.seed * 131 + d * 7 + 1, fought: true, fightSeconds: 90 });
+      const p = planSiege({ kind: 'gang', size: fight ? 16 : 8, temper: fight ? 'savage' : 'hard', hour: 14, seed: g.seed * 131 + d * 7 + 1, fought: true, fightSeconds: 90 });
       if (p.scenes.length >= 1) { ed = d; break; }
     }
-    g.gate.pending = { id: 'e9', kind: 'gang', day: ed, title: 'A gang comes up the road', dossier: ['Eight men, armed.'], size: 8, armed: true, strength: 60, temper: 'hard', stances: ['hide', 'parley', 'warn', 'defend'] };
+    g.gate.pending = { id: 'e9', kind: 'gang', day: ed, title: 'A gang comes up the road', dossier: ['Eight men, armed.'], size: fight ? 16 : 8, armed: true, strength: 60, temper: fight ? 'savage' : 'hard', stances: ['hide', 'parley', 'warn', 'defend'] };
     const { useBattleStore } = await import('/src/store/battleStore.ts');
     const { useCutsceneView } = await import('/src/store/cutsceneStore.ts');
     window.__adv = (match, maxSteps = 6000, dt = 0.1) => {
@@ -90,7 +90,7 @@ try {
     };
     G.getState().load(g);
     return { day: ed };
-  }, bare);
+  }, [bare, fight]);
   console.log(JSON.stringify(info));
   await frames(10);
   await page.waitForTimeout(3500);
@@ -101,5 +101,11 @@ try {
   await page.evaluate(() => window.__adv(() => false, 4));
   await frames(6);
   await page.waitForFunction(() => window.__cb.game.getState().cutscene?.phase === 'aftermath', null, { polling: 300 });
-  await shot(bare ? 'aftermath-bare' : 'aftermath-fortress', 6);
+  const tag = (bare ? 'bare' : 'fortress') + (fight ? '-fight' : '');
+  await shot('aftermath-' + tag, 6);
+  // the breakdown rows are open by default; the "more" line holds the rounds and the extra notes: open it and look at those too
+  if (await page.getByRole('button', { name: /more \(/ }).count()) { await page.getByRole('button', { name: /more \(/ }).click(); await shot('aftermath-' + tag + '-more', 3); } else console.log('no more line (nothing to add)');
+  // fold the breakdown (headline only), as a player can
+  const tg = page.getByTestId('raid-breakdown-toggle');
+  if (await tg.count()) { await tg.click(); await shot('aftermath-' + tag + '-folded', 3); } else console.log('no breakdown on this report');
 } finally { await browser.close(); vite.kill(); setTimeout(() => process.exit(0), 200); }

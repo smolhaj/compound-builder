@@ -9,13 +9,16 @@
  */
 import * as THREE from 'three';
 import {
-  applyVegetationDepth, buildConiferTree, buildDeciduousTree, buildTallCrownTree, createVegetationMaterial,
+  applyVegetationDepth, buildConiferTree, buildDesertTree, buildDeciduousTree, buildTallCrownTree, createVegetationMaterial,
   VEG_WIND, VEG_GUST, type TreeLod, type VegDetail,
 } from './treeGeometry';
 import { InstancedLodSet } from './instancedLod';
 import type { Quality } from '../WorldScene';
 
-export type ForestKind = 'conifer' | 'broad' | 'oval' | 'longleaf';
+export type ForestKind = 'conifer' | 'broad' | 'oval' | 'longleaf' | DesertKind;
+/** Southwest lot trees (buildDesertTree). */
+export type DesertKind = 'juniper' | 'mesquite' | 'paloverde' | 'saguaro';
+export const DESERT_KINDS: readonly DesertKind[] = ['juniper', 'mesquite', 'paloverde', 'saguaro'];
 
 export interface ForestTreeSpec {
   x: number;
@@ -45,6 +48,11 @@ type Palette = Array<[number, number]>;
 export const FOREST_CONIFER: Palette = [[0x3f6a4a, 3], [0x365f43, 2], [0x4a7248, 2], [0x46705f, 1.2], [0x52723e, 1]];
 export const FOREST_DECID: Palette = [[0x3a6327, 3], [0x47702c, 3], [0x506f29, 2], [0x31582c, 2]];
 /** Aspen / cottonwood: lighter, yellower summer green (they blaze gold in fall). */
+/** Desert trees: sun-bleached olive juniper, gray-olive mesquite, yellow-green palo verde, blue-green saguaro. */
+export const FOREST_JUNIPER: Palette = [[0x6f7a58, 3], [0x788462, 2], [0x66724f, 2], [0x808a6a, 1]];
+export const FOREST_MESQUITE: Palette = [[0x6b7a46, 3], [0x76854d, 2], [0x62703f, 2]];
+export const FOREST_PALOVERDE: Palette = [[0x9aa646, 3], [0x8d9b3e, 2], [0xa8b252, 2]];
+export const FOREST_SAGUARO: Palette = [[0x4f7048, 3], [0x58794f, 2], [0x466644, 2]];
 export const FOREST_ASPEN: Palette = [[0x5f8a38, 3], [0x6a9040, 2], [0x557f36, 2]];
 
 function pick(p: Palette, u: number): number {
@@ -84,7 +92,7 @@ export class ForestRenderer {
     const dummy = new THREE.Object3D();
     const c = new THREE.Color();
     const hsl = { h: 0, s: 0, l: 0 };
-    for (const set of ['conifer', 'conifer_stand', 'broad', 'oval', 'longleaf'] as const) {
+    for (const set of ['conifer', 'conifer_stand', 'broad', 'oval', 'longleaf', 'juniper', 'mesquite', 'paloverde', 'saguaro'] as const) {
       const kind: ForestKind = set === 'conifer_stand' ? 'conifer' : set;
       const list = specs.filter(t => t.kind === kind && (kind !== 'conifer' || !!t.stand === (set === 'conifer_stand')));
       if (list.length === 0) continue;
@@ -93,6 +101,7 @@ export class ForestRenderer {
         let geo = this._geos.get(key);
         if (!geo) {
           geo = kind === 'conifer' ? buildConiferTree(detail, 17, lod, set === 'conifer_stand' ? 1.0 : 0.42)
+            : (DESERT_KINDS as readonly string[]).includes(kind) ? buildDesertTree(kind as DesertKind, detail, 23, lod)
             : kind === 'longleaf' ? buildTallCrownTree('longleaf', detail, 31, lod)
             : buildDeciduousTree(kind === 'broad' ? 0 : 1, detail, kind === 'broad' ? 41 : 63, lod);
           this._geos.set(key, geo);
@@ -106,7 +115,7 @@ export class ForestRenderer {
         dummy.updateMatrix();
         return dummy.matrix.clone();
       });
-      const evergreen = kind === 'conifer' || kind === 'longleaf';
+      const evergreen = kind === 'conifer' || kind === 'longleaf' || kind === 'juniper' || kind === 'saguaro';
       const mat = evergreen ? this._matEver : this._matDecid;
       const inst = new InstancedLodSet(this._scene, levels, mat, mats, {
         name: `forest_${set}`,
@@ -117,7 +126,8 @@ export class ForestRenderer {
         peelable: true,
       });
       applyVegetationDepth(inst.meshes, mat); // bare winter crowns cast branch shadows
-      const pal = palettes[kind] ?? (evergreen ? FOREST_CONIFER : FOREST_DECID);
+      const pal = palettes[kind] ?? (kind === 'juniper' ? FOREST_JUNIPER : kind === 'mesquite' ? FOREST_MESQUITE : kind === 'paloverde' ? FOREST_PALOVERDE
+        : kind === 'saguaro' ? FOREST_SAGUARO : evergreen ? FOREST_CONIFER : FOREST_DECID);
       list.forEach((t, i) => {
         const [u, jh, jl, js] = t.cr;
         c.setHex(pick(pal, u));

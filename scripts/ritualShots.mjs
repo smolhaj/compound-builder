@@ -25,7 +25,7 @@ try {
   const shot = async (name) => { await frames(); await page.screenshot({ path: `${out}/${name}.png` }); lap(name); };
   const report = async tag => console.error(tag, JSON.stringify(await page.evaluate(() => {
     const cb = window.__cb, g = cb.game.getState().game, R = g.rituals;
-    return { hour: ((g.clock.ticks * 0.25 + 6) % 24).toFixed(2), calm: R && +R.calm.toFixed(2), tasks: g.personState.map(p => p.task), shown: [...cb.world.family.shown].length, who: g.people.map(p => { const q = cb.world.family.poseOf(p.id); return q ? [p.first, +q.x.toFixed(2), +q.z.toFixed(2)] : [p.first]; }), line: cb.store.getState().homeLine?.text };
+    return { house: window.__f, day: +g.clock.t.toFixed(2), hour: ((g.clock.ticks * 0.25 + 6) % 24).toFixed(2), calm: R && +R.calm.toFixed(2), tasks: g.personState.map(p => p.task), shown: [...cb.world.family.shown].length, who: g.people.map(p => { const q = cb.world.family.poseOf(p.id); return q ? [p.first, +q.x.toFixed(2), +q.z.toFixed(2)] : [p.first]; }), line: cb.store.getState().homeLine?.text };
   })));
   // jump the clock to an hour and let the people be where they should (a jump of more than 0.05 days puts everyone at their goals)
   const stage = async (hour, patch) => {
@@ -70,12 +70,18 @@ try {
   // eye level at the table: from just inside, looking at the nearest seated person
   const eye = async (back = 0.55, up = 0.2) => page.evaluate(([back, up]) => {
     const cb = window.__cb, g = cb.game.getState().game, f = window.__f;
-    const ps = g.people.map(p => cb.world.family.poseOf(p.id)).filter(Boolean);
+    // only the people inside the farmhouse (someone out in the yard must not drag the camera out of the room)
+    const ps = g.people.map(p => cb.world.family.poseOf(p.id)).filter(q => q && Math.hypot(q.x - f.x, q.z - f.z) < 3.2);
+    if (!ps.length) return;
     const mx = ps.reduce((a, p) => a + p.x, 0) / ps.length, mz = ps.reduce((a, p) => a + p.z, 0) / ps.length;
     const fl = cb.world.tourHeight(mx, mz);
-    const dx = mx - f.x, dz = mz - f.z, d = Math.hypot(dx, dz) || 1;
-    cb.qa.pose = { x: mx + (dx / d) * back + 0.0, y: fl + up, z: mz + (dz / d) * back, lx: mx, ly: fl + 0.12, lz: mz, fov: 62 };
-  }, [back, up]);
+    // stand on the room side of them (toward the middle of the house, or along -x when they are at the middle), never past a wall
+    let dx = f.x - mx, dz = f.z - mz; const d = Math.hypot(dx, dz);
+    if (d < 0.3) { dx = -1; dz = 0; } else { dx /= d; dz /= d; }
+    const bx = Math.max(f.x - 2.0, Math.min(f.x + 2.0, mx + dx * back)), bz = Math.max(f.z - 1.2, Math.min(f.z + 1.2, mz + dz * back));
+    cb.qa.pose = { x: bx, y: fl + up, z: bz, lx: mx, ly: fl + 0.12, lz: mz, fov: 62 };
+    return cb.qa.pose;
+  }, [back, up]).then(p => console.error('eye pose', JSON.stringify(p)));
   const free = () => page.evaluate(() => { window.__cb.qa.pose = null; });
 
   if (only === 'all' || only === 'dinner') {
@@ -111,12 +117,15 @@ try {
   if (only === 'all' || only === 'raid') {
     await page.evaluate(() => window.__cb.store.getState().setTimeOfDay(18.6));
     await stage(18.4); await wait(9000);
+    // staged alert: the clock is a normal day (the gate timer stays parked far out so no card opens, but the clock itself is not touched),
+    // one grown person on watch and the rest at supper, then the QA raid flag turns the table into an alert
+    await stage(18.4, "g.personState.forEach((p, i) => { p.task = i === 0 ? 'watch' : 'meal'; });");
     await page.evaluate(() => { window.__cb.world.qaRaid = true; });
     await wait(3000); await frames(); await wait(6000); await frames(); await report('raid');
     await page.evaluate(() => { window.__cb.store.getState().setHudHidden(false); window.__cb.world._lineAcc = 99; });
     await cam(2.4, 0.95, 0.55); await frames(); await wait(700); await shot('11-raid-alert-cutaway');
     await page.evaluate(() => { window.__cb.store.getState().setHudHidden(true); });
-    await eye(0.5, 0.18); await shot('12-raid-alert-eye-level'); await free();
+    await eye(0.5, 0.18); await frames(); console.error('cam', JSON.stringify(await page.evaluate(() => { const c = window.__cb.ws.camera; return { p: c.position.toArray(), tour: window.__cb.tour.active, cine: !!window.__cb.qa.cine, mode: window.__cb.store.getState().cameraMode }; }))); await shot('12-raid-alert-eye-level'); await free();
     await page.evaluate(() => { window.__cb.world.qaRaid = false; });
     for (let k = 0; k < 4; k++) { await wait(9000); await frames(); await report('recover' + k); await cam(2.4, 0.95, 0.55); await shot('13-recover-' + k); }
   }

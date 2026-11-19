@@ -67,4 +67,4 @@ export function lockdownClock(a: Air, c: AirCtx, cap = 24 * 365): Clock {
 export const advancedFilterUsd = (tier: DomeTier, cells = TIER[tier].cells): number => Math.round((60_000 + domeGeometry(tier, shellFt(tier, cells)).volumeCf * 0.9) / 1000) * 1000;
 export const scrubberUsd = (tier: DomeTier, cells = TIER[tier].cells): number => Math.round((15_000 + domeGeometry(tier, shellFt(tier, cells)).volumeCf * 0.12) / 1000) * 1000;
 /** The closed ecology: algae and plant loops, soil beds, sensors, a second power plant. Very expensive on purpose. */
-export const closedEcologyUsd = (tier: DomeTier, cells = TIER[tier].cells): number => Math.round((750_000 + 450 * domeGeometry(tier, shellFt(tier, cells)).footprintSf) / 10000) * 10000;
+export const closedEcologyUsd = (tier: DomeTier, cells = TIER[tier].cells): number => Math.round((2_000_000 + 1500 * domeGeometry(tier, shellFt(tier, cells)).footprintSf) / 10000) * 10000;

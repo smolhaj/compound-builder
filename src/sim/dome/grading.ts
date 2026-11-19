@@ -9,13 +9,15 @@
  */
 import { FT_PER_UNIT } from './standing';
 import type { DomeTier } from './tiers';
+import { EARTH_RATES } from './pricing';
 
 /** Only the big two are graded: a berm shell or a hut takes the hill as it comes. */
 export const GRADED_TIERS: readonly DomeTier[] = ['glass', 'arcology'];
 export const isGradedTier = (t: DomeTier | null): boolean => t !== null && GRADED_TIERS.includes(t);
 
 export const GRADING = {
-  cutUsdCy: 7, fillUsdCy: 11, haulUsdCy: 24, wallUsdSf: 60,
+  // the cut, fill and haul rates are shared with the crater's pricing (sim/dome/pricing.ts)
+  ...EARTH_RATES, wallUsdSf: 60,
   /** Cubic yards one machine spread moves in an hour (dozer, loader and trucks together). */
   cyPerHour: 45,
   /** A step in the pad shorter than this (ft) is just a graded edge; taller gets a retaining wall. */

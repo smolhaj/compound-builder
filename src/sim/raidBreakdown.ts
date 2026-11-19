@@ -10,6 +10,7 @@ import { PERIMETER, runFinished, type PerimeterKind } from './perimeter';
 import { isGuardUnit } from './defenseTune';
 import { dogCount } from './pets';
 import { pluralize } from './words';
+import { lootLines } from './raidFacts';
 
 export type Layer = 'wall' | 'towers' | 'guards' | 'dogs' | 'cameras' | 'family' | 'hiding' | 'supplies';
 
@@ -143,7 +144,7 @@ export function raidBreakdown(g: GameState, b: Battle, lost: ReadonlyArray<reado
 
   // supplies
   const stolen = f.loot.reduce((a, l) => a + l.n, 0);
-  if (stolen > 0 || lost.length > 0) lines.push({ layer: 'supplies', held: false, text: `Supplies lost: ${[...f.loot.map(l => `${l.n} ${l.what}`), ...lost.map(([k2, n]) => `${n} ${k2}`)].slice(0, 6).join(', ')}.` });
+  if (stolen > 0 || lost.length > 0) lines.push({ layer: 'supplies', held: false, text: `Supplies lost: ${(f.loot.length > 0 ? lootLines(f.loot) : lost.map(([k2, n]) => `${n} ${k2}`)).slice(0, 6).join(', ')}.` });   // the itemized loot reads in the report's own words; the stock list is the same goods under raw names
   else lines.push({ layer: 'supplies', held: true, text: 'Nothing was carried off.' });
 
   const headline = won

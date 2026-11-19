@@ -70,11 +70,11 @@ export interface TierSpec {
 export const TIER: Record<DomeTier, TierSpec> = {
   earthen: { tier: 'earthen', bermFt: 0, name: 'Earthen dome', cells: 2, minCells: 2, maxCells: 4, heightRatio: 0.5, skirtFt: 4, skirtThickFt: 1, airlocks: 0, hours: 700, permitFee: 0, reviewDays: 0, gateUsd: 0,
     blurb: 'A 20 ft earthbag-and-plaster dome with a sod crown and one low door: a cool summer kitchen, a storm room, a hideout that looks like a haystack.' },
-  geodesic: { tier: 'geodesic', bermFt: 5, name: 'Geodesic dome', cells: 7, minCells: 4, maxCells: 12, heightRatio: 0.5, skirtFt: 20, skirtThickFt: 2, airlocks: 2, hours: 6000, permitFee: 2800, reviewDays: 30, gateUsd: 0,
+  geodesic: { tier: 'geodesic', bermFt: 5, name: 'Geodesic dome', cells: 7, minCells: 4, maxCells: 12, heightRatio: 0.5, skirtFt: 20, skirtThickFt: 2, airlocks: 2, hours: 6000, permitFee: 12000, reviewDays: 30, gateUsd: 0,
     blurb: 'A 60 ft geodesic dome of steel struts glazed in twin-wall polycarbonate, berm-footed, two airlocks: one climate under one skin, frost-free greens all winter.' },
-  glass: { tier: 'glass', bermFt: 0, name: 'Glass & steel dome', cells: 15, minCells: 10, maxCells: 24, heightRatio: 0.5, skirtFt: 30, skirtThickFt: 3, airlocks: 3, hours: 40000, permitFee: 24000, reviewDays: 120, gateUsd: 5_000_000,
+  glass: { tier: 'glass', bermFt: 0, name: 'Glass & steel dome', cells: 15, minCells: 10, maxCells: 24, heightRatio: 0.5, skirtFt: 30, skirtThickFt: 3, airlocks: 3, hours: 40000, permitFee: 350000, reviewDays: 120, gateUsd: 15_000_000,
     blurb: 'A 150 ft steel gridshell glazed in laminated glass on a concrete ring beam: a conservatory over a whole yard, house, beds and well. Needs Founder money and an engineer\'s stamp.' },
-  arcology: { tier: 'arcology', bermFt: 0, name: 'Arcology dome', cells: 36, minCells: 24, maxCells: 60, heightRatio: 0.5, skirtFt: 60, skirtThickFt: 4, airlocks: 6, hours: 150000, permitFee: 180000, reviewDays: 420, gateUsd: 60_000_000,
+  arcology: { tier: 'arcology', bermFt: 0, name: 'Arcology dome', cells: 36, minCells: 24, maxCells: 60, heightRatio: 0.5, skirtFt: 60, skirtThickFt: 4, airlocks: 6, hours: 150000, permitFee: 15_000_000, reviewDays: 420, gateUsd: 500_000_000,
     blurb: 'A 360 ft space-frame dome of clear polycarbonate-composite panels that rifle fire, rockets and shrapnel cannot get through. A small town under a sky of its own. Magnate money, a contractor firm and about a year of review.' },
 };
 

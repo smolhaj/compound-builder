@@ -202,7 +202,7 @@ export interface FellJob {
   treeId: number;
   x: number;
   z: number;
-  kind: 'conifer' | 'oval' | 'broad';
+  kind: 'conifer' | 'oval' | 'broad' | 'juniper' | 'mesquite' | 'paloverde';
   scale: number;
   /** marked → felled (on the ground) → bucked (cut to length) → hauled (done). */
   stage: 'marked' | 'felled' | 'bucked';

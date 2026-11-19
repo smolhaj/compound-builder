@@ -64,6 +64,7 @@ export const RULES: Partial<Record<MaterialId, Rule>> = {
   aqua_kit: single(3, { installed: ['aquaponics'] }), modular_unit: single(3, { alt: 'a whole house; choose it on purpose' }),
   dome_earthbag: single(3, { alt: ALT_DOME, installed: ['dome_earthen'] }), dome_geodesic_kit: single(3, { alt: ALT_DOME, installed: ['dome_geodesic'] }), dome_glass_kit: single(3, { alt: ALT_DOME, installed: ['dome_glass'] }), dome_arcology_kit: single(3, { alt: ALT_DOME, installed: ['dome_arcology'] }),
   dome_air_plant: single(3, { alt: ALT_DOME }), dome_airlock: single(3, { alt: ALT_DOME }), dome_fitout: single(3, { alt: ALT_DOME }),
+  dome_dig: single(3, { alt: ALT_DOME }), dome_rock: single(3, { alt: ALT_DOME }), dome_shoring: single(3, { alt: ALT_DOME }), dome_dewater: single(3, { alt: ALT_DOME }), dome_skirtwork: single(3, { alt: ALT_DOME }), bunker_works: single(3, { alt: 'the bunker bill sizes it; build a bunker on purpose' }),
   tunnel_kit_small: single(3, { alt: ALT_SITE, installed: ['polytunnel'] }), tunnel_kit_high: single(3, { alt: ALT_SITE, installed: ['high_tunnel'] }),
   // the kitchen and the farm
   canner: single(3), dehydrator: single(3), grain_mill: single(3), smoker: single(3), crocks: single(3), fishing_gear: single(3), snares: single(3),
