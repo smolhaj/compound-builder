@@ -47,7 +47,8 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 104;
+import { richFunds } from './richStart';
+export const SAVE_VERSION = 105;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -278,6 +279,8 @@ export interface GameState {
   /** Severe weather: the storm on or warned of (sim/weatherThreats.ts; lazily set, absent in old saves). */
   weather?: WeatherState;
   /** The dome: lockdown, air filtering, closed ecology and the gauges (sim/dome/live.ts; absent until the player touches it; save v99). */
+  /** A rich start (sim/richStart.ts, save v105): sandbox-like, not graded, outside the dynasty score and milestones. Absent: an ordinary start. */
+  richStart?: import('./richStart').RichStart;
   dome?: import('./dome/live').DomeState;
   /** Every finished dome's own state by structure id (each runs its own air, climate and water loop; save v100). `dome` mirrors the biggest one's. */
   domes?: Record<string, import('./dome/live').DomeState>;
@@ -395,7 +398,7 @@ export interface GameState {
 }
 
 /** New-game choices (the setup screen). Defaults (tests, the dev scene): Free build, no day jobs. */
-export interface RunSetup { site?: Site; lifestyle?: Lifestyle; /** The weekender's town home: keep the house (default) or sell it before day one and rent. */ townPlan?: TownPlan; difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean; grid?: boolean; family?: Person[]; funds?: StartFunds; /** Relatives left in town at setup (they may ask to come), and whether they may. */ kinAway?: Person[]; kinOpen?: boolean }
+export interface RunSetup { /** A rich start (Founder or Magnate): replaces the family's savings with a fixed sum and marks the run unscored. */ rich?: import('./richStart').RichStart; site?: Site; lifestyle?: Lifestyle; /** The weekender's town home: keep the house (default) or sell it before day one and rent. */ townPlan?: TownPlan; difficulty?: Difficulty; mode?: Mode; peace?: PeaceLength; kind?: DisasterKind | null; variant?: string; dayJobs?: boolean; grid?: boolean; family?: Person[]; funds?: StartFunds; /** Relatives left in town at setup (they may ask to come), and whether they may. */ kinAway?: Person[]; kinOpen?: boolean }
 
 /**
  * Where a game started from the setup screen begins: Monday 12 April 2027. The weekender's week (sim/weekender.ts) and the market,
@@ -410,7 +413,7 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
   linkKin(people);
   foundLineage(people, seed);
   const site = setup.site ?? CLASSIC;
-  const funds: StartFunds | null = setup.site ? setup.funds ?? startFunds(people, setup.lifestyle ?? 'fulltime', seed, 0, setup.townPlan) : null;
+  const funds: StartFunds | null = setup.site ? setup.funds ?? (setup.rich ? richFunds(setup.rich) : startFunds(people, setup.lifestyle ?? 'fulltime', seed, 0, setup.townPlan)) : null;
   const g: GameState = {
     version: SAVE_VERSION,
     seed,
@@ -433,7 +436,8 @@ export function newGame(seed: number, startDoy = 105, startYear = 2027, setup: R
     armory: newArmory(),
     wild: newWild(),
     wildlife: newWildlife(),
-    lineage: newLineage(people[0].last),
+    lineage: { ...newLineage(people[0].last), ...(setup.rich && setup.site ? { unscored: true } : {}) },
+    ...(setup.rich && setup.site ? { richStart: setup.rich } : {}),
     site,
     stock: { ...emptyStock(), firewood: STARTING_FIREWOOD, canned: 2, canner: 1, ...startingBedding(people.length) },
     neighbors: generateNeighbors(seed),

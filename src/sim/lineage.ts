@@ -59,6 +59,8 @@ export interface Lineage {
   day: number;
   /** The era whose hit is already in the chronicle. */
   hitEra: number;
+  /** A rich start: nothing here scores and no milestone is awarded (save v105, optional). */
+  unscored?: boolean;
   /** Where the dynasty score came from (sums to `points`; save v73). */
   parts: Record<string, number>;
   /** Kinds of building already written up as "finished" in the chronicle. */
@@ -81,6 +83,7 @@ export interface Lineage {
 export const PART_LABEL: Record<string, string> = { years: 'People kept on the place', eras: 'Eras weathered', births: 'Children', milestones: 'Milestones', takenIn: 'People taken in', place: 'Size of the place', selfFed: 'Years feeding itself' };
 /** Add to the dynasty score, filed under where it came from. */
 export function award(L: Lineage, part: string, n: number): void {
+  if (L.unscored) return;   // a rich start (sim/richStart.ts) is outside the dynasty score
   L.points += n;
   L.parts[part] = (L.parts[part] ?? 0) + n;
 }
@@ -326,7 +329,7 @@ export function lineageDay(s: GameState): string[] {
   award(L, 'years', (s.people.filter(p => alive(s, p)).length + L.wards.length) / 365);
   // milestones
   const years = Math.floor(day / 365);
-  for (const m of MILESTONES) if (!L.milestones.includes(m.id) && m.test(s, years)) {
+  for (const m of MILESTONES) if (!L.unscored && !L.milestones.includes(m.id) && m.test(s, years)) {
     L.milestones.push(m.id);
     award(L, 'milestones', m.points);
     say('milestone', `${m.name}.`);
