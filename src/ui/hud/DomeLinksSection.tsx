@@ -13,11 +13,12 @@ import { yardRings } from '../../sim/compounds';
 import { lengthText } from '../../sim/units';
 import { pluralize } from '../../sim/words';
 
+const SHELL_WORD = { earthen: 'earth-covered', geodesic: 'polycarbonate', glass: 'glass', arcology: 'armored' } as const;
 type Choice = 'tunnel' | 'walkway' | 'both';
 const CHOICE: Record<Choice, string> = { tunnel: 'Underground', walkway: 'Above ground', both: 'Both' };
 const CHOICE_TIP: Record<Choice, string> = {
   tunnel: 'A hidden tunnel under the ground, out of sight and out of the weather. Slower and dearer to build; a crew that digs can reach a shallow one. Carries people, carts and vehicles.',
-  walkway: 'An enclosed glazed steel walkway on the ground or on piers. Cheaper and faster, and in plain sight: it is a wall to a raid and takes snow, wind and fire. People and carts only.',
+  walkway: 'A sealed, fully enclosed tube clad in the same shell as the domes it joins (the stronger of the two), on the ground or on piers. It takes that shell\'s wind, hail, snow, fire, blast and ram ratings, stays sealed against ash and fallout with an airlock at each end, and is a wall to a raid: a crew has to breach the shell or force an airlock. Faster than a tunnel, in plain sight, and priced by the shell. People and carts only.',
   both: 'Build each: two separate links with their own cost. If one is cut or collapsed the other still carries travel, supplies and the plants\' shared power and water lines.',
 };
 
@@ -65,7 +66,7 @@ export function DomeLinksSection({ v }: { v: DomeView }) {
           <span style={{ fontSize: 11.5, color: DIM }}>{depth} ft: {depthWord(depth)}. The deepest allowed is the shallower footing, {cap} ft.</span>
         </div>}
         {quotes.map(({ k, q }) => <div key={k} data-testid={`link-quote-${k}`} style={{ fontSize: 12, borderLeft: `3px solid ${q.problem ? TONE.bad : TONE.good}`, paddingLeft: 8, margin: '4px 0' }}>
-          <b>{k === 'tunnel' ? 'Underground tunnel' : 'Above-ground walkway'}</b>: {q.lenFt ? `${q.lenFt.toLocaleString('en-US')} ft` : ''}{q.problem ? <span style={{ color: TONE.bad }}> {q.problem}</span>
+          <b>{k === 'tunnel' ? 'Underground tunnel' : 'Above-ground walkway'}</b>: {q.lenFt ? `${q.lenFt.toLocaleString('en-US')} ft` : ''}{q.shellNote ? ` · ${q.shellNote}` : ''}{q.problem ? <span style={{ color: TONE.bad }}> {q.problem}</span>
             : <> · {usd(q.totalUsd)} in all ({usd(q.materialsUsd)} of materials from the stockpile + {usd(q.fitUsd)} contractor fit-out now) · about {q.hours.toLocaleString('en-US')} work hours
               <div style={{ color: DIM }}>{q.fitLines.map(l => `${l.label} ${usd(l.usd)}`).join(' · ')}. Each end adds an airlock cycle on a sealed dome.</div></>}
         </div>)}
@@ -90,7 +91,7 @@ function LinkRow({ l, self }: { l: DomeLink; self: string }) {
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><b>{l.kind === 'tunnel' ? 'Underground tunnel' : 'Above-ground walkway'} to {nodeLabel(game, other.id)}</b>
       <span style={{ color: TONE[tone] }}>{state === 'open' ? 'open' : state === 'down' ? (l.down?.clearsAt !== null ? 'being repaired' : 'out of service') : `${Math.round(progressOf(game, l) * 100)} percent`}</span></div>
     <div style={{ fontSize: 11.5, color: DIM }}>
-      {lengthText(l.lenFt * 0.3048)} · {state === 'building' ? STAGE_WORD[stageOf(game, l)] : l.kind === 'tunnel' ? `${l.depthFt ?? 0} ft down, ${depthWord(l.depthFt ?? 0)}` : `${Math.round((1 - l.wear) * 100)} percent sound, exposed to snow, wind and fire`}{both ? ' · backed by a second link' : ''}
+      {lengthText(l.lenFt * 0.3048)} · {state === 'building' ? STAGE_WORD[stageOf(game, l)] : l.kind === 'tunnel' ? `${l.depthFt ?? 0} ft down, ${depthWord(l.depthFt ?? 0)}` : `${l.shell ? `${SHELL_WORD[l.shell]} shell` : 'sealed shell'}, ${Math.round((1 - l.wear) * 100)} percent sound`}{both ? ' · backed by a second link' : ''}
     </div>
     {state === 'down' && l.down && <div style={{ fontSize: 11.5, color: TONE.bad }}>Lost to {l.down.why === 'snow' ? 'snow load' : l.down.why === 'charge' ? 'an attack' : l.down.why}. Nothing crosses it until a contractor repairs it.
       {l.down.clearsAt === null && <button data-testid={`link-repair-${l.id}`} style={{ ...btn(), padding: '1px 7px', marginLeft: 6 }} disabled={game.money < l.down.repairUsd} onClick={() => act(x => repairLink(x, l.id))}>Repair · {usd(l.down.repairUsd)}</button>}</div>}

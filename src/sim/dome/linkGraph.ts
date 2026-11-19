@@ -4,8 +4,9 @@
  * tunneler and route models that already read runs see it for free. This file holds only the types and the graph questions, so `compounds.ts` and
  * `standing.ts` can read them without a cycle. Pure (tested in links.test.ts).
  */
-import { PERIMETER, runFinished, type PerimeterRun } from '../perimeter';
+import { PERIMETER, runFinished, type PerimeterKind, type PerimeterRun } from '../perimeter';
 import type { GameState } from '../state';
+import type { DomeTier } from './tiers';
 
 export type LinkKind = 'tunnel' | 'walkway';
 export type LinkEndType = 'dome' | 'building' | 'yard';
@@ -30,6 +31,10 @@ export interface DomeLink {
   ends: [LinkEnd, LinkEnd];
   /** The run (underground passage or covered walkway) that is the link's body. */
   runId: string;
+  /** Walkways: the shell tier it is clad in, the stronger of the two domes' (its wall, ram, blast and weather ratings are that tier's). */
+  shell?: DomeTier;
+  /** What the link is worth (materials plus fit-out, US dollars): a repair is a share of it. Absent in a link ordered before it was saved: the fit-out. */
+  valueUsd?: number;
   /** Tunnels: depth to the crown of the lining, feet. */
   depthFt?: number;
   lenFt: number;
@@ -95,6 +100,6 @@ export const joined = (s: Pick<GameState, 'perimeter'> & Partial<Pick<GameState,
 
 /** Is this run the body of a tunnel link (hidden, underground)? */
 export const isTunnelRun = (r: Pick<PerimeterRun, 'kind'>): boolean => r.kind === 'underground_passage';
-export const runKindOf = (k: LinkKind) => (k === 'tunnel' ? 'underground_passage' : 'covered_walkway') as 'underground_passage' | 'covered_walkway';
+export const runKindOf = (k: LinkKind, shell: DomeTier = 'glass'): PerimeterKind => (k === 'tunnel' ? 'underground_passage' : (`link_walk_${shell}` as PerimeterKind));
 export const linkName = (k: LinkKind): string => (k === 'tunnel' ? 'underground tunnel' : 'above-ground walkway');
-export const linkRunName = (k: LinkKind): string => PERIMETER[runKindOf(k)].name;
+export const linkRunName = (k: LinkKind, shell?: DomeTier): string => PERIMETER[runKindOf(k, shell)].name;

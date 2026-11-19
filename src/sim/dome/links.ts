@@ -16,6 +16,8 @@ import { billUsd } from './cost';
 import { FT_PER_UNIT, domesOf, domeFrom, type Airlock, type Dome } from './standing';
 import { airlockAt } from './standing';
 import { digStops, domeRouteProblem, skirtOf } from './crossing';
+import { breaches, type Outside } from './protection';
+import { tierRank, type DomeTier } from './tiers';
 import { DIG_DEPTH_FT, SKIRT_MARGIN_FT } from './siting';
 import { AIRLOCK_CYCLE_S } from './siege';
 import { yardGeometry, hasYard } from './plantYard';
@@ -47,8 +49,8 @@ export const LINK = {
   MIN_DEPTH_FT: 8, DEPTH_STEP_FT: 2,
   /** A tunnel under the creek must be this deep (feet) so the bed does not leak into it. */
   CREEK_DEPTH_FT: 20,
-  /** Fit-out per foot beyond the run's own materials: walkway glazing, ribs and lights; tunnel lighting, cable, vent and pipe, and shoring that grows with depth. */
-  WALK_USD_FT: 72, TUNNEL_USD_FT: 25, SHORE_USD_FT_PER_FT: 2.6,
+  /** Fit-out per foot beyond the run's own materials (the walkway's shell is the tier's shell goods, priced as the dome's: `walkShellUsdFt`): walkway decking, lights and ribs; tunnel lighting, cable, vent and pipe, and shoring that grows with depth. */
+  WALK_FIT_USD_FT: 40, TUNNEL_USD_FT: 25, SHORE_USD_FT_PER_FT: 2.6,
   /** A link airlock sleeve through a dome's footing (a dome end), and a plain door or hatch at a building or yard end. */
   SLEEVE_FRAC: 0.6, DOOR_USD: 6_500,
   /** Extra work: a tunnel takes longer the deeper it goes (per foot of depth); each airlock is a day's work. */
@@ -156,6 +158,33 @@ export function depthWord(depthFt: number): string {
   return 'a plain crew can dig to it';
 }
 
+// ── the walkway's shell ──
+
+/** The tier a walkway between two nodes is clad in: the stronger of the two domes' (a dome-to-building walkway takes its dome's). */
+export function shellTierOf(a: Node, b: Node): DomeTier {
+  const ts = [a.dome?.tier, b.dome?.tier].filter((x): x is DomeTier => !!x);
+  return ts.reduce((best, t) => (tierRank(t) > tierRank(best) ? t : best), ts[0] ?? 'glass');
+}
+/** The words for the card: which shell the walkway wears and why. */
+export function shellNote(a: Node, b: Node): string {
+  const t = shellTierOf(a, b), name = { earthen: 'earth-covered adobe', geodesic: 'twin-wall polycarbonate', glass: 'laminated glass', arcology: 'armored panel' }[t];
+  const ta = a.dome?.tier, tb = b.dome?.tier;
+  return ta && tb && ta !== tb ? `${name} shell: the stronger of the two domes' shells (${ta} and ${tb})` : `${name} shell, the same as the dome's`;
+}
+/** Square feet of shell on each foot of the walkway tube (PROPOSED: about 8 ft wide, 9 ft high, with the roof and the floor skin). */
+export const TUBE_SF_PER_FT = 34;
+/** What the walkway's shell costs per foot, from the tier's own shell good (the price a dome pays: sim/dome/cost.ts). */
+export function walkShellUsdFt(tier: DomeTier): number {
+  const good = { earthen: 'dome_earthbag', geodesic: 'dome_geodesic_kit', glass: 'dome_glass_kit', arcology: 'dome_arcology_kit' }[tier] as keyof typeof MATERIALS, unit = tier === 'earthen' ? 100 : 1000;
+  return (MATERIALS[good].price ?? 0) * TUBE_SF_PER_FT / unit;
+}
+
+/** The outside load of each storm, in the units the shell is rated in (sim/dome/protection.ts). PROPOSED figures. */
+export const STORM_LOAD: Record<string, Outside> = {
+  blizzard: { snowPsf: 55, windMph: 60 }, ice_storm: { snowPsf: 45, windMph: 50 }, tornado: { windMph: 190 }, derecho: { windMph: 120 }, windstorm: { windMph: 90 },
+  hail: { hailIn: 2.2 }, lightning_fire: { embers: true }, hurricane_remnants: { windMph: 100 }, heat_wave: {},
+};
+
 // ── the quote ──
 
 export interface LinkQuote {
@@ -176,6 +205,9 @@ export interface LinkQuote {
   hours: number;
   /** Piers a walkway needs on a slope. */
   piers: number;
+  /** Walkway only: the shell it is clad in, and the words for the card. */
+  shell?: DomeTier;
+  shellNote?: string;
 }
 
 const EMPTY = (kind: LinkKind, problem: string): LinkQuote => ({ problem, kind, a: null, b: null, ends: null, pts: [], lenFt: 0, bill: {}, materialsUsd: 0, fitUsd: 0, fitLines: [], totalUsd: 0, hours: 0, piers: 0 });
@@ -238,7 +270,7 @@ export function quoteLink(s: GameState, aId: string, bId: string, kind: LinkKind
     if (water && (depth ?? 0) < LINK.CREEK_DEPTH_FT && cap >= LINK.CREEK_DEPTH_FT) return fail(`A tunnel under ${water === 'creek' ? 'the creek' : 'the moat'} must be ${LINK.CREEK_DEPTH_FT} ft deep so the bed stays above it.`);
     if (water && cap < LINK.CREEK_DEPTH_FT) return fail(`A tunnel under ${water === 'creek' ? 'the creek' : 'the moat'} must be ${LINK.CREEK_DEPTH_FT} ft deep, and the footing of one of these domes stops at ${cap} ft. Link by walkway over a bridge instead.`);
   }
-  const rk = runKindOf(kind), lenU = runLength([[ea.end.x, ea.end.z], [eb.end.x, eb.end.z]]);
+  const shell = kind === 'walkway' ? shellTierOf(a, b) : undefined, rk = runKindOf(kind, shell), lenU = runLength([[ea.end.x, ea.end.z], [eb.end.x, eb.end.z]]);
   const bill = runBill(rk, lenU), materialsUsd = billUsd(bill);
   const lines: Array<{ label: string; usd: number }> = [];
   const sleeve = (n: Node): number => (n.dome ? Math.round((MATERIALS.dome_airlock.price ?? 0) * LINK.SLEEVE_FRAC / 100) * 100 : LINK.DOOR_USD);
@@ -247,12 +279,12 @@ export function quoteLink(s: GameState, aId: string, bId: string, kind: LinkKind
     lines.push({ label: 'Lighting, cable, vent and pipe', usd: Math.round(lenFt * LINK.TUNNEL_USD_FT) });
     lines.push({ label: `Shoring and lining to ${depth} ft`, usd: Math.round(lenFt * LINK.SHORE_USD_FT_PER_FT * (depth ?? 0)) });
   } else {
-    lines.push({ label: 'Glazing, steel ribs and lights', usd: Math.round(lenFt * LINK.WALK_USD_FT) });
+    lines.push({ label: 'Decking, ribs and lights', usd: Math.round(lenFt * LINK.WALK_FIT_USD_FT) });
     if (piers) lines.push({ label: `${pluralize(piers, 'pier')} on the slope`, usd: piers * LINK.PIER_USD });
   }
   const fitUsd = lines.reduce((x, l) => x + l.usd, 0);
   const hours = Math.round(PERIMETER[rk].hours * lenU * (kind === 'tunnel' ? 1 + LINK.DEPTH_HOURS * (depth ?? 0) : 1) + LINK.AIRLOCK_HOURS * 2);
-  return { ...base, bill, materialsUsd, fitUsd, fitLines: lines, totalUsd: materialsUsd + fitUsd, hours, piers };
+  return { ...base, bill, materialsUsd, fitUsd, fitLines: lines, totalUsd: materialsUsd + fitUsd, hours, piers, shell, shellNote: shell ? shellNote(a, b) : undefined };
 }
 
 /** Why the link cannot be ordered now (the quote's problem, or money). Null: it can. */
@@ -269,9 +301,9 @@ export function orderLink(s: GameState, aId: string, bId: string, kind: LinkKind
   if (why) return why;
   const q = quoteLink(s, aId, bId, kind, depthFt);
   s.money -= q.fitUsd;
-  const run = planRun(s, runKindOf(kind), q.pts.map(p => [p[0], p[1]] as Pt), [], 0, true);
+  const run = planRun(s, runKindOf(kind, q.shell), q.pts.map(p => [p[0], p[1]] as Pt), [], 0, true);
   run.hours = q.hours;
-  const link: DomeLink = { id: `lk${s.nextId++}`, kind, ends: q.ends!, runId: run.id, depthFt: q.depthFt, lenFt: q.lenFt, orderedAt: s.clock.t, feeUsd: q.fitUsd, wear: 0 };
+  const link: DomeLink = { id: `lk${s.nextId++}`, kind, ends: q.ends!, runId: run.id, depthFt: q.depthFt, lenFt: q.lenFt, orderedAt: s.clock.t, feeUsd: q.fitUsd, valueUsd: q.totalUsd, wear: 0, ...(q.shell ? { shell: q.shell } : {}) };
   (s.domeLinks ??= []).push(link);
   log(s, `Ordered ${kind === 'tunnel' ? `an underground tunnel ${q.depthFt} ft down` : 'an enclosed walkway'}, ${q.lenFt.toLocaleString('en-US')} ft, ${nodeLabel(s, aId)} to ${nodeLabel(s, bId)}: ${money(q.fitUsd)} for the fit-out now, ${money(q.materialsUsd)} of materials from the stockpile, about ${q.hours.toLocaleString('en-US')} hours of work.`);
   return null;
@@ -302,23 +334,31 @@ export const progressOf = (s: GameState, l: DomeLink): number => { const r = lin
 
 // ── weather, wear, collapse, repair ──
 
-/** Daily chance a storm wrecks a walkway (before wear): snow load, wind, hail, fire. A tunnel only floods in a flood. (PROPOSED.) */
+/** Daily chance a storm wrecks a walkway at full wear before the shell's rating is counted: snow load, wind, hail, fire. A tunnel only floods in a flood. (PROPOSED.) */
 export const WALK_STORM: Partial<Record<string, { p: number; why: DownWhy }>> = {
-  blizzard: { p: 0.012, why: 'snow' }, ice_storm: { p: 0.012, why: 'snow' }, tornado: { p: 0.06, why: 'storm' }, derecho: { p: 0.03, why: 'storm' }, windstorm: { p: 0.02, why: 'storm' },
-  hail: { p: 0.01, why: 'storm' }, lightning_fire: { p: 0.03, why: 'fire' }, heat_wave: { p: 0.004, why: 'storm' }, hurricane_remnants: { p: 0.03, why: 'storm' },
+  blizzard: { p: 0.02, why: 'snow' }, ice_storm: { p: 0.02, why: 'snow' }, tornado: { p: 0.1, why: 'storm' }, derecho: { p: 0.05, why: 'storm' }, windstorm: { p: 0.03, why: 'storm' },
+  hail: { p: 0.02, why: 'storm' }, lightning_fire: { p: 0.05, why: 'fire' }, heat_wave: { p: 0.004, why: 'storm' }, hurricane_remnants: { p: 0.05, why: 'storm' },
 };
-/** Chance a storm of this kind downs a link of this kind and wear today: rises with wear, never falls (property test). */
-export function stormDownChance(kind: LinkKind, storm: string | null, wear: number): number {
+/** A load past the shell's rating (worn shell: it holds less) can down the walkway; a load inside it almost never does (a small residual from wear). */
+const RESIDUAL = 0.002;
+/**
+ * Chance a storm downs a link today. A tunnel ignores snow and wind. A walkway wears its shell tier's rating (sim/dome/protection.ts `SHELL`, `breaches`): a
+ * storm inside the rating leaves only a residual that rises with wear, a storm past it is the table's chance scaled by wear. Rises with wear (property test)
+ * and never rises up the built tiers (property test); the arcology shell is past nothing the table throws.
+ */
+export function stormDownChance(kind: LinkKind, storm: string | null, wear: number, tier: DomeTier = 'glass'): number {
   if (!storm) return 0;
   if (kind === 'tunnel') return storm === 'flood' || storm === 'flash_flood' ? 0.01 * (0.5 + wear) : 0;
   const t = WALK_STORM[storm];
-  return t ? Math.min(0.9, t.p * (0.5 + Math.max(0, Math.min(1, wear)))) : 0;
+  if (!t) return 0;
+  const w = Math.max(0, Math.min(1, wear)), past = breaches(tier, STORM_LOAD[storm] ?? {}, 1 - 0.25 * w).length > 0;
+  return Math.min(0.9, past ? t.p * (0.5 + w) : tier === 'arcology' ? 0 : RESIDUAL * w);
 }
 
 export function takeDown(s: GameState, l: DomeLink, why: DownWhy, text?: string): void {
   if (l.down) return;
   const big = why === 'collapse' || why === 'charge';
-  l.down = { at: s.clock.t, why, clearsAt: null, repairUsd: Math.round(l.feeUsd * (big ? LINK.CLEAR_FRAC : LINK.REPAIR_FRAC) / 100) * 100 };
+  l.down = { at: s.clock.t, why, clearsAt: null, repairUsd: Math.round((l.valueUsd ?? l.feeUsd) * (big ? LINK.CLEAR_FRAC : LINK.REPAIR_FRAC) / 100) * 100 };
   const nm = linkName(l.kind);
   log(s, text ?? `The ${nm} is out of service (${why === 'snow' ? 'snow load' : why}). People cannot cross it until it is repaired: ${money(l.down.repairUsd)}.`);
   chronicle(s, 'threat', `The ${nm} between the domes was lost to ${why === 'snow' ? 'the snow load' : why}.`);
@@ -358,7 +398,7 @@ export function linkDay(s: GameState): void {
       continue;
     }
     l.wear = Math.min(1, l.wear + (l.kind === 'walkway' ? LINK.WEAR_WALK : LINK.WEAR_TUNNEL));
-    const p = stormDownChance(l.kind, storm, l.wear);
+    const p = stormDownChance(l.kind, storm, l.wear, l.shell);
     if (p > 0 && r() < p) takeDown(s, l, l.kind === 'tunnel' ? 'storm' : WALK_STORM[storm!]?.why ?? 'storm');
   }
 }

@@ -20,7 +20,7 @@ export type Pt = [number, number];
 export const AIRLOCK_REACH = 1.2;
 
 /** Corridor kinds that go through a dome's skirt at an airlock (the way people walk): the rest (pipes and cables) pass in sealed sleeves. */
-export const CROSSING_KINDS: readonly string[] = ['escape_tunnel', 'underground_passage', 'covered_walkway', 'slope_tunnel', 'rock_tunnel', 'tunnel_bridge'];
+export const CROSSING_KINDS: readonly string[] = ['escape_tunnel', 'underground_passage', 'covered_walkway', 'link_walk_earthen', 'link_walk_geodesic', 'link_walk_glass', 'link_walk_arcology', 'slope_tunnel', 'rock_tunnel', 'tunnel_bridge'];
 
 /** Where the polyline first crosses the shell circle, or null (a line wholly inside or wholly outside). `inward` is true when it goes from outside to in. */
 export function crossesAt(d: Pick<Dome, 'x' | 'z' | 'r'>, pts: readonly Pt[]): { x: number; z: number; segment: number; inward: boolean } | null {

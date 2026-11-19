@@ -2,14 +2,17 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { setGroundOverride } from '../terrainState';
 import { place } from '../raidTestKit';
 import { dayIndex, type GameState } from '../state';
-import { runFinished } from '../perimeter';
+import { runFinished, PERIMETER } from '../perimeter';
 import { DOME_KIND, TIER, type DomeTier } from './tiers';
 import { domesOf } from './standing';
 import { AIRLOCK_CYCLE_S } from './siege';
 import { domeRouteProblem, nearestAirlock } from './crossing';
+import { billUsd } from './cost';
+import { wallHp } from '../perimeter';
+import { WALL_RESIST } from '../breachMeans';
 import { digStops } from './crossing';
 import {
-  LINK, SAFE_PLAIN_FT, bestLink, capacityOf, collapseLink, depthCapFt, depthChoices, depthWord, feederPartners, freeAngle, groupOf, joined, linkDay, linkGroups, linkCapacity,
+  takeDown, LINK, SAFE_PLAIN_FT, TUBE_SF_PER_FT, shellTierOf, shellNote, walkShellUsdFt, STORM_LOAD, WALK_STORM, bestLink, capacityOf, collapseLink, depthCapFt, depthChoices, depthWord, feederPartners, freeAngle, groupOf, joined, linkDay, linkGroups, linkCapacity,
   linkState, linksBetween, nodeOf, orderLink, quoteLink, redundant, repairLink, ringOf, stageOf, stormDownChance, supplemented, tunnelReach, linksOf, takenAngles, progressOf,
 } from './links';
 import { tripExposed } from '../compounds';
@@ -64,7 +67,7 @@ describe('quote, cost and rules', () => {
     const g = two(); const w = quoteLink(g, 'dA', 'dB', 'walkway'), t = quoteLink(g, 'dA', 'dB', 'tunnel');
     expect(w.problem).toBeNull(); expect(t.problem).toBeNull();
     expect(w.lenFt).toBeGreaterThan(100);
-    expect(w.totalUsd).toBeLessThan(t.totalUsd); expect(w.hours).toBeLessThan(t.hours);
+    expect(w.hours).toBeLessThan(t.hours);   // (the walkway is faster; its price is the shell's, so a glass shell is dear: see the shell tests)
     expect(w.fitLines.length).toBeGreaterThan(1);
   });
   it('a deeper tunnel costs more and takes longer (monotone)', () => {
@@ -123,7 +126,7 @@ describe('building, stages and the run', () => {
   it('lays a real run: a covered walkway or an underground passage, with stages like the dome dig', () => {
     const g = two(); orderLink(g, 'dA', 'dB', 'walkway'); orderLink(g, 'dA', 'dB', 'tunnel');
     const [w, t] = linksOf(g);
-    expect(g.perimeter.find(r => r.id === w.runId)!.kind).toBe('covered_walkway');
+    expect(g.perimeter.find(r => r.id === w.runId)!.kind).toBe('link_walk_glass');   // geodesic + glass: the stronger shell
     expect(g.perimeter.find(r => r.id === t.runId)!.kind).toBe('underground_passage');
     expect(stageOf(g, t)).toBe('planned');
     const rt = g.perimeter.find(r => r.id === t.runId)!, rw = g.perimeter.find(r => r.id === w.runId)!;
@@ -234,5 +237,59 @@ describe('the save', () => {
     const g = two(); orderLink(g, 'dA', 'dB', 'tunnel'); finish(g);
     const back = JSON.parse(JSON.stringify(g)) as GameState;
     expect(linksOf(back)).toEqual(linksOf(g)); expect(domesOf(back).find(d => d.id === 'dA')!.airlocks.some(a => a.role === 'link')).toBe(true);
+  });
+});
+
+describe('the walkway is a sealed tube in the dome shell (owner change)', () => {
+  const BUILT: DomeTier[] = ['geodesic', 'glass', 'arcology'];
+  const kind = (g: GameState) => g.perimeter.find(r => r.id === linksOf(g)[0].runId)!.kind;
+  it('is clad in the stronger of the two domes shells, and says so', () => {
+    for (const [a, b, want] of [['geodesic', 'glass', 'glass'], ['glass', 'arcology', 'arcology'], ['arcology', 'glass', 'arcology'], ['glass', 'glass', 'glass'], ['earthen', 'geodesic', 'geodesic']] as const) {
+      const g = two(a, b, 26); const q = quoteLink(g, 'dA', 'dB', 'walkway');
+      expect(q.shell).toBe(want); expect(shellTierOf(nodeOf(g, 'dA')!, nodeOf(g, 'dB')!)).toBe(want);
+      if (a !== b) expect(q.shellNote).toMatch(/stronger of the two/); else expect(q.shellNote).toMatch(/same as the dome/);
+      orderLink(g, 'dA', 'dB', 'walkway'); expect(kind(g)).toBe(`link_walk_${want}`); expect(linksOf(g)[0].shell).toBe(want); expect(shellNote(nodeOf(g, 'dA')!, nodeOf(g, 'dB')!)).toBeTruthy();
+    }
+  });
+  it('takes the shell tier protection: wall hit points, ram and blast odds, and impervious like the dome', () => {
+    for (const t of ['earthen', 'geodesic', 'glass', 'arcology'] as const) {
+      expect(wallHp(`link_walk_${t}` as never)).toBe(wallHp(`shell_${t}` as never));
+      expect(PERIMETER[`link_walk_${t}` as 'link_walk_glass'].blocks).toEqual(PERIMETER[`shell_${t}` as 'shell_glass'].blocks);
+      expect(WALL_RESIST[`link_walk_${t}` as never]).toEqual(WALL_RESIST[`shell_${t}` as never]);
+    }
+    expect(PERIMETER.link_walk_arcology.impervious).toBe(true);
+    let last = 0; for (const t of BUILT) { const h = wallHp(`link_walk_${t}` as never); expect(h).toBeGreaterThanOrEqual(last); last = h; }
+  });
+  it('weather: a storm inside the shell rating almost never downs it; one past it can; never worse up the built tiers (property)', () => {
+    for (const storm of Object.keys(WALK_STORM)) for (let w = 0; w <= 1.0001; w += 0.1) {
+      let last = 2; for (const t of BUILT) { const p = stormDownChance('walkway', storm, w, t); expect(p).toBeLessThanOrEqual(last + 1e-9); last = p; }
+    }
+    for (const storm of Object.keys(STORM_LOAD)) expect(stormDownChance('walkway', storm, 1, 'arcology')).toBe(0);
+    expect(stormDownChance('walkway', 'tornado', 0.5, 'glass')).toBeGreaterThan(0.01);   // 190 mph is past a glass shell (150)
+    expect(stormDownChance('walkway', 'blizzard', 0, 'glass')).toBe(0);                 // 55 psf of snow is inside it (60)
+    expect(stormDownChance('walkway', 'hail', 0, 'geodesic')).toBeGreaterThan(0.005);     // 2.2 in hail is past film (1.5 in)
+    expect(stormDownChance('walkway', 'tornado', 1, 'arcology')).toBe(0);
+  });
+  it('price follows the shell tier, from the same shell goods a dome pays; glass and arcology are large', () => {
+    let last = 0; for (const t of ['earthen', ...BUILT] as const) { const u = walkShellUsdFt(t); expect(u).toBeGreaterThan(last); last = u; }
+    const per = (a: DomeTier, b: DomeTier) => { const g = two(a, b, 26); const q = quoteLink(g, 'dA', 'dB', 'walkway'); return q.totalUsd / q.lenFt; };
+    expect(per('geodesic', 'geodesic')).toBeLessThan(per('glass', 'glass')); expect(per('glass', 'glass')).toBeLessThan(per('arcology', 'arcology'));
+    expect(per('glass', 'arcology')).toBeCloseTo(per('arcology', 'arcology'), -3);   // the stronger shell sets the price
+    expect(per('glass', 'glass')).toBeGreaterThan(walkShellUsdFt('glass')); expect(per('arcology', 'arcology')).toBeGreaterThan(walkShellUsdFt('arcology'));   // (the shell goods ARE the price: when the dome pricing lands the goods rise and so does this)
+    expect(billUsd(quoteLink(two('glass', 'glass'), 'dA', 'dB', 'walkway').bill)).toBeGreaterThan(0);
+  });
+  it('the run table holds the shell goods for the tube cross-section (one world unit is 20 ft)', () => {
+    const good = { earthen: 'dome_earthbag', geodesic: 'dome_geodesic_kit', glass: 'dome_glass_kit', arcology: 'dome_arcology_kit' } as const, unit = { earthen: 100, geodesic: 1000, glass: 1000, arcology: 1000 };
+    for (const t of ['earthen', ...BUILT] as const) expect((PERIMETER[`link_walk_${t}` as 'link_walk_glass'].materials as Record<string, number>)[good[t]]).toBeCloseTo(20 * TUBE_SF_PER_FT / unit[t], 5);
+  });
+  it('stays sealed like a dome: an airlock cycle at each end when the domes are sealed', () => {
+    const g = two('glass', 'arcology', 26); orderLink(g, 'dA', 'dB', 'walkway'); finish(g);
+    const open = bestLink(g, 'dA', 'dB')!, sealed = bestLink(g, 'dA', 'dB', 'family', () => true)!;
+    expect(sealed.cycles).toBe(2); expect(sealed.seconds - open.seconds).toBe(AIRLOCK_CYCLE_S.glass + AIRLOCK_CYCLE_S.arcology);
+  });
+  it('a repair costs a share of what the link is worth, so a glass walkway is dear to mend', () => {
+    const g = two('glass', 'glass'); orderLink(g, 'dA', 'dB', 'walkway'); finish(g); const l = linksOf(g)[0];
+    collapseLink(g, linksOf(g)[0].id); expect(l.down).toBeUndefined();   // only a tunnel collapses
+    takeDown(g, l, 'storm'); expect(l.down!.repairUsd).toBeGreaterThan(0.1 * linksOf(g)[0].valueUsd!);
   });
 });

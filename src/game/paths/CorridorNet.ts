@@ -13,7 +13,7 @@ export function deckFn(c: Pick<Corridor, 'kind' | 'a' | 'b' | 'lenU'>, ground: (
   if (c.kind === 'slope_tunnel') return (_s, x, z) => ground(x, z) - 0.15;
   // a dome link: a tunnel runs buried (the walker is under the terrain, in the underground view), a walkway's deck stands 1.6 ft up on its piers
   if (c.kind === 'underground_passage') return (_s, x, z) => ground(x, z) - 0.3;
-  if (c.kind === 'covered_walkway') return (_s, x, z) => ground(x, z) + 0.085;
+  if (c.kind === 'covered_walkway' || c.kind.startsWith('link_walk_')) return (_s, x, z) => ground(x, z) + 0.085;
   return s => ya + (yb - ya) * Math.min(1, Math.max(0, s / (c.lenU || 1))) + 0.01;
 }
 
