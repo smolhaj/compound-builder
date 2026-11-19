@@ -325,7 +325,7 @@ All procedural, no external assets. **No performance budget is raised**: nothing
 | 4 | `plantClimate.ts` and dome plant integration: COP, derate and trip, battery temperature, `heat` and `load` causes, repair lead scaling | M to L | 1 | 5 (different files, same `live.ts` seams: sequence the merge) |
 | 5 | `snowLoad.ts`, building roof loads, dome snow breach and shedding, shoveling, cold equipment teeth (diesel gel, batteries) | M | 1, 3 | 4, 7 |
 | 6 | UI: dome readouts, limit cards, setup and scenario text, collapse chip | M | 4, 5 | 7 |
-| 7 (**done**, PR link below) | Rendering: sky profiles, snow cover, frost on the shell, shimmer (optional). Landed: see the PR 7 notes. Cut: true shimmer distortion, icicles and drifts, frost on props | M | 1 | 4, 5, 6 |
+| 7 (**done**, [#391](https://github.com/smolhaj/compound-builder/pull/391)) | Rendering: sky profiles, snow cover, frost on the shell, shimmer (optional). Landed: see the PR 7 notes. Cut: true shimmer distortion, icicles and drifts, frost on props | M | 1 | 4, 5, 6 |
 | 8 | Balance and QA: bot playtest, survival table vs targets, tuning, perf census confirms no budget change | S to M | 2 to 7 | none |
 | 9 (optional) | PROPOSED purchases: cooling tower, ground-loop heat pump, thermal curtains; save v104 | M | 4, 6 | none |
 
