@@ -313,7 +313,7 @@ export function GameCanvas() {
     };
     let feltAcc = 9, hitOff = 0, hitBase = 0, hitHeld = false;
     const climOverlay: ClimateOverlay = { scorch: 0, snow: 0, freeze: 0 };
-    let shellAcc = 9;
+    let shellAcc = 6;
     const terrainOv = new TerrainOverlay(ws.scene, world.groundAt);
     const showTerrain = () => {
       const g = useGameStore.getState().game, m = useWorldStore.getState().terrainMode, t = terrainOf(g);
@@ -607,8 +607,8 @@ export function GameCanvas() {
       // the slow climate kinds bend the ground (scorched lawns, a lying snow pack, frozen still water) and the dome glass (frost, bleach)
       climOverlay.scorch = lookRaw.scorch; climOverlay.snow = lookRaw.snowCover; climOverlay.freeze = lookRaw.freeze;
       world.tick(dt, dayOfYear, totalDays, seasonMode, climOverlay, waterLockOf(lookRaw.freeze));
-      shellAcc += dt;
-      if (shellAcc >= 0.4 || renderReq.quality) {
+      // (every sixth frame: cheap, and a paused or lowrender QA clock, whose dt is tiny, still reaches it)
+      if (++shellAcc >= 6) {
         shellAcc = 0;
         const d0 = domeOf(game), st0 = d0 ? stateOf(game, d0) : null;
         setShellClimate(st0 ? shellFrostOf(st0.outF, st0.indoorF) : 0, st0 ? shellBleachOf(lookRaw.scorch, st0.outF) : 0);

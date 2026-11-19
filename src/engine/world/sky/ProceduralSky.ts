@@ -446,7 +446,7 @@ const FRAG = /* glsl */`
         float bq = (hp - (0.26 + 0.14 * sin(az3 * 1.7 + uTime * 0.04))) / 0.15;
         float band = exp(-bq * bq);
         vec3 ac = mix(vec3(0.12, 1.0, 0.42), vec3(0.85, 0.12, 0.38), smoothstep(0.32, 0.62, hp));
-        sky += ac * rays * band * (0.3 + 0.7 * wob) * uSkyB.z * 0.38 * (1.0 - 0.4 * cloudOcc) * smoothstep(0.0, 0.12, h) * (0.35 + 0.65 * uNight);
+        sky += ac * rays * band * (0.3 + 0.7 * wob) * uSkyB.z * 0.55 * (1.0 - 0.4 * cloudOcc) * smoothstep(0.0, 0.12, h) * (0.35 + 0.65 * uNight);
       }
       // Moon disc: lit from the sun's side, phase from the terminator, maria.
       vec3 md = normalize(uMoonDir);
