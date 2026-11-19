@@ -101,6 +101,9 @@ uniform float uRockSlope;
 uniform sampler2D uFarmTex;
 uniform vec4 uFarmRect;
 uniform vec4 uHoles[4];
+uniform vec4 uPits[4];
+uniform vec4 uCutA;
+uniform vec4 uCutB;
 varying vec3 vRPos;
 varying vec3 vRNrm;
 varying float vForest;
@@ -176,6 +179,11 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
     uFarmRect: { value: new THREE.Vector4(0, 0, 1, 0) },
     // openings cut clean through the ground (a floor hatch's stairwell under a house): x0, z0, x1, z1 in world units, up to four
     uHoles: { value: Array.from({ length: 4 }, () => new THREE.Vector4(0, 0, 0, 0)) },
+    // round pits cut through the ground (a dome's crater, or the moat round its skirt): centre x, z, outer radius, inner radius; up to four
+    uPits: { value: Array.from({ length: 4 }, () => new THREE.Vector4(0, 0, 0, 0)) },
+    // a straight slab cut away for a section: centre x, z, axis x, z (toward the viewer) / half width, length, on (1)
+    uCutA: { value: new THREE.Vector4(0, 0, 0, 1) },
+    uCutB: { value: new THREE.Vector4(0, 0, 0, 0) },
     uCropC: { value: Array.from({ length: CROP_SLOTS }, () => new THREE.Vector3(0.3, 0.4, 0.15)) },
     uCropT: { value: Array.from({ length: CROP_SLOTS }, (_, i) => (i + 1) / CROP_SLOTS) },
   };
@@ -193,6 +201,8 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
       .replace('#include <common>', '#include <common>\n' + TERRAIN_PARS)
       .replace('#include <color_fragment>', /* glsl */`#include <color_fragment>
         for (int hi = 0; hi < 4; hi++) { vec4 hh = uHoles[hi]; if (hh.z > hh.x && vRPos.x > hh.x && vRPos.x < hh.z && vRPos.z > hh.y && vRPos.z < hh.w) discard; }
+        for (int pi = 0; pi < 4; pi++) { vec4 pp = uPits[pi]; if (pp.z > 0.0) { float pd = length(vRPos.xz - pp.xy); if (pd < pp.z && pd >= pp.w) discard; } }
+        if (uCutB.z > 0.5) { vec2 cd = vRPos.xz - uCutA.xy; float ca = dot(cd, uCutA.zw); float cw = abs(dot(cd, vec2(-uCutA.w, uCutA.z))); if (ca > 0.0 && ca < uCutB.y && cw < uCutB.x) discard; }
         vec3 N = normalize(vRNrm);
         float slope = 1.0 - N.y;
         float alt = vRPos.y;
@@ -543,6 +553,23 @@ export class TerrainRenderer {
     if (!v) return;
     v.forEach((q, i) => { const r = this._holes[i]; if (r) q.set(r[0], r[1], r[2], r[3]); else q.set(0, 0, 0, 0); });
   }
+  private _pits: Array<[number, number, number, number]> = [];
+  private _cut: [number, number, number, number, number, number, number] | null = null;
+  /** Round pits cut clean through the ground (centre x, z, outer radius, inner radius; at most four): a dome's crater, or the moat round its buried skirt. */
+  setPits(circles: ReadonlyArray<readonly [number, number, number, number]>): void {
+    this._pits = circles.slice(0, 4).map(c => [c[0], c[1], c[2], c[3]]);
+    this._applyPits();
+  }
+  private _applyPits(): void {
+    const u = this._u;
+    if (!u) return;
+    (u['uPits'].value as THREE.Vector4[]).forEach((q, i) => { const c = this._pits[i]; if (c) q.set(c[0], c[1], c[2], c[3]); else q.set(0, 0, 0, 0); });
+    const c = this._cut, a = u['uCutA'].value as THREE.Vector4, b = u['uCutB'].value as THREE.Vector4;
+    if (c) { a.set(c[0], c[1], c[2], c[3]); b.set(c[4], c[5], 1, 0); } else { a.set(0, 0, 0, 1); b.set(0, 0, 0, 0); }
+  }
+  /** A straight slab of ground cut away (a section): from the centre out toward (ax, az) for `len`, `half` either side; null puts the ground back. */
+  setCut(cx: number, cz: number, ax: number, az: number, half: number, len: number): void { this._cut = [cx, cz, ax, az, half, len, 1]; this._applyPits(); }
+  clearCut(): void { this._cut = null; this._applyPits(); }
   private _opacity = 1;
   /** See-through ground (1 = solid): the underground view looks down through it. */
   setOpacity(k: number): void {
@@ -602,6 +629,7 @@ export class TerrainRenderer {
     (u['uFieldOrigin'].value as THREE.Vector2).set(fox, foz);
     this._u = u;
     this._applyHoles();
+    this._applyPits();
     const g = (u['uGrass'].value as THREE.Color).setHex(o.grass ?? look.grass ?? 0x557a3a);
     const gray = (g.r + g.g + g.b) / 3;
     g.lerp(new THREE.Color(gray, gray, gray), 0.18).multiplyScalar(0.8);

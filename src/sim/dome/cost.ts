@@ -6,6 +6,7 @@
 import { MATERIALS, type MaterialId } from '../materials';
 import { CELL_FT, TIER, shellFt, type DomeTier } from './tiers';
 import { domeGeometry } from './geometry';
+import { yardBill } from './plantYard';
 /** The shop's crew wage and a crew's week (sim/crews.ts has the same two numbers; a test holds them equal: importing crews here would make a cycle through the blueprints). */
 export const CREW_RATE = 60, CREW_WEEK = 4 * 9 * 5;
 
@@ -56,7 +57,8 @@ export function domeCost(tier: DomeTier, cells: number = TIER[tier].cells, o: { 
     foundation: { concrete, rebar: ceil(concrete / 6) },
     frame: { [SHELL_GOOD[tier]]: frameN },
     roof: { [SHELL_GOOD[tier]]: roofN },
-    finish: tier === 'earthen' ? { hardware: 2 } : { dome_air_plant: ceil(g.volumeCf / 10000), dome_airlock: airlocks, dome_fitout: ceil(g.footprintSf / 1000) },
+    // (the glass and arcology domes also get their hardened plant yard: wall, gate and the sleeves for the buried lines, sim/dome/plantYard.ts)
+    finish: tier === 'earthen' ? { hardware: 2 } : sum({ dome_air_plant: ceil(g.volumeCf / 10000), dome_airlock: airlocks, dome_fitout: ceil(g.footprintSf / 1000) }, yardBill(tier, d / 2 / 20).bill),
   };
   // an earthen dome is built from the family's own land: its stages have nothing to buy but the shell
   const bill = sum(stages.site, stages.foundation, stages.frame, stages.roof, stages.finish);

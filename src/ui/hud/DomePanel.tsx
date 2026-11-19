@@ -7,9 +7,12 @@ import { CLIMATE_MODES, BAND, comfortAt, type ClimateMode, type CoolStage } from
 import { WATER_LOOPS, LOOP_NAME, REUSE, type WaterLoop } from '../../sim/dome/waterLoop';
 import { stockCover } from '../../sim/dome/agro';
 import { useState } from 'react';
+import { useWorldStore } from '../../store/worldStore';
+import { skirtFacts } from '../../sim/dome/skirtFacts';
 import { FILTERING, LIMIT_PPM, type Filtering } from '../../sim/dome/air';
 import { outside, dayLoad, planPowered, buyFiltering, buyLoop, loopBill, loopProblem, domeClean, domeClock, domeViews, filteringBill, filteringProblem, freshClock, replaceFilters, setClimateMode, setLockdown, spareFiltersUsd, tendCostUsd, tendEcology, type DomeView } from '../../sim/dome/live';
 import { pluralize } from '../../sim/words';
+import { DomePlantSection } from './DomePlantSection';
 
 const NAME: Record<Filtering, string> = { none: 'None (shell leakage only)', scrubber: 'CO2 scrubbers', advanced: 'Advanced air bank', closed: 'Closed ecology' };
 const BUY: Record<Filtering, string> = { none: '', scrubber: 'Fit CO2 scrubbers', advanced: 'Fit the advanced air bank', closed: 'Build the closed ecology' };
@@ -74,6 +77,9 @@ export function DomePanel() {
       {st.ventedAt !== null && !st.lockdown && game.clock.t - st.ventedAt < 3 && <Note tone="warn">The fail-safe vents opened on their own (bad air, or a sealed shell over 105 F).</Note>}
       {st.lockdown && st.filtering !== 'none' && !powered && <Note tone="bad">The air plant has no power{game.utilities.fittings.some(f => f.building === d.st.id && f.kind === 'wire' && f.finishedAt !== null) ? '.' : ': the dome is not wired to the compound yet.'}</Note>}
     </Section>
+    <Section title="The buried skirt">
+      <SkirtSectionToggle id={id} tier={d.tier} />
+    </Section>
     <Section title="Air filtering">
       <Row label="Fitted" value={NAME[st.filtering]} />
       {st.filtering !== 'none' && <><Row label="Filter media" value={`${Math.round(st.filterHealth * 100)} percent`} tone={st.filterHealth < 0.35 ? 'bad' : st.filterHealth < 0.6 ? 'warn' : undefined} />
@@ -122,6 +128,19 @@ export function DomePanel() {
         })}
       </div>
     </Section>
+    <DomePlantSection v={v} />
     <div style={{ fontSize: 11, color: DIM }}>The {TIER_NAME(v).toLowerCase()} sits over the bunker, which keeps its own fallout protection. It keeps weather, ash and fallout dust off the ground under it, and it can be seen for miles.</div>
   </div>;
+}
+
+/** The Skirt section: cut the ground and the dome open along a vertical plane to see the buried skirt, its footing, the strata and how deep a crew digs. */
+function SkirtSectionToggle({ id, tier }: { id: string; tier: keyof typeof TIER }) {
+  const on = useWorldStore(s => s.domeSection === id), set = useWorldStore(s => s.setDomeSection), f = skirtFacts(tier);
+  return <>
+    <Row label="Skirt" value={`${f.depth} ft deep, ${f.thick} ft thick concrete`} title="The buried wall under the shell that keeps tunnelers from digging in underneath" />
+    <button data-testid="dome-skirt-section" style={{ ...btn(on), width: '100%', marginTop: 4 }} aria-pressed={on}
+      title="Cut the ground and the dome open along a vertical plane through its center, from the side you are looking from"
+      onClick={() => set(on ? null : id)}>{on ? 'Close the skirt section' : 'Skirt section'}</button>
+    {on && <Note>The cut shows the skirt in cross-section with the soil layers and a depth ruler in feet. A plain crew digs 6 to 14 ft; a crew that has learned the ground digs about 6 ft deeper. Orbit to the side you want to look from, then toggle it again.</Note>}
+  </>;
 }
