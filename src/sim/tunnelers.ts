@@ -36,6 +36,8 @@ import { pluralize } from './words';
 import { domesOf, type Dome } from './dome/standing';
 import { digStops, nearestAirlock, sideOfDome } from './dome/crossing';
 import { skirtDepthFt } from './dome/bunkerLive';
+import { tunnelReach, linkOpen } from './dome/links';
+import { diggable, linkOfDig, linkSurfaces, linkWarning, pointAlong, resolveLinkDig, spotWords } from './dome/linkDefense';
 
 export type Counter = 'sensors' | 'dogs' | 'watch' | 'tower';
 
@@ -60,6 +62,8 @@ export interface Dig {
   ignored: boolean;
   /** The tunnel runs into an underground passage (it is revealed when they surface). */
   passage: string | null;
+  /** The dome link (a tunnel) the crew is digging toward; absent for a wall or a dome (sim/dome/linkDefense.ts). */
+  link?: string;
 }
 
 export interface DigState {
@@ -197,6 +201,14 @@ function along(pts: readonly Pt[], u: number): Pt {
 export function startDig(s: GameState, r: () => number, day: number): Dig | null {
   const runs = s.perimeter.filter(isTarget);
   const domes = domesOf(s);
+  // a tunnel between domes is a target of its own, for a crew that can dig that deep (a shallow tunnel is the weak spot; a deep one is never found)
+  const tunnels = s.domeLinks?.length ? diggable(s, adaptNow(s)) : [];
+  if (tunnels.length && r() < tunnels.length * 0.6 / (tunnels.length * 0.6 + domes.length + runs.length)) {
+    const l = tunnels[Math.floor(r() * tunnels.length) % tunnels.length], at = pointAlong(l, 0.2 + 0.6 * r());
+    const size = adaptedHeads(4 + Math.floor(r() * 5), adaptNow(s));
+    return { id: `d${s.nextId++}`, run: `link:${l.id}`, link: l.id, at, startDay: day, days: 6 + Math.floor(r() * 8), size,
+      temper: raiderTemper(s, 'gang', r), detectedDay: null, by: null, skirtChecked: false, floodChecked: false, warned: false, ignored: false, passage: null };
+  }
   if (!runs.length && !domes.length) return null;
   // a dome is a target like a wall, weighed by its girth and by how little skirt it has: a crew scouting a dome looks for the shallow footing
   if (domes.length && (!runs.length || r() < domes.length / (domes.length + runs.length))) {
@@ -296,6 +308,7 @@ export function digDay(s: GameState): string[] {
     if (r() < digChancePerDay(s)) { d = ds.active = startDig(s, r, day); if (d) ds.started++; }
     return lines;   // (a new dig has no effect on its first day)
   }
+  if (d.link || d.run.startsWith('link:')) return linkDigDay(s, d, r, day, lines);
   const dome = domeOfDig(s, d);
   const run = dome ? ({ kind: 'concrete_wall', skirtAt: 0, finishedAt: 0 } as Pick<PerimeterRun, 'kind' | 'skirtAt' | 'finishedAt'>) : s.perimeter.find(x => x.id === d!.run);
   if (!run || (!dome && !runFinished(run as PerimeterRun))) { ds.active = null; return lines; }   // the wall they meant to go under is gone
@@ -360,6 +373,44 @@ export function digDay(s: GameState): string[] {
   return lines;
 }
 
+/** One day of a dig toward a dome link: the depth check, the notice (the same four counters), the alert card, and the breach. */
+function linkDigDay(s: GameState, d: Dig, r: () => number, day: number, lines: string[]): string[] {
+  const ds = (s.digs ??= newDigs()), l = linkOfDig(s, d);
+  if (!l || !linkOpen(s, l)) { ds.active = null; return lines; }   // the tunnel is gone or down: nothing to dig toward
+  const age = day - d.startDay;
+  // about halfway they reach its depth; those who cannot reach it turn back
+  if (!d.skirtChecked && age >= Math.floor(d.days * 0.4)) {
+    d.skirtChecked = true;
+    if (r() >= tunnelReach(l.depthFt ?? 0, adaptNow(s))) {
+      ds.turnedBySkirt++; ds.active = null;
+      lines.push(`A fresh hole ${spotWords(s, l, d.at)}: somebody dug down ${l.depthFt ?? 0} ft looking for the tunnel, found nothing and gave up.`);
+      return lines;
+    }
+  }
+  if (d.detectedDay === null) {
+    const def = digDefense(s, { kind: 'concrete_wall', skirtAt: 0, finishedAt: 0 }, d.at);
+    const hunter = Math.max(0, ...s.people.filter((p, i) => !p.kid && s.personState[i]?.needs.died == null).map(p => p.skills.hunter));
+    const c = detectChances(def, hunter), p = combine(c);
+    if (p > 0 && r() < p) {
+      d.detectedDay = day;
+      const tot = c.sensors + c.dogs + c.watch + c.tower;
+      let x = r() * tot;
+      d.by = (['sensors', 'dogs', 'watch', 'tower'] as Counter[]).find(k => { x -= c[k]; return x <= 0; }) ?? 'watch';
+    }
+  }
+  if (d.detectedDay !== null && !d.ignored && !d.warned && !s.gate.pending) {
+    d.warned = true;
+    s.gate.pending = linkWarning(s, d, l, day);
+    lines.push(s.gate.pending.title + '.');
+    return lines;
+  }
+  if (age >= d.days && !s.gate.pending) {
+    ds.surfaced++; ds.active = null;
+    lines.push(linkSurfaces(s, d, l, day, r) + '.');
+  }
+  return lines;
+}
+
 // ── what the player chooses ───────────────────────────────────────────────
 
 const take = (s: GameState, k: 'excavator', n: number) => { s.stock[k] = Math.max(0, s.stock[k] - n); };
@@ -394,6 +445,7 @@ export function resolveDigWarning(s: GameState, e: Encounter, stance: Stance, r:
   const g = s.gate, ds = (s.digs ??= newDigs()), day = dayIndex(s.clock.t);
   const d = ds.active && ds.active.id === e.dig?.id ? ds.active : null;
   if (!d) return { title: 'They gave up', text: 'By the time you look, the hole is empty and the dig is abandoned.', tone: 'good', lines: [] };
+  if (d.link || e.dig?.link) return resolveLinkDig(s, e, stance, r);
   if (stance === 'ambush') {
     const party = chosenParty(s);
     const { surprise, crew } = ambushShape(d.size, e.dig?.lead ?? 0);

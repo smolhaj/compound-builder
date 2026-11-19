@@ -37,7 +37,7 @@ export class DomePortals {
     const found: Array<{ d: Dome; i: number }> = [];
     for (const r of runs) {
       if (!CROSSING_KINDS.includes(r.kind) || r.finishedAt === null) continue;
-      for (const d of domes) { const a = airlockOfCorridor(d, r.pts); if (a) found.push({ d, i: a.index }); }
+      for (const d of domes) { const a = airlockOfCorridor(d, r.pts); if (a && a.role !== 'link') found.push({ d, i: a.index }); }   // (a dome link has its own airlock module, game/fx/DomeLinks: no backfill ridge, spoil or marker posts of an escape tunnel)
     }
     const key = found.map(f => `${f.d.id}:${f.i}:${f.d.x.toFixed(2)},${f.d.z.toFixed(2)}`).join('|');
     if (key === this._key) return;

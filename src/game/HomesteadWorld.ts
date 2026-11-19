@@ -37,6 +37,8 @@ import { lightsOutNow } from '../sim/blackout';
 import type { NetWorld } from './paths/pathNet';
 import { WALK_CLIFF, entryRampHeight, walkRoute } from './paths/walkRoute';
 import { CorridorNet } from './paths/CorridorNet';
+import { routeViaLink } from './paths/linkRoute';
+import { U_PER_M, type Corridor } from '../sim/corridors';
 import { roadYAlong } from './paths/driveHeight';
 import type { Bridge } from './wildlife/wildlifeCrossing';
 import { animalRoute, climbLimit } from './paths/groundMovers';
@@ -169,6 +171,9 @@ import { TIER, cellsOfKind, shellFt, tierOfKind } from '../sim/dome/tiers';
 import { inYard, yardGeometry } from '../sim/dome/plantYard';
 import { isGradedTier } from '../sim/dome/grading';
 import { makeDomePlant, plantKey, type DomePlantFx, type PlantLook } from './fx/DomePlant';
+import { makeLinkFixtures, linksKey, type LinkFixtureInput, type LinkFixtures } from './fx/DomeLinks';
+import { domesOf as standingDomes } from '../sim/dome/standing';
+import { linkState, linksOf } from '../sim/dome/linkGraph';
 import { stateOf as domeStateOf } from '../sim/dome/live';
 import { fxOf as plantFxOf, unitsOf as plantUnitsOf } from '../sim/dome/plantLive';
 import { makeDomeAir, type DomeAirFx } from './fx/DomeAir';
@@ -449,6 +454,7 @@ export class HomesteadWorld {
     this._underfoot = { mud: this.atmos.mud, snow: f.snow, rain: f.rain };
     this.lived.update(game, performance.now(), { night: f.night, lightsOut: lightsOutNow(game) });
     this._domeAir(game);
+    this._syncLinks(game);
   }
 
   /** The main dome's inner haze and closed-ecology plants (sim/dome/live.ts domeLook), kept on its own group. */
@@ -467,6 +473,55 @@ export class HomesteadWorld {
       f.group.visible = true;
       f.apply(look);
     }
+  }
+
+  private _links: LinkFixtures | null = null;
+  /** The dome shells and which run joins which two domes, for the walk between linked domes (people take the covered way: `_viaDomeLink`). */
+  private _linkShells: Array<{ id: string; x: number; z: number; r: number }> = [];
+  private _linkEnds = new Map<string, [string, string]>();
+  /** Put the finished dome links into the corridor net, so a walk from one dome to its linked partner goes through the tunnel or walkway. */
+  private _syncLinkRoutes(game: GameState, domes: ReturnType<typeof standingDomes>): void {
+    this._linkShells = domes.map(d => ({ id: d.id, x: d.x, z: d.z, r: d.r }));
+    this._linkEnds.clear();
+    const extra: Corridor[] = [];
+    for (const l of linksOf(game)) {
+      const r = this._runs.find(x => x.id === l.runId);
+      if (!r || r.finishedAt === null || r.pts.length < 2 || l.ends[0].type !== 'dome' || l.ends[1].type !== 'dome') continue;
+      let lenU = 0; for (let i = 1; i < r.pts.length; i++) lenU += Math.hypot(r.pts[i][0] - r.pts[i - 1][0], r.pts[i][1] - r.pts[i - 1][1]);
+      extra.push({ id: r.id, kind: r.kind, a: r.pts[0], b: r.pts[r.pts.length - 1], pts: r.pts, lenU, lenM: Math.round(lenU / U_PER_M), bore: false, collapsed: linkState(game, l) !== 'open' });
+      this._linkEnds.set(r.id, [l.ends[0].id, l.ends[1].id]);
+    }
+    this.corridors.setExtra(extra);
+    this.corridors.sync(this._runs);
+  }
+
+  /** The walk from inside one dome to inside a dome it is linked to goes through the link (covered, and out of the weather) rather than across the open ground. */
+  private _viaDomeLink(fx: number, fz: number, tx: number, tz: number, w: NetWorld): Wp[] | null {
+    if (!this._linkEnds.size) return null;
+    const under = (x: number, z: number) => this._linkShells.find(d => Math.hypot(x - d.x, z - d.z) < d.r + 0.4)?.id ?? null;
+    const a = under(fx, fz), b = under(tx, tz);
+    if (!a || !b || a === b) return null;
+    this.corridors.ensure(this.groundAt);
+    let best = -1, bestLen = Infinity;
+    this.corridors.links.forEach((l, i) => { const e = this._linkEnds.get(l.id); if (e && !l.blocked && ((e[0] === a && e[1] === b) || (e[0] === b && e[1] === a)) && l.lenU < bestLen) { best = i; bestLen = l.lenU; } });
+    return best < 0 ? null : routeViaLink([fx, fz], [tx, tz], this.corridors.links, best, (p, q) => this._groundVia(p, q, w));
+  }
+  /** The link airlocks, vent stacks and buried sleeves of the dome links (game/fx/DomeLinks), redrawn when a link is built or changes state. */
+  private _syncLinks(game: GameState): void {
+    const ls = linksOf(game);
+    if (!ls.length && !this._links) return;
+    const domes = standingDomes(game), ins: LinkFixtureInput[] = ls.map(link => ({
+      link, state: linkState(game, link),
+      ends: link.ends.map(e => { const a = e.type === 'dome' ? domes.find(d => d.id === e.id)?.airlocks.find(x => x.role === 'link' && x.linkId === link.id) : null; return a ? { x: a.x, z: a.z, angle: a.angle } : null; }),
+    }));
+    const key = linksKey(ins);
+    if (this._links && this._links.key === key) return;
+    this._syncLinkRoutes(game, domes);
+    if (this._links) { this._root.remove(this._links.group); this._links.dispose(); this._links = null; }
+    if (!ins.length) return;
+    const f = makeLinkFixtures(ins, (x, z) => this.parcel.height(x, z) + 0.01);
+    f.setUnder(this._under); f.setView(this._view);
+    this._root.add(f.group); this._links = f;
   }
 
   /** The plant of one finished big dome (every dome has its own: its machinery, yard, roof hatches and lamps; sim/dome/plant.ts), redrawn when its equipment or damage changes. */
@@ -1373,6 +1428,8 @@ export class HomesteadWorld {
   /** The way person `from` walks to `to`: through a tunnel when the goal is on the other side of the rock or the gorge; else the trails when they lead there, round buildings, the wall and cliffs when the straight line crosses them, else straight ([]). */
   private _walkVia(fx: number, fz: number, tx: number, tz: number): Wp[] {
     const w = this._walkWorld();
+    const dl = this._viaDomeLink(fx, fz, tx, tz, w);
+    if (dl) return dl;
     if (this.corridors.any || this.corridors.corridors.length) {
       const r = this._viaCorridors(fx, fz, tx, tz, w, (a, b) => this._groundVia(a, b, w));
       if (r) return r;
@@ -2023,6 +2080,7 @@ export class HomesteadWorld {
     this._under = on;
     this.terrain.setOpacity(on ? 0.3 : 1);
     for (const pf of this._domePlants.values()) pf.setUnder(on);   // the buried plant lines (sim/dome/plant.ts)
+    this._links?.setUnder(on);
     this.forest.visible = !on;
     this.sage.visible = !on;
     this.willow.visible = !on;
@@ -2465,6 +2523,7 @@ export class HomesteadWorld {
   setBuildingView(v: BuildingView): void {
     if (v === this._view) return;
     this._view = v;
+    this._links?.setView(v);
     if (this._lastStructures.length) this._syncCovered(this._lastStructures);
     for (const b of this._built.values()) { b.key = ''; this._applyView(b); }
     this._digKeys.clear(); if (this._lastStructures.length) this._syncDomeDigs(this._lastStructures);

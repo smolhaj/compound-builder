@@ -1,6 +1,8 @@
 import type { CSSProperties } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { ambushOdds, ambushParty, chosenParty } from '../sim/tunnelers';
+import { counterEdge, counterInputs, counterOdds, edgeWord } from '../sim/dome/linkDefense';
+import { linksOf } from '../sim/dome/linkGraph';
 import { doorHoldLine } from '../sim/terrainFx';
 import { hidePreview } from '../sim/bunkerHide';
 import { fightOdds, hideFoundChance, postureOf, type Stance } from '../sim/encounters';
@@ -144,11 +146,23 @@ export function GateCard() {
           const have = [...(Object.keys(t.goods) as Array<keyof typeof gm.stock>).map(k => `${Math.floor(gm.stock[k])} ${k}`), ...(Object.keys(t.ammo) as Caliber[]).map(k => `${pluralize(gm.armory.ammo[k] ?? 0, 'round')} of ${k}`)].join(', ');
           return <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.75 }}>You have: {have}{canPay(gm, t) ? '' : ' (not enough for all of it)'} · a double-cross is {e.temper === 'savage' ? 'a real risk with this crew' : e.temper === 'hard' ? 'possible' : 'unlikely'} (about {Math.round(DOUBLE_CROSS[e.temper ?? 'savage'] * 100)}%)</div>;
         })()}
-        {e.dig?.phase === 'warning' && e.stances.includes('ambush') && (() => {
+        {e.dig?.phase === 'warning' && (e.stances.includes('ambush') || e.stances.includes('counter_hold')) && (() => {
           const gm = g.game, able = ambushParty(gm, true), going = chosenParty(gm);
           return <div style={{ margin: '8px 0', fontSize: 12, opacity: 0.85 }}>Who goes to the dig site:{' '}
             {able.map(id => { const p = gm.people.find(x => x.id === id)!; return <label key={id} style={{ marginRight: 10 }}><input type="checkbox" checked={going.includes(id)} onChange={ev => g.setAmbushParty(ev.target.checked ? [...going, id] : going.filter(x => x !== id))} /> {p.first}</label>; })}
             <div style={{ opacity: 0.7 }}>The rest hold the house.</div></div>;
+        })()}
+        {e.dig?.phase === 'warning' && e.dig.link && e.stances.includes('counter_hold') && (() => {
+          const gm = g.game, l = linksOf(gm).find(x => x.id === e.dig!.link);
+          if (!l) return null;
+          const edge = counterEdge(counterInputs(gm, { size: e.size }, e.dig!.lead, l)), hold = counterOdds(gm, { size: e.size, temper: e.temper ?? 'hard' }, e.dig!.lead, 'hold'), fall = counterOdds(gm, { size: e.size, temper: e.temper ?? 'hard' }, e.dig!.lead, 'fall');
+          const line = (o: typeof hold) => `driven off ${inTen(o.driven_off)} · standoff ${inTen(o.standoff)} · a door forced or the tunnel lost ${inTen(o.partial_breach)} · defenders lost ${inTen(o.defenders_lost)}`;
+          return <div data-testid="link-odds" style={{ margin: '8px 0', fontSize: 12, opacity: 0.8 }}>
+            <div>Our edge: {edgeWord(edge)} (guards, towers, ammunition, cover and warning all count).</div>
+            <div>Hold position at the breach: {line(hold)}</div>
+            <div>Fall back to the airlock: {line(fall)}</div>
+            <div style={{ opacity: 0.8 }}>Collapsing the tunnel on them costs the link. Sealing the airlock costs it for days.</div>
+          </div>;
         })()}
         {e.dig?.phase === 'warning' && e.stances.includes('ambush') && (() => {
           const o = ambushOdds(g.game, { size: e.size, lead: e.dig!.lead, temper: e.temper });

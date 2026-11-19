@@ -11,6 +11,9 @@ import type { DomeRef, DomeState } from './live';
 import { PLANT_SHORT, plantFx, plantUnits, repairSpec, rushUsd, type PlantCause, type PlantFx, type PlantKind, type PlantSpec, type PlantUnit } from './plantUnits';
 import { plantLayout } from './plant';
 import type { RaidDamage } from '../raidDamage';
+import { isFinished } from '../construction';
+import { TIER, cellsOfKind, shellFt, tierOfKind } from './tiers';
+import { feederPartners, supplemented } from './links';
 
 type Ref = Pick<DomeRef, 'st' | 'tier' | 'cells' | 'r'>;
 
@@ -25,7 +28,27 @@ export function unitsOf(s: GameState, d: Ref, st: DomeState): PlantUnit[] {
 }
 
 /** What the plant as it stands lets the dome do. */
-export const fxOf = (s: GameState, d: Ref, st: DomeState): PlantFx => plantFx(unitsOf(s, d, st), s.clock.t);
+export const rawFxOf = (s: GameState, d: Ref, st: DomeState): PlantFx => plantFx(unitsOf(s, d, st), s.clock.t);
+
+/** A partner dome's own plant shares (not supplemented: the feeder never chains), or null when it is not a finished dome. */
+function partnerFx(s: GameState, id: string): PlantFx | null {
+  const stc = s.structures.find(x => x.id === id), tier = stc ? tierOfKind(stc.kind) : null;
+  if (!stc || !tier || !isFinished(stc)) return null;
+  const cells = cellsOfKind(stc.kind) ?? TIER[tier].cells, state = s.domes?.[id] ?? (s.dome && (s.dome.id === id || !s.dome.id) ? s.dome : null);
+  return state ? rawFxOf(s, { st: stc, tier, cells, r: shellFt(tier, cells) / 2 / 20 }, state) : null;
+}
+
+/**
+ * What the plant as it stands lets the dome do, with the feeder of any open link to another dome (sim/dome/links.ts, PROPOSED): a partner's whole
+ * plant lifts a weaker one's climate, scrubbing and water shares (N+1 across two domes). Never lower than the dome's own plant.
+ */
+export function fxOf(s: GameState, d: Ref, st: DomeState): PlantFx {
+  const own = rawFxOf(s, d, st);
+  if (!s.domeLinks?.length) return own;
+  const others = feederPartners(s, d.st.id).map(id => partnerFx(s, id)).filter((x): x is PlantFx => !!x);
+  if (!others.length) return own;
+  return { ...own, climate: supplemented(own.climate, others.map(o => o.climate)), scrub: supplemented(own.scrub, others.map(o => o.scrub)), water: supplemented(own.water, others.map(o => o.water)) };
+}
 
 /** The job for one unit (open), if any. */
 export const jobOf = (s: GameState, domeId: string, unitId: string): RaidDamage | undefined => plantJobs(s, domeId).find(j => j.unit === unitId);

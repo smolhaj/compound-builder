@@ -294,6 +294,55 @@ export function buildRun(run0: PerimeterRun, ground: Ground, t: number, under: (
       for (const e of spanEnds()) post(e.x, e.z, H + 0.15 * M, 0.11 * M, 'concrete');
       break;
     }
+    case 'link_walk_earthen': case 'link_walk_geodesic': case 'link_walk_glass': case 'link_walk_arcology': {
+      // a dome link's walkway (sim/dome/links.ts): a sealed tube clad in the shell of the dome it joins (the stronger of the two): glass in a steel gridshell, twin-wall
+      // polycarbonate in an aluminum frame with triangulated braces, armored panels in a dark space frame with a solid armored band, or an earth-covered adobe box under sod.
+      // A plank deck, structural ribs every bay, a lit interior. No open mesh, no timber roof.
+      const tier = run.kind.slice(10) as 'earthen' | 'geodesic' | 'glass' | 'arcology';
+      const big = tier === 'arcology', H = (big ? 3.4 : 2.9) * M, iw = (big ? 2.7 : 2.3) * M, FLH = 0.5 * M, hw2 = iw / 2 + 0.07 * M;
+      const panel: KitMaterialId = tier === 'glass' ? 'glass' : tier === 'geodesic' ? 'polycarb' : tier === 'arcology' ? 'arcology' : 'adobe';
+      const frame: KitMaterialId = tier === 'geodesic' ? 'aluminum' : tier === 'earthen' ? 'plaster' : 'steel';
+      const solid = tier === 'earthen';
+      bays(3 * M, (a, b, _i) => {
+        const nx = -a.dz, nz = a.dx, side = (u: number, p: typeof a) => ({ x: p.x + nx * u, z: p.z + nz * u });
+        const len = Math.hypot(b.x - a.x, b.z - a.z), mid = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
+        for (const u of [-hw2, hw2]) {
+          const A = side(u, a), B = side(u, b);
+          if (!solid) {
+            beam(A.x, A.z, B.x, B.z, FLH - 0.1 * M, 0.1 * M, 0.09 * M, frame);                       // sill chord
+            beam(A.x, A.z, B.x, B.z, FLH + H - 0.09 * M, 0.09 * M, 0.09 * M, frame);               // top chord
+            beam(A.x, A.z, B.x, B.z, FLH + H * 0.5, 0.05 * M, 0.06 * M, frame);                     // mid rail: the gridshell's parallel
+            post(A.x, A.z, H + FLH, 0.045 * M, frame);                                               // rib post
+            // the glazing, closed to the sill (no open mesh)
+            beam(A.x, A.z, B.x, B.z, FLH, H - 0.1 * M, 0.014 * M, panel);
+            if (tier === 'glass') beam(A.x, A.z, B.x, B.z, FLH + 0.4 * M, H - 0.5 * M, 0.02 * M, 'polycarb');   // the laminate's milky interlayer: the glazing reads as a closed skin, not open frames
+            if (tier === 'geodesic') {                                                               // triangulated braces: a diagonal in each panel, alternating
+              const l = len, ang = Math.atan2(H - 0.2 * M, l);
+              const g = new THREE.BoxGeometry(Math.hypot(l, H - 0.2 * M), 0.035 * M, 0.035 * M).rotateZ((u > 0 ? 1 : -1) * ang);
+              g.rotateY(-Math.atan2(B.z - A.z, B.x - A.x)).translate(mid.x + nx * u, ground(mid.x, mid.z) + FLH + H / 2, mid.z + nz * u);
+              add(frame, g);
+            }
+            if (tier === 'glass') beam(A.x, A.z, B.x, B.z, FLH + H * 0.25, 0.04 * M, 0.05 * M, frame); // a second parallel: the gridshell's meridian pattern
+            if (big) beam(A.x, A.z, B.x, B.z, FLH, 0.9 * M, 0.06 * M, 'steel');                      // the armored band, solid to waist height
+            else beam(A.x, A.z, B.x, B.z, FLH, 0.4 * M, 0.05 * M, frame);                            // a solid sill panel under the glazing: the tube reads as closed
+          } else {
+            beam(A.x, A.z, B.x, B.z, FLH - 0.1 * M, H + 0.1 * M, 0.5 * M, panel);                    // a thick adobe wall, plastered
+            beam(A.x, A.z, B.x, B.z, FLH + H * 0.55, 0.04 * M, 0.52 * M, frame);                     // a plaster course line
+          }
+        }
+        // the roof: a closed panel across the span, with a rib over it (an earth-covered corridor takes a deep sod roof)
+        const span = iw + 0.2 * M;
+        beam(a.x, a.z, b.x, b.z, FLH + H, 0.03 * M, span, panel);
+        if (tier === 'glass') beam(a.x, a.z, b.x, b.z, FLH + H - 0.02 * M, 0.02 * M, span, 'polycarb');
+        beam(a.x, a.z, b.x, b.z, FLH + H + 0.03 * M, solid ? 0.16 * M : 0.03 * M, solid ? span + 0.1 * M : 0.09 * M, solid ? 'hedge' : frame);
+        // the floor: chords, then a plank deck
+        beam(a.x, a.z, b.x, b.z, FLH - 0.12 * M, 0.06 * M, span, tier === 'earthen' ? 'fieldstone' : 'steel');
+        beam(a.x, a.z, b.x, b.z, FLH - 0.06 * M, 0.025 * M, iw, 'deck');
+        // a ceiling light at the middle of the bay (lit with power)
+        add(lit ? 'bulb' : 'enamel', new THREE.SphereGeometry(0.075 * M, 10, 7).scale(1, 0.7, 1).translate(mid.x, ground(mid.x, mid.z) + FLH + H - 0.18 * M, mid.z));
+      });
+      break;
+    }
     case 'covered_walkway': {
       // an enclosed steel walkway on trusses between two yards (SCALE v2: 2 m inside width, 2.6 m to the roof): portal frames every 3 m, X-bracing,
       // mesh below and glass above, a handrail inside, a roof with a ridge cap, pendant lights (lit only with power)

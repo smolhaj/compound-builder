@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STOP_TAG, buildReach, doorId, doorOf, hopsBetween, linkOf, lengthOf, routeLinked, type Link, type Wp } from './linkRoute';
+import { STOP_TAG, buildReach, doorId, doorOf, hopsBetween, linkOf, lengthOf, routeLinked, routeViaLink, type Link, type Wp } from './linkRoute';
 import type { Pt } from '../../sim/pathRoute';
 
 /** A world 40 x 20 cut by a rock face at x = 20 (4 wide), and a second cut at x = 34 with a gap (a gate) at z 8-10. */
@@ -91,5 +91,23 @@ describe('hopsBetween', () => {
   it('is empty on the same piece and null with no way', () => {
     expect(hopsBetween([], [], 1, 1)).toEqual([]);
     expect(hopsBetween([], [], 1, 2)).toBeNull();
+  });
+});
+
+describe('routeViaLink (the covered way between two linked domes)', () => {
+  const link = linkOf('w', [[10, 5], [30, 5]], s => 0.2 + s * 0)!;
+  it('enters at the end nearer the walker, passes the door tags in order and ends at the goal', () => {
+    const fwd = routeViaLink([8, 5], [33, 5], [link], 0, straight)!;
+    const tags = fwd.map(p => p[3]).filter(x => x !== undefined);
+    expect(tags).toEqual([doorId(0, 0), doorId(0, 1)]);
+    expect(fwd.at(-1)).toEqual([33, 5]);
+    const back = routeViaLink([33, 5], [8, 5], [link], 0, straight)!;
+    expect(back.map(p => p[3]).filter(x => x !== undefined)).toEqual([doorId(0, 1), doorId(0, 0)]);
+  });
+  it('the deck height rides every point inside, and a fallen link gives no route', () => {
+    const r = routeViaLink([8, 5], [33, 5], [link], 0, straight)!;
+    expect(r.filter(p => p[2] !== undefined).every(p => p[2] === 0.2)).toBe(true);
+    expect(routeViaLink([8, 5], [33, 5], [{ ...link, blocked: true }], 0, straight)).toBeNull();
+    expect(routeViaLink([8, 5], [33, 5], [link], 3, straight)).toBeNull();
   });
 });

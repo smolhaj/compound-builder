@@ -213,7 +213,7 @@ export function postureOf(s: GameState): Posture {
 // ─────────────────────────────────────────────────────────────────────────
 
 export type EncounterKind = 'insider' | 'guard_stay' | 'arrival' | 'looters' | 'gang' | 'refugees' | 'requisition' | 'neighbor_help' | 'trader' | 'horde' | 'patrol' | 'militia' | 'break_in' | 'ransom' | 'trial_end' | 'tunnelers' | 'kin' | 'shelter' | 'move_in' | 'stranded';
-export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'ignore' | 'build_first' | 'move_sell' | 'move_keep' | 'move_lease' | 'hold_on' | 'drive_now' | 'back_roads' | 'resupply' | 'dismiss' | 'neg_toll' | 'neg_aid' | 'neg_redirect' | 'flag_pay' | 'flag_pass' | 'flag_bluff' | 'flag_shoot';
+export type Stance = 'hide' | 'parley' | 'warn' | 'defend' | 'trade' | 'take_in' | 'trial' | 'turn_away' | 'call_911' | 'shout' | 'confront' | 'pay' | 'refuse' | 'ambush' | 'flood' | 'collapse' | 'counter_hold' | 'counter_fall' | 'seal' | 'ignore' | 'build_first' | 'move_sell' | 'move_keep' | 'move_lease' | 'hold_on' | 'drive_now' | 'back_roads' | 'resupply' | 'dismiss' | 'neg_toll' | 'neg_aid' | 'neg_redirect' | 'flag_pay' | 'flag_pass' | 'flag_bluff' | 'flag_shoot';
 
 export interface Encounter {
   id: string;
@@ -271,7 +271,7 @@ export interface Encounter {
   placeRig?: boolean;
   /** A neighbor household asking to shelter (or, for `settle`, to stay for good). */
   shelter?: { nid: string; why: ShelterWhy; days: number; settle?: boolean };
-  dig?: { phase: 'warning' | 'inside'; id: string; /** Days left in the dig when it was found. */ lead: number; by?: string };
+  dig?: { phase: 'warning' | 'inside'; id: string; /** Days left in the dig when it was found. */ lead: number; by?: string; /** The dome link the crew is digging toward (sim/dome/linkDefense.ts). */ link?: string };
   /** Hardcore (sim/adaptive.ts): how far this crew has learned the place, 0-1 (set when they are rolled; the battle and the gate card's odds read it). */
   adapt?: number;
   /** Hardcore: two or three men sent to test the wire; the crew they report to is `probe` (it turns up within a week or so, knowing where the line is thin). */
