@@ -22,15 +22,18 @@ describe('the dome plant geometry audit', () => {
       fx.dispose();
     });
   }
-  it('is three draw calls with lamps (machinery, lamp heads, light pools), and the buried lines add one hidden mesh', () => {
+  it('is three draw calls with lamps (machinery, lamp heads, light pools), and the buried lines and the passage add two hidden meshes', () => {
     const fx = makeDomePlant('arcology', 9, 'closed', flat, { loop: 'recycle' });
     const visible: THREE.Object3D[] = []; fx.group.traverse(o => { if ((o as THREE.Mesh).isMesh && o.visible) visible.push(o); });
     expect(visible.length).toBe(3);
     const all: THREE.Object3D[] = []; fx.group.traverse(o => { if ((o as THREE.Mesh).isMesh) all.push(o); });
-    expect(all.length).toBe(4);
+    expect(all.length).toBe(5);
     fx.setUnder(true);
     const v2: THREE.Object3D[] = []; fx.group.traverse(o => { if ((o as THREE.Mesh).isMesh && o.visible) v2.push(o); });
-    expect(v2.length).toBe(4);
+    expect(v2.length).toBe(5);
+    fx.setUnder(false); fx.setView('cutaway');
+    const v3: THREE.Object3D[] = []; fx.group.traverse(o => { if ((o as THREE.Mesh).isMesh && o.visible) v3.push(o); });
+    expect(v3.length).toBe(4);   // the passage shows in the cutaway view, the other buried lines do not
     fx.dispose();
   });
   it('a dark dome has no lamps and a burning unit adds no draw call', () => {
