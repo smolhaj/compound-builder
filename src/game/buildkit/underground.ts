@@ -168,7 +168,7 @@ export function siteProblem(def: KitPieceDef, x: number, z: number, rot: number,
   return placementProblem(def, x, z, rot, site, placed) ?? undergroundProblem(def, x, z, rot, site.height, placed) ?? domeBunkerProblem(def, x, z, rot, site.height, placed) ?? padOverBlocked(def, x, z, rot, site);
 }
 
-const domesIn = (placed: readonly Placed[]): DomeAt[] => placed.flatMap(p => (parseDomeKind(p.kind) ? [domeAt(p.kind, p.x, p.z, p.rot)!] : []));
+const domesIn = (placed: readonly Placed[]): DomeAt[] => placed.flatMap(p => (parseDomeKind(p.kind) ? [domeAt(p.kind, p.x, p.z, p.rot, (p as { portAngle?: number }).portAngle)!] : []));
 
 /** The ground over a rectangle, highest point (a bunker's floor is deepest under the high side). */
 const topOf = (r: Rect, height: (x: number, z: number) => number): number => { let m = -Infinity; for (const [x, z] of [[r.x0, r.z0], [r.x1, r.z0], [r.x0, r.z1], [r.x1, r.z1], [(r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2]]) m = Math.max(m, height(x, z)); return m; };

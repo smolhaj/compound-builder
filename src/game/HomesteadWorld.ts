@@ -2408,7 +2408,7 @@ export class HomesteadWorld {
     for (const p of list) {
       const pb = this._built.get(p.id);
       if (!pb?.under || !p.kind.startsWith('bunker_')) continue;
-      const d = domeAt(dome.kind, dome.x, dome.z, dome.rot);
+      const d = domeAt(dome.kind, dome.x, dome.z, dome.rot, (dome as { portAngle?: number }).portAngle);
       if (!d || Math.hypot(p.x - dome.x, p.z - dome.z) >= usableR(d) + 0.25) continue;
       const bp = blueprintOf(p), fin = p.stage >= bp.stages.length, hrs = bp.stages[Math.min(p.stage, bp.stages.length - 1)].hours, r = footprint(KIT[p.kind], p.x, p.z, p.rot, false);
       out.push({ id: p.id, x0: r.x0 - dome.x, z0: r.z0 - dome.z, x1: r.x1 - dome.x, z1: r.z1 - dome.z, floorY: pb.under.datum - y0, roofY: pb.under.datum + ROOF_TOP - y0, stage: fin ? 5 : p.stage, f: fin ? 1 : Math.round(20 * (p.supplied ? p.done / hrs : 0)) / 20, entry: isEntry(KIT[p.kind]), plinth: !p.underDome?.with });
@@ -2452,7 +2452,7 @@ export class HomesteadWorld {
   }
   /** The bunker rooms under a dome that the section plane cuts, in the face's frame. */
   private _sectionRooms(dome: Structure, rot: number, y0: number, list: readonly Structure[]): SectionRoom[] {
-    const d = domeAt(dome.kind, dome.x, dome.z, dome.rot), out: SectionRoom[] = [], c = Math.cos(rot), s = Math.sin(rot);
+    const d = domeAt(dome.kind, dome.x, dome.z, dome.rot, (dome as { portAngle?: number }).portAngle), out: SectionRoom[] = [], c = Math.cos(rot), s = Math.sin(rot);
     if (!d) return out;
     for (const p of list) {
       const pb = this._built.get(p.id);

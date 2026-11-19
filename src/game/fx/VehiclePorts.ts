@@ -45,6 +45,9 @@ function drape(cx: number, cz: number, u: [number, number], hl: number, hw: numb
   return paint(g, color);
 }
 
+/** Lateral offset of the person airlock's axis from the port's, along the shell (units). */
+const lamOfPerson = (f: PortFrame): number => (f.person!.outer[0] - f.outer[0]) * f.u[1] - (f.person!.outer[1] - f.outer[1]) * f.u[0];
+
 export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, z: number) => number): PortFixtures {
   const group = new THREE.Group(); group.name = 'vehicle_ports';
   const geos: THREE.BufferGeometry[] = [], lamps: Array<{ x: number; y: number; z: number }> = [];
@@ -59,7 +62,7 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     // bollards: steel posts set in concrete across the mouth of the apron, a gap for the road
     for (const [bx, bz] of f.bollards) {
       const lam = (bx - f.cx) * u[1] - (bz - f.cz) * u[0];
-      if (Math.abs(lam) < v.dw * 0.5) continue;
+      if (Math.abs(lam) < v.dw * 0.5 + 0.05 || (f.person && Math.abs(lam - lamOfPerson(f)) < 0.42)) continue;   // (a gap for the port's door and for the person airlock's)
       const y = ground(bx, bz);
       geos.push(cyl(0.018, 0.12, bx, y + 0.06, bz, STEEL), cyl(0.02, 0.014, bx, y + 0.114, bz, YELLOW));
     }

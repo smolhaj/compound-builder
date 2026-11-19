@@ -17,7 +17,7 @@
  *                    arcology: a large vehicle bay. A link between domes is a walkway or a tunnel for people: it is not a vehicle entrance (links.ts), a vehicle always uses its
  *                    dome's own port.
  */
-import { TIER, type DomeTier } from './tiers';
+import { FRAME_SPANS, TIER, type DomeTier } from './tiers';
 import { plantSize, yardGeometry, type YardGeom } from './plantYard';
 import type { Vestibule } from './vestibule';
 import type { MaterialId } from '../materials';
@@ -25,8 +25,7 @@ import { MATERIALS } from '../materials';
 
 export type Pt = [number, number];
 const TAU = Math.PI * 2;
-/** Person airlock angles and chamber widths (the same table as standing.ts, kept here so this module stays below it in the import order). */
-const airlockAngles = (n: number): number[] => Array.from({ length: n }, (_, i) => i * TAU / Math.max(1, n));
+/** Person airlock chamber widths (the same table as standing.ts, kept here so this module stays below it in the import order). */
 const VESTIBULE: Record<DomeTier, { w: number }> = { earthen: { w: 0.24 }, geodesic: { w: 0.42 }, glass: { w: 0.55 }, arcology: { w: 1.1 } };
 
 /** The vehicles the port is sized for (world units, SCALE v2: 20 ft a unit). A pickup is 0.92 long (`game/perimeter/gateKitLayout`), a box truck about 1.2, the motorhome 0.44 wide. */
@@ -91,28 +90,48 @@ export interface PortCtx {
 
 /** The inside plant's span width, as `plant.ts` lays it: the equipment fills this much arc round the middle of each of the first two spans (units). */
 function plantSpan(tier: DomeTier, r: number): number {
-  const n = Math.max(1, TIER[tier].airlocks), step = TAU / n, inRho = r - (tier === 'arcology' ? 0.03 : 0.12) - 0.5;
+  const n = FRAME_SPANS[tier], step = TAU / n, inRho = r - (tier === 'arcology' ? 0.03 : 0.12) - 0.5;
   return Math.max(1.2, step * inRho - 2.4);
 }
 
-/** Every stretch of the shell the port must keep out of. */
+/** The gap between the port's chamber and the person airlock beside it, in one gate complex (units). PROPOSED. */
+export const COMPLEX_GAP = 0.2;
+/** Angle between the port's axis and the person airlock's axis in the complex (radians): chamber half widths and the gap, over the radius. */
+export function personOffset(tier: DomeTier, r: number): number {
+  const v = portVestibule(tier, r);
+  return v ? (v.w / 2 + VESTIBULE[tier].w / 2 + COMPLEX_GAP) / r : 0;
+}
+/**
+ * The public entrances of a dome: the main person airlock beside the vehicle port (one gate complex, on the one approach), and, on the arcology, a second person airlock
+ * opposite (PROPOSED: the owner wants one entrance, two at most). `port` is the port's axis. The person airlock stands on the larger-angle side of the port.
+ */
+export function personAngles(tier: DomeTier, r: number, port: number): number[] {
+  const n = TIER[tier].airlocks;
+  if (!n || tier === 'earthen') return [];
+  const out = [port + personOffset(tier, r)];
+  if (n > 1) out.push(port + Math.PI);
+  return out;
+}
+
+/** Every stretch of the shell the gate complex must keep out of (centered on the port's axis; wide enough for the person airlock on either side). */
 export function blockedArcs(c: PortCtx): Arc[] {
   const v = portVestibule(c.tier, c.r);
   if (!v) return [];
-  const out: Arc[] = [], hw = v.w / 2, pv = VESTIBULE[c.tier], n = TIER[c.tier].airlocks;
+  const out: Arc[] = [], reach = v.w / 2 + personOffset(c.tier, c.r) * c.r + VESTIBULE[c.tier].w / 2;   // widest the complex reaches from the port's axis
   const turn = c.rot * Math.PI / 2;
-  // the person airlocks: their chambers' width, the port's half width and a clear gap
-  for (const a of airlockAngles(n)) out.push({ angle: a + turn, half: (pv.w / 2 + hw + PORT_CLEAR) / c.r, why: 'person airlock' });
-  // the plant yard outside and the plant inside: the spans between the first airlocks (glass and arcology)
+  // the plant yard outside and the plant inside: the spans of the reference frame (glass and arcology)
   const y = yardGeometry(c.tier, c.r, c.rot);
+  const arcs: Arc[] = [];
   if (y) {
-    out.push({ angle: y.phi, half: (y.W / 2 + hw + PORT_CLEAR) / c.r, why: 'plant yard' });
-    const span = plantSpan(c.tier, c.r), step = TAU / n;
-    for (const k of [0, 1]) out.push({ angle: k * step + step / 2 + turn, half: (span / 2 + hw + PORT_CLEAR) / c.r, why: 'plant spans' });
-    // the utility lines run out to the yard's own angle: the same arc as the yard (bunker.ts `inUtilityLane`)
+    arcs.push({ angle: y.phi, half: (y.W / 2 + reach + PORT_CLEAR) / c.r, why: 'plant yard' });
+    const span = plantSpan(c.tier, c.r), step = TAU / FRAME_SPANS[c.tier];
+    for (const k of [0, 1]) arcs.push({ angle: k * step + step / 2 + turn, half: (span / 2 + reach + PORT_CLEAR) / c.r, why: 'plant spans' });
   }
-  for (const l of c.links ?? []) out.push({ angle: l, half: (0.17 + hw + PORT_CLEAR) / c.r, why: 'link airlock' });
-  for (const a of c.avoid ?? []) out.push({ angle: a.angle, half: (a.width + hw + PORT_CLEAR) / c.r, why: a.why ?? 'bunker hatch' });
+  for (const l of c.links ?? []) arcs.push({ angle: l, half: (0.17 + reach + PORT_CLEAR) / c.r, why: 'link airlock' });
+  for (const a of c.avoid ?? []) arcs.push({ angle: a.angle, half: (a.width + reach + PORT_CLEAR) / c.r, why: a.why ?? 'bunker hatch' });
+  out.push(...arcs);
+  // the second entrance stands opposite the complex: the same lanes must be clear there too
+  if (TIER[c.tier].airlocks > 1) for (const a of arcs) out.push({ angle: a.angle + Math.PI, half: a.half, why: a.why + ' (second entrance)' });
   return out;
 }
 
@@ -174,6 +193,8 @@ export interface PortFrame {
   bollards: Pt[]; camera: Pt; light: Pt; booth: Pt;
   /** Does a vehicle drive in (a chamber the length of a truck)? */
   fits: boolean;
+  /** The main person airlock of the gate complex beside the port: its door outside (x, z) and axis angle (null: none). */
+  person: { angle: number; outer: Pt } | null;
 }
 
 const at = (cx: number, cz: number, u: Pt, rho: number, lam = 0): Pt => [cx + u[0] * rho + u[1] * lam, cz + u[1] * rho - u[0] * lam];
@@ -181,18 +202,21 @@ const at = (cx: number, cz: number, u: Pt, rho: number, lam = 0): Pt => [cx + u[
 /** The frame of the port of the dome at (cx, cz) whose shell has radius r, at `angle`. The earthen dome has only its low door: the frame is that door with a gravel apron (no gates, no lane). */
 export function portFrame(tier: DomeTier, cx: number, cz: number, r: number, angle: number): PortFrame | null {
   const v = portVestibule(tier, r) ?? EARTHEN_DOOR;
-  const u: Pt = [Math.sin(angle), Math.cos(angle)], hw = v.dw / 2 + 0.45;
-  const apronC = at(cx, cz, u, r + APRON_LEN / 2);
+  const u: Pt = [Math.sin(angle), Math.cos(angle)], off = tier === 'earthen' ? 0 : personOffset(tier, r) * r;
+  // the apron reaches across the port's door and the person airlock's beside it (the larger-angle side)
+  const hw = v.dw / 2 + 0.45 + off / 2;
+  const apronC = at(cx, cz, u, r + APRON_LEN / 2, off / 2);
   const bollards: Pt[] = [];
   const nb = tier === 'earthen' ? 0 : BASE[tier].bollards;
-  for (let i = 0; i < nb; i++) { const s = (i + 0.5) / nb * 2 - 1; bollards.push(at(cx, cz, u, r + APRON_LEN - 0.12, s * (hw + 0.1))); }
+  for (let i = 0; i < nb; i++) { const s = (i + 0.5) / nb * 2 - 1; bollards.push(at(cx, cz, u, r + APRON_LEN - 0.12, off / 2 + s * (hw + 0.1))); }
   return {
     angle, u, v, cx, cz, r,
     outer: at(cx, cz, u, r), inner: at(cx, cz, u, r - v.len), mid: at(cx, cz, u, r - v.len / 2),
     apronEnd: at(cx, cz, u, r + APRON_LEN), straightStart: at(cx, cz, u, r + STRAIGHT_LEN),
     apron: { c: apronC, hl: APRON_LEN / 2, hw },
-    bollards, camera: at(cx, cz, u, r + 0.35, -(v.cw / 2 + 0.3)), light: at(cx, cz, u, r + 0.35, v.cw / 2 + 0.3), booth: at(cx, cz, u, r + 0.55, v.cw / 2 + 0.75),
+    bollards, camera: at(cx, cz, u, r + 0.35, -(v.cw / 2 + 0.3)), light: at(cx, cz, u, r + 0.35, -(v.cw / 2 + 0.55)), booth: at(cx, cz, u, r + 0.55, -(v.cw / 2 + 0.85)),
     fits: tier !== 'earthen' && vehicleFits(v),
+    person: tier === 'earthen' ? null : (() => { const pa = angle + personOffset(tier, r); return { angle: pa, outer: [cx + Math.sin(pa) * r, cz + Math.cos(pa) * r] as Pt }; })(),
   };
 }
 

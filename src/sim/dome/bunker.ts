@@ -17,7 +17,8 @@
  * (`WITH_DOME`), or AFTER, by excavating under the finished floor with extra shoring (`AFTER_DOME`). A piece built with the dome waits for the crater to
  * be dug as deep as it needs, and the dome waits to backfill until every such piece has its walls and roof (`holdFor`, `holdDome`).
  */
-import { TIER, CELL_FT, shellFt, cellsOfKind, tierOfKind, type DomeTier } from './tiers';
+import { choosePortAngle, DEFAULT_BEARING, personAngles, portVestibule } from './vehiclePort';
+import { TIER, CELL_FT, shellFt, cellsOfKind, tierOfKind, type DomeTier, FRAME_SPANS } from './tiers';
 import { domeGeometry } from './geometry';
 import { SKIRT_MARGIN_FT, DIG_DEPTH_FT, rectVsCircle, type Rect } from './siting';
 import { vestibuleOf } from './vestibule';
@@ -26,7 +27,6 @@ import { domeCost } from './cost';
 import type { Blueprint } from '../blueprints';
 
 const FT_PER_UNIT = 2 * CELL_FT;
-const TAU = Math.PI * 2;
 const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
 
 /** Tunables (all PROPOSED). */
@@ -60,12 +60,12 @@ export interface UnderDome {
   floorFt: number;
 }
 
-export interface DomeAt { tier: DomeTier; cells: number; x: number; z: number; rot: number }
+export interface DomeAt { tier: DomeTier; cells: number; x: number; z: number; rot: number; /** The vehicle port's stamped angle (Structure.portAngle); absent: the free angle nearest the east. */ portAngle?: number }
 
 /** The dome a kit id and a place make, or null (not a dome). */
-export function domeAt(kind: string, x: number, z: number, rot = 0): DomeAt | null {
+export function domeAt(kind: string, x: number, z: number, rot = 0, portAngle?: number): DomeAt | null {
   const tier = tierOfKind(kind);
-  return tier ? { tier, cells: cellsOfKind(kind) ?? TIER[tier].cells, x, z, rot } : null;
+  return tier ? { tier, cells: cellsOfKind(kind) ?? TIER[tier].cells, x, z, rot, portAngle } : null;
 }
 
 /** Radius (world units) of the shell and of the ring's inner face and of the ground a room may use. */
@@ -82,14 +82,21 @@ export function againstSkirt(d: DomeAt, r: Rect): 'inside' | 'outside' | 'stradd
   return rectVsCircle({ x: d.x, z: d.z, r: shellR(d) + 0.05 }, r) === 'outside' ? 'outside' : 'straddles';
 }
 
-/** Does a rectangle stand in the lane of an airlock (the chamber, its doors and the sleeve's way in)? */
+/** Does a rectangle stand in the lane of an entrance (the chamber, its doors and the sleeve's way in): the person airlocks and the vehicle port of the gate complex? */
 export function inAirlockLane(d: DomeAt, r: Rect): boolean {
-  const n = d.tier === 'earthen' ? 1 : TIER[d.tier].airlocks, v = vestibuleOf(d.tier, shellR(d));
-  const half = v.w / 2 + 0.1, from = shellR(d) - v.len - 0.1, to = shellR(d);
-  for (let i = 0; i < n; i++) {
-    const a = (d.tier === 'earthen' ? 0 : i * TAU / n) + d.rot * Math.PI / 2, s = Math.sin(a), c = Math.cos(a);
+  const R = shellR(d), v = vestibuleOf(d.tier, R), pv = portVestibule(d.tier, R);
+  // (each lane: its angle, the chamber's width and length in from the shell)
+  const lanes: Array<{ a: number; w: number; len: number }> = [];
+  if (d.tier === 'earthen') lanes.push({ a: d.rot * Math.PI / 2, w: v.w, len: v.len });
+  else {
+    const port = d.portAngle ?? choosePortAngle({ tier: d.tier, r: R, rot: d.rot }, DEFAULT_BEARING).angle;
+    for (const a of personAngles(d.tier, R, port)) lanes.push({ a, w: v.w, len: v.len });
+    if (pv) lanes.push({ a: port, w: pv.w, len: pv.len });
+  }
+  for (const l of lanes) {
+    const half = l.w / 2 + 0.1, from = R - l.len - 0.1, s = Math.sin(l.a), c = Math.cos(l.a);
     for (let k = 0; k <= 8; k++) {
-      const t = from + (to - from) * k / 8, px = d.x + s * t, pz = d.z + c * t;
+      const t = from + (R - from) * k / 8, px = d.x + s * t, pz = d.z + c * t;
       const nx = Math.max(r.x0, Math.min(px, r.x1)), nz = Math.max(r.z0, Math.min(pz, r.z1));
       if (Math.hypot(nx - px, nz - pz) < half) return true;
     }
@@ -100,7 +107,7 @@ export function inAirlockLane(d: DomeAt, r: Rect): boolean {
 /** Does a rectangle stand on the buried power, water, sewer and data lines (laid across the pit floor from the plant out to the ring before anything else goes in)? */
 export function inUtilityLane(d: DomeAt, r: Rect): boolean {
   if (!hasUtilities(d.tier)) return false;
-  const R = shellR(d), a0 = (d.tier === 'earthen' ? 0 : 0) + d.rot * Math.PI / 2, n = TIER[d.tier].airlocks;
+  const R = shellR(d), a0 = (d.tier === 'earthen' ? 0 : 0) + d.rot * Math.PI / 2, n = FRAME_SPANS[d.tier];
   for (const u of utilityRuns(d.tier, d.cells)) {
     if (u.kind === 'sleeve') continue;
     // (the runs lie at the angle between the first two airlocks, turned with the dome; each is offset sideways by `off`)
