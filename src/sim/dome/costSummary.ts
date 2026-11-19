@@ -11,7 +11,7 @@ import { domeGeometry } from './geometry';
 import { yardBill, hasYard } from './plantYard';
 import { MATERIALS } from '../materials';
 import { advancedFilterUsd, closedEcologyUsd, scrubberUsd } from './air';
-import { nightKwhPerDay } from './climate';
+import { domeLoad, nightKwhPerDay } from './climate';
 import { auxKwhDay } from './live';
 import { spareUsd } from './plantUnits';
 import { runningCost, type Running } from './pricing';
@@ -67,7 +67,8 @@ export function domeCostSummary(tier: DomeTier, cells: number = TIER[tier].cells
     opts.push({ id: 'advanced', label: 'Advanced filtering (HEPA, carbon)', usd: advancedFilterUsd(tier, cells) });
     opts.push({ id: 'closed', label: 'Closed ecology', usd: closedEcologyUsd(tier, cells) });
   }
-  const kwh = nightKwhPerDay(tier, cells, 20, 'frost') + auxKwhDay(tier, cells);
+  // the design day is the worse of a 20 F night kept frost-free and a 100 F day in full sun held in the temperate band, plus the always-on house load
+  const kwh = Math.max(nightKwhPerDay(tier, cells, 20, 'frost'), domeLoad(tier, cells, 100, 1, 'temperate').kwhPerDay) + auxKwhDay(tier, cells);
   return {
     tier, cells, diameterFt: c.diameterFt, floorSf: Math.round(g.footprintSf), lines, earthwork: earth, totalUsd: c.totalUsd, usdPerSqFt: Math.round(c.totalUsd / g.footprintSf),
     options: opts, extras, grandUsd: c.totalUsd + extras.reduce((a, l) => a + l.usd, 0), running: runningCost(tier, kwh, c.totalUsd - c.permitUsd - c.laborUsd),
