@@ -80,14 +80,15 @@ try {
   const hs = await page.evaluate(async () => { const K = await import('/src/game/buildkit/kit.ts'), g = window.__cb.game.getState().game, w = window.__cb.world; return g.structures.filter(s => ['log_house', 'guest_house', 'workshop', 'barn'].includes(s.kind)).map(s => ({ id: s.id, kind: s.kind, x: s.x, z: s.z, cz: K.KIT[s.kind].cellsZ * K.CELL / 2, cx: K.KIT[s.kind].cellsX * K.CELL / 2 })); });
   const house = hs.find(s => s.kind === 'log_house');
   const door = (dz, y, dx = 0) => page.evaluate(([id, dx, y, dz]) => { const e = window.__cb.world.localToWorld(id, dx, y, dz); return [e.x, e.y, e.z]; }, [house.id, dx, y, dz]);
+  const segAt = (a, rho, hh = h) => { const ss = segsOf(a); if (!ss.length) return along(a, rho, 0, hh); const t = ss.sort((p, q) => Math.abs(Math.hypot(p.x, p.z) / R - rho) - Math.abs(Math.hypot(q.x, q.z) / R - rho))[0]; return L(t.x / R, t.z / R, hh); };
   const frac = p => [(p[0] - D.x) / R, (p[2] - D.z) / R];
   const centerOk = plan.plaza != null;
-  await pair('01-lawn-homes', centerOk ? L(0, 0, h) : along(best.a, 0.3, 0, h), [house.x, ground + 0.2, house.z], 70, [[0.14, 0.1], [-0.06, 0.45]]);
-  await pair('02-path-between', along(best.a, 0.4, 0, h), along(best.a, 0.95, 0, 0.25), 62, [frac(along(best.a, 0.6, 0.0))]);
+  await pair('01-lawn-homes', centerOk ? L(0, 0, h) : segAt(best.a, 0.3), [house.x, ground + 0.2, house.z], 70, [[0.14, 0.1], [-0.06, 0.45]]);
+  await pair('02-path-between', segAt(best.a, 0.4), along(best.a, 0.95, 0, 0.25), 62, [frac(segAt(best.a, 0.62, 0))]);
   { const e = await door(house.cz + 0.9, h), l = await door(house.cz - 0.1, 0.22);
     await pair('03-house-door', e, l, 62, [[(e[0] - D.x) / R + 0.05, (e[2] - D.z) / R - 0.03]]); }
-  await pair('05-airlock-person-out', along(best.a, 0.66, 0, h), along(best.a, 1.15, 0, 0.25), 64, [frac(along(best.a, 0.8, 0.02))]);
-  await pair('06-glass-ceiling', along(best.a, 0.35, 0.02, 0.3), L(0.05, 0.1, 5), 80, []);
+  await pair('05-airlock-person-out', segAt(best.a, 0.68), along(best.a, 1.15, 0, 0.25), 64, [frac(segAt(best.a, 0.8, 0))]);
+  await pair('06-glass-ceiling', segAt(best.a, 0.35, 0.3), L(0.05, 0.1, 5), 80, []);
   if (info.yard) {
     const [yx, yz] = info.yard.chamber, ph = info.yard.phi;
     await pair('04-plant-yard-airlock', L(Math.sin(ph) * 0.35, Math.cos(ph) * 0.35, h), [D.x + yx, ground + 0.25, D.z + yz], 64, [[Math.sin(ph) * 0.7 + 0.04, Math.cos(ph) * 0.7]]);
