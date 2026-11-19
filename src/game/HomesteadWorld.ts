@@ -171,8 +171,12 @@ import { TIER, cellsOfKind, shellFt, tierOfKind } from '../sim/dome/tiers';
 import { inYard, yardGeometry } from '../sim/dome/plantYard';
 import { isGradedTier } from '../sim/dome/grading';
 import { makeDomePlant, plantKey, type DomePlantFx, type PlantLook } from './fx/DomePlant';
+import { makeVehiclePorts, type PortFixtures, type PortInput } from './fx/VehiclePorts';
+import { planToPort, portFrameOf } from '../sim/dome/portRoad';
+import { insideLane, portCycleSeconds, vehicleTail } from '../sim/dome/vehiclePort';
+import { guardCount } from '../sim/guards';
 import { makeLinkFixtures, linksKey, type LinkFixtureInput, type LinkFixtures } from './fx/DomeLinks';
-import { domesOf as standingDomes } from '../sim/dome/standing';
+import { domeFrom, domesOf as standingDomes } from '../sim/dome/standing';
 import { linkState, linksOf } from '../sim/dome/linkGraph';
 import { stateOf as domeStateOf } from '../sim/dome/live';
 import { fxOf as plantFxOf, unitsOf as plantUnitsOf } from '../sim/dome/plantLive';
@@ -381,6 +385,7 @@ export class HomesteadWorld {
     this.county = countyRoad(site.region, seed);
     this.countyGaps = this._findCountyGaps();
     this.plan = roadPlanFor(site, seed, this.parcel);
+    this._baseRef = this.plan;
     this.access = accessFromPlan(this.plan);
     this.terrain = new TerrainRenderer(ws.scene);
     this.ridges = new DistantRidges(ws.scene);
@@ -455,6 +460,52 @@ export class HomesteadWorld {
     this.lived.update(game, performance.now(), { night: f.night, lightsOut: lightsOutNow(game) });
     this._domeAir(game);
     this._syncLinks(game);
+    this._syncPorts(game);
+  }
+
+
+  // ── the vehicle sally ports (sim/dome/vehiclePort.ts): the road ends at each dome's port, the apron, bollards and lane are drawn, the truck cycles the lock ──
+  /** The road as the county plans it, before any dome has taken the end of it to its port. */
+  private _baseRef!: RoadPlan;
+  private _portKey = '';
+  private _ports: PortFixtures | null = null;
+  private _portTail: Array<[number, number]> = [];
+  private _syncPorts(game: GameState): void {
+    const domes = standingDomes(game).filter(d => portFrameOf(d));
+    const guarded = guardCount(game) > 0;
+    const key = domes.map(d => `${d.id}:${d.x},${d.z}:${portFrameOf(d)!.angle.toFixed(3)}`).join('|') + `|${this._baseRef.signature}|${this._drive ? 1 : 0}|${guarded ? 1 : 0}`;
+    if (key === this._portKey) return;
+    this._portKey = key;
+    const pr = planToPort(this._baseRef, domes, (x, z) => this.parcel.height(x, z));
+    const ins: PortInput[] = domes.map(d => {
+      const f = portFrameOf(d)!;
+      return { id: d.id, frame: f, lane: insideLane(f), guarded };
+    });
+    if (this._ports) { this._root.remove(this._ports.group); this._ports.dispose(); this._ports = null; }
+    if (ins.length) { const f = makeVehiclePorts(ins, (x, z) => this.groundAt(x, z)); this._root.add(f.group); this._ports = f; }
+    this._applyPlan(pr ? pr.plan : this._baseRef);
+    this._portTail = pr ? vehicleTail(pr.frame).slice(1) : [];
+    this.truck.setLock(pr && pr.dome.tier !== 'earthen' ? { x: pr.frame.outer[0], z: pr.frame.outer[1], s: portCycleSeconds(pr.dome.tier) } : null);
+    this._tailKey = '';
+  }
+  /** Make `plan` the road in use: redraw the land along it, the road and the truck's way. */
+  private _applyPlan(plan: RoadPlan): void {
+    if (plan === this.plan) return;
+    const was = roadBedOf(this.plan).bbox;
+    this.plan = plan;
+    this.access = accessFromPlan(plan);
+    const bed = this._drive ? roadBedOf(plan) : null, nb = roadBedOf(plan).bbox;
+    this.parcel.setRoadBed(bed);
+    if (this._quality) {
+      this.terrain.refresh(this._terrainSource, Math.min(was[0], nb[0]), Math.min(was[1], nb[1]), Math.max(was[2], nb[2]), Math.max(was[3], nb[3]));
+      this._plant(this._quality);
+    }
+    this._buildRoads();
+    this.truck.dispose();
+    this.truck = new DeliveryTruck(this._ws.scene, this._truckRoute(), (x, z) => (Math.abs(x - this.county.x(z)) < ROAD_W ? this.countyY(x, z) : this.groundAt(x, z)), this.county.x, (x, z) => this._driveY(x, z));
+    this.plow.setRoute(this.access.drive);
+    this._stockKey = '';
+    this._ws.invalidateShadows();
   }
 
   /** The main dome's inner haze and closed-ecology plants (sim/dome/live.ts domeLook), kept on its own group. */
@@ -576,7 +627,9 @@ export class HomesteadWorld {
   /** The family chose another entrance (before the drive): plan the road from it, redraw it and send the truck the new way. */
   replan(site: LandSite): void {
     const plan = roadPlanFor(site, this._seed, this.parcel);
-    if (plan === this.plan) return;
+    if (plan === this._baseRef) return;
+    this._baseRef = plan;
+    this._portKey = '';
     this.plan = plan;
     this.access = accessFromPlan(plan);
     this.parcel.setRoadBed(this._drive ? roadBedOf(plan) : null);
@@ -1484,9 +1537,9 @@ export class HomesteadWorld {
   /** The delivery truck drives on through a tunnel when the yard lies beyond one (re-found when the layout changes, between deliveries). */
   private _syncTruckTail(): void {
     const drive = this._truckRoute(), end = drive[drive.length - 1], y = this.access.yard;
-    const key = `${this.corridors.corridors.map(c => c.id + (c.collapsed ? 'x' : '')).join()}|${[...this._built.keys()].length}|${end}|${y.x},${y.z}|${this._drive}`;
+    const key = `${this.corridors.corridors.map(c => c.id + (c.collapsed ? 'x' : '')).join()}|${[...this._built.keys()].length}|${end}|${y.x},${y.z}|${this._drive}|${this._portTail.length}`;
     if (key === this._tailKey || !end) return;
-    const tail = this.corridors.corridors.length ? this.vehicleRoute(end, [y.x, y.z]) ?? [] : [];
+    const tail = this._portTail.length ? this._portTail : this.corridors.corridors.length ? this.vehicleRoute(end, [y.x, y.z]) ?? [] : [];
     if (this.truck.setTail(tail)) this._tailKey = key;
   }
 
@@ -1764,6 +1817,8 @@ export class HomesteadWorld {
     if (climb) opts.rise = climb.rise;
     // a dome meets the hill: its stem wall and berm are draped on the natural ground (no pad), sampled from the group's own frame
     if (def.level === 'cover') { const gx = p.x, gz = p.z, base = gradedDome ? this.parcel.height : this._naturalH; opts.ground = (lx, lz) => base(gx + lx, gz + lz) - y; }
+    // a dome's vehicle sally port is cut at its stamped angle on the shell (turned into the group's own frame; sim/dome/vehiclePort.ts)
+    if (def.level === 'cover') { const vp = domeFrom(p as unknown as Structure)?.airlocks.find(a => a.role === 'vehicle'); if (vp) opts.port = vp.angle - p.rot * Math.PI / 2; }
     if (p.kind === 'vehicle_yard') {
       const half = def.cellsX * CELL / 2;
       opts.spur = yardSpur(this.access.drive, p.x, p.z, p.rot, half, DRIVE_W);

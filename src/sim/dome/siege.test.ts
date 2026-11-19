@@ -113,7 +113,7 @@ describe('the skirt against a dig', () => {
 describe('a tunnel crosses a dome only through an airlock', () => {
   const dome = (tier: DomeTier = 'glass') => domeFrom({ id: 'dm', kind: KIND[tier], x: 10, z: -4, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 })!;
   it('the airlocks are evenly spread and sit on the shell', () => {
-    for (const t of BUILT) { const d = dome(t); expect(d.airlocks.length).toBe(TIER[t].airlocks); for (const a of d.airlocks) expect(Math.hypot(a.x - d.x, a.z - d.z)).toBeCloseTo(d.r, 5); }
+    for (const t of BUILT) { const d = dome(t); expect(d.airlocks.filter(a => !a.role).length).toBe(TIER[t].airlocks); for (const a of d.airlocks) expect(Math.hypot(a.x - d.x, a.z - d.z)).toBeCloseTo(d.r, 5); }
     const a = airlocksOf('arcology', 0, 0, 9, 1); expect(a[0].angle).toBeCloseTo(Math.PI / 2, 9);
   });
   it('a line that never meets the shell is untouched; one that meets it away from an airlock is refused with the nearest airlock named', () => {
@@ -153,7 +153,7 @@ describe('the shell in a raid', () => {
     const g = withDome(place(3, 'standard', 'armed'), 'glass');
     const w = withDomeShell(g, { x: 0, z: 0 });
     const run = w.perimeter.find(r => r.id === 'dome:dm')!;
-    expect(run.kind).toBe('shell_glass'); expect(run.gates.length).toBe(3); expect(isShellKind(run.kind)).toBe(true);
+    expect(run.kind).toBe('shell_glass'); expect(run.gates.length).toBe(4); expect(isShellKind(run.kind)).toBe(true);
     expect(withDomeShell(g, { x: 500, z: 500 })).toBe(g);
     expect(shellRun(domesOf(g)[0], [1]).gates.filter(x => (x as { breach?: boolean }).breach).length).toBe(1);
     const p = shellPointAt(domesOf(g)[0], run.gates[0].at);
