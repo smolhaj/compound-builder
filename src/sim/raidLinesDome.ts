@@ -5,11 +5,11 @@
  */
 type Variants = Partial<Record<string, readonly string[]>>;
 export type DomeCtx = 'dome_scout' | 'dome_shots' | 'dome_tool' | 'dome_cut' | 'dome_airlock' | 'dome_ram' | 'dome_blast' | 'dome_skirt' | 'dome_argue' | 'dome_order' | 'dome_panic' | 'dome_vow'
-  | 'dome_watch' | 'dome_fire' | 'dome_holds' | 'dome_gone' | 'dome_angry' | 'dome_bounce' | 'dome_taunt';
+  | 'dome_watch' | 'dome_fire' | 'dome_holds' | 'dome_gone' | 'dome_angry' | 'dome_bounce' | 'dome_taunt' | 'dome_react_swing' | 'dome_react_bounce' | 'dome_react_limp' | 'dome_cross';
 
 /** Every key of every pool, so a test can hold the planner to using each one. */
-export const DOME_RAIDER_CTX: readonly DomeCtx[] = ['dome_scout', 'dome_shots', 'dome_tool', 'dome_cut', 'dome_airlock', 'dome_ram', 'dome_blast', 'dome_skirt', 'dome_argue', 'dome_order', 'dome_panic', 'dome_vow', 'dome_angry', 'dome_bounce'];
-export const DOME_DEFENDER_CTX: readonly DomeCtx[] = ['dome_watch', 'dome_fire', 'dome_holds', 'dome_gone', 'dome_taunt'];
+export const DOME_RAIDER_CTX: readonly DomeCtx[] = ['dome_scout', 'dome_shots', 'dome_tool', 'dome_cut', 'dome_airlock', 'dome_ram', 'dome_blast', 'dome_skirt', 'dome_argue', 'dome_order', 'dome_panic', 'dome_vow', 'dome_angry', 'dome_bounce', 'dome_cross'];
+export const DOME_DEFENDER_CTX: readonly DomeCtx[] = ['dome_watch', 'dome_fire', 'dome_holds', 'dome_gone', 'dome_taunt', 'dome_react_swing', 'dome_react_bounce', 'dome_react_limp'];
 export const DOME_VARIANT_KEYS: readonly string[] = ['any', 'desperate', 'hard', 'savage', 'small', 'large', 'leader', 'kid', 'civ', 'vet', 'elder'];
 
 export const DOME_LINES: Record<'raider' | 'defender', Partial<Record<DomeCtx, Variants>>> = {
@@ -94,9 +94,14 @@ export const DOME_LINES: Record<'raider' | 'defender', Partial<Record<DomeCtx, V
       desperate: ['Break. Please, just break.'],
     },
     dome_bounce: {
-      any: ['Who is shooting? Who is hit?', 'Something hit me. I am hit!', 'It came back! Get down!', 'Contact! Where did that come from?', 'My arm. I think it is my arm.'],
-      savage: ['Who fired? Who fired?'],
+      any: ['Who is shooting? Who is hit?', 'Something hit me. I am hit!', 'It came back! Get down!', 'Shit, contact! Where did that come from?', 'My arm. I think it is my arm.'],
+      savage: ['Who fired? Who the hell fired?'],
       desperate: ['I am okay. I am okay. Stay down.'],
+    },
+    dome_cross: {
+      any: ['What? What did you say?', 'I said keep on it, I... never mind.', 'Not now.', 'Who has the bar? Who... give me the bar.', 'Say that again.', 'Shut up, I am counting.', 'Me? I did not... it was him.', 'Wait. Wait, listen.'],
+      hard: ['Eyes on the dome, not on me.'],
+      desperate: ['I cannot... I cannot do this.'],
     },
   },
   defender: {
@@ -109,14 +114,31 @@ export const DOME_LINES: Record<'raider' | 'defender', Partial<Record<DomeCtx, V
     dome_holds: {
       any: ['It is holding.', 'Not a crack.', 'Barely felt that.', 'The inner door is shut.', 'They cannot get in. Stay calm.'],
     },
+    dome_react_swing: {
+      any: ['He is hitting it again. That is a sledge, that is...', 'Listen to that. Just listen.', 'Is it going to... no. No, it is fine.', 'Is it supposed to ring like that?', 'Every time he swings I... okay. It is okay.'],
+      kid: ['Mom, he is hitting it!', 'Is that a hammer?', 'Why does he keep... why does he keep doing that?'],
+      civ: ['Stop that! Stop it!', 'He is going to break his hands, the idiot.'],
+      vet: ['Let him swing. It is not going anywhere.'],
+    },
+    dome_react_bounce: {
+      any: ['Did you see... it came right back at him.', 'Did he just get hit? Was that his own?', 'Wait. He is down. He is... no, he is getting up.', 'That was his round. His own.'],
+      kid: ['Did it bounce?', 'Why did he fall down?'],
+      civ: ['Serves him right. Damn fool.', 'Oh God. Is he... okay. He is up.'],
+      vet: ['Ricochet. Stay back from the wall.'],
+    },
+    dome_react_limp: {
+      any: ['He is leaving. Is he leaving? He is limping.', 'That one is hurt. Look at him.', 'They are... are they going?', 'Is that one... is he all right?'],
+      civ: ['Good. Go.', 'Do not come back, you hear me?'],
+      vet: ['Watch the rest. One going does not mean all of them.'],
+    },
     dome_gone: {
       any: ['They are pulling back.', 'Going down the road. Keep watching.', 'They are leaving. Stay put.', 'That is the last of them. Check the shell at first light.', 'Stay inside until it is light.'],
     },
     dome_taunt: {
       any: ['Go home. You are not getting in.', 'Leave now.', 'It is not opening. Give it up.', 'Go on. Walk away.'],
       kid: ['Go away!', 'You cannot come in!', 'Leave us alone!'],
-      civ: ['Go home! You are not getting in. Leave now.', 'There is nothing for you here. Go to hell.', 'Give it up, damn it. Go home.', 'We told you. Leave.'],
-      vet: ['Back off. It is not opening.', 'You are wasting your time. Go home.', 'Eff off. We are not coming out.', 'Last warning. Walk away.'],
+      civ: ['Go home! You are not getting in. Leave now.', 'There is nothing for you here. Go to hell.', 'Give it up, damn it. Go home.', 'Get the hell off our land.', 'Fuck off. You are not getting in.', 'Fuck off. It is not opening, so fuck off.', 'We told you. Leave.'],
+      vet: ['Back off. It is not opening.', 'You are wasting your time. Go home.', 'Fuck off. We are not coming out.', 'Last warning. Walk away.'],
       elder: ['Go home, friends. It will not open.', 'Please. Go home.'],
     },
   },
