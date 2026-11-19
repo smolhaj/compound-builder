@@ -619,7 +619,7 @@ export function buildSection(o: SectionOpts): THREE.Group {
   sprite(`Skirt: ${TIER[tier].skirtFt} ft deep, ${TIER[tier].skirtThickFt} ft thick`, -half * 0.5, rulerTop - k.depthU - 0.25 * sc, 0.03, 3.4, 'rgba(110,112,118,0.85)');
   sprite(`A plain crew digs ${DIG_DEPTH_FT[0]} to ${DIG_DEPTH_FT[1]} ft`, half * 0.62, rulerTop - DIG_DEPTH_FT[1] / FT_PER_UNIT - 0.14, 0.03, 2.4, 'rgba(120,90,10,0.85)');
   sprite(`A crew that has learned the ground: ${DIG_DEPTH_FT[0] + DIG_DEEPER} to ${DIG_DEPTH_FT[1] + DIG_DEEPER} ft`, half * 0.62, rulerTop - (DIG_DEPTH_FT[1] + DIG_DEEPER) / FT_PER_UNIT - 0.14, 0.03, 3.6, 'rgba(150,40,30,0.85)');
-  for (const r of o.bunker ?? []) sprite(`Bunker: floor ${Math.round(-r.floorY * FT_PER_UNIT + 1)} ft down, inside the skirt`, (r.x0 + r.x1) / 2, r.floorY - 0.2 * sc, 0.03, 3.0, 'rgba(30,60,80,0.88)');
+  for (const r of o.bunker ?? []) sprite(`Bunker: floor ${Math.round(-r.floorY * FT_PER_UNIT + 1)} ft down, inside the skirt`, r.x1 + 1.7 * sc, (r.floorY + r.roofY) / 2, 0.03, 3.0, 'rgba(30,60,80,0.88)');
   let ys = 0; for (const st of STRATA.slice(0, 4)) { const mid = (st.fromFt + Math.min(st.toFt, D * FT_PER_UNIT)) / 2; if (st.fromFt < D * FT_PER_UNIT) sprite(st.name, -half + 1.0, rulerTop - mid / FT_PER_UNIT, 0.02, 1.4); ys++; }
   void ys;
   return g;
