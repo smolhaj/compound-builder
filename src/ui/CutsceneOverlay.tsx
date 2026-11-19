@@ -128,9 +128,10 @@ function Offer() {
 /** The report's detail, folded: rounds fired and the stray lines. */
 function MoreLines({ rounds, lines }: { rounds: number; lines: string[] }) {
   const [open, setOpen] = useState(false);
+  if (rounds <= 0 && lines.length === 0) return null;   // nothing to add: no empty "more" that only says 0 rounds
   return <div style={{ marginTop: 5, fontSize: 12.5 }}>
-    <button onClick={() => setOpen(!open)} style={{ background: 'transparent', border: 0, padding: 0, color: '#d8c9a0', cursor: 'pointer', fontSize: 12.5, fontFamily: 'inherit' }}>{open ? '\u25BE less' : `\u25B8 more (${pluralize(rounds, 'round')} fired${lines.length ? `, ${pluralize(lines.length, 'note')}` : ''})`}</button>
-    {open && <div style={{ opacity: 0.8 }}><div style={{ marginTop: 4 }}>Rounds fired: {rounds}</div>{lines.map((l, i) => <div key={i} style={{ marginTop: 4 }}>{l}</div>)}</div>}
+    <button onClick={() => setOpen(!open)} style={{ background: 'transparent', border: 0, padding: 0, color: '#d8c9a0', cursor: 'pointer', fontSize: 12.5, fontFamily: 'inherit' }}>{open ? '\u25BE less' : `\u25B8 more (${[rounds > 0 ? `${pluralize(rounds, 'round')} fired` : '', lines.length ? pluralize(lines.length, 'note') : ''].filter(Boolean).join(', ')})`}</button>
+    {open && <div style={{ opacity: 0.8 }}>{rounds > 0 && <div style={{ marginTop: 4 }}>Rounds fired: {rounds}</div>}{lines.map((l, i) => <div key={i} style={{ marginTop: 4 }}>{l}</div>)}</div>}
   </div>;
 }
 
