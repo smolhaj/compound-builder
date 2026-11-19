@@ -91,7 +91,12 @@ try {
   await pair('06-glass-ceiling', segAt(best.a, 0.35, 0.3), L(0.05, 0.1, 5), 80, []);
   if (info.yard) {
     const [yx, yz] = info.yard.chamber, ph = info.yard.phi;
-    await pair('04-plant-yard-airlock', L(Math.sin(ph) * 0.35, Math.cos(ph) * 0.35, h), [D.x + yx, ground + 0.25, D.z + yz], 64, [[Math.sin(ph) * 0.7 + 0.04, Math.cos(ph) * 0.7]]);
+    // the plant machinery stands along the shell near the service airlock: stand in the aisle in front of it, clear of every part (QA reads the same layout the world drew)
+    const near = await page.evaluate(async ([tier, R, ph]) => { const P = await import('/src/sim/dome/plant.ts'); const parts = P.plantLayout(tier, R, 'closed', { rot: 0 }).parts.filter(q => !q.onShell && Math.abs(Math.atan2(Math.sin(Math.atan2(q.x, q.z) - ph), Math.cos(Math.atan2(q.x, q.z) - ph))) < 0.55 && Math.hypot(q.x, q.z) < R * 0.98);
+      return { rMin: Math.min(...parts.map(q => Math.hypot(q.x, q.z) - Math.max(q.w ?? 0, q.d ?? 0, (q.r ?? 0) * 2) / 2)), n: parts.length }; }, [tier, R, ph]);
+    lap('plant ' + JSON.stringify(near));
+    const rho = Math.max(0.3 * R, near.rMin - 1.3), eye = [D.x + Math.sin(ph - 0.12) * rho, ground + h, D.z + Math.cos(ph - 0.12) * rho];
+    await pair('04-plant-yard-airlock', eye, [D.x + yx, ground + 0.22, D.z + yz], 70, [[(eye[0] - D.x) / R + Math.sin(ph) * 0.05 + 0.02, (eye[2] - D.z) / R + Math.cos(ph) * 0.05]]);
   }
   await page.close();
 } finally { await browser.close(); vite.kill(); setTimeout(() => process.exit(0), 200); }
