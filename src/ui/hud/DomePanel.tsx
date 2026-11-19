@@ -14,6 +14,7 @@ import { outside, dayLoad, planPowered, buyFiltering, buyLoop, loopBill, loopPro
 import { pluralize } from '../../sim/words';
 import { DomePlantSection } from './DomePlantSection';
 import { domeRunning } from '../../sim/dome/runningLine';
+import { DomeClimateSection } from './DomeClimateSection';
 import { DomeLinksSection } from './DomeLinksSection';
 import { DomeBunkerSection } from './DomeBunkerSection';
 
@@ -143,6 +144,7 @@ export function DomePanel() {
       </div>
     </Section>
     <DomeBunkerSection v={v} />
+    <DomeClimateSection v={v} />
     <DomePlantSection v={v} />
     <DomeLinksSection v={v} />
     <div style={{ fontSize: 11, color: DIM }}>The {TIER_NAME(v).toLowerCase()} sits over the bunker, which keeps its own fallout protection. It keeps weather, ash and fallout dust off the ground under it, and it can be seen for miles.</div>
