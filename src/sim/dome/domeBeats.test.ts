@@ -31,7 +31,7 @@ describe('raids on a dome are staged (presentation only)', () => {
         resetRaidMemory();
         const { b, dome } = fight(tier, seed);
         const out = domeBeats(b, { dome, seed, temper: 'hard', dir: new LineDirector(seed) });
-        expect(out.events.filter(e => e.kind !== 'say' && e.kind !== 'move' && e.kind !== 'probe' && e.kind !== 'tool')).toEqual(b.events.filter(e => e.kind !== 'say' && e.kind !== 'move'));
+        expect(out.events.filter(e => e.kind !== 'say' && e.kind !== 'move' && e.kind !== 'cover' && e.kind !== 'probe' && e.kind !== 'tool')).toEqual(b.events.filter(e => e.kind !== 'say' && e.kind !== 'move' && e.kind !== 'cover'));
         for (let i = 1; i < out.events.length; i++) expect(out.events[i].t).toBeGreaterThanOrEqual(out.events[i - 1].t);
         for (const e of out.events) if (e.kind === 'probe') {
           probes++; kinds.add(e.what);
@@ -42,6 +42,14 @@ describe('raids on a dome are staged (presentation only)', () => {
         // nobody is sent into the dome: every added move stays outside the shell
         const before = new Set(b.events);
         for (const e of out.events) if (e.kind === 'move' && !before.has(e)) expect(Math.hypot(e.x - dome.x, e.z - dome.z)).toBeGreaterThan(dome.r - 0.001);
+        // the crew starts within a short run of the shell, and every probe has its man standing at the shell when it lands
+        const first = Math.min(...out.units.filter(u => u.side === 'raider' && !u.machine && !u.job).map(u => Math.hypot(u.x - dome.x, u.z - dome.z)));
+        expect(first).toBeLessThan(dome.r + 8);
+        for (const e of out.events) if (e.kind === 'probe') {
+          const mv = out.events.filter(m => m.kind === 'move' && m.unit === e.unit && m.t <= e.t).pop();
+          expect(mv, `${tier} ${e.unit} @${e.t}`).toBeTruthy();
+          if (mv && mv.kind === 'move') { const walk = Math.hypot(mv.x - dome.x, mv.z - dome.z); expect(walk).toBeLessThan(dome.r + 1); }
+        }
         // an arcology shows nothing the shell does not hold against
         if (tier === 'arcology') for (const e of out.events) if (e.kind === 'probe') expect(e.holds).toBe(true);
         const t = say(out).filter(s => s.ctx?.startsWith('dome_')).map(s => s.text);
