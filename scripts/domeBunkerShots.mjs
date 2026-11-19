@@ -34,7 +34,7 @@ try {
     G.getState().plan(kind, sp.x, sp.z, 0);
     const dome = G.getState().game.structures.at(-1);
     // the bunker: a hatch, a bunkroom, a galley and a plant room, wall to wall, west of the center
-    const hx = Math.round(sp.x * 4) / 4 - 0.75, hz = Math.round(sp.z * 4) / 4 - 0.25, bk = await import('/src/sim/dome/bunkerLive.ts');
+    const hx = Math.round(sp.x * 4) / 4 - 1.5, hz = Math.round(sp.z * 4) / 4 - 1.25, bk = await import('/src/sim/dome/bunkerLive.ts');
     const list = [['bunker_hatch', hx, hz], ['bunker_dorm', hx + 0.75, hz + 0.25], ['bunker_galley', hx + 1.75, hz + 0.25], ['bunker_plant', hx + 0.75, hz + 1.25], ['bunker_comms', hx + 1.75, hz + 1.25]];
     const ids = [];
     for (const [k, x, z] of list) {

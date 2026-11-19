@@ -3,7 +3,7 @@ import { DOME_TIERS, TIER, kindOfCells } from './tiers';
 import { digStops, DIG_DEEPER } from './crossing';
 import { BLUEPRINTS } from '../blueprints';
 import {
-  BUNKER_DOME, LEARNED_DEEPER_FT, againstSkirt, bunkerBlueprint, bunkerProblemUnder, bunkerShellShare, coverOf, craterOpen, digReach, domeAt, floorFt,
+  inUtilityLane, BUNKER_DOME, LEARNED_DEEPER_FT, againstSkirt, bunkerBlueprint, bunkerProblemUnder, bunkerShellShare, coverOf, craterOpen, digReach, domeAt, floorFt,
   footingYd, holdDome, holdFor, inAirlockLane, projectHours, refuge, shellR, skirtNeedFt, skirtTurns, usableR, bpHours, type UnderDome,
 } from './bunker';
 
@@ -34,6 +34,18 @@ describe('where a bunker may stand under a dome', () => {
     expect(inAirlockLane(d, hatchRect(100, 100 + usableR(d) - 0.1))).toBe(true);
     expect(inAirlockLane(d, hatchRect(100, 100))).toBe(false);
   });
+});
+
+describe('the buried lines', () => {
+  it('a room on the power, water, sewer and data lane is refused; the opposite side of the dome is clear; a turned dome turns the lane', () => {
+    const d = dome('glass'), a = Math.PI / 3, R = shellR(d), t = R * 0.6;
+    const on = hatchRect(100 + Math.sin(a) * t, 100 + Math.cos(a) * t), off = hatchRect(100 - Math.sin(a) * t, 100 - Math.cos(a) * t);
+    expect(inUtilityLane(d, on)).toBe(true); expect(inUtilityLane(d, off)).toBe(false);
+    expect(bunkerProblemUnder(d, on, FLOOR)).toBe('utility_lane');
+    const turned = { ...d, rot: 1 };
+    expect(inUtilityLane(turned, on)).toBe(false);
+  });
+  it('the earthen dome has no buried lines', () => { expect(inUtilityLane(dome('earthen', 4), hatchRect(100.2, 100))).toBe(false); });
 });
 
 describe('the skirt against the bunker floor', () => {

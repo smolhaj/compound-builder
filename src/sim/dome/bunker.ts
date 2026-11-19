@@ -21,7 +21,7 @@ import { TIER, CELL_FT, shellFt, cellsOfKind, tierOfKind, type DomeTier } from '
 import { domeGeometry } from './geometry';
 import { SKIRT_MARGIN_FT, DIG_DEPTH_FT, rectVsCircle, type Rect } from './siting';
 import { vestibuleOf } from './vestibule';
-import { digState } from './dig';
+import { digState, hasUtilities, utilityRuns } from './dig';
 import type { Blueprint } from '../blueprints';
 
 const FT_PER_UNIT = 2 * CELL_FT;
@@ -94,6 +94,24 @@ export function inAirlockLane(d: DomeAt, r: Rect): boolean {
   return false;
 }
 
+/** Does a rectangle stand on the buried power, water, sewer and data lines (laid across the pit floor from the plant out to the ring before anything else goes in)? */
+export function inUtilityLane(d: DomeAt, r: Rect): boolean {
+  if (!hasUtilities(d.tier)) return false;
+  const R = shellR(d), a0 = (d.tier === 'earthen' ? 0 : 0) + d.rot * Math.PI / 2, n = TIER[d.tier].airlocks;
+  for (const u of utilityRuns(d.tier, d.cells)) {
+    if (u.kind === 'sleeve') continue;
+    // (the runs lie at the angle between the first two airlocks, turned with the dome; each is offset sideways by `off`)
+    const a = u.a + a0, s = Math.sin(a), c = Math.cos(a), half = u.pipe * (u.n > 1 ? 1 + u.n : 1) + 0.12, to = Math.min(u.r1, R);
+    for (let k = 0; k <= 12; k++) {
+      const t = u.r0 + (to - u.r0) * k / 12, px = d.x + s * t + c * u.off, pz = d.z + c * t - s * u.off;
+      const nx = Math.max(r.x0, Math.min(px, r.x1)), nz = Math.max(r.z0, Math.min(pz, r.z1));
+      if (Math.hypot(nx - px, nz - pz) < half) return true;
+    }
+  }
+  void n;
+  return false;
+}
+
 // ── depth: the skirt against the bunker floor ──
 
 /** Depth of a bunker floor below the ground (ft): ground height less the room's datum, in world units, plus the slab. */
@@ -118,10 +136,11 @@ export function footingYd(d: Pick<DomeAt, 'tier' | 'cells'>, extraFt: number): n
   return extraFt <= 0 ? 0 : Math.ceil(domeGeometry(d.tier, shellFt(d.tier, d.cells)).ringFt * extraFt * TIER[d.tier].skirtThickFt / 27);
 }
 
-export type BunkerProblem = 'straddles_skirt' | 'airlock_lane' | 'skirt_too_shallow' | 'earthen_hut';
+export type BunkerProblem = 'straddles_skirt' | 'airlock_lane' | 'utility_lane' | 'skirt_too_shallow' | 'earthen_hut';
 export const BUNKER_PROBLEM_TEXT: Record<BunkerProblem, string> = {
   straddles_skirt: 'The dome\'s buried skirt is in the way: keep a bunker wholly inside it, a cell of clear ground from the ring (or wholly outside the dome)',
   airlock_lane: 'That is the way in to an airlock: keep the bunker clear of it',
+  utility_lane: 'The dome\'s buried power, water, sewer and data lines run here: keep the bunker clear of them',
   earthen_hut: 'An earthen dome is a solid hut with no floor to open a hatch in, and its 4 ft skirt is too shallow to guard a bunker: build the bunker beside it, or under a geodesic, glass or arcology dome',
   skirt_too_shallow: 'The bunker floor would lie deeper than the dome\'s skirt can be taken down: choose ground that is not so low here',
 };
@@ -136,6 +155,7 @@ export function bunkerProblemUnder(d: DomeAt, r: Rect, fl: number): BunkerProble
   if (d.tier === 'earthen') return 'earthen_hut';
   if (where === 'straddles') return 'straddles_skirt';
   if (inAirlockLane(d, r)) return 'airlock_lane';
+  if (inUtilityLane(d, r)) return 'utility_lane';
   if (coverOf(d.tier, fl).state === 'refused') return 'skirt_too_shallow';
   return null;
 }

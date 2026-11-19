@@ -16,13 +16,13 @@ describe('a bunker under a dome', () => {
   for (const tier of ['geodesic', 'glass', 'arcology'] as const) {
     it(`${tier}: a hatch inside the ring is allowed whether the dome is staked first or the bunker is`, () => {
       const { kind, dome } = at(tier);
-      expect(siteProblem(KIT.bunker_hatch, 10.25, 10.25, 0, flat, [dome])).toBeNull();
-      expect(siteProblem(KIT[kind], 10, 10, 0, flat, [P('s1', 'bunker_hatch', 10.25, 10.25)])).toBeNull();
+      expect(siteProblem(KIT.bunker_hatch, 9.75, 9.75, 0, flat, [dome])).toBeNull();
+      expect(siteProblem(KIT[kind], 10, 10, 0, flat, [P('s1', 'bunker_hatch', 9.75, 9.75)])).toBeNull();
     });
   }
   it('a bunkroom joins the hatch under a big dome, wall to wall, and a dome staked later accepts it', () => {
-    const { kind, dome } = at('glass'), hatch = P('s1', 'bunker_hatch', 10.25, 10.25), room = P('s2', 'bunker_dorm', 11, 10.5);
-    expect(siteProblem(KIT.bunker_dorm, 11, 10.5, 0, flat, [dome, hatch])).toBeNull();
+    const { kind, dome } = at('glass'), hatch = P('s1', 'bunker_hatch', 9.75, 9.75), room = P('s2', 'bunker_dorm', 9, 9.75);
+    expect(siteProblem(KIT.bunker_dorm, 9, 9.75, 0, flat, [dome, hatch])).toBeNull();
     expect(siteProblem(KIT[kind], 10, 10, 0, flat, [hatch, room])).toBeNull();
   });
   it('a piece in the band between the usable ground and the ring is refused, from either side, with the skirt reason', () => {
