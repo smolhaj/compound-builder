@@ -44,7 +44,11 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
     for (const b of bs) {
       if (!onPath(b.rho)) continue;
       const off = PATH_W / 2 + BENCH.dep / 2 + 0.06, x = sx * b.rho + px * off * b.side, z = sz * b.rho + pz * off * b.side;
-      if (free(x, z, BENCH.len / 2 + 0.04)) out.benches.push({ x, z, rot: Math.atan2(-b.side * sz, b.side * sx) });
+      if (free(x, z, BENCH.len / 2 + 0.04)) {
+        out.benches.push({ x, z, rot: Math.atan2(-b.side * sz, b.side * sx) });
+        // a lamp post at every other bench, its pool of light reaching across the path
+        if (out.lamps.length < 9 && (b.rho === bs[0].rho || b.rho === bs[2].rho)) out.lamps.push({ x: x + sx * 0.14, z: z + sz * 0.14 });
+      }
     }
     // the door: a crate stack off the lane (a supply drop), a sign on the other side
     const dr = r * 0.82;

@@ -9,7 +9,7 @@ describe('dome interior plan', () => {
     const p = interiorPlan('glass', R, angles, []);
     expect(p.segs.length).toBeGreaterThan(15); expect(p.benches.length).toBeGreaterThan(3);
     expect(p.crates.length).toBe(3); expect(p.signs.length).toBe(3);
-    expect(p.plaza).not.toBeNull(); expect(p.planters.length).toBeGreaterThan(0); expect(p.lamps.length).toBe(3);
+    expect(p.plaza).not.toBeNull(); expect(p.planters.length).toBeGreaterThan(0); expect(p.lamps.length).toBeGreaterThanOrEqual(3);
   });
   it('houses get a pool of light round them, and a ring path runs round the middle', () => {
     const p = interiorPlan('glass', R, angles, [{ x: 1, z: 1, hx: 0.5, hz: 0.4, home: true }, { x: -2, z: 1, hx: 0.5, hz: 0.4 }]);
