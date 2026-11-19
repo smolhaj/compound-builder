@@ -66,7 +66,7 @@ export class ShellFx {
     const h = this._h, y = h.ground(e.x, e.z) + 0.07 + this._rnd() * 0.22;
     // the point just proud of the shell
     const p = new THREE.Vector3(e.x + e.ox * 0.012, y, e.z + e.oz * 0.012);
-    const spark = (n: number, color = 0xffd27a) => { for (let i = 0; i < n; i++) h.puff(p.clone().add(new THREE.Vector3((this._rnd() - 0.5) * 0.05, (this._rnd() - 0.2) * 0.05, (this._rnd() - 0.5) * 0.05)).addScaledVector(new THREE.Vector3(e.ox, 0, e.oz), 0.03 + i * 0.01), 0.012, 0.03, 0.3 + this._rnd() * 0.2, -0.05, color, 1, true); };
+    const spark = (n: number, color = 0xffd27a) => { for (let i = 0; i < n; i++) h.puff(p.clone().add(new THREE.Vector3((this._rnd() - 0.5) * 0.05, (this._rnd() - 0.2) * 0.05, (this._rnd() - 0.5) * 0.05)).addScaledVector(new THREE.Vector3(e.ox, 0, e.oz), 0.03 + i * 0.01), 0.005, 0.014, 0.22 + this._rnd() * 0.15, -0.05, color, 1, true); };
     switch (e.what) {
       case 'rifle':
         h.flash(p, 5, 0xfff0c8); spark(5);

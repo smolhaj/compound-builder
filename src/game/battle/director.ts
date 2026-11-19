@@ -340,6 +340,8 @@ export class Director {
   private _last = new Map<string, number>();
   private _boxes: readonly Box[] = [];
   private _lastCheck = -99;
+  /** The latest crew member seen at work on a dome's shell (sim/dome/domeBeats.ts probes): the next cut is to him while the work is on. */
+  private _probe: { unit: string; t: number } | null = null;
   private _t = 0;
   private _g: Ground = () => 0;
   private _byId: ReadonlyMap<string, Actor> = new Map();
@@ -427,7 +429,7 @@ export class Director {
       if (want?.force) continue;
       if ((e.kind === 'wound' && !e.stopped) || e.kind === 'death' || e.kind === 'aid') { const u = byId.get(e.unit); if (u && (u.side === 'home' || this._r() < 0.5)) want = { kind: 'close', subject: e.unit, hold: 3.6 }; }
       else if (e.kind === 'breach' || e.kind === 'fallback' || e.kind === 'explosion' || e.kind === 'mine') want = { kind: 'wide', hold: 4.2 };
-      else if (e.kind === 'probe' && e.what !== 'rifle' && this._r() < 0.7) want = { kind: 'close', subject: e.unit, hold: 3.8 };
+      else if (e.kind === 'probe') { this._probe = { unit: e.unit, t: time }; if (e.what !== 'rifle' && this._r() < 0.85) want = { kind: 'close', subject: e.unit, hold: 3.8 }; }
       else if (e.kind === 'alarm' && !this.shot) want = { kind: 'house', hold: 5 };
       else if (e.kind === 'say' && e.who && !want) {
         const u = byId.get(e.who); const lastSaid = this._last.get(e.who) ?? -99;
@@ -463,6 +465,11 @@ export class Director {
       const shot = this._cut(time, want.kind, want.subject, want.hold, home, raiders, hc, rc, road, house, ground);
       if (want.force) shot.pinUntil = time + want.hold;
       return shot;
+    }
+    if (due && this._probe && time - this._probe.t < 3.5) {
+      // raiders are at a dome's shell right now: that is the picture (not the family's yard behind the glass)
+      const u = byId.get(this._probe.unit);
+      if (u && !u.dead && !u.gone) return this._cut(time, 'close', u.id, 3.6 + this._r() * 0.8, home, raiders, hc, rc, road, house, ground);
     }
     if (due) {
       // next in the rotation that has something to show
