@@ -161,11 +161,12 @@ import { homeSafety, homeSafetyInput, type HomeSafety } from './atmosphere/homeS
 import { ritualsOf, stanceOf, tableSet } from '../sim/rituals';
 import { bedHour, pickHomeLine } from '../sim/domesticLines';
 import { domeOf, domeLook } from '../sim/dome/live';
+import { TIER, cellsOfKind, shellFt, tierOfKind } from '../sim/dome/tiers';
+import { inYard, yardGeometry } from '../sim/dome/plantYard';
 import { isGradedTier } from '../sim/dome/grading';
 import { makeDomePlant, plantKey, type DomePlantFx, type PlantLook } from './fx/DomePlant';
 import { stateOf as domeStateOf } from '../sim/dome/live';
 import { fxOf as plantFxOf, unitsOf as plantUnitsOf } from '../sim/dome/plantLive';
-import { tierOfKind } from '../sim/dome/tiers';
 import { makeDomeAir, type DomeAirFx } from './fx/DomeAir';
 import { FOOD, type FoodItemId } from '../sim/pantry';
 
@@ -460,6 +461,7 @@ export class HomesteadWorld {
       }
       f.group.visible = true;
       f.apply(look);
+      for (const pf of this._domePlants.values()) pf.setView(this._view);   // (cutaway and x-ray: the plant goes see-through and the passage shows)
       // the plant: the machinery, roof hatches and path lamps of a big dome, scaled by its ecology and size (sim/dome/plant.ts)
       if (isGradedTier(d.tier)) {
         const dst = domeStateOf(game, d), hurt: Record<string, 'ok' | 'damaged' | 'down'> = {};
@@ -1649,7 +1651,15 @@ export class HomesteadWorld {
   onBuilding(x: number, z: number, pad = 0, withPorch = true, domes = false): boolean {
     for (const b of this._built.values()) {
       // a dome is a circle, and counts only where asked (trees and brush stay out from under the shell; walls, paths and people may stand inside)
-      if (b.cover) { if (domes) { const d = KIT[b.placed.kind]; if (Math.hypot(x - b.placed.x, z - b.placed.z) < d.cellsX * CELL / 2 + pad) return true; } continue; }
+      if (b.cover) {
+        if (domes) {
+          const d = KIT[b.placed.kind]; if (Math.hypot(x - b.placed.x, z - b.placed.z) < d.cellsX * CELL / 2 + pad) return true;
+          // the plant yard of a big dome stands just outside the shell: brush and trees stay out of it too
+          const tier = tierOfKind(b.placed.kind), yg = tier ? yardGeometry(tier, shellFt(tier, cellsOfKind(b.placed.kind) ?? TIER[tier].cells) / 40, b.placed.rot) : null;
+          if (yg && inYard(yg, b.placed.x, b.placed.z, x, z, pad + 0.15)) return true;
+        }
+        continue;
+      }
       const r = withPorch ? b.fpPorch : b.fpBody;
       if (x > r.x0 - pad && x < r.x1 + pad && z > r.z0 - pad && z < r.z1 + pad) return true;
     }

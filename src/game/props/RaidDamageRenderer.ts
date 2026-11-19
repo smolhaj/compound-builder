@@ -91,7 +91,7 @@ function placed(list: THREE.BufferGeometry[], x: number, y: number, z: number, r
 export function buildDamageGeometry(items: readonly RaidDamage[], ground: Ground, heading: (d: RaidDamage) => number, glass: readonly GlassHome[] = []): THREE.BufferGeometry | null {
   const all: THREE.BufferGeometry[] = [];
   for (const h of glass) all.push(...glassPieces(h, ground).map(g => g));
-  for (const d of items) if (d.done < d.hours) all.push(...placed(damagePieces(d), d.x, ground(d.x, d.z), d.z, d.kind === 'burn' ? 0 : heading(d)));
+  for (const d of items) if (d.done < d.hours) all.push(...placed(damagePieces(d), d.x, ground(d.x, d.z) + (d.kind === 'plant' ? 0.07 : 0), d.z, d.kind === 'burn' || d.kind === 'plant' ? 0 : heading(d)));   // (a plant unit's scorch lies on the yard slab or the pad, above it)
   return all.length ? mergeGeometries(all) : null;
 }
 

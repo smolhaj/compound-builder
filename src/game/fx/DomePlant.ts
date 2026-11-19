@@ -14,7 +14,7 @@ import type { Filtering } from '../../sim/dome/air';
 import type { DomeTier } from '../../sim/dome/tiers';
 import { kitMaterial } from '../buildkit/materials';
 
-export interface DomePlantFx { group: THREE.Group; key: string; /** Show the buried lines (the underground view). */ setUnder(on: boolean): void; dispose(): void }
+export interface DomePlantFx { group: THREE.Group; key: string; /** Show the buried lines (the underground view). */ setUnder(on: boolean): void; /** The building view: in the cutaway and x-ray views the machinery turns see-through and the sealed passage shows. */ setView(v: 'full' | 'cutaway' | 'xray'): void; dispose(): void }
 
 /** What the renderer needs of the plant's state: the loop, the spares, the dome's turn, which units are hurt, and whether the dome is dark. */
 export interface PlantLook { loop?: WaterLoop; spares?: readonly PlantKind[]; rot?: number; hurt?: Readonly<Record<string, PlantCond>>; dark?: boolean }
@@ -93,26 +93,35 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
     pools.renderOrder = 2;
     owned.push(headGeo, poolGeo);
   }
-  // the buried lines: only in the underground view (U); each leaves the yard in a sealed sleeve through the footing
-  let lines: THREE.Mesh | null = null;
-  if (plant.lines.length) {
+  // the buried lines: only in the underground view (U); each leaves the yard in a sealed sleeve through the footing. The sealed passage is its own mesh: it also
+  // shows in the cutaway and x-ray views (a fat teal tube from the service airlock to the yard)
+  const lineMesh = (name: string, pick: (ln: PlantLine) => boolean): THREE.Mesh | null => {
     const pieces: THREE.BufferGeometry[] = [];
-    for (const ln of plant.lines) for (let i = 1; i < ln.pts.length; i++) {
+    for (const ln of plant.lines.filter(pick)) for (let i = 1; i < ln.pts.length; i++) {
       const [ax, az] = ln.pts[i - 1], [bx, bz] = ln.pts[i], len = Math.hypot(bx - ax, bz - az); if (len < 1e-3) continue;
-      const g = new THREE.CylinderGeometry(ln.kind === 'passage' ? 0.14 : ln.kind === 'feeder' ? 0.035 : 0.025, ln.kind === 'passage' ? 0.14 : ln.kind === 'feeder' ? 0.035 : 0.025, len, 8);
+      const rad = ln.kind === 'passage' ? 0.14 : ln.kind === 'feeder' ? 0.035 : 0.025;
+      const g = new THREE.CylinderGeometry(rad, rad, len, 8);
       g.rotateZ(Math.PI / 2); g.rotateY(Math.atan2(-(bz - az), bx - ax));
-      const mx = (ax + bx) / 2, mz = (az + bz) / 2; g.translate(mx, ground(mx, mz) - ln.depth, mz);
+      const mx = (ax + bx) / 2, mz = (az + bz) / 2; g.translate(mx, ground(mx, mz) - ln.depth + (ln.kind === 'passage' ? 0.16 : 0), mz);
       g.deleteAttribute('uv'); const ng = g.toNonIndexed(), col = new THREE.Color(LINE_COLOR[ln.kind]), arr = new Float32Array(ng.attributes.position.count * 3);
       for (let k = 0; k < ng.attributes.position.count; k++) { arr[k * 3] = col.r; arr[k * 3 + 1] = col.g; arr[k * 3 + 2] = col.b; }
       ng.setAttribute('color', new THREE.BufferAttribute(arr, 3)); pieces.push(ng); g.dispose();
     }
-    if (pieces.length) {
-      const geo = mergeGeometries(pieces, false); pieces.forEach(g => g.dispose());
-      const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.2, emissive: 0x201408 });
-      lines = new THREE.Mesh(geo, mat); lines.name = 'plant_lines'; lines.visible = false; lines.matrixAutoUpdate = false; lines.updateMatrix(); lines.castShadow = false; lines.receiveShadow = false;
-      group.add(lines); owned.push(geo, mat);
-    }
-  }
+    if (!pieces.length) return null;
+    const geo = mergeGeometries(pieces, false); pieces.forEach(g => g.dispose());
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, metalness: 0.2, emissive: 0x201408, transparent: true, opacity: 0.85 });
+    const m = new THREE.Mesh(geo, mat); m.name = name; m.visible = false; m.matrixAutoUpdate = false; m.updateMatrix(); m.castShadow = false; m.receiveShadow = false;
+    group.add(m); owned.push(geo, mat);
+    return m;
+  };
+  const lines = lineMesh('plant_lines', ln => ln.kind !== 'passage'), passage = lineMesh('plant_passage', ln => ln.kind === 'passage');
+  let under = false, view: 'full' | 'cutaway' | 'xray' = 'full';
+  const machMat = group.getObjectByName('plant_machinery') ? ((group.getObjectByName('plant_machinery') as THREE.Mesh).material as THREE.MeshStandardMaterial) : null;
+  const apply = (): void => {
+    if (lines) lines.visible = under;
+    if (passage) passage.visible = under || view !== 'full';
+    if (machMat) { const see = view !== 'full'; machMat.transparent = see; machMat.opacity = see ? 0.5 : 1; machMat.depthWrite = !see; machMat.needsUpdate = true; }
+  };
   group.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = false; o.receiveShadow = false; } });
-  return { group, key: plantKey(tier, r, filtering, look), setUnder: on => { if (lines) lines.visible = on; }, dispose: () => { for (const o of owned) o.dispose(); } };
+  return { group, key: plantKey(tier, r, filtering, look), setUnder: on => { under = on; apply(); }, setView: v => { view = v; apply(); }, dispose: () => { for (const o of owned) o.dispose(); } };
 }
