@@ -116,3 +116,9 @@ None of these are applied in this PR; the odds tables are unchanged.
 
 Cases that cannot be a cutscene: a **tunneler crew turned back at the skirt** is a log line from `digDay` (there is no encounter or battle for it; the next crew arrives at the airlock, and carries the skirt lines when its kind is `tunnelers`);
 **plant-yard wall circling** has no fight events to hang a scene on (the strike resolves in `strikePlant` after the fight).
+
+## Frames (not in this PR)
+
+`docs/ux/dome-raids/` is empty: the render lock (`/tmp/cb.lock`) was held by other agents' multi-hour jobs for the whole session, so no frame of the staging was rendered or eye-checked.
+Run one tier at a time: `flock /tmp/cb.lock node scripts/domeRaidMovie.mjs --dome <glass|geodesic|arcology> --day 30 --lowrender --quality high --from 108 --sparse 48 --max 22 --w 800 --h 450 --out <dir>`,
+and check probe height on the shell, raiders clipping and the camera inside geometry before merging.
