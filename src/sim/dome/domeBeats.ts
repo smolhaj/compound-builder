@@ -25,12 +25,37 @@ export interface DomeBeatInput {
 
 const r2 = (n: number): number => Math.round(n * 100) / 100;
 /** How close the crew starts to the shell (world units, 1 = 6 m), and how fast it walks to it. */
-const APPROACH = 7, WALK_SPEED = 1.0;
+const APPROACH = 5, WALK_SPEED = 1.0;
 /** Every dialogue key the planner can use (a test holds raidLinesDome.ts to it). */
 export const BEAT_CTX_USED: readonly string[] = ['dome_scout', 'dome_shots', 'dome_tool', 'dome_cut', 'dome_airlock', 'dome_ram', 'dome_blast', 'dome_skirt', 'dome_argue', 'dome_order', 'dome_panic', 'dome_vow', 'dome_watch', 'dome_fire', 'dome_holds', 'dome_gone'];
 
 /** Does this fight's own timeline break the shell (a gap or a breach on a shell run)? Then the crew's tool work before it is real. */
 export const shellBroken = (b: Battle): boolean => b.events.some(e => (e.kind === 'breach' && !!e.where && isShellKind(e.where.kind)) || (e.kind === 'gap' && e.runId.startsWith('dome:')));
+
+/** The word a crew uses for the shell of each tier, so the lines never name glass at a geodesic's panels or an arcology's wall. */
+const MATERIAL: Record<string, { glass: string; panes: string; Glass: string }> = {
+  glass: { glass: 'glass', panes: 'pane of glass', Glass: 'Glass' },
+  geodesic: { glass: 'panels', panes: 'panel', Glass: 'Panels' },
+  arcology: { glass: 'shell', panes: 'wall panel', Glass: 'Shell' },
+  earthen: { glass: 'earth', panes: 'patch of dirt', Glass: 'Earth' },
+};
+/** Tier-correct wording for a line written about the glass dome (pure; a test holds it). */
+export function shellWording(text: string, tier: string): string {
+  const m = MATERIAL[tier];
+  if (!m || tier === 'glass') return text;
+  return text.replace(/Glass breaks\. Glass always breaks\./, `${m.Glass} cracks. ${m.Glass} always cracks.`).replace(/pane of glass/g, m.panes).replace(/\bGlass\b/g, m.Glass).replace(/\bglass\b/g, m.glass);
+}
+/** The strongest a dome caption may be is "damn": a line the generic pools wrote with stronger language is softened (pure). */
+export function mildWording(text: string): string {
+  return text
+    .replace(/\bgoddamn(ed|it)?\b/gi, m => (m[0] === 'G' ? 'Damn' : 'damn'))
+    .replace(/\bson of a bitch\b/gi, 'damn it')
+    .replace(/\bjesus christ\b/gi, 'Good Lord')
+    .replace(/\bjesus\b(?!,? please)/gi, 'Good Lord')
+    .replace(/\bf+u+c+k\w*/gi, m => (/^F/.test(m) ? 'Damn' : 'damn'))
+    .replace(/\bbull?shit\b/gi, 'nonsense')
+    .replace(/\bshit\w*/gi, m => (/^S/.test(m) ? 'Damn' : 'damn'));
+}
 
 export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
   const d = o.dome, tier = d.tier, rnd = mulberry32(o.seed * 4909 + 17);
@@ -86,7 +111,7 @@ export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
     const text = o.dir.pick(role, ctx, { speaker: u.id, variants });
     if (!text) return;
     spoke.set(u.id, [...(spoke.get(u.id) ?? []), t]);
-    out.push({ t: r2(t), kind: 'say', text, who: u.id, ctx });
+    out.push({ t: r2(t), kind: 'say', text: shellWording(text, tier), who: u.id, ctx });
   };
   const pickWorker = (i: number): BattleUnit | undefined => { const pool = workers.length ? workers : crewOrder.length ? crewOrder : [leader]; return pool[(i + Math.floor(rnd() * 3)) % pool.length]; };
   /** Send a man to a spot on the shell, to be there at `t` (his walk starts early enough). */
@@ -100,7 +125,7 @@ export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
   };
 
   // 1. a scout's report
-  say(at(0.02), pickWorker(0), 'dome_scout');
+  say(0.6, pickWorker(0), 'dome_scout');   // (a voice in the first second: the director cuts to the crew, not to the family's yard)
   if (o.skirtCrew) say(at(0.08), pickWorker(1), 'dome_skirt');
   say(at(0.1), leader, 'dome_scout');
   // 2. rifles at the shell
@@ -174,5 +199,6 @@ export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
   const carriers = new Set([...moved.keys()].flatMap(e => (e.kind === 'charge' && e.carrier ? [e.carrier] : [])));
   const keep = b.events.map(e => moved.get(e) ?? e).filter(e => !((e.kind === 'move' || e.kind === 'cover') && ((crewIds.has(e.unit) && !drivers.has(e.unit) && e.t < tEnd) || (carriers.has(e.unit) && e.t < tEnd))));
   const units = b.units.map(u => (start.has(u.id) && pull > 0 && !u.job ? { ...u, ...start.get(u.id)! } : u));
-  return { ...b, units, events: [...keep, ...out].sort((p, q) => p.t - q.t) };
+  const soft = keep.map(e => (e.kind === 'say' && mildWording(e.text) !== e.text ? { ...e, text: mildWording(e.text) } : e));
+  return { ...b, units, events: [...soft, ...out].sort((p, q) => p.t - q.t) };
 }

@@ -108,6 +108,32 @@ export function surfaceCover(eye: V3, look: V3, fov: number, boxes: readonly Box
   return hit / total;
 }
 
+/** A bush or hedge this close to the lens (units, about 7 m) hides the picture behind it. */
+export const BRUSH_NEAR = 1.2;
+export const MAX_BRUSH_COVER = 0.2;
+/**
+ * The share of the picture ground cover (a bush, a hedge) fills within BRUSH_NEAR of the eye: the same 9 x 5 rays as `surfaceCover`, counting brush only.
+ * A leaf wall across the frame is a bad shot even when it is nowhere near the subject. Pure.
+ */
+export function brushCover(eye: V3, look: V3, fov: number, boxes: readonly Box[], ground: Ground): number {
+  const near = boxes.filter(b => b.kind === 'brush' && flatDist(eye.x, eye.z, b) < BRUSH_NEAR + 0.2);
+  if (!near.length) return 0;
+  const f = norm3(sub(look, eye)), r = norm3({ x: f.z, y: 0, z: -f.x });
+  const u = { x: r.y * f.z - r.z * f.y, y: r.z * f.x - r.x * f.z, z: r.x * f.y - r.y * f.x };
+  const th = Math.tan(fov * Math.PI / 360);
+  let hit = 0, total = 0;
+  for (let ix = -4; ix <= 4; ix++) for (let iy = -2; iy <= 2; iy++) {
+    total++;
+    const a = ix / 4 * th * FRAME.aspect * FRAME.h, c = iy / 2 * th * FRAME.v;
+    const d = norm3({ x: f.x + r.x * a + u.x * c, y: f.y + r.y * a + u.y * c, z: f.z + r.z * a + u.z * c });
+    for (let k = 0.05; k <= BRUSH_NEAR; k += 0.05) {
+      const q = { x: eye.x + d.x * k, y: eye.y + d.y * k, z: eye.z + d.z * k };
+      if (near.some(b => insideAny(q, b, ground, 0))) { hit++; break; }
+    }
+  }
+  return hit / total;
+}
+
 /** A house or wall within this many units (about 18 m) of the eye may not cover more than MAX_WALL_COVER of the picture: a gable wall filling a third of the frame is a bad frame even when the camera is not touching it. */
 export const WALL_REACH = 3;
 export const MAX_WALL_COVER = 0.25;
@@ -249,6 +275,7 @@ export function shotProblems(s: Shot, ctx: ShotCtx): string[] {
     if (eye.y - ctx.ground(eye.x, eye.z) < EYE_MIN - 1e-6) out.push(`eye on the ground at t=${t.toFixed(1)}`);
     for (const b of ctx.boxes) if (nearBox(eye, b, ctx.ground, CLEAR)) { out.push(`eye ${insideBox(eye, b, ctx.ground) ? 'inside' : 'against'} a ${b.kind} at t=${t.toFixed(1)}`); break; }
     { const cov = surfaceCover(eye, look, s.fov, ctx.boxes, ctx.ground); if (cov > MAX_SURFACE_COVER) out.push(`a surface covers ${Math.round(cov * 100)}% of the picture at t=${t.toFixed(1)}`); }
+    { const bc = brushCover(eye, look, s.fov, ctx.boxes, ctx.ground); if (bc > MAX_BRUSH_COVER) out.push(`a bush covers ${Math.round(bc * 100)}% of the picture at t=${t.toFixed(1)}`); }
     if (t === 0 && !out.length && !ctx.live) { const wc = wallCover(eye, look, s.fov, ctx.boxes, ctx.ground); if (wc > MAX_WALL_COVER) out.push(`a wall covers ${Math.round(wc * 100)}% of the picture at t=${t.toFixed(1)}`); }
     // dead ahead: nothing solid within VIEW_CLEAR (or before the look target, whichever is nearer)
     const f = norm3(sub(look, eye)), dist = Math.hypot(look.x - eye.x, look.y - eye.y, look.z - eye.z);

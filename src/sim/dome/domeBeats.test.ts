@@ -4,7 +4,7 @@ import { place, opts } from '../raidTestKit';
 import { planBattle } from '../battle';
 import { LineDirector, resetRaidMemory, LINES } from '../raidDialogue';
 import { DOME_LINES, DOME_RAIDER_CTX, DOME_DEFENDER_CTX, DOME_VARIANT_KEYS } from '../raidLinesDome';
-import { domeBeats, BEAT_CTX_USED } from './domeBeats';
+import { domeBeats, BEAT_CTX_USED, shellWording, mildWording } from './domeBeats';
 import { domesOf, PANELS } from './standing';
 import { addScars, visibleScars, SCAR_LIFE } from './scars';
 import { blastOdds, ramOdds } from '../breachMeans';
@@ -126,4 +126,22 @@ describe('what a raid leaves on the shell, and the audit claims', () => {
     expect((e[0] + e[1] + e[2]) / 3).toBeGreaterThan(0.2); expect((e[0] + e[1] + e[2]) / 3).toBeLessThan(0.55);
     for (const t of ['geodesic', 'glass'] as const) expect(rate(t, 4, none, 60, 30)).toBeLessThanOrEqual(rate(t, 16, big, 300, 30));
   }, 120000);
+});
+
+describe('dome caption wording', () => {
+  it('names the right shell for each tier', () => {
+    const all = Object.values(DOME_LINES).flatMap(r => Object.values(r)).flatMap(v => Object.values(v ?? {}).flat() as string[]);
+    for (const tier of ['geodesic', 'arcology', 'earthen']) for (const l of all) expect(shellWording(l, tier), `${tier}: ${l}`).not.toMatch(/glass/i);
+    expect(shellWording('Everybody on the glass! All at once!', 'geodesic')).toBe('Everybody on the panels! All at once!');
+    expect(shellWording('Everybody on the glass! All at once!', 'glass')).toBe('Everybody on the glass! All at once!');
+  });
+  it('keeps dome captions to "damn" and no stronger', () => {
+    for (const l of ['What the fuck! What the fuck!', 'Jesus Christ, look at them.', 'Oh shit, the barn!', 'Goddamn it, it jammed!', 'Come on, you piece of shit!']) expect(mildWording(l)).not.toMatch(/fuck|shit|jesus|goddamn/i);
+    expect(mildWording('Damn it, that should have shattered.')).toBe('Damn it, that should have shattered.');
+    for (const tier of ['glass', 'geodesic', 'arcology'] as const) for (let seed = 300; seed < 306; seed++) {
+      resetRaidMemory();
+      const { b, dome } = fight(tier, seed);
+      for (const e of domeBeats(b, { dome, seed, temper: 'savage', dir: new LineDirector(seed) }).events) if (e.kind === 'say') expect(e.text).not.toMatch(/fuck|shit|jesus christ|goddamn/i);
+    }
+  });
 });
