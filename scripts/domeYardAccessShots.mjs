@@ -28,7 +28,7 @@ try {
     const cb = window.__cb, G = cb.game, c = cb.world.camp; G.getState().setSpeed(0);
     G.setState(s => ({ game: { ...s.game, money: 900_000_000 } }));
     const put = (kind, x, z, r = 4) => { const sp = cb.tool.findSpot(kind, x, z, 0, r); if (!sp) return null; G.getState().plan(kind, sp[0], sp[1], 0); return { id: G.getState().game.structures.at(-1).id, x: sp[0], z: sp[1], kind }; };
-    const domes = { arc: put('dome_arcology_30', c.x - 7, c.z - 4, 14), glass: put('dome_glass_18', c.x + 8, c.z - 3, 14), geo: put('dome_geodesic_8', c.x - 1, c.z + 9, 12), earth: put('dome_earthen_3', c.x + 10, c.z + 9, 12) };
+    const domes = { arc: put('dome_arcology_30', c.x - 7, c.z - 4, 14), glass: put('dome_glass_18', c.x + 8, c.z - 3, 14), geo: put('dome_geodesic_8', c.x - 12, c.z + 8, 12), earth: put('dome_earthen_3', c.x + 20, c.z + 8, 12) };
     const inside = (d, R, list) => { for (const [k, fx, fz] of list) { const sp = cb.tool.findSpot(k, d.x + fx * R, d.z + fz * R, 0, 2); if (sp) G.getState().plan(k, sp[0], sp[1], 0); } };
     if (domes.arc) inside(domes.arc, 7.5, [['log_house', -0.12, 0.1], ['barn', 0.34, -0.3], ['workshop', 0.18, 0.3], ['garden', -0.3, -0.2], ['greenhouse', -0.46, 0.0]]);
     if (domes.glass) inside(domes.glass, 4.5, [['log_house', -0.1, 0.0], ['garden', 0.3, -0.2]]);
@@ -50,6 +50,7 @@ try {
   await frames(3);
   const gd = (x, z) => page.evaluate(([x, z]) => window.__cb.world.groundAt(x, z), [x, z]);
   const pose = async (e, l, fov = 60) => { if (e[1] < 0) { e = [e[0], (await gd(e[0], e[2])) + -e[1], e[2]]; } return poseRaw(e, l, fov); };
+  const pr = async (e, l, fov = 55) => poseRaw([e[0], (await gd(e[0], e[2])) + e[1], e[2]], [l[0], (await gd(l[0], l[2])) + l[1], l[2]], fov);
   const poseRaw = (e, l, fov = 60) => page.evaluate(([e, l, fov]) => { window.__cb.qa.pose = { x: e[0], y: e[1], z: e[2], lx: l[0], ly: l[1], lz: l[2], fov }; }, [e, l, fov]);
   const person = async (x, z) => page.evaluate(async ([x, z]) => { const m = await import('/src/game/HomesteadWorld.ts'); window.__cb.ws.scene.add(m.scaleFigure(x, z, window.__cb.world.groundAt(x, z))); }, [x, z]);
   await set(`const s = cb.store.getState(); s.setTimeOfDay(16.6); s.setBuildingView('full'); s.setSeasonMode?.('summer'); s.setWeatherMode('clear');`);
@@ -62,40 +63,40 @@ try {
     // eye level on the glass dome's yard (wall continuous, no gate) with a person beside the wall
     const e = gg.y.er, t = gg.y.et;
     await person(yg[0] + e[0] * 1.9 + t[0] * 0.6, yg[1] + e[1] * 1.9 + t[1] * 0.6);
-    await pose([yg[0] + e[0] * 5.2 + t[0] * 2.0, gG + 0.45, yg[1] + e[1] * 5.2 + t[1] * 2.0], [yg[0], gG + 0.4, yg[1]], 55); await shot('glass-yard-eye-no-gate');
+    await pr([yg[0] + e[0] * 5.2 + t[0] * 2.0, 0.45, yg[1] + e[1] * 5.2 + t[1] * 2.0], [yg[0], 0.4, yg[1]], 55); await shot('glass-yard-eye-no-gate');
     const ea = ga.y.er, ta = ga.y.et;
     await person(ya[0] + ea[0] * 3.6 + ta[0] * 1.0, ya[1] + ea[1] * 3.6 + ta[1] * 1.0);
-    await pose([ya[0] + ea[0] * 8 + ta[0] * 3, gA + 0.5, ya[1] + ea[1] * 8 + ta[1] * 3], [ya[0], gA + 0.5, ya[1]], 55); await shot('arcology-yard-eye-no-gate');
+    await pr([ya[0] + ea[0] * 8 + ta[0] * 3, 0.5, ya[1] + ea[1] * 8 + ta[1] * 3], [ya[0], 0.5, ya[1]], 55); await shot('arcology-yard-eye-no-gate');
   }
   if (want('yard')) {
     const e = ga.y.er, t = ga.y.et;
-    await pose([ya[0] + e[0] * 3.4 + t[0] * 2.4, gA + 3.6, ya[1] + e[1] * 3.4 + t[1] * 2.4], [ya[0], gA + 0.2, ya[1]], 50); await shot('arcology-yard-closeup-outside');
-    await pose([ya[0] + e[0] * 2.2 - t[0] * 2.4, gA + 1.4, ya[1] + e[1] * 2.2 - t[1] * 2.4], [ya[0] - t[0] * 0.3, gA + 0.3, ya[1] - t[1] * 0.3], 55); await shot('arcology-yard-equipment');
+    await pr([ya[0] + e[0] * 3.4 + t[0] * 2.4, 3.6, ya[1] + e[1] * 3.4 + t[1] * 2.4], [ya[0], 0.2, ya[1]], 50); await shot('arcology-yard-closeup-outside');
+    await pr([ya[0] + e[0] * 2.2 - t[0] * 2.4, 1.4, ya[1] + e[1] * 2.2 - t[1] * 2.4], [ya[0] - t[0] * 0.3, 0.3, ya[1] - t[1] * 0.3], 55); await shot('arcology-yard-equipment');
   }
   if (want('inside')) {
     const e = ga.y.er, p = ga.y.portal, pc = [A.x + p.chamber[0], A.z + p.chamber[1]];
-    await pose([pc[0] - e[0] * 2.6, gA + 0.5, pc[1] - e[1] * 2.6], [pc[0], gA + 0.3, pc[1]], 58); await shot('arcology-interior-service-airlock');
-    await pose([pc[0] - e[0] * 3.6 - ga.y.et[0] * 2.4, gA + 0.5, pc[1] - e[1] * 3.6 - ga.y.et[1] * 2.4], [pc[0] - ga.y.et[0] * 1.6, gA + 0.3, pc[1] - ga.y.et[1] * 1.6], 62); await shot('arcology-interior-gallery-bays');
+    await pr([pc[0] - e[0] * 2.6, 0.5, pc[1] - e[1] * 2.6], [pc[0], 0.3, pc[1]], 58); await shot('arcology-interior-service-airlock');
+    await pr([pc[0] - e[0] * 3.6 - ga.y.et[0] * 2.4, 0.5, pc[1] - e[1] * 3.6 - ga.y.et[1] * 2.4], [pc[0] - ga.y.et[0] * 1.6, 0.3, pc[1] - ga.y.et[1] * 1.6], 62); await shot('arcology-interior-gallery-bays');
     const eg = gg.y.er, pg = gg.y.portal, pcg = [G2.x + pg.chamber[0], G2.z + pg.chamber[1]];
-    await pose([pcg[0] - eg[0] * 2.2 - gg.y.et[0] * 1.4, gG + 0.45, pcg[1] - eg[1] * 2.2 - gg.y.et[1] * 1.4], [pcg[0] - gg.y.et[0] * 1.0, gG + 0.3, pcg[1] - gg.y.et[1] * 1.0], 62); await shot('glass-interior-plant-and-airlock');
+    await pr([pcg[0] - eg[0] * 2.2 - gg.y.et[0] * 1.4, 0.45, pcg[1] - eg[1] * 2.2 - gg.y.et[1] * 1.4], [pcg[0] - gg.y.et[0] * 1.0, 0.3, pcg[1] - gg.y.et[1] * 1.0], 62); await shot('glass-interior-plant-and-airlock');
   }
   if (want('under')) {
     const e = ga.y.er, p = ga.y.portal, pt = [A.x + (p.from[0] + p.to[0]) / 2, A.z + (p.from[1] + p.to[1]) / 2];
     await set(`cb.world.setUnderground(true)`); await frames(2);
-    await pose([pt[0] - e[0] * 3.2 + ga.y.et[0] * 1.2, gA + 2.6, pt[1] - e[1] * 3.2 + ga.y.et[1] * 1.2], [pt[0] + e[0] * 0.8, gA - 0.1, pt[1] + e[1] * 0.8], 55); await shot('arcology-passage-underground-view');
+    await pr([pt[0] - e[0] * 3.2 + ga.y.et[0] * 1.2, 2.6, pt[1] - e[1] * 3.2 + ga.y.et[1] * 1.2], [pt[0] + e[0] * 0.8, -0.1, pt[1] + e[1] * 0.8], 55); await shot('arcology-passage-underground-view');
     await set(`cb.world.setUnderground(false)`);
   }
   if (want('cut')) {
     const e = ga.y.er, p = ga.y.portal, pt = [A.x + (p.from[0] + p.to[0]) / 2, A.z + (p.from[1] + p.to[1]) / 2];
     await set(`cb.store.getState().setBuildingView('cutaway')`); await frames(3);
-    await pose([pt[0] - e[0] * 3.2 + ga.y.et[0] * 1.6, gA + 2.2, pt[1] - e[1] * 3.2 + ga.y.et[1] * 1.6], [pt[0] + e[0] * 0.6, gA + 0.2, pt[1] + e[1] * 0.6], 55); await shot('arcology-passage-cutaway-view');
+    await pr([pt[0] - e[0] * 3.2 + ga.y.et[0] * 1.6, 2.2, pt[1] - e[1] * 3.2 + ga.y.et[1] * 1.6], [pt[0] + e[0] * 0.6, 0.2, pt[1] + e[1] * 0.6], 55); await shot('arcology-passage-cutaway-view');
     await set(`cb.store.getState().setBuildingView('full')`);
   }
   if (want('dusk')) {
     await set(`cb.store.getState().setTimeOfDay(19.9)`);
-    await pose([cx + 4, gA + 7, cz + 22], [cx + 1, gA + 1.5, cz - 1], 50); await shot('dusk-four-domes');
+    await pose([cx + 3, gA + 9, cz + 32], [cx + 1, gA + 1, cz + 4], 50); await shot('dusk-four-domes');
     await set(`cb.store.getState().setTimeOfDay(21.8)`);
-    const e = ga.y.er; await pose([ya[0] + e[0] * 5 + ga.y.et[0] * 3, gA + 1.4, ya[1] + e[1] * 5 + ga.y.et[1] * 3], [ya[0], gA + 0.4, ya[1]], 52); await shot('night-yard-arcology');
+    const e = ga.y.er; await pr([ya[0] + e[0] * 5 + ga.y.et[0] * 3, 1.4, ya[1] + e[1] * 5 + ga.y.et[1] * 3], [ya[0], 0.4, ya[1]], 52); await shot('night-yard-arcology');
     await set(`cb.store.getState().setTimeOfDay(16.6)`);
   }
   if (want('damaged') || want('panel')) {
@@ -109,7 +110,7 @@ try {
   }
   if (want('damaged')) {
     const e = ga.y.er, t = ga.y.et;
-    await pose([ya[0] + e[0] * 3.4 + t[0] * 2.4, gA + 3.6, ya[1] + e[1] * 3.4 + t[1] * 2.4], [ya[0], gA + 0.2, ya[1]], 50); await shot('damaged-yard-arcology');
+    await pr([ya[0] + e[0] * 3.4 + t[0] * 2.4, 3.6, ya[1] + e[1] * 3.4 + t[1] * 2.4], [ya[0], 0.2, ya[1]], 50); await shot('damaged-yard-arcology');
   }
   if (want('panel')) {
     await set(`cb.store.getState().setHudHidden?.(false)`);

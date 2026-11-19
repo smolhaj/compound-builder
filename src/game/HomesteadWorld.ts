@@ -160,7 +160,7 @@ import { ritualCtx } from './people/ritualGoals';
 import { homeSafety, homeSafetyInput, type HomeSafety } from './atmosphere/homeSafety';
 import { ritualsOf, stanceOf, tableSet } from '../sim/rituals';
 import { bedHour, pickHomeLine } from '../sim/domesticLines';
-import { domeOf, domeLook } from '../sim/dome/live';
+import { domeOf, domeLook, domesOf as domesLive } from '../sim/dome/live';
 import { TIER, cellsOfKind, shellFt, tierOfKind } from '../sim/dome/tiers';
 import { inYard, yardGeometry } from '../sim/dome/plantYard';
 import { isGradedTier } from '../sim/dome/grading';
@@ -451,6 +451,7 @@ export class HomesteadWorld {
   private _domeAir(game: GameState): void {
     const d = domeOf(game), look = domeLook(game);
     for (const b of this._built.values()) {
+      if (b.cover) this._syncPlant(b, game);
       const fx = b.group.userData.domeAir as DomeAirFx | undefined;
       if (!d || b.placed.id !== d.st.id || !b.finished) { if (fx) fx.group.visible = false; continue; }
       let f = fx;
@@ -461,22 +462,25 @@ export class HomesteadWorld {
       }
       f.group.visible = true;
       f.apply(look);
-      for (const pf of this._domePlants.values()) pf.setView(this._view);   // (cutaway and x-ray: the plant goes see-through and the passage shows)
-      // the plant: the machinery, roof hatches and path lamps of a big dome, scaled by its ecology and size (sim/dome/plant.ts)
-      if (isGradedTier(d.tier)) {
-        const dst = domeStateOf(game, d), hurt: Record<string, 'ok' | 'damaged' | 'down'> = {};
-        for (const u of plantUnitsOf(game, d, dst)) if (u.cond !== 'ok') hurt[u.id] = u.cond;
-        const plook: PlantLook = { loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark: plantFxOf(game, d, dst).power === 'dark' };
-        const key = plantKey(d.tier, d.r, look.filtering, plook), cur = this._domePlants.get(b.placed.id);
-        if (!cur || cur.key !== key) {
-          if (cur) { this._root.remove(cur.group); cur.dispose(); }
-          const gx = b.placed.x, gz = b.placed.z, y0 = b.group.position.y;
-          const pf = makeDomePlant(d.tier, d.r, look.filtering, (lx, lz) => this.parcel.height(gx + lx, gz + lz) - y0 + 0.01, plook);
-          pf.setUnder(this._under);
-          pf.group.position.set(gx, y0, gz);
-          this._root.add(pf.group); this._domePlants.set(b.placed.id, pf);
-        }
-      }
+    }
+  }
+
+  /** The plant of one finished big dome (every dome has its own: its machinery, yard, roof hatches and lamps; sim/dome/plant.ts), redrawn when its equipment or damage changes. */
+  private _syncPlant(b: Built, game: GameState): void {
+    const ref = domesLive(game).find(x => x.st.id === b.placed.id);
+    if (!ref || !b.finished || !isGradedTier(ref.tier)) return;
+    const dst = domeStateOf(game, ref), hurt: Record<string, 'ok' | 'damaged' | 'down'> = {};
+    for (const u of plantUnitsOf(game, ref, dst)) if (u.cond !== 'ok') hurt[u.id] = u.cond;
+    const plook: PlantLook = { loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark: plantFxOf(game, ref, dst).power === 'dark' };
+    const key = plantKey(ref.tier, ref.r, dst.filtering, plook), cur = this._domePlants.get(b.placed.id);
+    if (cur) cur.setView(this._view);
+    if (!cur || cur.key !== key) {
+      if (cur) { this._root.remove(cur.group); cur.dispose(); }
+      const gx = b.placed.x, gz = b.placed.z, y0 = b.group.position.y;
+      const pf = makeDomePlant(ref.tier, ref.r, dst.filtering, (lx, lz) => this.parcel.height(gx + lx, gz + lz) - y0 + 0.01, plook);
+      pf.setUnder(this._under); pf.setView(this._view);
+      pf.group.position.set(gx, y0, gz);
+      this._root.add(pf.group); this._domePlants.set(b.placed.id, pf);
     }
   }
 
