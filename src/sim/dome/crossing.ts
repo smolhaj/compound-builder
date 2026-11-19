@@ -48,7 +48,7 @@ export function crossesAt(d: Pick<Dome, 'x' | 'z' | 'r'>, pts: readonly Pt[]): {
 /** The airlock nearest a point, and the distance along the shell to it (world units, straight line). */
 export function nearestAirlock(d: Dome, x: number, z: number): { airlock: Airlock; off: number } | null {
   let best: { airlock: Airlock; off: number } | null = null;
-  for (const a of d.airlocks) { const off = Math.hypot(a.x - x, a.z - z); if (!best || off < best.off) best = { airlock: a, off }; }
+  for (const a of d.airlocks) { if (a.role === 'link') continue; const off = Math.hypot(a.x - x, a.z - z); if (!best || off < best.off) best = { airlock: a, off }; }
   return best;
 }
 

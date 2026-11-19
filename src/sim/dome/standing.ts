@@ -28,6 +28,10 @@ export interface Airlock {
   outX: number; outZ: number; inX: number; inZ: number;
   /** Outside width of the chamber, and the width of each door's opening (world units). */
   w: number; dw: number;
+  /** `link`: a dedicated airlock for a tunnel or walkway to another dome (sim/dome/links.ts), separate from the person airlocks; absent: a person airlock. */
+  role?: 'link';
+  /** The link this airlock serves (role `link`). */
+  linkId?: string;
 }
 
 export interface Dome {
@@ -47,33 +51,43 @@ export interface Dome {
 /** Panels in each tier's shell (a triangulated or gridded skin): what one lost panel is worth of the shell's health. */
 export const PANELS: Record<DomeTier, number> = { earthen: 1, geodesic: 150, glass: 288, arcology: 864 };
 
+/** One airlock at a world angle on a shell of radius `r` centered at (x, z). */
+export function airlockAt(tier: DomeTier, x: number, z: number, r: number, angle: number, index: number): Airlock {
+  const v = vestibuleOf(tier, r), s = Math.sin(angle), c = Math.cos(angle);
+  return { index, angle, x: x + s * r, z: z + c * r, outX: x + s * (r + 0.45), outZ: z + c * (r + 0.45), inX: x + s * (r - v.len), inZ: z + c * (r - v.len), w: v.w, dw: v.dw };
+}
+
 /** The airlocks of a dome of this tier at (x, z) turned `rot` quarter turns. */
 export function airlocksOf(tier: DomeTier, x: number, z: number, r: number, rot = 0): Airlock[] {
-  const t = TIER[tier], v = vestibuleOf(tier, r);
-  const angles = tier === 'earthen' ? [0] : airlockAngles(t.airlocks);
-  return angles.map((a0, index) => {
-    const angle = a0 + rot * Math.PI / 2, s = Math.sin(angle), c = Math.cos(angle);
-    return { index, angle, x: x + s * r, z: z + c * r, outX: x + s * (r + 0.45), outZ: z + c * (r + 0.45), inX: x + s * (r - v.len), inZ: z + c * (r - v.len), w: v.w, dw: v.dw };
-  });
+  const angles = tier === 'earthen' ? [0] : airlockAngles(TIER[tier].airlocks);
+  return angles.map((a0, index) => airlockAt(tier, x, z, r, a0 + rot * Math.PI / 2, index));
+}
+
+/** The link airlocks a dome carries (one per link end that meets it), from the saved links (`GameState.domeLinks`). */
+export function linkAirlocksOf(s: Partial<Pick<GameState, 'domeLinks'>>, tier: DomeTier, st: Pick<Structure, 'id' | 'x' | 'z'>, r: number, first: number): Airlock[] {
+  const out: Airlock[] = [];
+  for (const l of s.domeLinks ?? []) for (const e of l.ends) if (e.type === 'dome' && e.id === st.id && e.angle !== undefined) out.push({ ...airlockAt(tier, st.x, st.z, r, e.angle, first + out.length), role: 'link', linkId: l.id });
+  return out;
 }
 
 /** Share of the panels whole, from the panels the family has not yet replaced on this dome (the open 'panel' jobs of sim/raidDamage.ts). */
 export function shellHealth(tier: DomeTier, panelsDown: number): number { return Math.max(0.2, Math.min(1, 1 - panelsDown / PANELS[tier])); }
 
 /** One dome, from its structure (null when the kind is not a dome). */
-export function domeFrom(st: Structure, panelsDown = 0): Dome | null {
+export function domeFrom(st: Structure, panelsDown = 0, links: Partial<Pick<GameState, 'domeLinks'>> = {}): Dome | null {
   const tier = tierOfKind(st.kind);
   if (!tier) return null;
   const cells = cellsOfKind(st.kind) ?? TIER[tier].cells, r = shellFt(tier, cells) / 2 / FT_PER_UNIT - 0.03;
-  return { id: st.id, tier, x: st.x, z: st.z, r, footR: cells * CELL_FT / 2 / FT_PER_UNIT, airlocks: airlocksOf(tier, st.x, st.z, r, st.rot), health: shellHealth(tier, panelsDown), structure: st };
+  const person = airlocksOf(tier, st.x, st.z, r, st.rot);
+  return { id: st.id, tier, x: st.x, z: st.z, r, footR: cells * CELL_FT / 2 / FT_PER_UNIT, airlocks: [...person, ...linkAirlocksOf(links, tier, st, r, person.length)], health: shellHealth(tier, panelsDown), structure: st };
 }
 
 /** Every finished dome on the place. `staked` (default false) also returns the ones still going up. */
-export function domesOf(s: Pick<GameState, 'structures'> & Partial<Pick<GameState, 'raidDamage'>>, staked = false): Dome[] {
+export function domesOf(s: Pick<GameState, 'structures'> & Partial<Pick<GameState, 'raidDamage' | 'domeLinks'>>, staked = false): Dome[] {
   const down = new Map<string, number>();
   for (const d of s.raidDamage ?? []) if (d.kind === 'panel' && d.structure && d.done < d.hours) down.set(d.structure, (down.get(d.structure) ?? 0) + (d.panels ?? 1));
   const out: Dome[] = [];
-  for (const st of s.structures) { if (!staked && !isFinished(st)) continue; const d = domeFrom(st, down.get(st.id) ?? 0); if (d) out.push(d); }
+  for (const st of s.structures) { if (!staked && !isFinished(st)) continue; const d = domeFrom(st, down.get(st.id) ?? 0, s); if (d) out.push(d); }
   return out;
 }
 
