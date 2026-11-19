@@ -22,6 +22,7 @@ import { domeGeometry } from './geometry';
 import { SKIRT_MARGIN_FT, DIG_DEPTH_FT, rectVsCircle, type Rect } from './siting';
 import { vestibuleOf } from './vestibule';
 import { digState, hasUtilities, utilityRuns } from './dig';
+import { domeCost } from './cost';
 import type { Blueprint } from '../blueprints';
 
 const FT_PER_UNIT = 2 * CELL_FT;
@@ -53,6 +54,8 @@ export interface UnderDome {
   /** Feet of deep footing this piece pays for (beyond the tier's skirt and what other pieces already paid), and its poured concrete (cu yd). */
   footFt: number;
   footYd: number;
+  /** The footing's goods and price: the difference between the dome's own bill at the deeper skirt and at the tier's depth (concrete, rebar, the skirt crew, the deeper crater and shoring), so it is priced exactly as the dome prices its own skirt and nothing is charged twice. */
+  footGoods?: Record<string, number>; footUsd?: number;
   /** How far down its floor lies (ft), as staked: what the crater must reach before it digs, and what the skirt must cover. */
   floorFt: number;
 }
@@ -131,6 +134,18 @@ export function coverOf(tier: DomeTier, fl: number, paid = 0): Cover {
   return { need, have, extra, state: need - base > BUNKER_DOME.FOOTING_MAX_FT ? 'refused' : extra > 0 ? 'footing' : 'covered' };
 }
 
+/**
+ * What `extraFt` more depth of the skirt costs, the dome's own way (sim/dome/pricing.ts: skirt concrete at the new rebar rate, the skirt crew, and the deeper
+ * crater and shoring that go with it): the difference of two `domeCost` bills. Goods and dollars; the bunker piece that needs it carries them in its foundation
+ * stage, so the dome's own bill and the card's `domeCostSummary(...).extras` line never count it twice (PROPOSED: priced as the dome prices it).
+ */
+export function footingBill(d: Pick<DomeAt, 'tier' | 'cells'>, extraFt: number): { goods: Record<string, number>; usd: number } {
+  if (extraFt <= 0) return { goods: {}, usd: 0 };
+  const a = domeCost(d.tier, d.cells), b = domeCost(d.tier, d.cells, { skirtFt: TIER[d.tier].skirtFt + extraFt }), goods: Record<string, number> = {};
+  for (const st of ['site', 'foundation'] as const) for (const [k, n] of Object.entries(b.stages[st]) as Array<[string, number]>) { const dn = n - ((a.stages[st] as Record<string, number>)[k] ?? 0); if (dn > 0) goods[k] = (goods[k] ?? 0) + dn; }
+  return { goods, usd: Math.max(0, b.materialsUsd - a.materialsUsd) };
+}
+
 /** Cubic yards of concrete in `extraFt` more depth of the ring. */
 export function footingYd(d: Pick<DomeAt, 'tier' | 'cells'>, extraFt: number): number {
   return extraFt <= 0 ? 0 : Math.ceil(domeGeometry(d.tier, shellFt(d.tier, d.cells)).ringFt * extraFt * TIER[d.tier].skirtThickFt / 27);
@@ -178,7 +193,7 @@ export function bunkerBlueprint(bp: Blueprint, ud: UnderDome): Blueprint {
       if (st.id === 'foundation') {
         if (ud.with && m.excavator) m.excavator = Math.max(1, Math.ceil(m.excavator * BUNKER_DOME.WITH_EXCAVATOR));
         if (!ud.with) m.lumber = (m.lumber ?? 0) + Math.max(1, Math.ceil((st.yields?.spoil ?? 0) / BUNKER_DOME.SHORING_M3_PER_LUMBER));
-        if (ud.footYd > 0) { m.concrete = (m.concrete ?? 0) + ud.footYd; m.rebar = (m.rebar ?? 0) + Math.ceil(ud.footYd / 6); }
+        for (const [g, n] of Object.entries(ud.footGoods ?? {})) (m as Record<string, number>)[g] = ((m as Record<string, number>)[g] ?? 0) + n;
         return { ...st, hours: hours + Math.round(ud.footYd * BUNKER_DOME.FOOTING_HOURS_PER_YD), materials: m };
       }
       return { ...st, hours, materials: m };
@@ -187,9 +202,9 @@ export function bunkerBlueprint(bp: Blueprint, ud: UnderDome): Blueprint {
 }
 
 /** A dome placed over a bunker already there pays for the deep footing the bunker needs: its foundation stage gets the concrete and the labor. */
-export function footedBlueprint(bp: Blueprint, footYd: number): Blueprint {
+export function footedBlueprint(bp: Blueprint, footYd: number, goods: Record<string, number> = {}): Blueprint {
   if (footYd <= 0) return bp;
-  return { ...bp, stages: bp.stages.map(st => st.id !== 'foundation' ? st : { ...st, hours: st.hours + Math.round(footYd * BUNKER_DOME.FOOTING_HOURS_PER_YD), materials: { ...st.materials, concrete: (st.materials.concrete ?? 0) + footYd, rebar: (st.materials.rebar ?? 0) + Math.ceil(footYd / 6) } }) };
+  return { ...bp, stages: bp.stages.map(st => { if (st.id !== 'foundation') return st; const m = { ...st.materials } as Record<string, number>; for (const [g, n] of Object.entries(goods)) m[g] = (m[g] ?? 0) + n; return { ...st, hours: st.hours + Math.round(footYd * BUNKER_DOME.FOOTING_HOURS_PER_YD), materials: m }; }) };
 }
 
 /** Total on-site hours of a blueprint. */

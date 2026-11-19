@@ -4,7 +4,7 @@ import { ownsAt } from '../sim/land';
 import { CELL, KIT, PROBLEM_TEXT, snapCenter, footprint, type SiteQuery } from './buildkit/kit';
 import { DEPTH, deepestUnder, floorDepthFt, isUnderground, previewDatum, siteProblem } from './buildkit/underground';
 import { bunkerSite } from '../sim/dome/bunkerLive';
-import { coverOf, footingYd } from '../sim/dome/bunker';
+import { coverOf, footingBill, footingYd } from '../sim/dome/bunker';
 import { useWorldStore } from '../store/worldStore';
 import { buildGhost } from './buildkit/buildings';
 import type { HomesteadWorld } from './HomesteadWorld';
@@ -291,8 +291,9 @@ export class PlacementTool {
     let foot: { ft: number; yd: number } | undefined, footLine: string | undefined;
     if (deep !== null) {
       const c = coverOf(tier, deep);
-      foot = c.extra > 0 ? { ft: c.extra, yd: footingYd({ tier, cells }, c.extra) } : undefined;
-      footLine = `A bunker stands under it, its floor ${Math.round(deep)} ft down: the skirt (${TIER[tier].skirtFt} ft) ${c.extra > 0 ? `is taken ${c.extra} ft deeper (${foot!.yd} cu yd of concrete) to cover it` : 'already covers it'}.`;
+      const fb = c.extra > 0 ? footingBill({ tier, cells }, c.extra) : null;
+      foot = fb ? { ft: c.extra, yd: footingYd({ tier, cells }, c.extra), goods: fb.goods, usd: fb.usd } : undefined;
+      footLine = `A bunker stands under it, its floor ${Math.round(deep)} ft down: the skirt (${TIER[tier].skirtFt} ft) ${c.extra > 0 ? `is taken ${c.extra} ft deeper (+$${Math.round(foot!.usd ?? 0).toLocaleString('en-US')}, priced as the dome prices its skirt) to cover it` : 'already covers it'}.`;
     }
     if (!cur || cur.cells !== cells || cur.ok !== ok || cur.summary !== summary || cur.workLine !== workLine || cur.footLine !== footLine) st.setDomeSite({ tier, cells, ok, summary, work, workLine, foot, footLine });
   }

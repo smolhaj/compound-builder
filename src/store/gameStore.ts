@@ -88,7 +88,7 @@ import { muteFeedback } from '../ui/feel/quiet';
 /** The earthwork a graded dome pad needs, measured by the world under the cursor (sim/dome/grading.ts). */
 export interface SiteWork { cutCy: number; fillCy: number; wallSf: number }
 /** What the circle ghost says about the spot under the cursor. */
-export interface DomeSite { tier: DomeTier; cells: number; ok: boolean; summary: string; work?: SiteWork; workLine?: string; /** Deep footing the dome pays for bunker pieces already under it (ft, cu yd) and the line the card shows. */ foot?: { ft: number; yd: number }; footLine?: string }
+export interface DomeSite { tier: DomeTier; cells: number; ok: boolean; summary: string; work?: SiteWork; workLine?: string; /** Deep footing the dome pays for bunker pieces already under it (ft, cu yd) and the line the card shows. */ foot?: { ft: number; yd: number; goods?: Record<string, number>; usd?: number }; footLine?: string }
 
 export interface CutsceneState {
   phase: 'prompt' | 'playing' | 'aftermath';

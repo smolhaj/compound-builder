@@ -9,7 +9,7 @@ import { BLUEPRINTS } from '../blueprints';
 import { blueprintOf, isFinished } from '../construction';
 import { TIER, tierOfKind, shellFt, cellsOfKind, type DomeTier } from './tiers';
 import {
-  againstSkirt, usableR, bpHours, bunkerBlueprint, bunkerShellShare, combinedRoom, coverOf, craterOpen, domeAt, footingYd, refuge,
+  againstSkirt, usableR, bpHours, bunkerBlueprint, bunkerShellShare, combinedRoom, coverOf, craterOpen, domeAt, footingBill, footingYd, refuge,
   type Cover, type DomeAt, type Hazard, type Refuge, type UnderDome,
 } from './bunker';
 import type { Rect } from './siting';
@@ -39,7 +39,7 @@ export function skirtDepthFt(s: GameState, dome: Structure): number {
 export interface BunkerSite {
   dome: string; tier: DomeTier; domeName: string;
   /** Floor depth (ft), the skirt's own depth, and the cover against it. */
-  floorFt: number; skirtFt: number; cover: Cover; footYd: number;
+  floorFt: number; skirtFt: number; cover: Cover; footYd: number; footUsd: number;
   /** The dome's crater is open (before backfill): the bunker may be built with it. */
   craterOpen: boolean;
   /** Whole hours of combined work still free in this crater, and the hours this piece would take with the dome. */
@@ -60,26 +60,26 @@ export function domeOver(s: GameState, rect: Rect): Structure | null {
 export function bunkerSite(s: GameState, kind: string, rect: Rect, floorFt: number): BunkerSite | null {
   const dome = domeOver(s, rect), tier = dome && tierOfKind(dome.kind);
   if (!dome || !tier || !isBunkerKind(kind) || !BLUEPRINTS[kind]) return null;
-  const cover = coverOf(tier, floorFt, footingPaid(s, dome)), yd = footingYd({ tier, cells: cellsOfKind(dome.kind)! }, cover.extra);
+  const cover = coverOf(tier, floorFt, footingPaid(s, dome)), dd = { tier, cells: cellsOfKind(dome.kind)! }, yd = footingYd(dd, cover.extra), fb = footingBill(dd, cover.extra);
   const dbp = blueprintOf(dome), domeHours = dbp.stages.filter(x => x.id === 'site' || x.id === 'foundation').reduce((a, x) => a + x.hours, 0);
   const linked = pieces(s, dome.id).filter(p => p.underDome!.with).reduce((a, p) => a + bpHours(blueprintOf(p)), 0);
-  const ud: UnderDome = { id: dome.id, with: true, footFt: cover.extra, footYd: yd, floorFt };
+  const ud: UnderDome = { id: dome.id, with: true, footFt: cover.extra, footYd: yd, footGoods: fb.goods, footUsd: fb.usd, floorFt };
   const withHours = bpHours(bunkerBlueprint(BLUEPRINTS[kind], ud));
   const room = combinedRoom(domeHours, linked), open = craterOpen(dome.stage) && !isFinished(dome);
   const sk = TIER[tier].skirtFt;
   const line = cover.state === 'refused'
     ? `The skirt is ${sk} ft deep and this floor lies ${Math.round(floorFt)} ft down: too deep to cover (a deep footing goes at most 20 ft further).`
     : `Protected by the skirt: the ring is ${sk}${cover.have > sk ? ` (${cover.have} ft with the footings staked)` : ''} ft deep, this bunker's floor is ${Math.round(floorFt)} ft down, and the skirt must reach ${cover.need} ft (floor plus 3 ft).`
-      + (cover.extra > 0 ? ` A deep footing takes it ${cover.extra} ft further: ${yd} cu yd of concrete on this piece's bill.` : '');
-  return { dome: dome.id, tier, domeName: TIER[tier].name, floorFt, skirtFt: sk, cover, footYd: yd, craterOpen: open, room, withHours, canWith: open && room >= withHours, line };
+      + (cover.extra > 0 ? ` A deep footing takes it ${cover.extra} ft further: $${Math.round(fb.usd).toLocaleString('en-US')} of concrete, steel, crew and crater work, priced as the dome prices its own skirt, on this piece's bill.` : '');
+  return { dome: dome.id, tier, domeName: TIER[tier].name, floorFt, skirtFt: sk, cover, footYd: yd, footUsd: fb.usd, craterOpen: open, room, withHours, canWith: open && room >= withHours, line };
 }
 
 /** Stamp a newly staked bunker piece with its dome: built with it (when the crater is open and the crew has room and the player chose it) or dug under its floor. */
 export function stampUnderDome(s: GameState, st: Structure, site: Pick<BunkerSite, 'dome' | 'floorFt'>, withDome: boolean): void {
   const dome = s.structures.find(x => x.id === site.dome), tier = dome && tierOfKind(dome.kind);
   if (!dome || !tier) return;
-  const cover = coverOf(tier, site.floorFt, footingPaid(s, dome)), yd = footingYd({ tier, cells: cellsOfKind(dome.kind)! }, cover.extra);
-  const probe: UnderDome = { id: dome.id, with: true, footFt: cover.extra, footYd: yd, floorFt: site.floorFt };
+  const cover = coverOf(tier, site.floorFt, footingPaid(s, dome)), dd = { tier, cells: cellsOfKind(dome.kind)! }, yd = footingYd(dd, cover.extra), fb = footingBill(dd, cover.extra);
+  const probe: UnderDome = { id: dome.id, with: true, footFt: cover.extra, footYd: yd, footGoods: fb.goods, footUsd: fb.usd, floorFt: site.floorFt };
   const w = bunkerSite(s, st.kind, { x0: st.x, z0: st.z, x1: st.x, z1: st.z }, site.floorFt);
   const room = w ? w.room : 0, withHrs = bpHours(bunkerBlueprint(BLUEPRINTS[st.kind], probe));
   st.underDome = { ...probe, with: withDome && craterOpen(dome.stage) && !isFinished(dome) && room >= withHrs };
@@ -89,7 +89,7 @@ export function stampUnderDome(s: GameState, st: Structure, site: Pick<BunkerSit
 export function stampDomeFoot(st: Structure, tier: DomeTier, cells: number, deepestFloorFt: number | null): void {
   if (deepestFloorFt === null) { delete st.domeFoot; return; }
   const c = coverOf(tier, deepestFloorFt);
-  if (c.extra > 0) st.domeFoot = { ft: c.extra, yd: footingYd({ tier, cells }, c.extra) }; else delete st.domeFoot;
+  if (c.extra > 0) { const fb = footingBill({ tier, cells }, c.extra); st.domeFoot = { ft: c.extra, yd: footingYd({ tier, cells }, c.extra), goods: fb.goods, usd: fb.usd }; } else delete st.domeFoot;
 }
 
 // ── the rows the panels show ──

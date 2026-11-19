@@ -22,7 +22,7 @@ import { lengthText } from './units';
 export function blueprintOf(st: Structure) {
   let bp = BLUEPRINTS[st.kind];
   if (st.underDome) bp = bunkerBlueprint(bp, st.underDome);
-  else if (st.domeFoot) bp = footedBlueprint(bp, st.domeFoot.yd);
+  else if (st.domeFoot) bp = footedBlueprint(bp, st.domeFoot.yd, st.domeFoot.goods);
   return st.grade ? gradedBlueprint(styledBlueprint(bp, st.mat), st.grade) : styledBlueprint(bp, st.mat);
 }
 

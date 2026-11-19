@@ -143,7 +143,7 @@ export interface Structure {
   /** A bunker piece standing inside a dome's skirt ring (sim/dome/bunker.ts): which dome, whether it was staked with the dome's crater open, and the deep footing it pays for (optional, so no save bump). */
   underDome?: import('./dome/bunker').UnderDome;
   /** A dome staked over a bunker that was already there: the deep footing its foundation pays for (cu yd of concrete; optional, so no save bump). */
-  domeFoot?: { ft: number; yd: number };
+  domeFoot?: { ft: number; yd: number; goods?: Record<string, number>; usd?: number };
   siteWork?: { cutCy: number; fillCy: number; wallSf: number; usd: number };
   permitAt?: number;
   /** The permit was rushed (sim/shelterBridge.ts): paid through the expedite desk, or the runner was caught and the review started over (optional; save v101). */
