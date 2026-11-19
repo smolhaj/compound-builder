@@ -249,10 +249,11 @@ export function ProjectsTab() {
 
 /** A dome's ground works, in words: what the crew is doing now (the crater, the utilities, the skirt, the backfill) and how much dirt there is. */
 export function DigLine({ st }: { st: Structure }) {
+  const game = useGameStore(g => g.game);
   const tier = tierOfKind(st.kind);
   if (!tier) return null;
   const hrs = blueprintOf(st).stages[st.stage]?.hours ?? 1, d = digState(tier, st.stage, st.done / hrs, st.supplied), cells = cellsOfKind(st.kind) ?? TIER[tier].cells;
-  const game = useGameStore(g => g.game), shell = bunkerShellPct(game, st.id);
+  const shell = bunkerShellPct(game, st.id);
   return <div data-testid="dome-dig-line"><Note>{digLabel(tier, d, d.phase === 'excavation' ? digVolumes(tier, cells, d.depthFt) : undefined)}</Note>
     {shell !== null && <Note tone={st.stage === 2 && shell < 100 ? 'warn' : undefined}><span data-testid="dome-bunker-shell">Bunker shell: {shell} percent{shell < 100 ? ' (the crater is not backfilled until its walls and roof stand)' : ''}</span></Note>}</div>;
 }
