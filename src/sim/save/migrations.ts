@@ -59,6 +59,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   102: s => ({ ...s, version: 103 }),
   // 103 → 104: dome links (sim/dome/links.ts): optional `domeLinks` (absent: none), `Dig.link`, the dome's tunnel counterattack card; nothing to back-fill
   103: s => ({ ...s, version: 104 }),
+  // v105: optional GameState.shellScars (scorch and chip marks a raid leaves on a dome's shell)
+  104: s => ({ ...s, version: 105 }),
   97: s => ({ ...s, version: 98 }),
   // 95 → 96: hiding in the bunker (sim/bunkerHide.ts): `Outcome.bunker` on the gate card, optional; no old-save work
   95: s => ({ ...s, version: 96 }),
