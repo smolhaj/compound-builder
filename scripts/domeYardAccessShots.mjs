@@ -78,7 +78,7 @@ try {
     await pr([pc[0] - e[0] * 2.6, 0.5, pc[1] - e[1] * 2.6], [pc[0], 0.3, pc[1]], 58); await shot('arcology-interior-service-airlock');
     await pr([pc[0] - e[0] * 4.6 - ga.y.et[0] * 2.0, 1.7, pc[1] - e[1] * 4.6 - ga.y.et[1] * 2.0], [pc[0] - ga.y.et[0] * 2.0, 0.25, pc[1] - ga.y.et[1] * 2.0], 62); await shot('arcology-interior-gallery-bays');
     const eg = gg.y.er, pg = gg.y.portal, pcg = [G2.x + pg.chamber[0], G2.z + pg.chamber[1]];
-    await pr([pcg[0] - eg[0] * 2.2 - gg.y.et[0] * 1.4, 0.45, pcg[1] - eg[1] * 2.2 - gg.y.et[1] * 1.4], [pcg[0] - gg.y.et[0] * 1.0, 0.3, pcg[1] - gg.y.et[1] * 1.0], 62); await shot('glass-interior-plant-and-airlock');
+    await pr([pcg[0] - eg[0] * 2.8 - gg.y.et[0] * 1.2, 1.9, pcg[1] - eg[1] * 2.8 - gg.y.et[1] * 1.2], [pcg[0] - gg.y.et[0] * 0.8, 0.25, pcg[1] - gg.y.et[1] * 0.8], 66); await shot('glass-interior-plant-and-airlock');
   }
   if (want('under')) {
     const e = ga.y.er, p = ga.y.portal, pt = [A.x + (p.from[0] + p.to[0]) / 2, A.z + (p.from[1] + p.to[1]) / 2];

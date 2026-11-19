@@ -120,7 +120,7 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
   const apply = (): void => {
     if (lines) lines.visible = under;
     if (passage) passage.visible = under || view !== 'full';
-    if (machMat) { const see = view !== 'full'; machMat.transparent = see; machMat.opacity = see ? 0.5 : 1; machMat.depthWrite = !see; machMat.needsUpdate = true; }
+    if (machMat) { const see = view !== 'full' || under; machMat.transparent = see; machMat.opacity = see ? 0.5 : 1; machMat.depthWrite = !see; machMat.needsUpdate = true; }
   };
   group.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = false; o.receiveShadow = false; } });
   return { group, key: plantKey(tier, r, filtering, look), setUnder: on => { under = on; apply(); }, setView: v => { view = v; apply(); }, dispose: () => { for (const o of owned) o.dispose(); } };
