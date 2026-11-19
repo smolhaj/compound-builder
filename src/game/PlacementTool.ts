@@ -2,7 +2,9 @@ import { isOrchard, orchardSiteNote } from '../sim/orchard';
 import * as THREE from 'three';
 import { ownsAt } from '../sim/land';
 import { CELL, KIT, PROBLEM_TEXT, snapCenter, footprint, type SiteQuery } from './buildkit/kit';
-import { DEPTH, isUnderground, previewDatum, siteProblem } from './buildkit/underground';
+import { DEPTH, deepestUnder, floorDepthFt, isUnderground, previewDatum, siteProblem } from './buildkit/underground';
+import { bunkerSite } from '../sim/dome/bunkerLive';
+import { coverOf, footingYd } from '../sim/dome/bunker';
 import { useWorldStore } from '../store/worldStore';
 import { buildGhost } from './buildkit/buildings';
 import type { HomesteadWorld } from './HomesteadWorld';
@@ -255,9 +257,20 @@ export class PlacementTool {
     g.rotation.y = this._turn * Math.PI / 2;
     g.visible = true;
     this._showDome(def, x, z, problem === null && !clash, placed, problem ? PROBLEM_TEXT[problem] : clashMsg);
+    this._showBunker(def, x, z, problem === null && !clash, placed);
     const m = this._ok ? this._okMat : this._badMat;
     g.traverse(o => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).material = m; });
     useGameStore.getState().setToolProblem(problem ? PROBLEM_TEXT[problem] : clashMsg ?? (this._yardRefused ? NO_LEVEL_SITE : null));
+  }
+
+  /** A bunker piece inside a dome's ring: the skirt against the bunker floor and the with-the-dome offer for the placing card (sim/dome/bunkerLive.ts). */
+  private _showBunker(def: (typeof KIT)[string], x: number, z: number, ok: boolean, placed: readonly { id: string; kind: string; x: number; z: number; rot: number }[]): void {
+    const st = useGameStore.getState();
+    const fl = ok && isUnderground(def) ? floorDepthFt(def, x, z, this._turn, this._site.height, placed) : null;
+    const site = fl === null ? null : bunkerSite(st.game, def.id, footprint(def, x, z, this._turn, false), fl);
+    const cur = st.bunkerSite;
+    if (!site) { if (cur) st.setBunkerSite(null); return; }
+    if (!cur || cur.line !== site.line || cur.canWith !== site.canWith || cur.room !== site.room || cur.withHours !== site.withHours) st.setBunkerSite(site);
   }
 
   /** The circle ghost for a dome: the footprint against the land, the buildings and the trees (sim/dome/siting `domeSiteReport`), and its line on the placing card. */
@@ -273,7 +286,15 @@ export class PlacementTool {
     // the graded pad of a big dome: cut and fill under the square footprint, priced by the dirt moved (sim/dome/grading)
     let work: SiteWork | undefined, workLine: string | undefined;
     if (isGradedTier(tier)) { const g = gradeSquare({ x, z, half: footR }, this._site.height); work = { cutCy: g.cutCy, fillCy: g.fillCy, wallSf: g.wallSf }; workLine = gradingLine(g); }
-    if (!cur || cur.cells !== cells || cur.ok !== ok || cur.summary !== summary || cur.workLine !== workLine) st.setDomeSite({ tier, cells, ok, summary, work, workLine });
+    // bunker pieces already under the footprint: their floors must be covered, and the dome's foundation pays for the footing that does it
+    const deep = deepestUnder(def.id, x, z, this._turn, this._site.height, placed as never);
+    let foot: { ft: number; yd: number } | undefined, footLine: string | undefined;
+    if (deep !== null) {
+      const c = coverOf(tier, deep);
+      foot = c.extra > 0 ? { ft: c.extra, yd: footingYd({ tier, cells }, c.extra) } : undefined;
+      footLine = `A bunker stands under it, its floor ${Math.round(deep)} ft down: the skirt (${TIER[tier].skirtFt} ft) ${c.extra > 0 ? `is taken ${c.extra} ft deeper (${foot!.yd} cu yd of concrete) to cover it` : 'already covers it'}.`;
+    }
+    if (!cur || cur.cells !== cells || cur.ok !== ok || cur.summary !== summary || cur.workLine !== workLine || cur.footLine !== footLine) st.setDomeSite({ tier, cells, ok, summary, work, workLine, foot, footLine });
   }
 
   /** The gravel spur from the yard's gate must meet the road's edge at a drivable grade: not a yard on a bench above a road cut. */

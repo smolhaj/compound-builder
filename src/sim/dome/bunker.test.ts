@@ -59,7 +59,12 @@ describe('the skirt against the bunker floor', () => {
     expect(footingYd(dome('earthen'), 10)).toBeGreaterThan(0);
   });
   it('a bunker under a ring too shallow for any footing is refused with the right reason', () => {
-    expect(bunkerProblemUnder(dome('earthen', 4), hatchRect(100, 100), 40)).toBe('skirt_too_shallow');
+    expect(bunkerProblemUnder(dome('glass'), hatchRect(100, 100), 90)).toBe('skirt_too_shallow');
+  });
+  it('the earthen dome is a hut: nothing goes under it, anything wholly outside is fine', () => {
+    expect(bunkerProblemUnder(dome('earthen', 4), hatchRect(100, 100), 17)).toBe('earthen_hut');
+    expect(bunkerProblemUnder(dome('earthen', 4), hatchRect(100.6, 100), 17)).toBe('earthen_hut');
+    expect(bunkerProblemUnder(dome('earthen', 4), hatchRect(110, 100), 17)).toBeNull();
   });
 });
 
@@ -104,7 +109,7 @@ describe('the refuge', () => {
 });
 
 describe('with the dome or after it', () => {
-  const ud = (w: boolean, footYd = 0): UnderDome => ({ id: 's1', with: w, footFt: 0, footYd });
+  const ud = (w: boolean, footYd = 0): UnderDome => ({ id: 's1', with: w, footFt: 0, footYd, floorFt: 17 });
   it('built with the dome is never longer than apart, and never free', () => {
     for (const k of Object.keys(BLUEPRINTS).filter(k => k.startsWith('bunker_'))) {
       const bp = BLUEPRINTS[k], w = bunkerBlueprint(bp, ud(true)), a = bunkerBlueprint(bp, ud(false));
@@ -131,7 +136,7 @@ describe('with the dome or after it', () => {
 });
 
 describe('stage order and the progress readout', () => {
-  const piece = (stage: number, w = true) => ({ id: 'b', kind: 'bunker_dorm', stage, done: 0, underDome: { id: 'd', with: w, footFt: 0, footYd: 0 } });
+  const piece = (stage: number, w = true) => ({ id: 'b', kind: 'bunker_dorm', stage, done: 0, underDome: { id: 'd', with: w, footFt: 0, footYd: 0, floorFt: 17 } });
   it('the dome waits to backfill until the walls and roof stand', () => {
     expect(holdDome(2, [piece(3)])).toMatch(/walls and roof/);
     expect(holdDome(2, [piece(4)])).toBeNull();

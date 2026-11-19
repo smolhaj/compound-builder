@@ -4,8 +4,9 @@
  *
  * Where it may go. Bunker rooms and entrances may stand wholly inside the skirt ring, with one build cell (10 ft) of clear ground between the ring's
  * inner face and the room, so the buried utility lines, the airlock sleeves and the plant passage that run inside the footing never meet a room.
- * A room that would cross the ring, or sit in an airlock's lane, is refused. A small (earthen) dome has little room: a hatch fits in the smallest, a
- * bunkroom or the buried container only in the larger sizes, and the card says so.
+ * A room that would cross the ring, or sit in an airlock's lane, is refused. Tiers that make sense: geodesic, glass and arcology (a geodesic dome has about 36 ft
+ * across to use, so a hatch and a corridor or one room; the bigger two hold whole bunkers). The earthen dome is a solid hut on its own pad with no floor to open a
+ * hatch in and a 4 ft skirt, so a bunker is refused under it with a message that says to build beside it (PROPOSED).
  *
  * Protected by the skirt. The ring reaches `skirtFt` deep; a bunker floor lies `floorFt` below the ground (the entrance's shaft depth plus the floor slab).
  * The skirt must reach the floor plus the usual margin (`SKIRT_MARGIN_FT`), or the room's outer side is a weak spot. A tier whose skirt is shallower than
@@ -52,6 +53,8 @@ export interface UnderDome {
   /** Feet of deep footing this piece pays for (beyond the tier's skirt and what other pieces already paid), and its poured concrete (cu yd). */
   footFt: number;
   footYd: number;
+  /** How far down its floor lies (ft), as staked: what the crater must reach before it digs, and what the skirt must cover. */
+  floorFt: number;
 }
 
 export interface DomeAt { tier: DomeTier; cells: number; x: number; z: number; rot: number }
@@ -115,10 +118,11 @@ export function footingYd(d: Pick<DomeAt, 'tier' | 'cells'>, extraFt: number): n
   return extraFt <= 0 ? 0 : Math.ceil(domeGeometry(d.tier, shellFt(d.tier, d.cells)).ringFt * extraFt * TIER[d.tier].skirtThickFt / 27);
 }
 
-export type BunkerProblem = 'straddles_skirt' | 'airlock_lane' | 'skirt_too_shallow';
+export type BunkerProblem = 'straddles_skirt' | 'airlock_lane' | 'skirt_too_shallow' | 'earthen_hut';
 export const BUNKER_PROBLEM_TEXT: Record<BunkerProblem, string> = {
   straddles_skirt: 'The dome\'s buried skirt is in the way: keep a bunker wholly inside it, a cell of clear ground from the ring (or wholly outside the dome)',
   airlock_lane: 'That is the way in to an airlock: keep the bunker clear of it',
+  earthen_hut: 'An earthen dome is a solid hut with no floor to open a hatch in, and its 4 ft skirt is too shallow to guard a bunker: build the bunker beside it, or under a geodesic, glass or arcology dome',
   skirt_too_shallow: 'The bunker floor would lie deeper than the dome\'s skirt can be taken down: choose ground that is not so low here',
 };
 
@@ -129,6 +133,7 @@ export const BUNKER_PROBLEM_TEXT: Record<BunkerProblem, string> = {
 export function bunkerProblemUnder(d: DomeAt, r: Rect, fl: number): BunkerProblem | null {
   const where = againstSkirt(d, r);
   if (where === 'outside') return null;
+  if (d.tier === 'earthen') return 'earthen_hut';
   if (where === 'straddles') return 'straddles_skirt';
   if (inAirlockLane(d, r)) return 'airlock_lane';
   if (coverOf(d.tier, fl).state === 'refused') return 'skirt_too_shallow';
