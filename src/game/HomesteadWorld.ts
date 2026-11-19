@@ -566,7 +566,10 @@ export class HomesteadWorld {
       const rr = q.shape === 'box' ? Math.hypot(q.w, q.d) / 2 : q.r;
       if (rr > 0.06) obs.push({ x: q.x, z: q.z, hx: rr, hz: rr });
     }
-    const made = { plan: interiorPlan(ref.tier, ref.r, angles, obs, b.placed.rot + 1), key };
+    const plan = interiorPlan(ref.tier, ref.r, angles, obs, b.placed.rot + 1);
+    // the plant's equipment is lit at night: a pool of light round every unit (the yard and gallery read as a working place, not a dark plane)
+    for (const u of plantLayout(ref.tier, ref.r, filtering, { rot: b.placed.rot }).units) if (Math.hypot(u.x, u.z) < ref.r * 1.8) plan.glows.push({ x: u.x, z: u.z, r: 1.1 * Math.max(0.6, Math.min(1.5, ref.r / 6)) });
+    const made = { plan, key };
     this._interiorCache.set(b.placed.id, made);
     return made;
   }
@@ -2638,7 +2641,7 @@ export class HomesteadWorld {
         const def = KIT[b.placed.kind], area = def.cellsX * def.cellsZ / 4;
         // warm, low lamplight (incandescent-ish), not a bright work light
         // (the tunnel is lined in dark boards on a low arch: it takes nearly twice the light to read as lit)
-        b.light.intensity = (this._blackout ? 0.05 : this._under ? 0.25 : 0.34) * Math.min(1, 0.2 + 0.8 * area) * (b.placed.kind === 'bunker_corridor' ? 2.4 : 1);
+        b.light.intensity = (this._blackout ? 0.05 : this._under ? 0.25 : 0.28) * Math.min(1, 0.2 + 0.8 * area) * (b.placed.kind === 'bunker_corridor' ? 2.9 : 1);
         b.light.color.set(this._blackout ? 0xff8a5c : 0xffd49e);
         if (pick) this._noteLight(cands, b, above);
         continue;

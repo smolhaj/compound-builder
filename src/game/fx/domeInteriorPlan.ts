@@ -23,7 +23,7 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
   const out: InteriorPlan = { segs: [], benches: [], crates: [], planters: [], signs: [], lamps: [], plaza: null, glows: [] };
   if (tier !== 'glass' && tier !== 'arcology' && tier !== 'geodesic') return out;
   const free = (x: number, z: number, pad: number, inner = 0.9): boolean => Math.hypot(x, z) < r * inner && !obstacles.some(o => Math.abs(x - o.x) < o.hx + pad && Math.abs(z - o.z) < o.hz + pad);
-  for (const o of obstacles) if (o.home) out.glows.push({ x: o.x, z: o.z, r: Math.max(o.hx, o.hz) * 3 });
+  for (const o of obstacles) if (o.home) out.glows.push({ x: o.x, z: o.z, r: Math.max(o.hx, o.hz) * 4.5 });
   const plazaR = Math.min(0.9, r * 0.11);
   const plazaOk = free(0, 0, plazaR + 0.25, 1);
   if (plazaOk) out.plaza = { x: 0, z: 0, r: plazaR };

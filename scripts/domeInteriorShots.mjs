@@ -88,15 +88,15 @@ try {
   { const e = await door(house.cz + 0.9, h), l = await door(house.cz - 0.1, 0.22);
     await pair('03-house-door', e, l, 62, [[(e[0] - D.x) / R + 0.05, (e[2] - D.z) / R - 0.03]]); }
   await pair('05-airlock-person-out', segAt(best.a, 0.68), along(best.a, 1.15, 0, 0.25), 64, [frac(segAt(best.a, 0.8, 0))]);
-  await pair('06-glass-ceiling', segAt(best.a, 0.35, 0.3), L(0.05, 0.1, 5), 80, []);
+  await pair('06-glass-ceiling', segAt(best.a, 0.3, 0.3), [house.x, ground + 1.7, house.z], 80, [frac(segAt(best.a, 0.42, 0))]);
   if (info.yard) {
     const [yx, yz] = info.yard.chamber, ph = info.yard.phi;
     // the plant machinery stands along the shell near the service airlock: stand in the aisle in front of it, clear of every part (QA reads the same layout the world drew)
     const near = await page.evaluate(async ([tier, R, ph]) => { const P = await import('/src/sim/dome/plant.ts'); const parts = P.plantLayout(tier, R, 'closed', { rot: 0 }).parts.filter(q => !q.onShell && Math.abs(Math.atan2(Math.sin(Math.atan2(q.x, q.z) - ph), Math.cos(Math.atan2(q.x, q.z) - ph))) < 0.55 && Math.hypot(q.x, q.z) < R * 0.98);
       return { rMin: Math.min(...parts.map(q => Math.hypot(q.x, q.z) - Math.max(q.w ?? 0, q.d ?? 0, (q.r ?? 0) * 2) / 2)), n: parts.length }; }, [tier, R, ph]);
     lap('plant ' + JSON.stringify(near));
-    const rho = Math.max(0.3 * R, near.rMin - 2.8), eye = [D.x + Math.sin(ph - 0.18) * rho, ground + h, D.z + Math.cos(ph - 0.18) * rho];
-    await pair('04-plant-yard-airlock', eye, [D.x + yx, ground + 0.22, D.z + yz], 70, [[(eye[0] - D.x) / R + Math.sin(ph) * 0.05 + 0.02, (eye[2] - D.z) / R + Math.cos(ph) * 0.05]]);
+    const rho = Math.max(0.3 * R, near.rMin - 3.6), eye = [D.x + Math.sin(ph - 0.18) * rho, ground + h, D.z + Math.cos(ph - 0.18) * rho];
+    await pair('04-plant-yard-airlock', eye, [D.x + yx, ground + 0.4, D.z + yz], 78, [[(eye[0] - D.x) / R + Math.sin(ph) * 0.05 + 0.02, (eye[2] - D.z) / R + Math.cos(ph) * 0.05]]);
   }
   await page.close();
 } finally { await browser.close(); vite.kill(); setTimeout(() => process.exit(0), 200); }
