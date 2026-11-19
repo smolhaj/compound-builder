@@ -319,7 +319,7 @@ All procedural, no external assets. **No performance budget is raised**: nothing
 
 | PR | Content | Size | Depends on | Parallel with |
 |---|---|---|---|---|
-| 1 | `climateCurve.ts` (curves, regional tables, wet-bulb, work gate, grow factor) plus tests; `winter.ts` `coldScale` | S (about 350 lines) | this draft | none |
+| 1 (**done**, [#385](https://github.com/smolhaj/compound-builder/pull/385)) | `climateCurve.ts` (curves, regional tables, wet-bulb, work gate, grow factor) plus tests; `winter.ts` `coldScale` | S (about 350 lines) | this draft | none |
 | 2 | `runaway_heat` kind: `DisasterDef`, `KindFx`, blurbs, pool and fate, scenario card, look profile, no dome changes | M | 1 | 3 |
 | 3 | `ice_age` kind (same shape) | M | 1 | 2 |
 | 4 | `plantClimate.ts` and dome plant integration: COP, derate and trip, battery temperature, `heat` and `load` causes, repair lead scaling | M to L | 1 | 5 (different files, same `live.ts` seams: sequence the merge) |
