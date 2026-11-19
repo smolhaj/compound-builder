@@ -400,7 +400,7 @@ function SkirtPanel({ x }: { x: number }): ReactElement {
         ['Turned crews do not give up: they work along the footing toward the nearest airlock. The only way in is the door.', C.ink],
         ['Buried ground sensors (a set covers about 390 ft of wall, powered), dogs, a watcher or a tower can hear the dig first.', C.teal],
         ['The airlock is two doors and a room between them. Tunnels cross only here, through a sleeve, to a floor hatch.', C.teal],
-        ['Plant pipes and cables run buried inside the same footing and cross it only in sealed sleeves at the plant yard.', C.teal],
+        ['Plant pipes, cables and the passage to the walled yard run through the same footing in sealed sleeves; the yard has no outside gate.', C.teal],
       ].map(([text, col], i) => (
         <g key={i}>
           <Badge x={x + 28} y={636 + i * 53} n={i + 1} fill={col} />

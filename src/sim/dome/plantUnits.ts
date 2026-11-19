@@ -6,7 +6,7 @@
  *  units      chiller (the climate plant: chillers and heat pumps), air (the scrubber and air-handling house), substation (the transformers), water (the
  *             recycling plant and its pumps), battery (the ride-through bank of a closed ecology) and vents (the roof hatches). The control room, the
  *             pumps and the pipe runs are drawn (plant.ts) but are never a unit of their own: they ride with the units above and are always inside.
- *  places     `yard`: heat rejection and the substation need open air, so they stand in a walled yard (concrete wall, one gate) outside the shell of a
+ *  places     `yard`: heat rejection and the substation need open air, so they stand in a walled yard (a gateless concrete wall, reached from inside by a service airlock and a sealed passage) outside the shell of a
  *             glass or arcology dome. Everything else stands INSIDE the shell: loose in the plant yard just inside a glass dome's wall, in the
  *             service gallery built into the thickness of the arcology's armored band, packaged in a geodesic dome.
  *  states     a unit is whole, `damaged` (half its capacity) or `down` (none). The state is not saved on its own: it is read from the open repair jobs

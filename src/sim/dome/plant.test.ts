@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { plantLayout, plantScale, type Plant } from './plant';
 import { FILTERING } from './air';
-import { yardGeometry, yardBill, GATE_U } from './plantYard';
+import { yardGeometry, yardBill, yardRunData, yardAccess, inYard, PORTAL_U } from './plantYard';
 import { PLANT_KINDS, placeOf, plantKinds, type PlantKind } from './plantUnits';
 import { PERIMETER, runBill } from '../perimeter';
 
@@ -89,25 +89,60 @@ describe('what stands inside the shell and what stands outside', () => {
   });
 });
 
-describe('the hardened yard', () => {
-  it('is a closed ring with one gate on the outer wall, and a bigger dome never gets a smaller yard', () => {
+describe('the hardened yard, reached only from inside', () => {
+  it('is a closed ring with no gate and no opening on its outside, and a bigger dome never gets a smaller yard', () => {
     let last = 0;
     for (const r of [3.75, 6, 9, 12, 15]) {
       const y = yardGeometry('arcology', r)!;
       expect(y.length).toBeCloseTo(2 * (y.W + y.D), 6);
-      expect(y.gate.at).toBeGreaterThan(y.W + y.D);
-      expect(y.gate.at + y.gate.w / 2).toBeLessThan(y.length - y.D);
+      expect(yardRunData(y, 0, 0).gates).toEqual([]);
+      expect('gate' in y).toBe(false);
       expect(y.W * y.D).toBeGreaterThanOrEqual(last * 0.7);
       last = y.W * y.D;
     }
-    expect(GATE_U).toBeGreaterThan(0);
+    expect(PORTAL_U).toBeGreaterThan(0);
+    expect(yardAccess()).toEqual({ fromInside: true, outsideGate: false });
+  });
+  it('the outer wall is continuous: no wall piece is missing along the outside face', () => {
+    for (const [tier, r] of [['glass', 3.75], ['arcology', 9], ['arcology', 15]] as const) {
+      const p = plantLayout(tier, r, 'closed', { loop: 'recycle' }), y = p.yard!;
+      // every 0.25 unit along the outer wall line is covered by some wall part (a box at wall height, near the line)
+      const walls = p.parts.filter(q => q.shape === 'box' && q.h > 0.6 && q.h < 0.8 && q.w > 0.1 && q.d < 0.1);
+      for (let u = -y.W / 2 + 0.1; u < y.W / 2 - 0.1; u += 0.25) {
+        const x = y.center[0] + y.et[0] * u + y.er[0] * (y.D / 2), z = y.center[1] + y.et[1] * u + y.er[1] * (y.D / 2);
+        const hit = walls.some(q => Math.hypot(q.x - x, q.z - z) < q.w / 2 + 0.05);
+        expect(hit, `${tier} u=${u.toFixed(2)}`).toBe(true);
+      }
+    }
+  });
+  it('has a service airlock inside the shell, a sealed passage through the band and an inner door in the yard, aligned with each other', () => {
+    for (const [tier, r] of [['glass', 3.75], ['glass', 6], ['arcology', 9], ['arcology', 15]] as const) {
+      const p = plantLayout(tier, r, 'closed', { loop: 'recycle', spares: ['air'] }), y = p.yard!, pt = y.portal;
+      expect(Math.hypot(pt.chamber[0], pt.chamber[1])).toBeLessThan(r);            // the chamber is inside the shell
+      expect(Math.hypot(pt.to[0], pt.to[1])).toBeGreaterThan(r);                   // the inner door is in the yard
+      expect(Math.hypot(pt.from[0], pt.from[1])).toBeLessThan(Math.hypot(pt.chamber[0], pt.chamber[1]));   // the dome-side door is deeper in than the chamber's middle
+      const pass = p.parts.filter(q => q.passage);
+      expect(pass.length).toBeGreaterThan(10);
+      expect(pass.some(q => Math.hypot(q.x, q.z) < r - 0.2)).toBe(true);            // the airlock chamber
+      expect(pass.some(q => Math.hypot(q.x, q.z) > r + 0.05)).toBe(true);           // the passage outside the band
+      expect(p.lines.some(l => l.kind === 'passage')).toBe(true);
+      // it is in line with the yard's axis: the chamber, the passage and the inner door share one tangent offset
+      const off = (q: [number, number]) => (q[0] - y.center[0]) * y.et[0] + (q[1] - y.center[1]) * y.et[1];
+      expect(off(pt.chamber)).toBeCloseTo(off(pt.to), 6); expect(off(pt.from)).toBeCloseTo(off(pt.to), 6);
+      // and clear of the plant: no gallery bay or house stands on the passage
+      for (const q of p.parts) if (!q.passage && !q.high && !q.onShell && Math.hypot(q.x, q.z) < r) expect(Math.hypot(q.x - pt.chamber[0], q.z - pt.chamber[1]), `${tier} ${r} ${q.unit ?? ''}`).toBeGreaterThan(0.25);
+      // the airlock stands clear of the person airlocks
+      const n = tier === 'glass' ? 3 : 6;
+      for (let i = 0; i < n; i++) { const a = i * Math.PI * 2 / n; expect(Math.hypot(pt.chamber[0] - Math.sin(a) * r, pt.chamber[1] - Math.cos(a) * r)).toBeGreaterThan(0.9); }
+      void inYard;
+    }
   });
   it('has no yard on a geodesic or earthen dome', () => { expect(yardGeometry('geodesic', 3)).toBeNull(); expect(yardGeometry('earthen', 1)).toBeNull(); });
-  it('its bill matches the poured-concrete wall table, and a bigger yard never costs less', () => {
+  it('its bill is the wall table plus the service airlock and passage, not a gate, and a bigger yard never costs less', () => {
     for (const r of [3.75, 9]) {
-      const y = yardGeometry('glass', r)!, wall = y.length - y.gate.w, ref = runBill('concrete_wall', wall);
-      const b = yardBill('glass', r).bill;
+      const b = yardBill('glass', r).bill, y = yardGeometry('glass', r)!, wall = y.length, pass = (y.portal.len + 0.5) * 2, ref = runBill('concrete_wall', wall + pass);
       expect(b.concrete).toBe(ref.concrete); expect(b.rebar).toBe(ref.rebar);
+      expect(b.dome_airlock).toBe(1);
     }
     expect(PERIMETER.concrete_wall.materials.concrete).toBe(9);
     expect(yardBill('arcology', 15).hours).toBeGreaterThanOrEqual(yardBill('arcology', 9).hours);
