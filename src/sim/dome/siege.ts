@@ -176,7 +176,10 @@ export function panelSpot(d: Pick<Dome, 'x' | 'z' | 'r' | 'airlocks'>, k = 0): {
     gaps.push({ mid: (a + b) / 2, span: b - a });
   }
   gaps.sort((p, q) => q.span - p.span || p.mid - q.mid);
-  const angle = gaps[k % gaps.length].mid, [x, z] = onShell(d, angle);
+  // a wide vehicle port leaves some mid-gaps too close: those that clear every airlock come first (the rest only when none does)
+  const room = (a: number): number => d.airlocks.reduce((m, l) => Math.min(m, Math.abs(angDiff(a, l.angle)) * d.r - (l.role === 'vehicle' ? l.w / 2 : 0)), Infinity);
+  const clear = gaps.filter(g => room(g.mid) >= PANEL_CLEARANCE * Math.min(1, d.r / 2));
+  const pool = clear.length ? clear : gaps, angle = pool[k % pool.length].mid, [x, z] = onShell(d, angle);
   return { x, z, angle };
 }
 
@@ -186,8 +189,8 @@ export function awayFromAirlocks(d: Pick<Dome, 'x' | 'z' | 'r' | 'airlocks'>, x:
   const need = clear / d.r;
   for (let pass = 0; pass < 3; pass++) {
     for (const l of d.airlocks) {
-      const off = angDiff(a, l.angle);
-      if (Math.abs(off) < need) { a = l.angle + (off >= 0 ? 1 : -1) * need; moved = true; }
+      const off = angDiff(a, l.angle), nd = l.role === 'vehicle' ? need + l.w / 2 / d.r : need;   // (a vehicle port is wide: its chamber and gates)
+      if (Math.abs(off) < nd) { a = l.angle + (off >= 0 ? 1 : -1) * nd; moved = true; }
     }
   }
   const [nx, nz] = onShell(d, a);

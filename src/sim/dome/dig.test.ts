@@ -12,7 +12,7 @@ describe('dome dig stages', () => {
   it('the stage shares sum to one and the blueprints keep the same total hours', () => {
     for (const t of DOME_TIERS) {
       expect(STAGE_SPLIT[t].reduce((a, b) => a + b, 0)).toBeCloseTo(1, 9);
-      const bp = BLUEPRINTS[DOME_KIND[t]], total = bp.stages.reduce((a, s) => a + s.hours, 0), want = domeCost(t).hours;
+      const bp = BLUEPRINTS[DOME_KIND[t]], total = bp.stages.reduce((a, s) => a + s.hours, 0), want = domeCost(t, undefined, { vehiclePort: true }).hours;
       expect(Math.abs(total - want)).toBeLessThanOrEqual(5);
     }
   });

@@ -4,6 +4,7 @@
  * written once. Pure (tested in siege.test.ts); a dome is a structure of a dome kind, so nothing here is saved.
  */
 import { vestibuleOf } from './vestibule';
+import { DEFAULT_BEARING, choosePortAngle, hasVehiclePort, portVestibule } from './vehiclePort';
 import { CELL_FT, TIER, cellsOfKind, shellFt, tierOfKind, type DomeTier } from './tiers';
 import { isFinished } from '../construction';
 import type { GameState, Structure } from '../state';
@@ -29,7 +30,7 @@ export interface Airlock {
   /** Outside width of the chamber, and the width of each door's opening (world units). */
   w: number; dw: number;
   /** `link`: a dedicated airlock for a tunnel or walkway to another dome (sim/dome/links.ts), separate from the person airlocks; absent: a person airlock. */
-  role?: 'link';
+  role?: 'link' | 'vehicle';
   /** The link this airlock serves (role `link`). */
   linkId?: string;
 }
@@ -63,6 +64,19 @@ export function airlocksOf(tier: DomeTier, x: number, z: number, r: number, rot 
   return angles.map((a0, index) => airlockAt(tier, x, z, r, a0 + rot * Math.PI / 2, index));
 }
 
+/**
+ * The vehicle sally port of a dome (sim/dome/vehiclePort.ts): a larger airlock, role `vehicle`, at the angle stamped when the dome was staked (`Structure.portAngle`),
+ * else the free angle nearest the east (a dome staked before the port existed). Null for the earthen dome (a low door only).
+ */
+export function vehicleAirlockOf(tier: DomeTier, st: Pick<Structure, 'x' | 'z' | 'rot' | 'portAngle'>, r: number, person: readonly Airlock[], links: readonly Airlock[], index: number): Airlock | null {
+  const v = portVestibule(tier, r);
+  if (!v || !hasVehiclePort(tier)) return null;
+  const angle = st.portAngle ?? choosePortAngle({ tier, r, rot: st.rot, links: links.map(a => a.angle) }, DEFAULT_BEARING).angle;
+  const s = Math.sin(angle), c = Math.cos(angle);
+  void person;
+  return { index, angle, x: st.x + s * r, z: st.z + c * r, outX: st.x + s * (r + 0.45), outZ: st.z + c * (r + 0.45), inX: st.x + s * (r - v.len), inZ: st.z + c * (r - v.len), w: v.w, dw: v.dw, role: 'vehicle' };
+}
+
 /** The link airlocks a dome carries (one per link end that meets it), from the saved links (`GameState.domeLinks`). */
 export function linkAirlocksOf(s: Partial<Pick<GameState, 'domeLinks'>>, tier: DomeTier, st: Pick<Structure, 'id' | 'x' | 'z'>, r: number, first: number): Airlock[] {
   const out: Airlock[] = [];
@@ -79,7 +93,8 @@ export function domeFrom(st: Structure, panelsDown = 0, links: Partial<Pick<Game
   if (!tier) return null;
   const cells = cellsOfKind(st.kind) ?? TIER[tier].cells, r = shellFt(tier, cells) / 2 / FT_PER_UNIT - 0.03;
   const person = airlocksOf(tier, st.x, st.z, r, st.rot);
-  return { id: st.id, tier, x: st.x, z: st.z, r, footR: cells * CELL_FT / 2 / FT_PER_UNIT, airlocks: [...person, ...linkAirlocksOf(links, tier, st, r, person.length)], health: shellHealth(tier, panelsDown), structure: st };
+  const linkLocks = linkAirlocksOf(links, tier, st, r, person.length), veh = vehicleAirlockOf(tier, st, r, person, linkLocks, person.length + linkLocks.length);
+  return { id: st.id, tier, x: st.x, z: st.z, r, footR: cells * CELL_FT / 2 / FT_PER_UNIT, airlocks: [...person, ...linkLocks, ...(veh ? [veh] : [])], health: shellHealth(tier, panelsDown), structure: st };
 }
 
 /** Every finished dome on the place. `staked` (default false) also returns the ones still going up. */

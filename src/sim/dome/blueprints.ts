@@ -13,7 +13,7 @@ const NAMES: Record<DomeTier, [string, string, string, string, string]> = {
 const IDS = ['site', 'foundation', 'frame', 'roof', 'finish'] as const;
 
 export function domeBlueprint(tier: DomeTier, cells: number = TIER[tier].cells, kind: string = DOME_KIND[tier]): Blueprint {
-  const c = domeCost(tier, cells);
+  const c = domeCost(tier, cells, { vehiclePort: true });
   return {
     kind,
     stages: IDS.map((id, i) => ({ id, name: NAMES[tier][i], hours: Math.max(2, Math.round(c.hours * STAGE_SPLIT[tier][i])), materials: c.stages[id] })),

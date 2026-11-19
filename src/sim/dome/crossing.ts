@@ -48,7 +48,7 @@ export function crossesAt(d: Pick<Dome, 'x' | 'z' | 'r'>, pts: readonly Pt[]): {
 /** The airlock nearest a point, and the distance along the shell to it (world units, straight line). */
 export function nearestAirlock(d: Dome, x: number, z: number): { airlock: Airlock; off: number } | null {
   let best: { airlock: Airlock; off: number } | null = null;
-  for (const a of d.airlocks) { if (a.role === 'link') continue; const off = Math.hypot(a.x - x, a.z - z); if (!best || off < best.off) best = { airlock: a, off }; }
+  for (const a of d.airlocks) { if (a.role) continue; const off = Math.hypot(a.x - x, a.z - z); if (!best || off < best.off) best = { airlock: a, off }; }
   return best;
 }
 
@@ -141,6 +141,6 @@ export function routeThroughDomes(s: Land, kind: string, pts: readonly Pt[]): Pt
 
 /** The airlock a standing corridor meets a dome at, or null (the corridor is not one a dome has an airlock for). */
 export function airlockOfCorridor(d: Dome, pts: readonly Pt[]): Airlock | null {
-  for (const a of d.airlocks) if (pts.some(p => Math.hypot(p[0] - a.x, p[1] - a.z) < 0.35)) return a;
+  for (const a of d.airlocks) if (a.role !== 'vehicle' && pts.some(p => Math.hypot(p[0] - a.x, p[1] - a.z) < 0.35)) return a;
   return null;
 }
