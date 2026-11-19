@@ -2059,21 +2059,13 @@ export class HomesteadWorld {
   private _pitKey = '';
   private _dig: THREE.Group | null = null;
   private _soilMat: THREE.Material | null = null;
-  private readonly _coveredIds = new Set<string>();
   private _syncPits(list: readonly Structure[]): void {
     const pits: Pit[] = [];
     /** Per open dig: the spoil on its heap (m³) and whether the excavator is working it. */
     const sites: DigSite[] = [];
-    // in the Cutaway view the ground over a finished bunker under a dome is cut open (a window down to its roof), so the rooms inside the skirt ring show
-    this._coveredIds.clear();
-    if (this._view === 'cutaway' && !this._under) {
-      const domes = list.filter(x => tierOfKind(x.kind) && tierOfKind(x.kind) !== 'earthen' && x.stage >= BLUEPRINTS[x.kind].stages.length).map(x => domeAt(x.kind, x.x, x.z, x.rot)!);
-      for (const st of list) { if (st.kind.startsWith('bunker_') && domes.some(d => Math.hypot(st.x - d.x, st.z - d.z) < usableR(d) + 0.25)) this._coveredIds.add(st.id); }
-    }
     for (const st of list) {
       const b = this._built.get(st.id);
       if (!b?.under) continue;
-      if (this._coveredIds.has(st.id) && st.stage >= BLUEPRINTS[st.kind].stages.length) { const r = footprint(KIT[st.kind], st.x, st.z, st.rot, false); pits.push({ x0: r.x0 - 0.02, z0: r.z0 - 0.02, x1: r.x1 + 0.02, z1: r.z1 + 0.02, floor: b.under.datum + ROOF_TOP + 0.02, k: 1 }); continue; }
       if (st.underDome?.with) continue;   // (built with its dome: it goes into the dome's crater, drawn there)
       const stages = BLUEPRINTS[st.kind].stages, done = st.stage >= stages.length;
       const f = done ? 0 : st.supplied ? st.done / stages[st.stage].hours : 0;
@@ -2452,7 +2444,6 @@ export class HomesteadWorld {
   setBuildingView(v: BuildingView): void {
     if (v === this._view) return;
     this._view = v;
-    if (this._lastStructures.length) this._syncPits(this._lastStructures);
     for (const b of this._built.values()) { b.key = ''; this._applyView(b); }
     this._digKeys.clear(); if (this._lastStructures.length) this._syncDomeDigs(this._lastStructures);
     this._ws.invalidateShadows();
@@ -2463,7 +2454,7 @@ export class HomesteadWorld {
     const v = this._under ? (b.under ? 'cutaway' : 'ghost') : this._view;
     // a finished bunker room is drawn only where somebody can see it (the underground view, walking below): from the surface the earth hides it, so skip its draw calls
     // (an entrance stays: its shaft or stairwell is part of the yard)
-    if (b.under) b.group.visible = !this._inCrater(b.placed.id) && (!b.finished || this._under || this._below || this._belowCam || this._coveredIds.has(b.placed.id) || isEntry(KIT[b.placed.kind]));
+    if (b.under) b.group.visible = !this._inCrater(b.placed.id) && (!b.finished || this._under || this._below || this._belowCam || isEntry(KIT[b.placed.kind]));
     for (const o of b.group.children) {
       const m = o as THREE.Mesh;
       if (!m.isMesh) continue;

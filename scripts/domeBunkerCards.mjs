@@ -1,4 +1,4 @@
-// Dome bunker cards (docs/ux/dome-bunker): the placing card (with the dome, and after it), the Dome page section, the Projects row, and the Cutaway window.
+// Dome bunker cards (docs/ux/dome-bunker): the placing card (with the dome, and after it), the Dome page section, and the Projects row.
 //   node scripts/domeBunkerCards.mjs <outDir> [tier=glass] [port=5994]
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
@@ -23,7 +23,7 @@ try {
     const kind = `dome_${tier}_${cells}`, sp = cb.tool.findSpot(kind, c.x - 4, c.z - 4, 0, 40) ?? [c.x - 4, c.z - 4];
     G.getState().plan(kind, sp[0], sp[1], 0);
     const dome = G.getState().game.structures.at(-1), bk = await import('/src/sim/dome/bunkerLive.ts');
-    const hx = Math.round(sp[0] * 4) / 4 - 1.5, hz = Math.round(sp[1] * 4) / 4 - 1.25;
+    const hx = Math.floor(sp[0] / 0.5) * 0.5 + 0.25 - 1.5, hz = Math.floor(sp[1] / 0.5) * 0.5 + 0.25 - 1.0;   // (a one-cell piece stands on an odd quarter, a two-cell room on a half)
     const pieces = [['bunker_hatch', hx, hz], ['bunker_dorm', hx + 0.75, hz + 0.25], ['bunker_galley', hx + 1.75, hz + 0.25]];
     for (const [k, x, z] of pieces) {
       G.getState().plan(k, x, z, 0);
@@ -46,15 +46,15 @@ try {
   await ok();
   // 1 with the dome: the crater open (the dome's dig stage), a room to add beside the others
   await setP(0.4, 0.2, false);
-  await hover('bunker_galley', info.hx + 1.75, info.hz + 1.25); await shot('placing-card-with-dome');
+  await hover('bunker_stores', info.hx + 0.75, info.hz + 1.25); await shot('placing-card-with-dome');
+  await page.evaluate(() => window.__cb.tool.setKind(null)); await page.waitForTimeout(300);
   // 2 Projects row: the dome selected
   await page.evaluate(id => { const s = window.__cb.game.getState(); s.select?.(id); }, info.dome);
-  await page.getByRole('button', { name: /Projects/ }).first().click({ timeout: 6000 }).catch(e => console.error('no Projects button'));
-  await page.waitForTimeout(600); await shot('projects-bunker-shell');
+  await page.waitForTimeout(900); await shot('projects-bunker-shell');
   // 3 after the dome: the crater closed
   await setP(1, 1, true);
   await page.evaluate(() => { window.__cb.game.getState().select?.(null); window.__cb.tool.setKind(null); });
-  await hover('bunker_stores', info.hx + 0.75, info.hz + 1.25); await shot('placing-card-after-dome');
+  await hover('bunker_medical', info.hx + 1.75, info.hz + 1.25); await shot('placing-card-after-dome');
   await page.evaluate(() => window.__cb.tool.setKind(null)); await page.waitForTimeout(300);
   // 4 the Dome page
   await page.evaluate(() => window.__cb.game.getState().focusHud({ right: 'utilities' })); await page.waitForTimeout(500);
@@ -62,11 +62,5 @@ try {
   await page.mouse.move(700, 400); await page.waitForTimeout(400);
   await page.evaluate(() => document.querySelector('[data-testid=dome-bunker-rows]')?.scrollIntoView({ block: 'center' })); await page.waitForTimeout(500);
   await shot('dome-panel-bunker');
-  // 5 the Cutaway window (diagnostic: the covered rooms and the pits)
-  await page.evaluate(() => window.__cb.store.getState().setHudHidden?.(true));
-  const diag = await page.evaluate(([x, z]) => { const cb = window.__cb; cb.store.getState().setBuildingView('cutaway'); const w = cb.world; return { covered: w._coveredIds.size, pits: w.parcel.pits.length, view: w._view }; }, [info.x, info.z]);
-  console.error('DIAG', JSON.stringify(diag));
-  await page.evaluate(([x, z]) => { const cb = window.__cb; cb.cam.target.set(x - 1, 0, z); cb.cam.radius = 14; cb.cam.pitch = 1.0; }, [info.x, info.z]);
-  await page.waitForTimeout(500); await shot('cutaway-window');
   await page.close();
 } finally { await browser.close(); vite.kill(); }
