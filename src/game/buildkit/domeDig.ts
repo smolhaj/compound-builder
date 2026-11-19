@@ -449,7 +449,7 @@ export function disposeSite(g: THREE.Object3D): void {
 export const SECTION_LEN = 14;
 export interface SectionOpts { tier: DomeTier; cells: number; ground: Ground; sensors?: number }
 const rulerTex = new Map<string, THREE.Texture>();
-function label(text: string, w = Math.max(256, text.length * 21), h = 64, fg = '#f6efe0', bg = 'rgba(20,28,40,0.78)'): THREE.Texture {
+function label(text: string, w = Math.max(256, text.length * 27), h = 64, fg = '#f6efe0', bg = 'rgba(20,28,40,0.78)'): THREE.Texture {
   const key = `${text}|${fg}|${bg}|${w}`;
   let t = rulerTex.get(key);
   if (t) return t;
@@ -541,7 +541,7 @@ export function buildSection(o: SectionOpts): THREE.Group {
   const sprite = (text: string, x: number, y: number, z: number, w0 = 0.9, bg?: string): void => {
     const w = w0 * sc;
     const m = new THREE.SpriteMaterial({ map: label(text, 256, 64, '#f6efe0', bg), depthTest: false, transparent: true });
-    const sp = new THREE.Sprite(m); sp.scale.set(w, w * 64 / Math.max(256, text.length * 21), 1); sp.position.set(x, y, z); sp.renderOrder = 20; sp.userData.own = true; g.add(sp);
+    const sp = new THREE.Sprite(m); sp.scale.set(w, w * 64 / Math.max(256, text.length * 27), 1); sp.position.set(x, y, z); sp.renderOrder = 20; sp.userData.own = true; g.add(sp);
   };
   for (let ft = 10; ft <= D * FT_PER_UNIT + 1e-6; ft += ft < 50 ? 10 : 20) sprite(`${ft} ft`, rx - 0.52, rulerTop - ft / FT_PER_UNIT, 0.02, 0.55);
   sprite('grade', rx - 0.52, rulerTop, 0.02, 0.55);
