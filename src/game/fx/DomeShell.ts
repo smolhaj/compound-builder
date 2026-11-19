@@ -27,9 +27,40 @@ function baseOf(id: KitMaterialId): Base {
   return b;
 }
 
+/**
+ * The inside surface of a double-sided shell (polycarbonate, the arcology's armor panels) stays CLEAR: frost and bleach are the weather on the OUTER
+ * skin, and the inner skin of a heated dome is warm. Front faces (the outer skin) take the writes above; back faces (the inner skin, seen from inside or
+ * through the near wall from outside) keep the material's base color, opacity, roughness and metalness. Patched once per material; nothing per frame.
+ * (`dome_glass` is front-side only: its inner skin is not drawn at all, so it is clear already.)
+ */
+export const INNER_CLEAR_FRAG = {
+  color: '#include <color_fragment>\nif ( !gl_FrontFacing ) diffuseColor = vec4( uShellIn.rgb, uShellIn.a );',
+  rough: '#include <roughnessmap_fragment>\nif ( !gl_FrontFacing ) roughnessFactor = uShellInR.x;',
+  metal: '#include <metalnessmap_fragment>\nif ( !gl_FrontFacing ) metalnessFactor = uShellInR.y;',
+} as const;
+const _patched = new Set<KitMaterialId>();
+function keepInnerClear(id: KitMaterialId): void {
+  if (_patched.has(id)) return;
+  const m = kitMaterial(id);
+  if (m.side !== THREE.DoubleSide) return;
+  _patched.add(id);
+  const b = baseOf(id);
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uShellIn = { value: new THREE.Vector4(b.color.r, b.color.g, b.color.b, b.opacity) };
+    sh.uniforms.uShellInR = { value: new THREE.Vector2(b.rough, b.metal) };
+    sh.fragmentShader = 'uniform vec4 uShellIn;\nuniform vec2 uShellInR;\n' + sh.fragmentShader
+      .replace('#include <color_fragment>', INNER_CLEAR_FRAG.color)
+      .replace('#include <roughnessmap_fragment>', INNER_CLEAR_FRAG.rough)
+      .replace('#include <metalnessmap_fragment>', INNER_CLEAR_FRAG.metal);
+  };
+  m.customProgramCacheKey = () => 'shell-inner-clear';
+  m.needsUpdate = true;
+}
+
 /** Set the shell look: `frost` 0 (clear) to 1 (milky), `bleach` 0 to 1 (pale, hazy). Cheap; call every frame. */
 export function setShellClimate(frost: number, bleach: number): void {
   const f = q(frost), b = q(bleach);
+  for (const id of IDS) keepInnerClear(id);
   if (f === _frost && b === _bleach) return;
   _frost = f; _bleach = b;
   for (const id of IDS) {

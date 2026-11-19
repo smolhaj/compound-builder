@@ -15,4 +15,10 @@ describe('dome shelter', () => {
     let last = 0;
     for (let r = 20; r >= 0; r -= 0.5) { const v = shelterUnderDome([d], { x: 10 + r, y: 0.3, z: 10 }); expect(v).toBeGreaterThanOrEqual(last); last = v; }
   });
+  it('a breached shell shelters less, a whole one fully', () => {
+    const c = { x: 10, y: 0.5, z: 10 };
+    expect(shelterUnderDome([{ ...d, k: 1 }], c)).toBe(1);
+    expect(shelterUnderDome([{ ...d, k: 0.4 }], c)).toBeCloseTo(0.4, 6);
+    expect(shelterUnderDome([{ ...d, k: 0 }, { x: 100, z: 100, r: 5 }], c)).toBe(0);
+  });
 });
