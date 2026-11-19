@@ -398,6 +398,30 @@ const ROWS: Record<FeltKind, Row[]> = {
     ['l1', 'local', 'true', 2, 0, 60, 'active', 'Family from the coast camped in our pasture. Four kids. Walked from the highway.'],
     ['l2', 'local', 'false', 1, 0, 60, 'relief', 'Guard is opening a camp. At the fairgrounds. Hot meals. Tomorrow.'],
   ],
+  runaway_heat: [
+    ['o1', 'official', 'true', 2, 0, 400, 'active', 'National Weather Service: the heat emergency continues, day {d}. Stay out of the sun from late morning until after dark, and check on the old and the small.'],
+    ['o2', 'official', 'true', 2, 0, 1500, 'active', 'The utility: afternoon power is rationed. Do not run ovens or dryers before sundown. Cooling centers close when the power does.'],
+    ['o3', 'official', 'true', 1, 5, 1500, 'days:5', 'County: wells are dropping. Lawn watering is banned and farm wells will be metered. Report a dry well to the district.'],
+    ['h1', 'ham', 'true', 1, 0, 1500, 'active', 'Ham net: the whole middle of the country is over a hundred and ten and the nights are not cooling. People are heading north, day {d}.'],
+    ['t1', 'trade', 'true', 1, 0, 1500, 'price:1.3', 'Trader: ice, fans and shade cloth go for {p} times what they did. Water barrels are the best trade I have.'],
+    ['r1', 'rumor', 'true', 1, 0, 1500, 'active', 'Hundred and fifteen. At the school. Tar soft on the road. Don\'t go out at noon.'],
+    ['r2', 'rumor', 'false', 1, 0, 1500, 'lifted', 'Cool front Friday. Back to normal. By the weekend. Heard it on the radio.'],
+    ['r3', 'rumor', 'false', 1, 0, 1500, 'relief', 'Power company. Has a fix. Afternoon power back Monday. They said.'],
+    ['l1', 'local', 'true', 1, 0, 1500, 'active', 'Sleeping on the porch. House is too hot. Kids can\'t sleep. Nobody can.'],
+    ['l2', 'local', 'false', 1, 0, 1500, 'up:grid', 'Co-op power is back. All day. Go look. Somebody always says that.'],
+  ],
+  ice_age: [
+    ['o1', 'official', 'true', 2, 0, 400, 'active', 'National Weather Service: the cold emergency continues, day {d}. Do not use a stove or a generator indoors. Check roofs for snow load.'],
+    ['o2', 'official', 'true', 2, 0, 1500, 'active', 'County: roads are plowed once a day at best. Keep a month of food, water and firewood in the house. Roof collapses are rising.'],
+    ['o3', 'official', 'true', 1, 5, 1500, 'days:5', 'State: diesel and propane are limited to heating and farm use. Treated winter fuel is on allocation at the co-op.'],
+    ['h1', 'ham', 'true', 1, 0, 1500, 'active', 'Ham net: snow on the ground in six southern states. The whole northern tier is frozen in. Day {d}, no end date.'],
+    ['t1', 'trade', 'true', 1, 0, 1500, 'price:1.3', 'Trader: firewood is {p} times normal and I am not selling it for cash. Seed grain and stove pipe are what I want.'],
+    ['r1', 'rumor', 'true', 1, 0, 1500, 'active', 'Sun\'s a smudge. Snow\'s been there since fall. Don\'t count on a spring.'],
+    ['r2', 'rumor', 'false', 1, 0, 1500, 'lifted', 'Thaw coming. Two weeks. Tops. The weather man said.'],
+    ['r3', 'rumor', 'false', 1, 0, 1500, 'relief', 'Fuel convoy. On the interstate. Fifty tankers. Free diesel at the county line.'],
+    ['l1', 'local', 'true', 1, 0, 1500, 'active', 'Barn roof went. At the Petersons. Six head of cattle. Snow too deep to dig.'],
+    ['l2', 'local', 'false', 1, 0, 1500, 'up:grid', 'Co-op power is back. All day, they say. Go look. Maybe.'],
+  ],
 };
 
 /** The kind's own lines, as radio lines (the claim and the text are checkable and state-driven). */

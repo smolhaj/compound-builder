@@ -10,6 +10,7 @@ import { pickPeaceNews, seasonOf } from './newsPool';
 import type { RegionId } from './regions';
 import { mulberry32 as rng } from './rng';
 import { rollImpact } from './impactZone';
+import { WINTER_KINDS, isSlowKind } from './slowClimate';
 
 /** "Never" (Free build until triggered); JSON-safe, unlike Infinity. */
 export const NEVER = 1e9;
@@ -27,7 +28,9 @@ export type DisasterKind = 'grid_down' | 'financial' | 'lawless' | 'drought' | '
   // WP7: the herd and the flock (docs/scenarios/livestock_plague.md)
   | 'livestock_plague'
   // WP10: the seven planned kinds (docs/scenarios/<kind>.md), each with a collapse clock and a per-kind module in sim/disasters/
-  | 'satellite_loss' | 'oil_shock' | 'reactor_meltdown' | 'global_famine' | 'water_war' | 'cult_takeover' | 'mass_exodus';
+  | 'satellite_loss' | 'oil_shock' | 'reactor_meltdown' | 'global_famine' | 'water_war' | 'cult_takeover' | 'mass_exodus'
+  // the slow climate kinds (docs/design/climate_disasters.md, owner-approved 2026-11-19): years, not days; the era waits for the curve (sim/slowClimate.ts)
+  | 'runaway_heat' | 'ice_age';
 import { unscripted } from './godMode';
 export type Mode = 'surprise' | 'scenario' | 'sandbox' | 'god';
 /** GDS difficulty presets: Cozy (long warning, gentle raids), Standard, Hardcore (little warning, harsh raids, permadeath). */
@@ -407,6 +410,35 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
     hit: ['The road is full: {cause}, and the state has declared martial law with a curfew at 8 p.m.'],
     chain: [{ kind: 'lawless', p: 0.25, after: [45, 120] }, { kind: 'global_famine', p: 0.2, after: [60, 150] }, { kind: 'pandemic', p: 0.1, after: [20, 80] }],
   },
+  // ── the slow climate kinds (docs/design/climate_disasters.md sections 1 and 2): a long ramp over years; nothing comes back inside a run ──
+  runaway_heat: {
+    kind: 'runaway_heat', name: 'Runaway heat', pulpy: false, warn: [120, 360],
+    variants: [
+      { id: 'dry_furnace', name: 'a dry furnace: the summers keep climbing and the air stays parched', weight: 2, curves: { grid: C(120, 600, 0.15, null), fuel: C(180, 500, 0.2, null), stores: C(150, 500, 0.15, null), deliveries: C(150, 500, 0.2, null), medical: C(200, 500, 0.3, null), law: C(300, 400, 0.3, null), phone: C(300, 500, 0.4, null), banks: C(200, 400, 0.2, null) } },
+      { id: 'humid_furnace', name: 'a humid furnace: heat and wet air that the body cannot shed', weight: 1, curves: { grid: C(90, 600, 0.1, null), fuel: C(180, 500, 0.2, null), stores: C(150, 500, 0.15, null), deliveries: C(150, 500, 0.2, null), medical: C(150, 500, 0.25, null), law: C(300, 400, 0.3, null), phone: C(300, 500, 0.4, null), banks: C(200, 400, 0.2, null) } },
+    ],
+    hints: [
+      ['Record heat dome over the interior; the weather service says "once in a thousand years" for the third time.', 'Dead lawns and a county burn ban in June. The farm store is out of window units.', 'City cooling centers are full, and the hospital counts heat deaths for the week.'],
+      ['The utility asks everyone to run no appliances between 3 and 8 p.m.; brownouts on the afternoons.', 'Neighbors are buying generators and shade cloth. Hens are panting in the coop.', 'A wet-bulb alert: the weather service says to stay out of the sun until dark.'],
+      ['Rolling blackouts every afternoon. The pavement softens on the county road.', 'The grain elevator is half the usual price of wheat, because nobody is sure of the harvest.', 'People up the road say they are leaving for the north before the next summer.'],
+    ],
+    hit: ['The heat does not break: {cause}. The afternoons are not safe to work in and the grid is failing on the hot days.'],
+    chain: [{ kind: 'mass_exodus', p: 0.4, after: [30, 120] }, { kind: 'water_war', p: 0.35, after: [60, 240] }, { kind: 'global_famine', p: 0.3, after: [90, 300] }, { kind: 'wildfire', p: 0.4, after: [5, 60] }, { kind: 'lawless', p: 0.3, after: [120, 360] }],
+  },
+  ice_age: {
+    kind: 'ice_age', name: 'Ice age', pulpy: false, warn: [90, 300],
+    variants: [
+      { id: 'dimmed_sun', name: 'a dimmed sun: the cold comes everywhere at once', weight: 2, curves: { grid: C(30, 200, 0.2, null), fuel: C(30, 300, 0.2, null), stores: C(60, 300, 0.2, null), deliveries: C(30, 300, 0.2, null), medical: C(60, 300, 0.4, null), law: C(200, 300, 0.4, null), phone: C(100, 400, 0.4, null), banks: C(100, 300, 0.2, null) } },
+      { id: 'ocean_shutdown', name: 'an ocean current shutdown: the north freezes first and hardest', weight: 1, curves: { grid: C(30, 200, 0.25, null), fuel: C(30, 300, 0.25, null), stores: C(60, 300, 0.25, null), deliveries: C(30, 300, 0.25, null), medical: C(60, 300, 0.4, null), law: C(200, 300, 0.4, null), phone: C(100, 400, 0.4, null), banks: C(100, 300, 0.2, null) } },
+    ],
+    hints: [
+      ['A cold, wet year without a summer: frost in July and snow on the high ridges in August.', 'Strange red sunsets, and the weather service cannot say why the sun looks dim.', 'Grain exports halted by three countries; flour is up a quarter.'],
+      ['Early snow, and it is not melting. The county orders the plow trucks out in October.', 'The farm store is out of wood stoves, stovepipe and diesel anti-gel.', 'Neighbors are splitting every tree on the place and stacking cordwood to the eaves.'],
+      ['Rivers are freezing in October. The weather service says the cold "has no end date".', 'Gas stations are limiting diesel; the trucks cannot run in the cold without treated fuel.', 'People are leaving for the south, in cars loaded to the roof.'],
+    ],
+    hit: ['The cold does not let go: {cause}. The snow stays on the ground and the growing season is gone.'],
+    chain: [{ kind: 'global_famine', p: 0.45, after: [60, 240] }, { kind: 'mass_exodus', p: 0.35, after: [30, 120] }, { kind: 'lawless', p: 0.3, after: [90, 300] }],
+  },
 };
 
 
@@ -415,21 +447,23 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
  * (SURPRISE_BASE) and the region scales it (a quake in the Pacific Northwest, a flood in a river valley). The pulpy six stay the rarest.
  */
 export const SURPRISE_POOL: DisasterKind[] = ['grid_down', 'nuclear', 'financial', 'lawless', 'drought', 'pandemic', 'solar_flare', 'wildfire', 'ash_winter', 'cyberattack', 'invasion', 'civil_war', 'bioweapon', 'zombies', 'asteroid', 'unknown',
-  'emp', 'mega_quake', 'crop_blight', 'dam_flood', 'supervolcano', 'livestock_plague', 'satellite_loss', 'oil_shock', 'reactor_meltdown', 'global_famine', 'water_war', 'cult_takeover', 'mass_exodus'];
+  'emp', 'mega_quake', 'crop_blight', 'dam_flood', 'supervolcano', 'livestock_plague', 'satellite_loss', 'oil_shock', 'reactor_meltdown', 'global_famine', 'water_war', 'cult_takeover', 'mass_exodus', 'runaway_heat', 'ice_age'];
 /** Base weight of a pool kind before the region's odds (1 = the usual; the rest are rare). */
 export const SURPRISE_BASE: Partial<Record<DisasterKind, number>> = {
   invasion: 0.2, civil_war: 0.2, bioweapon: 0.08, zombies: 0.04, asteroid: 0.04, unknown: 0.04,
   emp: 0.1, mega_quake: 0.25, crop_blight: 0.4, dam_flood: 0.3, supervolcano: 0.05, livestock_plague: 0.4,
   satellite_loss: 0.12, oil_shock: 0.4, reactor_meltdown: 0.15, global_famine: 0.15, water_war: 0.25, cult_takeover: 0.08, mass_exodus: 0.25,
+  runaway_heat: 0.15, ice_age: 0.12,
 };
 /** A pool kind's weight in a region: its base weight times the region's odds. */
 export const surpriseWeight = (k: DisasterKind, odds: Partial<Record<DisasterKind, number>> = {}): number => (SURPRISE_BASE[k] ?? 1) * (odds[k] ?? 1);
 /** The Surprise roll, weighted by how likely each disaster is in the region (1 = the usual). */
-export function surpriseKind(u: number, odds: Partial<Record<DisasterKind, number>> = {}): DisasterKind {
-  const w = SURPRISE_POOL.map(k => surpriseWeight(k, odds)), tot = w.reduce((a, b) => a + b, 0);
+export function surpriseKind(u: number, odds: Partial<Record<DisasterKind, number>> = {}, skip: (k: DisasterKind) => boolean = () => false): DisasterKind {
+  const pool = SURPRISE_POOL.filter(k => !skip(k));
+  const w = pool.map(k => surpriseWeight(k, odds)), tot = w.reduce((a, b) => a + b, 0);
   let acc = 0;
-  for (let i = 0; i < w.length; i++) { acc += w[i] / tot; if (u < acc) return SURPRISE_POOL[i]; }
-  return SURPRISE_POOL[SURPRISE_POOL.length - 1];
+  for (let i = 0; i < w.length; i++) { acc += w[i] / tot; if (u < acc) return pool[i]; }
+  return pool[pool.length - 1];
 }
 
 /**
@@ -451,6 +485,8 @@ export const FATE_ODDS: Partial<Record<DisasterKind, [number, number, number]>> 
   // WP0 placeholders and the WP10 kinds
   emp: [0.1, 0.3, 0.6], mega_quake: [0.55, 0.35, 0.1], crop_blight: [0.5, 0.35, 0.15], dam_flood: [0.8, 0.17, 0.03], supervolcano: [0.05, 0.3, 0.65], livestock_plague: [0.55, 0.35, 0.1],
   satellite_loss: [0.25, 0.4, 0.35], oil_shock: [0.6, 0.3, 0.1], reactor_meltdown: [0.55, 0.35, 0.1], global_famine: [0.35, 0.4, 0.25], water_war: [0.3, 0.45, 0.25], cult_takeover: [0.3, 0.45, 0.25], mass_exodus: [0.55, 0.35, 0.1],
+  // the slow climate kinds: nothing mends inside a run (design doc 1.1 and 2.1)
+  runaway_heat: [0.02, 0.18, 0.8], ice_age: [0.05, 0.25, 0.7],
 };
 /**
  * Per-variant fate odds (override the kind's): a bank holiday mends sooner than a default; an ice storm is over by spring and a
@@ -464,6 +500,7 @@ export const VARIANT_FATE: Record<string, [number, number, number]> = {
   'reactor_meltdown/spent_pool_fire': [0.1, 0.4, 0.5], 'reactor_meltdown/dirty_bomb': [0.75, 0.2, 0.05],
   'global_famine/export_ban': [0.6, 0.3, 0.1], 'water_war/contamination': [0.7, 0.25, 0.05], 'satellite_loss/gps_only': [0.6, 0.3, 0.1],
   'mass_exodus/fleeing_front': [0.3, 0.4, 0.3], 'crop_blight/locusts': [0.65, 0.28, 0.07], 'livestock_plague/hpai': [0.65, 0.28, 0.07], 'livestock_plague/bse_like': [0.3, 0.4, 0.3],
+  'runaway_heat/humid_furnace': [0.01, 0.14, 0.85], 'ice_age/ocean_shutdown': [0.08, 0.3, 0.62],
 };
 /** The fate odds for a kind (and variant). */
 export const fateOdds = (kind: DisasterKind, variant?: string): [number, number, number] => (variant && VARIANT_FATE[`${kind}/${variant}`]) || FATE_ODDS[kind] || [0, 0, 1];
@@ -542,7 +579,8 @@ function rollBack(def: DisasterDef, variant: string, r: () => number): Partial<R
 /** Set up the disaster for a new run. */
 export function newDisaster(seed: number, mode: Mode, peace: PeaceLength = 'random', kind: DisasterKind | null = null, variant?: string, difficulty: Difficulty = 'standard', odds: Partial<Record<DisasterKind, number>> = {}): DisasterState {
   const r = rng(seed * 7919 + 13);
-  const k: DisasterKind | null = unscripted(mode) ? null : kind ?? surpriseKind(r(), odds);
+  // (the slow climate kinds are never rolled for a first Surprise run: a new player meets them in Scenario mode, on purpose)
+  const k: DisasterKind | null = unscripted(mode) ? null : kind ?? surpriseKind(r(), odds, isSlowKind);
   const def = k ? DISASTERS[k] : undefined;
   const v = def ? (variant && def.variants.some(x => x.id === variant) ? variant : pick(def.variants, r()).id) : '';
   const len = unscripted(mode) ? NEVER : peace === 'random' || mode === 'surprise' ? Math.round(3 * 365 + r() * 3 * 365) : PEACE_DAYS[peace];
@@ -628,6 +666,7 @@ export function nextEraDisaster(prev: DisasterState, now: number, seed: number, 
   if (unscripted(prev.mode)) return peaceOnly;
   const gone = (k: Track) => (base[k] ?? 1) < 0.3;
   let pool = SURPRISE_POOL.filter(k => k !== prev.kind
+    && !(WINTER_KINDS.includes(k) && prev.kind != null && WINTER_KINDS.includes(prev.kind))   // never one winter kind right after another
     && !(gone('grid') && (k === 'grid_down' || k === 'cyberattack' || k === 'solar_flare'))
     && !(gone('banks') && k === 'financial') && !(gone('law') && k === 'lawless')
     && !(gone('fuel') && k === 'oil_shock') && !(gone('phone') && k === 'satellite_loss') && !(gone('grid') && k === 'emp'));

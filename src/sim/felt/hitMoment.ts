@@ -47,6 +47,8 @@ export const HIT_BY_KIND: Partial<Record<FeltKind, HitSeq>> = {
   global_famine: { title: 'The food is running out everywhere', beats: [B(0, { tint: [0.65, 0.6, 0.45], flash: 0.2, caption: 'The grain news is bad, then worse.' }), B(2, { caption: 'The store limits each shopper to one bag.' }), B(3.8, { bearing: 'town' })] },
   water_war: { title: 'The water is being fought over', beats: [B(0, { tint: [0.45, 0.55, 0.65], flash: 0.2, caption: 'The creek runs low, and upstream has a gate.' }), B(2, { caption: 'Men with rifles sit at the headgate.' }), B(3.8)] },
   cult_takeover: { title: 'A new faith has taken the county', beats: [B(0, { tint: [0.6, 0.3, 0.3], flash: 0.2, caption: 'Banners go up on the town hall overnight.' }), B(2, { caption: 'The new preacher knows everyone\'s name.' }), B(3.8, { bearing: 'town' })] },
+  runaway_heat: { title: 'The heat is not going to break', beats: [B(0, { tint: [1, 0.93, 0.7], flash: 0.25, caption: 'The thermometer on the porch is past a hundred and twenty.' }), B(2, { tint: [1, 0.9, 0.65], caption: 'The sky is white and the air does not move.' }), B(3.8)] },
+  ice_age: { title: 'The snow is not going to melt', beats: [B(0, { tint: [0.6, 0.7, 0.85], flash: 0.2, caption: 'The sun is a pale coin behind the haze.' }), B(2, { tint: [0.65, 0.74, 0.88], caption: 'The drifts have not shrunk in a month.' }), B(3.8)] },
   mass_exodus: { title: 'Everyone is leaving', beats: [B(0, { tint: [0.7, 0.65, 0.55], flash: 0.15, caption: 'Cars stream past your gate, loaded to the roof.' }), B(2, { caption: 'Houses down the road stand open and empty.' }), B(3.8, { bearing: 'road' })] },
 };
 
