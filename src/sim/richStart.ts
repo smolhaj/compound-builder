@@ -13,9 +13,9 @@ export type RichStart = 'founder' | 'magnate';
 export const RICH_STARTS: RichStart[] = ['founder', 'magnate'];
 
 /** PROPOSED. Cash to spend on land and building, before the land comes out. Founder meets the glass dome's $15 million gate; Magnate the arcology's $500 million. */
-export const RICH_START: Record<RichStart, { name: string; budget: number; blurb: string; label: string; domes: DomeTier[] }> = {
-  founder: { name: 'Founder', budget: 25_000_000, label: 'a sold company', blurb: 'The family sold a company. Sandbox-like: a rich start is not graded and does not count toward the dynasty score or milestones.', domes: ['geodesic', 'glass'] },
-  magnate: { name: 'Magnate', budget: 1_500_000_000, label: 'a fortune', blurb: 'A fortune on the table. Sandbox-like: a rich start is not graded and does not count toward the dynasty score or milestones.', domes: ['glass', 'arcology'] },
+export const RICH_START: Record<RichStart, { name: string; budget: number; blurb: string; label: string; domes: Array<[DomeTier, 'smallest' | 'usual']> }> = {
+  founder: { name: 'Founder', budget: 25_000_000, label: 'a sold company', blurb: 'The family sold a company. Sandbox-like: a rich start is not graded and does not count toward the dynasty score or milestones.', domes: [['geodesic', 'usual'], ['glass', 'smallest'], ['glass', 'usual']] },
+  magnate: { name: 'Magnate', budget: 1_500_000_000, label: 'a fortune', blurb: 'A fortune on the table. Sandbox-like: a rich start is not graded and does not count toward the dynasty score or milestones.', domes: [['glass', 'usual'], ['arcology', 'usual']] },
 };
 
 /** The starting money of a rich start, in the same shape as the ordinary start's. */

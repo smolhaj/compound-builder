@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DOME_TIERS, TIER, sizesOf } from './tiers';
+import { DOME_KIND, DOME_TIERS, TIER, kindOfCells, sizesOf } from './tiers';
+import { PERMIT_FEE } from '../paperwork';
 import { domeCost } from './cost';
 import { domeCostSummary } from './costSummary';
-import { DOME_PRICING, EARTH_RATES, earthwork, runningCost, spanFactor } from './pricing';
+import { DOME_PRICING, EARTH_RATES, PERMIT_SHARE, earthwork, runningCost, spanFactor } from './pricing';
 import { GRADING } from './grading';
 import { FUNDS_RANGE } from '../startFunds';
 import { BLUEPRINTS, totalBill, totalHours } from '../blueprints';
@@ -80,5 +81,25 @@ describe('dome pricing (docs/design/dome_pricing.md)', () => {
     const chiller = s.find(o => o.id === 'spare_chiller')!.usd, sub = s.find(o => o.id === 'spare_sub')!.usd;
     expect(chiller).toBeGreaterThan(1_000_000); expect(chiller).toBeLessThan(6_000_000);   // a few 500-ton chillers at $200,000 to $400,000 each, with towers and piping
     expect(sub).toBeGreaterThan(2_000_000); expect(sub).toBeLessThan(8_000_000);            // a 5 to 20 MVA substation
+  });
+  it('the permit grows with the job: about 1 percent of the build price, never under the old flat fee', () => {
+    for (const t of ['geodesic', 'glass', 'arcology'] as const) {
+      let last = 0;
+      for (let c = TIER[t].minCells; c <= TIER[t].maxCells; c++) {
+        const k = domeCost(t, c), build = k.materialsUsd + k.laborUsd;
+        expect(k.permitUsd).toBeGreaterThanOrEqual(TIER[t].permitFee); expect(k.permitUsd).toBeGreaterThanOrEqual(last);
+        expect(k.permitUsd).toBeGreaterThanOrEqual(Math.round(build * PERMIT_SHARE / 1000) * 1000); last = k.permitUsd;
+      }
+    }
+    // 100 ft glass ($13.6M) now pays its floor of $350k; the 240 ft one ($97M) about $970k; a 600 ft arcology about $39M against the old flat $15M
+    expect(domeCost('glass', 10).permitUsd).toBe(TIER.glass.permitFee);   // the smallest glass dome sits on the floor
+    expect(domeCost('glass', 24).permitUsd).toBeGreaterThan(domeCost('glass', 10).permitUsd * 2);
+    expect(domeCost('arcology', 60).permitUsd).toBeGreaterThan(2 * TIER.arcology.permitFee);
+    expect(domeCost('earthen').permitUsd).toBe(0);
+  });
+  it('the county quote follows the sized dome (the placing card reads PERMIT_FEE)', () => {
+    expect(PERMIT_FEE[kindOfCells('glass', 24)]).toBe(domeCost('glass', 24).permitUsd);
+    expect(PERMIT_FEE[kindOfCells('glass', 24)]).toBeGreaterThan(PERMIT_FEE[kindOfCells('glass', 10)]);
+    expect(PERMIT_FEE[DOME_KIND.arcology]).toBe(domeCost('arcology').permitUsd);
   });
 });

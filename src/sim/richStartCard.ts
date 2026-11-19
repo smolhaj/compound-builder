@@ -10,11 +10,15 @@ export function compactUsd(n: number): string {
   return `$${Math.round(n / 1000)}k`;
 }
 
-/** The real price of each dome the start can afford, at its default size ("a 150 ft glass dome costs about $33M"), from the pricing module. */
+/**
+ * The real price of each dome a start is for ("a 150 ft glass dome costs about $33M"), from the pricing module. A dome that costs more than the
+ * start's whole budget says so, so nobody picks Founder to build the 150 ft glass dome and finds it $8 million short.
+ */
 export function richPriceLines(kind: RichStart): string[] {
-  return RICH_START[kind].domes.map(t => {
-    const sum = domeCostSummary(t);
+  const budget = RICH_START[kind].budget;
+  return RICH_START[kind].domes.map(([t, size]) => {
+    const cells = size === 'smallest' ? TIER[t].minCells : TIER[t].cells, sum = domeCostSummary(t, cells);
     const noun = t === 'geodesic' ? 'geodesic dome' : t === 'glass' ? 'glass dome' : 'arcology';
-    return `a ${Math.round(shellFt(t, TIER[t].cells))} ft ${noun} costs about ${compactUsd(sum.totalUsd)}`;
+    return `a ${Math.round(shellFt(t, cells))} ft ${noun} costs about ${compactUsd(sum.totalUsd)}${sum.totalUsd > budget ? ', more than this start has' : ''}`;
   });
 }

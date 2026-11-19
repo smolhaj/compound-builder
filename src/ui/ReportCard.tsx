@@ -33,7 +33,7 @@ export function ReportCard() {
   };
   // finishing a run unlocks the pulpy scenarios (GDS: zombies, invasion … as unlockables)
   try { localStorage.setItem('cb.unlocked', '1'); } catch { /* storage blocked: stays locked */ }
-  const gradeColor = r.grade === 'A' ? '#2f6b2a' : r.grade === 'B' ? '#4f6b2a' : r.grade === 'C' ? '#7a6a20' : '#8a2f22';
+  const gradeColor = r.grade === 'R' || r.grade === 'S' ? '#4a4a44' : r.grade === 'A' ? '#2f6b2a' : r.grade === 'B' ? '#4f6b2a' : r.grade === 'C' ? '#7a6a20' : '#8a2f22';
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(10,12,9,0.7)', alignItems: 'center', justifyContent: 'center', zIndex: 12, padding: 16, display: hidden ? 'none' : 'flex' }}>
       <div style={{ background: '#f2ecdc', color: '#1d1b16', width: 620, maxWidth: '100%', maxHeight: '100%', overflowY: 'auto', borderRadius: 4, padding: '18px 26px 20px', boxShadow: '0 12px 50px rgba(0,0,0,0.6)', fontFamily: serif }}>
@@ -64,7 +64,7 @@ export function ReportCard() {
         </div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center', marginTop: 14, fontFamily: 'system-ui, sans-serif' }}>
           <span style={{ flex: 1, fontSize: 12, opacity: 0.7 }}>{e.kind === 'bug_out' ? 'The place stands empty behind them, and the road ahead is theirs to find.' : e.kind === 'wipe'
-            ? `The ${g.game.lineage.family} line ran ${spanText(g.game.clock.t)}. Dynasty score ${Math.round(g.game.lineage.points + r.score).toLocaleString('en-US')}.`
+            ? `The ${g.game.lineage.family} line ran ${spanText(g.game.clock.t)}. ${g.game.richStart ? 'Rich start: no dynasty score.' : `Dynasty score ${Math.round(g.game.lineage.points + r.score).toLocaleString('en-US')}.`}`
             : 'The family goes on. The world will turn again.'}</span>
           {e.kind !== 'wipe' && e.kind !== 'bug_out' && <button style={{ padding: '7px 14px', borderRadius: 6, border: '1px solid #1d1b16', background: 'transparent', cursor: 'pointer' }} onClick={() => g.playOn()}>Keep playing: the next era</button>}
           {e.kind === 'wipe' && <>
