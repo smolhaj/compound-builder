@@ -55,7 +55,7 @@ try {
   console.error('order walkway:', await order(Gl.id, Ge.id, 'walkway'));
   await finishAll(); await frames(4);
   const dir = [Ge.x - Gl.x, Ge.z - Gl.z], len = Math.hypot(...dir), u = [dir[0] / len, dir[1] / len], side = [-u[1], u[0]];
-  if (want('walkway')) { await pose([mid[0] + side[0] * 1, gm + 9, mid[1] + side[1] * 26], [mid[0], gm + 0.5, mid[1]], 52); await shot('hero-aerial-walkway-between-domes'); await pose([mid[0] - u[0] * 20 + side[0] * 7, gm + 2.2, mid[1] - u[1] * 20 + side[1] * 7], [mid[0], gm + 0.7, mid[1]], 55); await shot('walkway-side-view'); }
+  if (want('walkway')) { await pose([mid[0] + side[0] * 1, gm + 9, mid[1] + side[1] * 19], [mid[0], gm + 0.5, mid[1]], 50); await shot('hero-aerial-walkway-between-domes'); await pose([mid[0] - u[0] * 12 + side[0] * 6, gm + 2.0, mid[1] - u[1] * 12 + side[1] * 6], [mid[0], gm + 0.7, mid[1]], 55); await shot('walkway-side-view'); }
   if (want('eye')) {
     await person(mid[0] + u[0] * 1.2, mid[1] + u[1] * 1.2);
     await pose([mid[0] - u[0] * 2.6, 0.4, mid[1] - u[1] * 2.6], [mid[0] + u[0] * 4, 0.35, mid[1] + u[1] * 4], 62); await shot('eye-person-in-walkway');
