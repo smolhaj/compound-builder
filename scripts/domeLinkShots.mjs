@@ -57,10 +57,14 @@ try {
   const dir = [Ge.x - Gl.x, Ge.z - Gl.z], len = Math.hypot(...dir), u = [dir[0] / len, dir[1] / len], side = [-u[1], u[0]];
   if (want('walkway')) { await pose([mid[0] + side[0] * 1, gm + 9, mid[1] + side[1] * 19], [mid[0], gm + 0.5, mid[1]], 50); await shot('hero-aerial-walkway-between-domes'); await pose([mid[0] - u[0] * 12 + side[0] * 6, gm + 2.0, mid[1] - u[1] * 12 + side[1] * 6], [mid[0], gm + 0.7, mid[1]], 55); await shot('walkway-side-view'); }
   if (want('eye')) {
-    await person(mid[0] + u[0] * 1.2, mid[1] + u[1] * 1.2);
-    await pose([mid[0] - u[0] * 2.6, 0.4, mid[1] - u[1] * 2.6], [mid[0] + u[0] * 4, 0.35, mid[1] + u[1] * 4], 62); await shot('eye-person-in-walkway');
-    await person(mid[0] + side[0] * 1.6, mid[1] + side[1] * 1.6);
-    await pose([mid[0] + side[0] * 4.2 - u[0] * 1.8, 0.45, mid[1] + side[1] * 4.2 - u[1] * 1.8], [mid[0], 0.5, mid[1]], 58); await shot('eye-outside-walkway-with-person');
+    // the walkway's real center line (its two door points), the deck 1.6 ft up, 6.5 ft wide, 8.5 ft inside: a person walks it, the camera looks along it
+    const wl = await page.evaluate(async () => { const g = window.__cb.game.getState().game, l = g.domeLinks.find(x => x.kind === 'walkway'); return { a: [l.ends[0].x, l.ends[0].z], b: [l.ends[1].x, l.ends[1].z] }; });
+    const d2 = [wl.b[0] - wl.a[0], wl.b[1] - wl.a[1]], L2 = Math.hypot(...d2), uu = [d2[0] / L2, d2[1] / L2], ss = [-uu[1], uu[0]], m2 = [(wl.a[0] + wl.b[0]) / 2, (wl.a[1] + wl.b[1]) / 2], g2 = await gd(m2[0], m2[1]), DECK = 0.085;
+    const personAt = async (x, z, dy) => page.evaluate(async ([x, z, dy]) => { const m = await import('/src/game/HomesteadWorld.ts'); window.__cb.ws.scene.add(m.scaleFigure(x, z, window.__cb.world.groundAt(x, z) + dy)); }, [x, z, dy]);
+    await personAt(m2[0] + uu[0] * 1.1, m2[1] + uu[1] * 1.1, DECK); await personAt(m2[0] + uu[0] * 2.4, m2[1] + uu[1] * 2.4, DECK);
+    await poseRaw([m2[0] - uu[0] * 1.9, g2 + DECK + 0.24, m2[1] - uu[1] * 1.9], [m2[0] + uu[0] * 5, g2 + DECK + 0.2, m2[1] + uu[1] * 5], 66); await shot('eye-person-walking-through-walkway');
+    await personAt(m2[0] - ss[0] * 1.5, m2[1] - ss[1] * 1.5, 0);
+    await poseRaw([m2[0] - ss[0] * 4.0 - uu[0] * 1.6, g2 + 0.42, m2[1] - ss[1] * 4.0 - uu[1] * 1.6], [m2[0] + uu[0] * 0.4, g2 + 0.3, m2[1] + uu[1] * 0.4], 60); await shot('eye-outside-walkway-with-person');
   }
   console.error('order tunnel:', await order(Gl.id, Ge.id, 'tunnel')); if (Ea) console.error('order earth tunnel:', await order(Ge.id, Ea.id, 'tunnel', 4));
   await finishAll(); await frames(4);
