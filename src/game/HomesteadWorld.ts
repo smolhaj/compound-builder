@@ -2668,8 +2668,10 @@ export class HomesteadWorld {
   /** One building's light as a candidate for the budget. A bunker room seen from above ground, or a house seen from the underground view, cannot be seen. */
   private _noteLight(cands: LightCandidate[], b: Built, above: boolean): void {
     const cam = this._ws.camera.position;
-    const weight = b.under ? (above && !this._under ? 0.03 : 1) : (this._under ? 0.15 : 1);
-    cands.push({ id: b.placed.id, intensity: b.light!.intensity, dist: Math.hypot(cam.x - b.group.position.x, cam.y - b.group.position.y, cam.z - b.group.position.z), was: this._litNow.has(b.placed.id), weight });
+    const dist = Math.hypot(cam.x - b.group.position.x, cam.y - b.group.position.y, cam.z - b.group.position.z);
+    // (the bunker room you stand in always keeps its lamp: the small rooms are dimmer and would lose the pick to a bright neighbor)
+    const weight = b.under ? (above && !this._under ? 0.03 : dist < 0.8 ? 4 : 1) : (this._under ? 0.15 : 1);
+    cands.push({ id: b.placed.id, intensity: b.light!.intensity, dist, was: this._litNow.has(b.placed.id), weight });
   }
 
   /** Vehicles: in their bays and the yard, and out the gate on a run. */
