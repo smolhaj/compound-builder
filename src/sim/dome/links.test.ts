@@ -274,7 +274,7 @@ describe('the walkway is a sealed tube in the dome shell (owner change)', () => 
     let last = 0; for (const t of ['earthen', ...BUILT] as const) { const u = walkShellUsdFt(t); expect(u).toBeGreaterThan(last); last = u; }
     const per = (a: DomeTier, b: DomeTier) => { const g = two(a, b, 26); const q = quoteLink(g, 'dA', 'dB', 'walkway'); return q.totalUsd / q.lenFt; };
     expect(per('geodesic', 'geodesic')).toBeLessThan(per('glass', 'glass')); expect(per('glass', 'glass')).toBeLessThan(per('arcology', 'arcology'));
-    expect(per('glass', 'arcology')).toBeCloseTo(per('arcology', 'arcology'), -3);   // the stronger shell sets the price
+    expect(Math.abs(per('glass', 'arcology') - per('arcology', 'arcology')) / per('arcology', 'arcology')).toBeLessThan(0.08);   // the stronger shell sets the price
     expect(per('glass', 'glass')).toBeGreaterThan(walkShellUsdFt('glass')); expect(per('arcology', 'arcology')).toBeGreaterThan(walkShellUsdFt('arcology'));   // (the shell goods ARE the price: when the dome pricing lands the goods rise and so does this)
     expect(billUsd(quoteLink(two('glass', 'glass'), 'dA', 'dB', 'walkway').bill)).toBeGreaterThan(0);
   });
