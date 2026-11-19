@@ -510,14 +510,14 @@ export const VEHICLE_YARD_BLUEPRINT: Blueprint = bp('vehicle_yard', [
 
 // ── Underground: dug with a hired excavator; the net earth dug out becomes spoil for berms ──
 type Fit = Partial<Stock>;
-/** A poured room: dig + slab, walls, roof slab + waterproofing + backfill, fit-out. `spoil` m³ net. */
+/** A poured room: dig + slab, walls, roof slab + waterproofing + backfill, fit-out. `spoil` m³ net. The in-place cost of hardened below-grade concrete (shoring, forms, pump, the engineer) rides in `bunker_works`, a cubic yard each (PROPOSED, docs/design/dome_pricing.md). */
 const vaultBp = (kind: string, spoil: number, conc: [number, number, number], rebar: [number, number, number], dig: number, walls: number, roof: number, fitHours: number, fit: Fit, fitName = 'Vents, doors, wiring and the fit-out'): Blueprint => ({
   kind,
   stages: [
     { id: 'site', name: 'Stake out the dig', hours: 8, materials: {} },
-    { id: 'foundation', name: 'Dig out (hired excavator), gravel bed, floor slab', hours: Math.round(dig * 2.5), materials: { excavator: Math.max(1, Math.round(spoil / 90)), concrete: conc[0], rebar: rebar[0] }, yields: { spoil } },
-    { id: 'frame', name: 'Form, tie the rebar and pour the walls', hours: Math.round(walls * 2.5), materials: { concrete: conc[1], rebar: rebar[1], lumber: Math.ceil(conc[1] / 4) } },
-    { id: 'roof', name: 'Pour the roof slab, waterproof, backfill', hours: Math.round(roof * 2.5), materials: { concrete: conc[2], rebar: rebar[2], membrane: Math.max(1, Math.round(spoil / 60)), excavator: 1 } },
+    { id: 'foundation', name: 'Dig out (hired excavator), gravel bed, floor slab', hours: Math.round(dig * 2.5), materials: { excavator: Math.max(1, Math.round(spoil / 90)), concrete: conc[0], rebar: rebar[0], bunker_works: conc[0] }, yields: { spoil } },
+    { id: 'frame', name: 'Form, tie the rebar and pour the walls', hours: Math.round(walls * 2.5), materials: { concrete: conc[1], rebar: rebar[1], lumber: Math.ceil(conc[1] / 4), bunker_works: conc[1] } },
+    { id: 'roof', name: 'Pour the roof slab, waterproof, backfill', hours: Math.round(roof * 2.5), materials: { concrete: conc[2], rebar: rebar[2], bunker_works: conc[2], membrane: Math.max(1, Math.round(spoil / 60)), excavator: 1 } },
     { id: 'finish', name: fitName, hours: Math.round(fitHours * 2), materials: fit },
   ],
 });
@@ -536,10 +536,10 @@ export const BUNKER_BLUEPRINTS: Blueprint[] = [
     kind: 'bunker_container',
     stages: [
       { id: 'site', name: 'Stake out the trench', hours: 6, materials: {} },
-      { id: 'foundation', name: 'Dig the trench (hired excavator), gravel bed', hours: 24, materials: { excavator: 2, concrete: 2 }, yields: { spoil: 140 } },
-      { id: 'frame', name: 'Set and brace the container, cut the doorways', hours: 40, materials: { container: 1, lumber: 6, hardware: 2 } },
-      { id: 'roof', name: 'Waterproof and backfill (not too deep: a container crushes)', hours: 40, materials: { membrane: 3, excavator: 1 } },
-      { id: 'finish', name: 'Bunks, table, shelves, vents', hours: 40, materials: { lumber: 6, hardware: 1 } },
+      { id: 'foundation', name: 'Dig the trench (hired excavator), gravel bed', hours: 24, materials: { excavator: 2, concrete: 2, bunker_works: 12 }, yields: { spoil: 140 } },
+      { id: 'frame', name: 'Set and brace the container, cut the doorways', hours: 40, materials: { container: 1, lumber: 6, hardware: 2, blast_door: 1, bunker_works: 6 } },
+      { id: 'roof', name: 'Waterproof and backfill (not too deep: a container crushes)', hours: 40, materials: { membrane: 3, excavator: 1, bunker_works: 4 } },
+      { id: 'finish', name: 'Bunks, table, shelves, vents', hours: 40, materials: { lumber: 6, hardware: 1, nbc_filter: 1 } },
     ],
   },
 ];

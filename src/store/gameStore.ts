@@ -7,6 +7,7 @@ import { dropBridge, routeProblem } from '../sim/terrainFx';
 import { routeThroughDomes } from '../sim/dome/crossing';
 import { clampCells, tierOfKind, type DomeTier } from '../sim/dome/tiers';
 import { gradingCost, isGradedTier } from '../sim/dome/grading';
+import { stampUnderDome, type BunkerSite } from '../sim/dome/bunkerLive';
 import { clearCollapse, strandAway } from '../sim/corridors';
 import { dropRoadBridge, rebuildRoadBridge } from '../sim/roadFx';
 import { interrogate, type Approach, type Question } from '../sim/interrogation';
@@ -87,7 +88,7 @@ import { muteFeedback } from '../ui/feel/quiet';
 /** The earthwork a graded dome pad needs, measured by the world under the cursor (sim/dome/grading.ts). */
 export interface SiteWork { cutCy: number; fillCy: number; wallSf: number }
 /** What the circle ghost says about the spot under the cursor. */
-export interface DomeSite { tier: DomeTier; cells: number; ok: boolean; summary: string; work?: SiteWork; workLine?: string }
+export interface DomeSite { tier: DomeTier; cells: number; ok: boolean; summary: string; work?: SiteWork; workLine?: string; /** Deep footing the dome pays for bunker pieces already under it (ft, cu yd) and the line the card shows. */ foot?: { ft: number; yd: number; goods?: Record<string, number>; usd?: number }; footLine?: string }
 
 export interface CutsceneState {
   phase: 'prompt' | 'playing' | 'aftermath';
@@ -151,6 +152,11 @@ export interface GameStore {
   /** What the circle ghost says about the spot under the cursor (the placing card shows it). Not saved. */
   domeSite: DomeSite | null;
   setDomeSite: (s: DomeSite | null) => void;
+  /** What the spot under the cursor is for a bunker piece placed inside a dome (skirt against floor depth, with the dome or after), and whether the player chose to build it with the dome. Not saved. */
+  bunkerSite: BunkerSite | null;
+  setBunkerSite: (s: BunkerSite | null) => void;
+  bunkerWithDome: boolean;
+  setBunkerWithDome: (on: boolean) => void;
   /** A one-line notice that fades by itself (a refused click: why). Not saved. */
   toast: { text: string; id: number } | null;
   showToast: (text: string) => void;
@@ -384,6 +390,10 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
   setDomeCells: (tier, cells) => set(st => ({ domeCells: { ...st.domeCells, [tier]: clampCells(tier, cells) } })),
   domeSite: null,
   setDomeSite: (domeSite) => set({ domeSite }),
+  bunkerSite: null,
+  setBunkerSite: (bunkerSite) => set({ bunkerSite }),
+  bunkerWithDome: true,
+  setBunkerWithDome: (bunkerWithDome) => set({ bunkerWithDome }),
   toast: null,
   showToast: (text) => {
     const id = (get().toast?.id ?? 0) + 1;
@@ -506,6 +516,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const g = structuredClone(get().game);
     const st = planStructure(g, kind, x, z, rot);
     stampHighGround(st);
+    { const bs = get().bunkerSite, ds = get().domeSite; if (bs && st.kind.startsWith('bunker_')) stampUnderDome(g, st, bs, get().bunkerWithDome); else if (ds?.foot && tierOfKind(kind)) st.domeFoot = ds.foot; }
     if (work) { st.siteWork = work; g.money -= work.usd; log(g, `Graded the dome pad: ${work.cutCy.toLocaleString('en-US')} cu yd cut, ${work.fillCy.toLocaleString('en-US')} cu yd filled, $${work.usd.toLocaleString('en-US')}.`); }
     if (isRig(kind)) claimWaitingRig(g, st);
     else {
@@ -765,7 +776,7 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const changed = isMarked(g, t.id) ? unmarkTree(g, t.id) : markTree(g, t, haulDist) !== null;
     if (changed) set({ game: g });
   },
-  setTool: (tool) => { if (!locked()) set({ tool, toolProblem: null, domeSite: null, spendAsk: null, ...(tool ? { stakedNote: null } : {}) }); },
+  setTool: (tool) => { if (!locked()) set({ tool, toolProblem: null, domeSite: null, bunkerSite: null, spendAsk: null, ...(tool ? { stakedNote: null } : {}) }); },
   setToolProblem: (toolProblem) => set({ toolProblem }),
   flashStaked: (text) => {
     set({ stakedNote: text });

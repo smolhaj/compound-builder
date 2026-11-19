@@ -1028,13 +1028,14 @@ export function resolve(s: GameState, stance: Stance): Outcome {
       if (deterred) { title = 'They thought better of it'; text = 'A shot over the truck and the walls behind it. They turn around in the road.'; tone = 'good'; if (e.kind === 'refugees') g.humanity = Math.max(0, g.humanity - 5); }
       else stance = 'defend';
     }
-    const deter = stance === 'defend' && !skipFight ? deterrence(s, p).score : 0;
+    const deterAll = stance === 'defend' && !skipFight ? deterrence(s, p) : null;
+    const deter = deterAll?.score ?? 0;
     if (stance === 'defend' && !skipFight) {
       // the fight itself, second by second (sim/battle.ts); the world can play it back from g.battle
       // a crew up inside the wall (tunnelers), or one that finds a hatch outside it (an underground passage's way in): no wall to get over
       // first contact (sim/deterrence.ts): guards, dogs, cameras, the wall and towers can turn the crew back before a shot
       if (!e.dig && !e.insiderHelp && !talkAmbush && r() < turnBackChance(deter, e, angry)) {
-        title = 'They thought better of it'; tone = 'good'; text = 'They looked the place over from the road, the wall, the men on it and what watched from the poles, and the crew turned round. No shot was fired.';
+        title = 'They thought better of it'; tone = 'good'; text = `They looked the place over from the road${deterAll?.lines.length ? `: ${deterAll.lines.join(', ')}` : ''}, and the crew turned round. No shot was fired.`;
         g.respect = Math.min(1, (g.respect ?? 0) + 0.12); g.next = Math.max(g.next, e.day + Math.round(12 + 30 * g.respect)); g.raidsHeld++;
         skipFight = true;
       }

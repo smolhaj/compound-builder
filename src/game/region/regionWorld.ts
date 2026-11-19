@@ -66,6 +66,8 @@ export interface TreeMix {
   timber: Array<{ kind: ForestKind; w: number; scale: [number, number]; sx?: [number, number]; sy?: [number, number] }>;
   /** Creek-bank trees. */
   riparian: { kind: ForestKind; scale: [number, number] };
+  /** Trees on a dry wash (desert lots): mesquite and palo verde, not the creek's cottonwoods. Defaults to `riparian`. */
+  wash?: { kind: ForestKind; scale: [number, number] };
   /** Young trees under a closed canopy / at the edge (null: none). */
   under: { thick: ForestKind | null; edge: ForestKind | null };
   /** Crown colors per kind. */
@@ -145,12 +147,18 @@ export const REGION_WORLD: Record<RegionId, RegionWorld> = {
     road: 'asphalt', fence: 'rail',
   },
   desert: {
-    kind: 'desert', climate: 'desert_southwest', relief: 'bajada', cover: 3.5,
+    kind: 'desert', climate: 'desert_southwest', relief: 'bajada', cover: 2.2,
     trees: {
-      timber: [{ kind: 'conifer', w: 1, scale: [0.28, 0.45], sx: [1.25, 1.6], sy: [0.7, 0.9] }],   // one-seed juniper, pinyon
-      riparian: { kind: 'conifer', scale: [0.34, 0.58] },                             // one-seed juniper by the wash (a cottonwood on every dry gully read as a green lollipop line on tan ground)
+      timber: [
+        { kind: 'juniper', w: 0.42, scale: [0.8, 1.3], sx: [0.9, 1.2], sy: [0.85, 1.15] },     // one-seed juniper on the rocky rises
+        { kind: 'mesquite', w: 0.26, scale: [0.8, 1.2] },                                      // honey mesquite on the flats
+        { kind: 'paloverde', w: 0.16, scale: [0.8, 1.2] },                                     // foothill palo verde
+        { kind: 'saguaro', w: 0.1, scale: [0.55, 1.2], sx: [0.9, 1.05], sy: [0.9, 1.1] },      // saguaro on the warm slopes (sparse)
+      ],
+      riparian: { kind: 'broad', scale: [1.1, 1.5] },                                  // Fremont cottonwood where a creek really runs
+      wash: { kind: 'mesquite', scale: [0.9, 1.3] },                                   // mesquite and palo verde line the dry wash (a cottonwood on every dry gully read as a green lollipop line)
       under: { thick: null, edge: null },
-      palettes: { conifer: DESERT_JUNIPER, broad: COTTONWOOD },
+      palettes: { broad: COTTONWOOD, juniper: DESERT_JUNIPER },
     },
     sage: 1, scrub: 'desert', sagePalette: [0x8a9460, 0x7d8a58, 0x9aa070, 0x868f62, 0x9a9468, 0x6f7d50], willow: 0.3,   // creosote, rabbitbrush, yucca, prickly pear
     rocks: { count: 30, color: 0x9a5c44, size: [0.1, 0.45], flat: 0.6 },              // red sandstone
@@ -253,11 +261,11 @@ export const REGION_WORLD: Record<RegionId, RegionWorld> = {
     trees: {
       timber: [
         { kind: 'broad', w: 0.45, scale: [0.85, 1.2], sx: [1.3, 1.6], sy: [0.7, 0.85] },   // plateau live oak: low and wide
-        { kind: 'conifer', w: 0.55, scale: [0.35, 0.55], sx: [1.15, 1.45], sy: [0.8, 1.0] }, // Ashe juniper ("cedar")
+        { kind: 'juniper', w: 0.55, scale: [0.9, 1.4], sx: [0.95, 1.2], sy: [0.9, 1.2] },        // Ashe juniper ("cedar"): a dense dome, not a spruce
       ],
       riparian: { kind: 'broad', scale: [1.1, 1.5] },                                  // pecan, sycamore, bald cypress
-      under: { thick: 'conifer', edge: null },
-      palettes: { broad: LIVE_OAK, conifer: JUNIPER },
+      under: { thick: 'juniper', edge: null },
+      palettes: { broad: LIVE_OAK, juniper: JUNIPER },
     },
     sage: 0, willow: 0.3,
     rocks: { count: 36, color: 0xc8bfa8, size: [0.1, 0.4], flat: 0.85 },             // white limestone ledges

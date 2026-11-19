@@ -49,7 +49,7 @@ export function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'lumber': return planks('#c89a62');
     case 'firewood': return g(<>{[[14, 26], [26, 26], [20, 18]].map(([x, y]) => <g key={x + '' + y}><circle cx={x} cy={y} r="6" fill="#8a6440" /><circle cx={x} cy={y} r="3" fill="#c8a070" /></g>)}</>);
     case 'fieldstone': return g(<>{[[14, 26, 8], [28, 24, 9], [20, 16, 7]].map(([x, y, r]) => <ellipse key={x} cx={x} cy={y} rx={r} ry={r * 0.75} fill="#9a9488" stroke="#5a564e" />)}</>);
-    case 'concrete': return bag('#b4b0a8', 'MIX');
+    case 'concrete': case 'dome_skirtwork': case 'bunker_works': return bag('#b4b0a8', 'MIX');
     case 'roofing': return g(<>{[8, 16, 24, 32].map(x => <rect key={x} x={x} y="10" width="6" height="24" fill="#7a3428" stroke="#4a1a14" />)}</>);
     case 'hardware': return box('#5a6068', 'BOLTS');
     case 'wire': return g(<><circle cx="22" cy="22" r="11" fill="none" stroke="#a0a6aa" strokeWidth="3" /><circle cx="22" cy="22" r="6" fill="none" stroke="#a0a6aa" strokeWidth="2" /></>);
@@ -91,7 +91,7 @@ export function Icon({ id, tint }: { id: string; tint?: number }) {
     case 'traps': return g(<><rect x="10" y="20" width="24" height="10" fill="#c8a070" /><path d="M12 20 q10 -10 20 0" fill="none" stroke="#9aa0a4" strokeWidth="2" /></>);
     case 'fuel': case 'stabilizer': return g(<><path d="M12 12 h16 l6 6 v18 h-22 z" fill={id === 'fuel' ? '#b83a2a' : '#3a7ab8'} /><rect x="26" y="8" width="5" height="6" fill="#333" /></>);
     case 'plow': return g(<path d="M6 30 q16 -16 32 0 v4 h-32 z" fill="#d8a020" stroke="#7a5a10" />);
-    case 'excavator': return g(<><rect x="8" y="24" width="18" height="8" fill="#e0b020" /><path d="M26 26 l8 -10 l4 6" stroke="#e0b020" strokeWidth="3" fill="none" /><rect x="8" y="32" width="18" height="4" fill="#333" /></>);
+    case 'excavator': case 'dome_dig': case 'dome_rock': case 'dome_shoring': case 'dome_dewater': return g(<><rect x="8" y="24" width="18" height="8" fill="#e0b020" /><path d="M26 26 l8 -10 l4 6" stroke="#e0b020" strokeWidth="3" fill="none" /><rect x="8" y="32" width="18" height="4" fill="#333" /></>);
     case 'pipe': return g(<><circle cx="22" cy="22" r="12" fill="none" stroke="#c84a30" strokeWidth="4" /></>);
     case 'cable': return g(<><circle cx="22" cy="22" r="12" fill="none" stroke="#2a2a2a" strokeWidth="5" /><circle cx="22" cy="22" r="12" fill="none" stroke="#c8a040" strokeWidth="1" /></>);
     case 'fixtures': return g(<><rect x="10" y="16" width="24" height="14" rx="3" fill="#f0eee8" /><path d="M22 10 v6" stroke="#aaa" strokeWidth="3" /></>);

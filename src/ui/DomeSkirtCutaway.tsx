@@ -36,6 +36,23 @@ const T = (p: { x: number; y: number; children: ReactNode; size?: number; weight
   <g>{p.chip ? <rect x={(p.anchor === 'end' ? p.x - p.chip : p.anchor === 'middle' ? p.x - p.chip / 2 : p.x) - 5} y={p.y - (p.size ?? 15) - 1} width={p.chip + 10} height={(p.size ?? 15) + 8} rx={3} fill={C.paper} opacity={0.9} /> : null}<text x={p.x} y={p.y} fontSize={p.size ?? 15} fontWeight={p.weight ?? 500} fill={p.fill ?? C.ink} textAnchor={p.anchor ?? 'start'} fontStyle={p.italic ? 'italic' : 'normal'} letterSpacing={p.spacing} opacity={p.opacity} fontFamily={FONT}>{p.children}</text></g>
 );
 
+const BUNKER_CLEAR_FT = 10;
+/** The bunker below the dome floor, to scale: roof 6.6 ft down, floor 17 ft, a stair shaft up to the dome floor, inside the ring and above the skirt's foot. */
+function BunkerInSection({ x0, x1, skirtFt }: { x0: number; x1: number; skirtFt: number }): ReactElement {
+  const roof = 6.6, floor = 16, slab = 1, wall = 1.1;
+  return <g data-testid="skirt-bunker">
+    <rect x={x0} y={dy(roof - 1)} width={x1 - x0} height={(floor + slab - roof + 1) * PX} fill="url(#sk-concrete)" stroke={C.ink} strokeWidth={2} />
+    <rect x={x0 + wall * PX} y={dy(roof)} width={x1 - x0 - 2 * wall * PX} height={(floor - roof) * PX} fill="#2b2a26" />
+    <rect x={x0 + 30} y={dy(floor - 3.2)} width={x1 - x0 - 60} height={3.2 * PX} fill="#4a3f33" opacity={0.9} />
+    <rect x={x0 + 18} y={dy(floor - 6)} width={30} height={6 * PX} fill="#6f7a86" opacity={0.85} />
+    <rect x={x0 + 54} y={GY} width={22} height={dy(roof - 1) - GY} fill="#2b2a26" stroke={C.ink} strokeWidth={2} />
+    {Array.from({ length: 7 }, (_, i) => <line key={i} x1={x0 + 54} x2={x0 + 76} y1={GY + 14 + i * 14} y2={GY + 14 + i * 14} stroke="#c9b27a" strokeWidth={2} />)}
+    <rect x={x0 + 50} y={GY - 6} width={30} height={7} fill={C.steel} stroke={C.ink} strokeWidth={1.6} />
+    <T x={x1 + 12} y={dy((roof + floor) / 2) - 8} size={15} weight={700} fill={C.ink} chip={150}>Bunker under the dome</T>
+    <T x={x1 + 12} y={dy((roof + floor) / 2) + 12} size={13} fill={C.ink2} chip={150}>floor {floor + slab} ft down, skirt {skirtFt} ft</T>
+  </g>;
+}
+
 /** A numbered callout badge. */
 const Badge = ({ x, y, n, fill = C.ink }: { x: number; y: number; n: number; fill?: string }): ReactElement => (
   <g><circle cx={x} cy={y} r={13} fill={fill} stroke={C.paper} strokeWidth={2} /><T x={x} y={y + 5} size={14} weight={800} fill={C.paper} anchor="middle">{n}</T></g>
@@ -206,6 +223,8 @@ export function SkirtSection({ standalone = true }: { standalone?: boolean }): R
             <circle cx={WX + th + 92} cy={dy(t.depth)} r={3.2} fill={C.ink} />
           </g>
         ))}
+        {/* a bunker under the dome: inside the ring, a cell of clear ground from it, its floor above the skirt's foot (sim/dome/bunker.ts) */}
+        <BunkerInSection x0={WX + th + BUNKER_CLEAR_FT * PX} x1={WX + th + BUNKER_CLEAR_FT * PX + 20 * PX} skirtFt={arc.skirtFt} />
         {/* what a raider tunnel meets */}
         {/* plain crew tunnel, 12 ft */}
         <path d={`M232 ${GY} L300 ${dy(12)} L${WX - 2} ${dy(12)}`} fill="none" stroke="#2a1a10" strokeWidth={26} strokeLinejoin="round" />

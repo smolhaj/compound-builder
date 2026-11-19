@@ -33,14 +33,23 @@ export interface ShadeBox {
   kind: 'building' | 'tree';
 }
 
-export interface ShadeTree { x: number; y: number; z: number; kind: 'conifer' | 'broad' | 'oval' | 'longleaf'; scale: number; sy: number }
+export interface ShadeTree { x: number; y: number; z: number; kind: 'conifer' | 'broad' | 'oval' | 'longleaf' | 'juniper' | 'mesquite' | 'paloverde' | 'saguaro'; scale: number; sy: number }
 
-/** Tree crown as a box: half-width and top (world units, 1 u = 6 m: a mature conifer is ~2.3 u = 14 m). */
+/** Tree crown as a box: half-width and top (world units, 1 u = 20 ft: a mature conifer is ~2.3 u = 46 ft). Desert trees are low and open. */
 export function treeBox(t: ShadeTree): ShadeBox {
   const conifer = t.kind === 'conifer' || t.kind === 'longleaf';
-  const h = (conifer ? 2.3 : 1.9) * t.scale * t.sy, r = (conifer ? 0.3 : 0.55) * t.scale;
-  return { x0: t.x - r, x1: t.x + r, z0: t.z - r, z1: t.z + r, top: t.y + h, opacity: conifer ? 1 : BARE_LEAF, kind: 'tree' };
+  const desert = DESERT_SHADE[t.kind as string];
+  const h = (desert ? desert.h : conifer ? 2.3 : 1.9) * t.scale * t.sy, r = (desert ? desert.r : conifer ? 0.3 : 0.55) * t.scale;
+  return { x0: t.x - r, x1: t.x + r, z0: t.z - r, z1: t.z + r, top: t.y + h, opacity: desert ? desert.opacity : conifer ? 1 : BARE_LEAF, kind: 'tree' };
 }
+
+/** Desert trees: height and crown half-width at scale 1 (a saguaro is a thin column, a mesquite a wide airy crown). */
+const DESERT_SHADE: Record<string, { h: number; r: number; opacity: number }> = {
+  juniper: { h: 0.9, r: 0.5, opacity: 1 },
+  mesquite: { h: 1.0, r: 0.8, opacity: 0.55 },
+  paloverde: { h: 0.95, r: 0.6, opacity: 0.5 },
+  saguaro: { h: 1.6, r: 0.12, opacity: 1 },
+};
 
 /** How tall a kind of building stands, world units (storeys 0.6-0.7 u, a roof on top; panels tilted; underground nothing). */
 export function buildingHeight(kind: string, category?: string): number {

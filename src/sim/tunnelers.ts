@@ -34,7 +34,8 @@ import { daysOfFood } from './needs';
 import { adaptation, adaptedHeads, adaptLevel, digFactor, sinceHit } from './adaptive';
 import { pluralize } from './words';
 import { domesOf, type Dome } from './dome/standing';
-import { digStops, nearestAirlock, sideOfDome, skirtOf } from './dome/crossing';
+import { digStops, nearestAirlock, sideOfDome } from './dome/crossing';
+import { skirtDepthFt } from './dome/bunkerLive';
 import { tunnelReach, linkOpen } from './dome/links';
 import { diggable, linkOfDig, linkSurfaces, linkWarning, pointAlong, resolveLinkDig, spotWords } from './dome/linkDefense';
 
@@ -316,14 +317,14 @@ export function digDay(s: GameState): string[] {
   // the skirt of a dome (owner decision 7): they reach it about halfway; how many turn round is the skirt's depth against how deep they can dig
   if (dome && !d.skirtChecked && age >= Math.floor(d.days * 0.4)) {
     d.skirtChecked = true;
-    if (r() < digStops(skirtOf(dome.tier), adaptNow(s))) {
+    if (r() < digStops(skirtDepthFt(s, dome.structure), adaptNow(s))) {
       ds.turnedBySkirt++;
       ds.active = null;
       const lock = nearestAirlock(dome, d.at[0], d.at[1]);
       if (lock) {
         ds.turnedToAirlock = (ds.turnedToAirlock ?? 0) + 1;
         s.gate.next = Math.min(s.gate.next, day + 2 + Math.floor(r() * 3));   // they work along the footing toward the only way in: the airlock
-        lines.push(`Scratches and a fresh hole against the buried skirt on the ${sideOfDome(dome, d.at[0], d.at[1])} side of the dome: somebody dug down ${skirtOf(dome.tier)} ft, found concrete, and followed it along toward the ${sideOfDome(dome, lock.airlock.x, lock.airlock.z)} airlock.`);
+        lines.push(`Scratches and a fresh hole against the buried skirt on the ${sideOfDome(dome, d.at[0], d.at[1])} side of the dome: somebody dug down ${skirtDepthFt(s, dome.structure)} ft, found concrete, and followed it along toward the ${sideOfDome(dome, lock.airlock.x, lock.airlock.z)} airlock.`);
       } else lines.push(`Scratches and a fresh hole against the buried skirt on the ${sideOfDome(dome, d.at[0], d.at[1])} side of the dome: somebody dug down to it, found concrete, and gave up.`);
       return lines;
     }

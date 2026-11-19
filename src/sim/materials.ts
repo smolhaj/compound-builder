@@ -39,7 +39,9 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   // breeding swine and reusable canning lids (sim/swine.ts, sim/kitchen.ts)
   | 'sow' | 'boar' | 'lids_reuse'
   // the domed compound (sim/dome/): kits sold by the contractor, installed by their erectors
-  | 'dome_earthbag' | 'dome_geodesic_kit' | 'dome_glass_kit' | 'dome_arcology_kit' | 'dome_air_plant' | 'dome_airlock' | 'dome_fitout';
+  | 'dome_earthbag' | 'dome_geodesic_kit' | 'dome_glass_kit' | 'dome_arcology_kit' | 'dome_air_plant' | 'dome_airlock' | 'dome_fitout'
+  // the civil work under a dome and the hardened concrete of a bunker (sim/dome/pricing.ts); contractor services, sold by the unit
+  | 'dome_dig' | 'dome_rock' | 'dome_shoring' | 'dome_dewater' | 'dome_skirtwork' | 'bunker_works';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -79,11 +81,11 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   rebar: { id: 'rebar', name: 'Rebar', unit: 'bundle (20 #4 bars, 20 ft each, with ties)', price: 240 },
   membrane: { id: 'membrane', name: 'Waterproofing membrane', unit: 'roll (≈ 215 sq ft)', price: 400 },
   excavator: { id: 'excavator', name: 'Excavator hire', unit: 'day (mini-excavator, delivered)', price: 650 },
-  blast_door: { id: 'blast_door', name: 'Blast door', unit: 'steel blast door and frame', price: 14000 },
-  nbc_filter: { id: 'nbc_filter', name: 'Fallout and gas air filter', unit: 'filtration unit, hand crank, blast valves', price: 9500 },
+  blast_door: { id: 'blast_door', name: 'Blast door', unit: 'steel blast door and frame', price: 22000 },
+  nbc_filter: { id: 'nbc_filter', name: 'Fallout and gas air filter', unit: 'filtration unit, hand crank, blast valves', price: 16000 },
   spoil: { id: 'spoil', name: 'Spoil (dug earth)', unit: 'cu yd', price: null },
   culvert: { id: 'culvert', name: 'Tunnel vault', unit: '20 ft of poured arch: forms, rebar, concrete', price: 3600 },
-  egress_hatch: { id: 'egress_hatch', name: 'Egress hatch', unit: 'steel lid, collar, inside drop-bolts, ladder', price: 4500 },
+  egress_hatch: { id: 'egress_hatch', name: 'Egress hatch', unit: 'steel lid, collar, inside drop-bolts, ladder', price: 6500 },
   lead_sheet: { id: 'lead_sheet', name: 'Lead sheet', unit: '3 × 7 ft sheet, ¼ in thick (≈ 300 lb)', price: 650 },
   faraday_mesh: { id: 'faraday_mesh', name: 'Faraday mesh', unit: 'roll of welded copper-clad mesh + bonding strap', price: 420 },
   blast_valve: { id: 'blast_valve', name: 'Blast valve', unit: 'spring-loaded vent valve', price: 2200 },
@@ -157,7 +159,7 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   blackout_curtains: { id: 'blackout_curtains', name: 'Blackout curtains', unit: 'heavy light-blocking curtains and tracks for one house: the room stays lit, the window stays dark', price: 140 },
   vehicle_parts: { id: 'vehicle_parts', name: 'Vehicle parts', unit: 'kit: filters, belts, hoses, plugs, a fuel pump and a battery for one truck or tractor', price: 260 },
   ground_sensor: { id: 'ground_sensor', name: 'Ground sensors', unit: 'a string of buried geophones along about 390 ft of wall and a base unit: hears digging days out (needs power)', price: 1400 },
-  passage_hatch: { id: 'passage_hatch', name: 'Passage hatch', unit: 'steel blast hatch, collar and locks from both sides (one for each end of an underground passage)', price: 3800 },
+  passage_hatch: { id: 'passage_hatch', name: 'Passage hatch', unit: 'steel blast hatch, collar and locks from both sides (one for each end of an underground passage)', price: 7500 },
   ai_sensor_module: { id: 'ai_sensor_module', name: 'AI sensor module', unit: 'a chip and lens for one floodlight: tells people from animals, so the light comes on for people only (needs the light powered; fit it in Defense)', price: 180 },
   tripwire: { id: 'tripwire', name: 'Tripwire alarms', unit: 'tripwire noisemakers for the trails into the place', price: 60 },
   dog: { id: 'dog', name: 'Dog (trained adult)', unit: 'a named, trained adult dog: a family pet who also barks at strangers. It must be fed, watered, walked and doctored, and it will grieve and be grieved', price: 600 },
@@ -241,11 +243,18 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   // the domed compound (sim/dome/cost.ts sizes the order; the erectors' labor is in each kit's price)
   dome_earthbag: { id: 'dome_earthbag', name: 'Earthbag dome shell', unit: '100 sq ft of earthbag, barbed wire, plaster and sod, delivered with a mason\'s crew', price: 1800 },
   dome_geodesic_kit: { id: 'dome_geodesic_kit', name: 'Geodesic dome kit', unit: '1,000 sq ft of steel strut-and-hub frame with twin-wall polycarbonate and film glazing, erected', price: 75000 },
-  dome_glass_kit: { id: 'dome_glass_kit', name: 'Glass and steel dome kit', unit: '1,000 sq ft of steel gridshell with laminated glass, crane-set', price: 128000 },
-  dome_arcology_kit: { id: 'dome_arcology_kit', name: 'Arcology panel kit', unit: '1,000 sq ft of space frame with clear polycarbonate-composite armor panels, set by a contractor firm', price: 320000 },
-  dome_air_plant: { id: 'dome_air_plant', name: 'Dome air plant', unit: 'per 10,000 cu ft of enclosed air: heat pumps, energy-recovery ventilators, particulate filters, ducts and controls', price: 16000 },
-  dome_airlock: { id: 'dome_airlock', name: 'Dome airlock', unit: 'two sealed doors, a vestibule, a pressure gauge and an interlock', price: 85000 },
-  dome_fitout: { id: 'dome_fitout', name: 'Dome fit-out', unit: 'per 1,000 sq ft of floor: paths, drainage, beds, lighting and finishes', price: 18000 },
+  dome_glass_kit: { id: 'dome_glass_kit', name: 'Glass and steel dome kit', unit: '1,000 sq ft of steel gridshell with laminated glass, crane-set', price: 650000 },
+  dome_arcology_kit: { id: 'dome_arcology_kit', name: 'Arcology panel kit', unit: '1,000 sq ft of space frame with clear polycarbonate-composite armor panels, set by a contractor firm', price: 5000000 },
+  dome_air_plant: { id: 'dome_air_plant', name: 'Dome air plant', unit: 'per 10,000 cu ft of enclosed air: heat pumps, energy-recovery ventilators, particulate filters, ducts and controls', price: 22000 },
+  dome_airlock: { id: 'dome_airlock', name: 'Dome airlock', unit: 'two sealed doors, a vestibule, a pressure gauge and an interlock', price: 160000 },
+  // the civil work under a dome (sim/dome/pricing.ts), PROPOSED 2025 prices; a contractor's service, sold by the unit
+  dome_dig: { id: 'dome_dig', name: 'Crater excavation', unit: '100 cu yd of crater: cut, load, haul off the third that will not go back, and place and compact the rest as backfill', price: 2500 },
+  dome_rock: { id: 'dome_rock', name: 'Rock excavation premium', unit: '100 cu yd of weathered rock: rippers, a hydraulic hammer and some blasting, over the common-earth rate', price: 4500 },
+  dome_shoring: { id: 'dome_shoring', name: 'Pit shoring', unit: '100 sq ft of pit wall: soil nails and shotcrete, or soldier piles and lagging', price: 7000 },
+  dome_dewater: { id: 'dome_dewater', name: 'Dewatering', unit: 'one deep well for a month: drilling, pump, power and the discharge permit', price: 5500 },
+  dome_skirtwork: { id: 'dome_skirtwork', name: 'Skirt forms and placement', unit: 'cu yd of skirt: forms, concrete pump, placing the steel, finishing and the special inspector', price: 650 },
+  bunker_works: { id: 'bunker_works', name: 'Hardened concrete works', unit: 'cu yd of below-grade structural concrete in place: shoring, forms, pump, waterproofing detail, the engineer\'s stamp and inspections (the concrete and steel are bought separately)', price: 1200 },
+  dome_fitout: { id: 'dome_fitout', name: 'Dome fit-out', unit: 'per 1,000 sq ft of floor: paths, drainage, beds, lighting and finishes', price: 65000 },
   lids: { id: 'lids', name: 'Canning lids', unit: 'sleeve of 12 lids (one case of quarts filled; the jars come back, the lids don\'t)', price: 6 },
   filter_set: { id: 'filter_set', name: 'HEPA filter set', unit: 'HEPA cartridges + hand-crank blower', price: 1100 },
 };

@@ -179,8 +179,8 @@ export function spareUsd(tier: DomeTier, cells: number, kind: PlantKind, filteri
   const fp = domeGeometry(tier, shellFt(tier, cells)).footprintSf;
   const round = (v: number, to = 1000): number => Math.max(to, Math.round(v / to) * to);
   switch (kind) {
-    case 'chiller': return round(fp * 12);
-    case 'substation': return round(fp * 3.5);
+    case 'chiller': return round(15_000 + fp * 30);   // PROPOSED: about $300 a ton installed (a 500-ton chiller $200,000 to $400,000 plus its tower, pumps and piping)
+    case 'substation': return round(60_000 + fp * 55);   // PROPOSED: a 5 to 20 MVA substation is $2 million to $8 million; a small pad-mount transformer $60,000
     case 'air': return filtering === 'none' ? null : round(filtering === 'scrubber' ? scrubberUsd(tier, cells) : advancedFilterUsd(tier, cells));
     default: return null;
   }
