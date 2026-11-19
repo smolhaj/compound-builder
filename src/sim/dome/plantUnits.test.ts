@@ -3,7 +3,12 @@ import { newGame, SAVE_VERSION, type GameState, type Structure } from '../state'
 import { migrate } from '../save/migrations';
 import { BLUEPRINTS } from '../blueprints';
 import { addDamageWork, openDamage } from '../raidDamage';
-import { DOME_KIND, type DomeTier } from './tiers';
+import { DOME_KIND, TIER, type DomeTier } from './tiers';
+import { domeFrom } from './standing';
+import { digStops, turnedTo } from './crossing';
+import { SALLY_HOLD, AIRLOCK_CYCLE_S } from './siege';
+import { passageDepthFt, yardAccess, yardGeometry } from './plantYard';
+import { plantLayout } from './plant';
 import { stepDome, domeOf, ownState, stateOf, setLockdown, buySpare, sparesProblem, domeClock, dayLoad, planPowered, domeCards, domeChoose, domeWaterFlows, spareBill } from './live';
 import { damagePlant, fxOf, jobOf, plantJobs, unitsOf } from './plantLive';
 import {
@@ -212,6 +217,40 @@ describe('the dome steps down with its plant', () => {
     expect(fxOf(g, d, stateOf(g, d)).climate).toBe(1);
     hurt(g, 'chiller2', 'down');
     expect(fxOf(g, d, stateOf(g, d)).climate).toBe(0);
+  });
+});
+
+describe('the yard is reached from inside', () => {
+  it('a yard unit can be repaired by the family while the dome is sealed, and the dome stays sealed', () => {
+    const g = base('arcology', 'advanced'), d = domeOf(g)!;
+    setLockdown(g, true);
+    hurt(g, 'chiller', 'down');
+    expect(unitsOf(g, d, stateOf(g, d)).find(u => u.id === 'chiller')!.place).toBe('yard');
+    const job = jobOf(g, d.st.id, 'chiller')!;
+    job.supplied = true;
+    const used = addDamageWork(g, job, job.hours);
+    expect(used).toBe(job.hours);
+    expect(plantJobs(g, d.st.id).length).toBe(0);
+    expect(stateOf(g, d).lockdown).toBe(true);
+    expect(yardAccess()).toEqual({ fromInside: true, outsideGate: false });
+  });
+  it('the passage is cast into the footing at the skirt depth, so the skirt and tunnel rules cover it, and a crew turned at it is steered to a person airlock', () => {
+    for (const tier of ['glass', 'arcology'] as const) {
+      expect(passageDepthFt(tier)).toBe(TIER[tier].skirtFt);
+      expect(digStops(passageDepthFt(tier), 0.4)).toBe(digStops(TIER[tier].skirtFt, 0.4));
+      const g = base(tier, 'advanced'), st = g.structures.find(x => x.id.startsWith('d'))!, dm = domeFrom(st)!, y = yardGeometry(tier, dm.r)!;
+      const a = turnedTo(dm, st.x + y.portal.from[0], st.z + y.portal.from[1]);
+      expect(a).not.toBeNull();
+      expect(dm.airlocks.some(l => l.index === a!.index)).toBe(true);
+    }
+  });
+  it('the sally port and airlock hold rules are unchanged by the service airlock: the tier tables still rise', () => {
+    const tiers = ['earthen', 'geodesic', 'glass', 'arcology'] as const;
+    for (let i = 1; i < tiers.length; i++) { expect(SALLY_HOLD[tiers[i]]).toBeGreaterThanOrEqual(SALLY_HOLD[tiers[i - 1]]); expect(AIRLOCK_CYCLE_S[tiers[i]]).toBeGreaterThanOrEqual(AIRLOCK_CYCLE_S[tiers[i - 1]]); }
+    expect(TIER.arcology.airlocks).toBe(6); expect(TIER.glass.airlocks).toBe(3);   // (the service airlock is not one of the person airlocks)
+  });
+  it('the whole plant layout stays within a part budget (merged into one mesh)', () => {
+    for (const [tier, r] of [['glass', 3.75], ['glass', 6], ['arcology', 9], ['arcology', 15]] as const) expect(plantLayout(tier, r, 'closed', { loop: 'recycle', spares: ['chiller', 'air', 'substation'] }).parts.length).toBeLessThan(650);
   });
 });
 
