@@ -8,7 +8,7 @@ import {
 } from './climateLook';
 
 const seq = (n: number) => Array.from({ length: n + 1 }, (_, i) => i / n);
-const mono = (f: (x: number) => number, up = true) => { const v = seq(40).map(f); for (let i = 1; i < v.length; i++) up ? expect(v[i]).toBeGreaterThanOrEqual(v[i - 1] - 1e-12) : expect(v[i]).toBeLessThanOrEqual(v[i - 1] + 1e-12); };
+const mono = (f: (x: number) => number, up = true) => { const v = seq(40).map(f); for (let i = 1; i < v.length; i++) { if (up) expect(v[i]).toBeGreaterThanOrEqual(v[i - 1] - 1e-12); else expect(v[i]).toBeLessThanOrEqual(v[i - 1] + 1e-12); } };
 
 describe('climate look curves', () => {
   it('are monotone in the anomaly, clamped and finite for any input', () => {

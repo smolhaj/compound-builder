@@ -24,7 +24,7 @@ import { useEffect, useRef } from 'react';
 import type { GameState } from '../sim/state';
 import { MushroomCloud } from './fx/MushroomCloud';
 import { collapseLook, withWeather } from '../sim/collapseLook';
-import { shellBleachOf, shellFrostOf, waterLockOf } from '../sim/climateLook';
+import { shellBleachOf, shellFrostOf, shimmerOf, waterLockOf } from '../sim/climateLook';
 import { domeOf, stateOf } from '../sim/dome/live';
 import { setShellClimate } from './fx/DomeShell';
 import type { ClimateOverlay } from '../engine/world/season/seasonState';
@@ -643,6 +643,9 @@ export function GameCanvas() {
       // dry country in a windy rainless spell lifts dust; a hot dry midday shimmers in a haze (weather/dustStorm.ts: from the weather already running)
       const dustIn = dustStorm({ region: seasonState.climate.id, season: vis, wind: wo.wind, rain: wo.rain, storm: wo.storm, snow: wo.snow, cloud: wo.cloud, hour: t });
       if (qa.dust !== undefined) dustIn.dust = qa.dust;
+      // runaway heat: the existing midday heat haze (a pale low band in the sky and a warm cast) rides the heat anomaly, strongest mid-afternoon
+      // (a true shimmer needs a refraction pass; that is cut: no new pass)
+      if (lookRaw.scorch > 0) dustIn.heat = Math.max(dustIn.heat, shimmerOf(lookRaw.scorch, t));
       const look = applyDust(withWeather(gs === game ? lookRaw : collapseLook(gs), { rain: wo.rain, snow: wo.snow, season: vis }), weatherMode === 'off' ? { dust: 0, heat: 0 } : dustIn);
       const wx = weather.update({
         dt, speed: speed === 0 ? 1 : 60 / SECONDS_PER_DAY[speed], season: wxSeason, hour: t,
