@@ -95,7 +95,7 @@ try {
     const near = await page.evaluate(async ([tier, R, ph]) => { const P = await import('/src/sim/dome/plant.ts'); const parts = P.plantLayout(tier, R, 'closed', { rot: 0 }).parts.filter(q => !q.onShell && Math.abs(Math.atan2(Math.sin(Math.atan2(q.x, q.z) - ph), Math.cos(Math.atan2(q.x, q.z) - ph))) < 0.55 && Math.hypot(q.x, q.z) < R * 0.98);
       return { rMin: Math.min(...parts.map(q => Math.hypot(q.x, q.z) - Math.max(q.w ?? 0, q.d ?? 0, (q.r ?? 0) * 2) / 2)), n: parts.length }; }, [tier, R, ph]);
     lap('plant ' + JSON.stringify(near));
-    const rho = Math.max(0.3 * R, near.rMin - 1.3), eye = [D.x + Math.sin(ph - 0.12) * rho, ground + h, D.z + Math.cos(ph - 0.12) * rho];
+    const rho = Math.max(0.3 * R, near.rMin - 2.8), eye = [D.x + Math.sin(ph - 0.18) * rho, ground + h, D.z + Math.cos(ph - 0.18) * rho];
     await pair('04-plant-yard-airlock', eye, [D.x + yx, ground + 0.22, D.z + yz], 70, [[(eye[0] - D.x) / R + Math.sin(ph) * 0.05 + 0.02, (eye[2] - D.z) / R + Math.cos(ph) * 0.05]]);
   }
   await page.close();
