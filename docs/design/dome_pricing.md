@@ -67,7 +67,7 @@ Sample earthwork bill, 360 ft arcology: crater 384,907 cu yd; 75,415 cu yd of it
 | Dome air plant, per 10,000 cu ft | $16,000 | $22,000 | NBC-grade filtration and controls on top of chillers and air handlers. |
 | Dome airlock | $85,000 | $160,000 | Pressure-rated two-door vestibule, interlock, armored doors. |
 | Dome fit-out, per 1,000 sq ft of floor | $18,000 | $65,000 | $65 a sq ft for paths, drainage, beds, lighting (conservatory interiors run $50 to $200). |
-| Permit fee: geodesic / glass / arcology | $2,800 / $24,000 / $180,000 | $12,000 / $350,000 / $15,000,000 | About 1 percent of value, as plan review and impact fees. Still a flat fee per tier (see "Needs an owner decision"). |
+| Permit fee: geodesic / glass / arcology | $2,800 / $24,000 / $180,000 | $12,000 / $350,000 / $15,000,000 | About 1 percent of value, as plan review and impact fees. Scaled by size in the follow-ups (about 1 percent of the build price, never under this flat floor). |
 | Wealth gate: glass / arcology | $5M / $60M | $15M / $500M | The gate was below the price of the smallest dome. Now about 45 percent of the default dome. |
 | Chiller spare (N+1) | $12 a sq ft of floor | $15,000 + $30 a sq ft | Arcology 360 ft: $3.1M (a few 500-ton chillers with towers). |
 | Substation spare | $3.5 a sq ft | $60,000 + $55 a sq ft | Arcology 360 ft: $5.7M (5 to 20 MVA band $2M to $8M). |
@@ -132,6 +132,10 @@ Cozy difficulty adds 15 percent to the start and cuts all prices 40 percent; Sta
 ## Operating costs (see `runningCost`, PROPOSED yearly figures)
 
 The sim already bills the dome's power day by day through the utilities (kWh x $0.14 plus the day's service charge, or fuel when off grid), so power is a real running cost. It does not model upkeep, insurance or staff; `runningCost` supplies them for the table and for a card. The design day in the table is the worse of a 20 F frost night and a 100 F sunny day, plus the always-on house load: glass 150 ft peaks at about 1,900 kWh a day in the sim (the owner's 3,500 kWh a day figure for a glass dome at peak is higher; the sim's number follows `domeLoad`, unchanged here).
+
+## Follow-ups built (owner approved items 1, 2, 3 and 5)
+
+Rich starts (Founder, Magnate), upkeep billing with a failure path, permit by size and repair panels by the 100 sq ft are built: see the DECISIONS row "Dome pricing follow-ups". Item 4 (per-site dewatering) is still open.
 
 ## Needs an owner decision (not invented)
 
