@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MATERIALS } from '../materials';
 import { DOME_TIERS, TIER, type DomeTier } from './tiers';
 import { STOPS } from './protection';
 import { domesOf, airlocksOf, shellHealth, PANELS } from './standing';
@@ -255,3 +256,30 @@ describe('how a dome reads from the road', () => {
   });
 });
 function g0(g: GameState): void { g.disaster.tracks = { ...g.disaster.tracks, law: 0 }; }
+
+describe('panel repairs are sold by the 100 sq ft', () => {
+  it('the panel goods are a tenth of the kit, the same price a square foot', () => {
+    expect(MATERIALS.dome_glass_panels.price).toBe(MATERIALS.dome_glass_kit.price! / 10);
+    expect(MATERIALS.dome_arcology_panels.price).toBe(MATERIALS.dome_arcology_kit.price! / 10);
+    expect(MATERIALS.dome_geodesic_panels.price).toBe(MATERIALS.dome_geodesic_kit.price! / 10);
+  });
+  it('one glass panel is about $65k a 100 sq ft, one arcology panel about $500k a 100 sq ft, not a whole kit', () => {
+    const g = panelJob('glass', 1), a = panelJob('arcology', 1);
+    expect(g.usd / (g.sqft / 100)).toBeGreaterThan(48_000); expect(g.usd / (g.sqft / 100)).toBeLessThan(82_000);   // (a 120 sq ft panel is billed as one 100 sq ft unit)
+    expect(a.usd / (a.sqft / 100)).toBeGreaterThan(450_000); expect(a.usd / (a.sqft / 100)).toBeLessThan(560_000);   // (190 sq ft rounds to 2 units: $1M)
+    expect(g.usd).toBeLessThan(MATERIALS.dome_glass_kit.price! / 3); expect(a.usd).toBeLessThan(MATERIALS.dome_arcology_kit.price! / 3);
+    expect(g.bill).toEqual({ dome_glass_panels: 1 });
+  });
+  it('the cost is proportional to the area, within one 100 sq ft unit, and never falls as panels are added', () => {
+    for (const t of BUILT) {
+      let last = 0;
+      for (const n of [1, 2, 4, 8, 20, 60]) {
+        const j = panelJob(t, n), unit = j.usd / Object.values(j.bill)[0]!;
+        expect(Math.abs(j.usd - (j.sqft / 100) * unit)).toBeLessThanOrEqual(unit); expect(j.usd).toBeGreaterThanOrEqual(last); last = j.usd;
+      }
+    }
+  });
+  it('the old whole-kit rounding is gone: ten panels of glass cost 12 units, not 2 kits', () => {
+    expect(panelJob('glass', 10).bill).toEqual({ dome_glass_panels: 12 });
+  });
+});

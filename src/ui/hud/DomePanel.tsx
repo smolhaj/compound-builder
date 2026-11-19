@@ -13,6 +13,7 @@ import { FILTERING, LIMIT_PPM, type Filtering } from '../../sim/dome/air';
 import { outside, dayLoad, planPowered, buyFiltering, buyLoop, loopBill, loopProblem, domeClean, domeClock, domeViews, filteringBill, filteringProblem, freshClock, replaceFilters, setClimateMode, setLockdown, spareFiltersUsd, tendCostUsd, tendEcology, type DomeView } from '../../sim/dome/live';
 import { pluralize } from '../../sim/words';
 import { DomePlantSection } from './DomePlantSection';
+import { domeRunning } from '../../sim/dome/runningLine';
 import { DomeClimateSection } from './DomeClimateSection';
 import { DomeLinksSection } from './DomeLinksSection';
 import { DomeBunkerSection } from './DomeBunkerSection';
@@ -68,6 +69,17 @@ export function DomePanel() {
       {views.length > 1 && <Note>Each dome runs its own air, filtering, climate, water loop and power. People are counted with the dome their home stands under; the main dome takes anyone whose home is outside every shell.</Note>}
     </Section>
     <Section title={`${views.length > 1 ? v.label : t.name}: ${st.lockdown ? 'sealed' : 'open'}`}>
+      {(() => {
+        const rc = domeRunning(game).find(x => x.id === id);
+        if (!rc) return null;
+        const bad = rc.stage !== 'paid' || rc.cashShort;
+        return <div data-testid="dome-running-cost" style={{ margin: "6px 0 2px" }}>
+          <Row label="Running cost" tone={bad ? "warn" : undefined} value={rc.upkeepUsd > 0 ? `${usd(rc.totalUsd)} a year` : `about ${usd(rc.powerUsd)} a year`} />
+          <Note>{rc.upkeepUsd > 0 ? `Upkeep ${usd(rc.upkeepUsd)} a year (maintenance, insurance${rc.tier === 'glass' || rc.tier === 'arcology' ? ', staff' : ''}) is billed a day at a time; power, about ${usd(rc.powerUsd)}, is billed with the utilities.` : `Power, billed with the utilities. An earthen dome has no upkeep bill.`}</Note>
+          {rc.stageText && <Note>{`Warning: ${rc.stageText} Owed: ${usd(rc.owedUsd)}.`}</Note>}
+          {!rc.stageText && rc.cashShort && <Note>{`Warning: cash on hand is under one month of upkeep (${usd(rc.monthUsd)}): the upkeep will start to run behind.`}</Note>}
+        </div>;
+      })()}
       <button data-testid="dome-lockdown" style={{ ...btn(st.lockdown), width: '100%', padding: '8px 9px', fontWeight: 700, letterSpacing: 0.5, background: st.lockdown ? '#8a3b2a' : '#3b6a3a', color: '#fff' }}
         title={st.lockdown ? 'Open the vents and airlocks. With dust in the air outside, it comes in.' : 'Shut the airlocks and vents. The air is then on a clock: people make CO2, the plant and the plants take it back.'}
         onClick={() => act(x => setLockdown(x, !st.lockdown, id))}>{st.lockdown ? 'OPEN THE DOME' : 'LOCK DOWN'}</button>

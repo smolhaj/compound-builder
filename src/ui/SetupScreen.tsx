@@ -11,6 +11,8 @@ import { difficultySummary } from '../sim/difficulty';
 import { BLURB } from '../sim/disasterBlurbs';
 import { DISASTERS, type Difficulty, type DisasterKind, type Mode, type PeaceLength } from '../sim/disaster';
 import { saveGame, AUTOSAVE } from '../sim/save/saveSystem';
+import { RICH_START, RICH_STARTS, richFunds, type RichStart } from '../sim/richStart';
+import { compactUsd, richPriceLines } from '../sim/richStartCard';
 import { affordable, ANY_WISH, builtFacts, LIFESTYLE, landPriceRange, listings, siteFacts, type Acres, type LandWish, type Lifestyle, type Site } from '../sim/site';
 import { LotTerrain } from './LotTerrain';
 import { PLAYABLE, REGION_IDS, REGIONS, type RegionDef, type RegionId, type StormKind } from '../sim/regions';
@@ -105,6 +107,7 @@ export function SetupScreen() {
   const [wish, setWish] = useState<LandWish>(ANY_WISH);
   const [batch, setBatch] = useState(0);
   const [life, setLife] = useState<Lifestyle>('fulltime');
+  const [rich, setRich] = useState<RichStart | null>(null);   // an optional rich start (sim/richStart.ts): replaces the family's savings, sandbox-like
   const [townPlan, setTownPlan] = useState<TownPlan>('own');
   const [famRoll, setFamRoll] = useState(0);
   // each adult's occupation: undefined = whatever the roll gave; a pool id = chosen or shuffled
@@ -117,8 +120,8 @@ export function SetupScreen() {
   const [kinOpen, setKinOpen] = useState(true);
   const brought = pool.filter(p => kinWith.includes(p.id));
   const family = [...baseFamily, ...brought];
-  const plan: TownPlan = life === 'weekend' ? townPlan : 'own';
-  const funds = startFunds(family, life, seed, famRoll, plan);
+  const plan: TownPlan = life === 'weekend' && !rich ? townPlan : 'own';
+  const funds = rich ? richFunds(rich) : startFunds(family, life, seed, famRoll, plan);
   const town = townHouseFor(family, seed);
   const budget = funds.budget;
   const lots = listings(seed + batch * 1013, region, wish, 6, budget);
@@ -139,7 +142,7 @@ export function SetupScreen() {
   try { unlocked = localStorage.getItem('cb.unlocked') === '1'; } catch { /* storage blocked */ }
   const start = () => {
     if (!lot) return;
-    const game = newGame(seed, NEW_GAME_START.doy, NEW_GAME_START.year, { site: lot, lifestyle: life, townPlan: plan, mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, variant: mode === 'scenario' && kind === 'invasion' && invader ? invader : undefined, dayJobs: LIFESTYLE[life].jobs, difficulty: diff, grid: true, family, funds, kinAway: pool.filter(p => !kinWith.includes(p.id)), kinOpen });
+    const game = newGame(seed, NEW_GAME_START.doy, NEW_GAME_START.year, { site: lot, lifestyle: rich ? 'independent' : life, rich: rich ?? undefined, townPlan: plan, mode, peace: mode === 'scenario' ? peace : 'random', kind: mode === 'scenario' ? kind : null, variant: mode === 'scenario' && kind === 'invasion' && invader ? invader : undefined, dayJobs: LIFESTYLE[life].jobs, difficulty: diff, grid: true, family, funds, kinAway: pool.filter(p => !kinWith.includes(p.id)), kinOpen });
     game.clock.speed = 0;   // a new game waits for the player: nothing happens until they press play
     g.load(game);
     g.setWelcome(true);
@@ -198,18 +201,31 @@ export function SetupScreen() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8, marginBottom: 6, alignItems: 'start' }}>
               {(['fulltime', 'independent', 'weekend'] as Lifestyle[]).map(id => {
                 const L = LIFESTYLE[id];
-                return <button key={id} style={tile(life === id, !L.ready)} onClick={() => L.ready && (setLife(id), setLotId(null))}>
+                return <button key={id} style={tile(life === id && !rich, !L.ready)} onClick={() => L.ready && (setLife(id), setRich(null), setLotId(null))}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><span style={{ fontWeight: 700 }}>{L.name}</span></div>
                   <div style={{ fontSize: 12, color: C.dim, margin: '3px 0 6px', lineHeight: 1.35 }}>{L.blurb}</div>
                   <div style={{ fontSize: 12.5 }}>{usdK(FUNDS_RANGE[id][0])} to {usdK(FUNDS_RANGE[id][1])} to spend{L.passive ? ' · investment income' : L.jobs ? ' · two wages' : ''}</div>
-                  {life === id && <div style={{ fontSize: 12, color: C.gold, marginTop: 2 }}>This family: {usd(budget)}</div>}
+                  {life === id && !rich && <div style={{ fontSize: 12, color: C.gold, marginTop: 2 }}>This family: {usd(budget)}</div>}
                   {life === id && id === 'weekend' && <div style={{ fontSize: 11.5, color: C.dim, marginTop: 3, lineHeight: 1.35 }}>{plan === 'rent'
                     ? `Sells the town house before day one (about ${usd(equityNet(town))} after the agent and the mortgage goes into the budget) and rents in town. Building goes at weekend pace, and the place needs a caretaker.`
                     : `Keeps a town house worth about ${usd(town.value)} (${usd(town.mortgage)} owed): not part of the budget. Building goes at weekend pace, and the place needs a caretaker.`}</div>}
                 </button>;
               })}
             </div>
-            {life === 'weekend' && <div style={{ ...tile(false), cursor: 'default', padding: '10px 14px', marginBottom: 6 }}>
+            <H>Or start rich (optional, sandbox-like)</H>
+            <div data-testid="rich-starts" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 8, marginBottom: 6, alignItems: 'start' }}>
+              {RICH_STARTS.map(id => {
+                const R2 = RICH_START[id], on = rich === id;
+                return <button key={id} data-testid={`rich-start-${id}`} aria-pressed={on} style={tile(on)} onClick={() => { setRich(on ? null : id); setLotId(null); }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}><span style={{ fontWeight: 700 }}>{R2.name}</span><span style={{ fontSize: 11, color: C.gold }}>RICH START</span></div>
+                  <div style={{ fontSize: 12.5, margin: '3px 0 4px' }}>about {compactUsd(R2.budget)} to spend</div>
+                  <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.35 }}>{R2.blurb}</div>
+                  <div style={{ fontSize: 12, marginTop: 5 }}>{richPriceLines(id).map(t => <div key={t}>{t[0].toUpperCase() + t.slice(1)}.</div>)}</div>
+                  {on && <div style={{ fontSize: 12, color: C.gold, marginTop: 3 }}>This family: {usd(budget)}</div>}
+                </button>;
+              })}
+            </div>
+            {life === 'weekend' && !rich && <div style={{ ...tile(false), cursor: 'default', padding: '10px 14px', marginBottom: 6 }}>
               <Chips label="Town home" value={townPlan} set={v => { setTownPlan(v); setLotId(null); }} opts={[['own', 'Keep the house'], ['rent', 'Sell it and rent']]} />
               <div style={{ fontSize: 12, color: C.dim, lineHeight: 1.4 }}>
                 {townPlan === 'own'
