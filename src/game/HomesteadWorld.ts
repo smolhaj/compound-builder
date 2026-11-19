@@ -171,6 +171,9 @@ import { TIER, cellsOfKind, shellFt, tierOfKind } from '../sim/dome/tiers';
 import { inYard, yardGeometry } from '../sim/dome/plantYard';
 import { isGradedTier } from '../sim/dome/grading';
 import { makeDomePlant, plantKey, type DomePlantFx, type PlantLook } from './fx/DomePlant';
+import { makeDomeInterior, type DomeInteriorFx } from './fx/DomeInterior';
+import { interiorPlan, type Obstacle } from './fx/domeInteriorPlan';
+import { plantLayout } from '../sim/dome/plant';
 import { makeLinkFixtures, linksKey, type LinkFixtureInput, type LinkFixtures } from './fx/DomeLinks';
 import { domesOf as standingDomes } from '../sim/dome/standing';
 import { linkState, linksOf } from '../sim/dome/linkGraph';
@@ -541,6 +544,34 @@ export class HomesteadWorld {
       pf.group.position.set(gx, y0, gz);
       this._root.add(pf.group); this._domePlants.set(b.placed.id, pf);
     }
+    this._syncInterior(b, game, ref, dst.filtering, plook.dark === true);
+  }
+
+  /** The floor dressing of a big dome (paths, benches, crates, signs, planters, plaza lamps; game/fx/DomeInterior), redrawn when a building goes up inside it or the plant changes. */
+  private _syncInterior(b: Built, game: GameState, ref: ReturnType<typeof domesLive>[number], filtering: Parameters<typeof plantLayout>[2], dark: boolean): void {
+    const obs: Obstacle[] = [], sig: string[] = [ref.tier, ref.r.toFixed(2), String(b.placed.rot), dark ? 'd' : 'l'];
+    for (const st of game.structures) {
+      if (st.id === ref.st.id) continue;
+      const lx = st.x - b.placed.x, lz = st.z - b.placed.z, def = KIT[st.kind];
+      if (!def || Math.hypot(lx, lz) > ref.r) continue;
+      obs.push({ x: lx, z: lz, r: Math.hypot(def.cellsX, def.cellsZ) * CELL / 2 });
+      sig.push(`${st.id}@${Math.round(lx * 20)},${Math.round(lz * 20)}`);
+    }
+    const angles = (standingDomes(game).find(d => d.id === ref.st.id)?.airlocks ?? []).map(a => a.angle);
+    sig.push(angles.map(a => a.toFixed(2)).join('/'), filtering);
+    const key = sig.join('|'), cur = this._domeInteriors.get(b.placed.id);
+    if (cur && cur.key === key) return;
+    if (cur) { this._root.remove(cur.group); cur.dispose(); }
+    for (const q of plantLayout(ref.tier, ref.r, filtering, { rot: b.placed.rot }).parts) {
+      if (q.onShell || Math.hypot(q.x, q.z) > ref.r * 0.97) continue;
+      const rr = q.shape === 'box' ? Math.hypot(q.w, q.d) / 2 : q.r;
+      if (rr > 0.06) obs.push({ x: q.x, z: q.z, r: rr });
+    }
+    const gx = b.placed.x, gz = b.placed.z, y0 = b.group.position.y;
+    const fx = makeDomeInterior(interiorPlan(ref.tier, ref.r, angles, obs, b.placed.rot + 1), (lx, lz) => this.parcel.height(gx + lx, gz + lz) - y0 + 0.01, dark);
+    fx.key = key; fx.setUnder(this._under);
+    fx.group.position.set(gx, y0, gz);
+    this._root.add(fx.group); this._domeInteriors.set(b.placed.id, fx);
   }
 
   /** A gravel drive in to the yard (else a two-track, and the truck stops at the gate). */
@@ -1848,6 +1879,7 @@ export class HomesteadWorld {
   /** The level pad under each graded dome (glass, arcology): what is built inside it is graded from this level. */
   /** The machinery, roof hatches and path lamps of each big dome (game/fx/DomePlant), in the world (not in the dome's group, which the building layers manage). */
   private readonly _domePlants = new Map<string, DomePlantFx>();
+  private readonly _domeInteriors = new Map<string, DomeInteriorFx>();
   /** A dome's buried skirt and utilities, its open crater (while it is dug, or the moat of the Cutaway view) and the key each was drawn for. */
   private readonly _buried = new Map<string, THREE.Group>();
   private readonly _digSites = new Map<string, { site: DomeDigSite; group: THREE.Group }>();
@@ -2080,6 +2112,7 @@ export class HomesteadWorld {
     this._under = on;
     this.terrain.setOpacity(on ? 0.3 : 1);
     for (const pf of this._domePlants.values()) pf.setUnder(on);   // the buried plant lines (sim/dome/plant.ts)
+    for (const f of this._domeInteriors.values()) f.setUnder(on);
     this._links?.setUnder(on);
     this.forest.visible = !on;
     this.sage.visible = !on;
@@ -2270,6 +2303,7 @@ export class HomesteadWorld {
     this._dropDig(id);
     { const bg = this._buried.get(id); if (bg) { this._ws.scene.remove(bg); disposeSite(bg); this._buried.delete(id); } }
     { const pf = this._domePlants.get(id); if (pf) { this._root.remove(pf.group); pf.dispose(); this._domePlants.delete(id); } }
+    { const f = this._domeInteriors.get(id); if (f) { this._root.remove(f.group); f.dispose(); this._domeInteriors.delete(id); } }
     this.walls.remove(id);
     this._harden.delete(id);
     if (b.under) this._syncUnderground();
