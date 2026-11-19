@@ -8,7 +8,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { kitMaterial } from '../buildkit/materials';
 import { BENCH, CRATE, PATH_W, type InteriorPlan } from './domeInteriorPlan';
 
-export interface DomeInteriorFx { group: THREE.Group; /** The signature the world compares to decide a redraw (set by the caller). */ key: string; setUnder(on: boolean): void; dispose(): void }
+export interface DomeInteriorFx { /** What was laid out (QA reads it to put the camera on a free path). */ plan: InteriorPlan; group: THREE.Group; /** The signature the world compares to decide a redraw (set by the caller). */ key: string; setUnder(on: boolean): void; dispose(): void }
 
 const col = (g: THREE.BufferGeometry, hex: number, jitter = 0, seed = 0): THREE.BufferGeometry => {
   g = g.index ? g.toNonIndexed() : g; g.deleteAttribute('uv');
@@ -76,5 +76,5 @@ export function makeDomeInterior(plan: InteriorPlan, ground: (lx: number, lz: nu
     pools.renderOrder = 2; owned.push(hg, pg);
   }
   const key = `${plan.segs.length}:${plan.benches.length}:${plan.crates.length}:${plan.lamps.length}:${dark ? 1 : 0}`;
-  return { group, key, setUnder: on => { group.visible = !on; }, dispose: () => { for (const o of owned) o.dispose(); } };
+  return { plan, group, key, setUnder: on => { group.visible = !on; }, dispose: () => { for (const o of owned) o.dispose(); } };
 }

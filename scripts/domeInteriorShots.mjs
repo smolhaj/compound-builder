@@ -68,13 +68,26 @@ try {
   };
   await set(`const s = cb.store.getState(); s.setBuildingView('full'); s.setSeasonMode?.('summer');`);
   const h = 0.3;
-  // the standing views (dome-local R fractions)
-  const [gx, gz] = [0, 0];
-  await pair('01-lawn-homes', L(0.12, -0.12, h), L(-0.2, 0.15, 0.18), 70, [[-0.02, 0.0], [-0.12, 0.28]]);
-  await pair('02-path-between', L(0.02, 0.5, h), L(-0.12, 0.08, 0.2), 60, [[-0.04, 0.3]]);
-  await pair('03-house-door', L(-0.12, 0.32, h), L(-0.12, 0.10, 0.2), 62, [[-0.1, 0.24]]);
-  await pair('05-airlock-person-out', L(0, 0.62, h), L(0, 1.15, 0.25), 64, [[0.06, 0.78]]);
-  await pair('06-glass-ceiling', L(0, 0, 0.3), L(0.05, 0.1, 5), 80, []);
+  console.error('INTERIOR', JSON.stringify(await page.evaluate(() => [...window.__cb.world._domeInteriors.values()].map(f => ({ key: f.key.slice(0, 80), kids: f.group.children.map(c => [c.name || c.type, c.isInstancedMesh ? c.count : c.geometry?.attributes?.position?.count, c.visible]), vis: f.group.visible, pos: f.group.position.toArray() })))));
+  await pair('00-aerial-inside', L(0.0, -1.35, 3.2), L(0, 0.15, 0), 60, [[0.02, 0.5]]);
+  // the standing views: the camera stands on the plan's free paths (QA reads the plan the world drew), so it is never inside a building
+  const plan = await page.evaluate(() => { const f = [...window.__cb.world._domeInteriors.values()][0]; return f ? { segs: f.plan.segs, benches: f.plan.benches, plaza: f.plan.plaza, crates: f.plan.crates, signs: f.plan.signs } : null; });
+  const airlocks = info.airlocks.map(a => a[2]);
+  const along = (a, rho, off = 0, h = 0) => L(Math.sin(a) * rho + Math.cos(a) * off, Math.cos(a) * rho - Math.sin(a) * off, h);   // rho in fractions of R, off across the path (fractions of R)
+  const segsOf = a => plan.segs.filter(s => Math.abs(Math.atan2(Math.sin(Math.atan2(s.x, s.z) - a), Math.cos(Math.atan2(s.x, s.z) - a))) < 0.08);
+  const best = airlocks.map(a => ({ a, n: segsOf(a).length })).sort((p, q) => q.n - p.n)[0];
+  lap('plan ' + JSON.stringify({ segs: plan.segs.length, benches: plan.benches.length, plaza: plan.plaza, best }));
+  const hs = await page.evaluate(async () => { const K = await import('/src/game/buildkit/kit.ts'), g = window.__cb.game.getState().game, w = window.__cb.world; return g.structures.filter(s => ['log_house', 'guest_house', 'workshop', 'barn'].includes(s.kind)).map(s => ({ id: s.id, kind: s.kind, x: s.x, z: s.z, cz: K.KIT[s.kind].cellsZ * K.CELL / 2, cx: K.KIT[s.kind].cellsX * K.CELL / 2 })); });
+  const house = hs.find(s => s.kind === 'log_house');
+  const door = (dz, y, dx = 0) => page.evaluate(([id, dx, y, dz]) => { const e = window.__cb.world.localToWorld(id, dx, y, dz); return [e.x, e.y, e.z]; }, [house.id, dx, y, dz]);
+  const frac = p => [(p[0] - D.x) / R, (p[2] - D.z) / R];
+  const centerOk = plan.plaza != null;
+  await pair('01-lawn-homes', centerOk ? L(0, 0, h) : along(best.a, 0.3, 0, h), [house.x, ground + 0.2, house.z], 70, [[0.14, 0.1], [-0.06, 0.45]]);
+  await pair('02-path-between', along(best.a, 0.4, 0, h), along(best.a, 0.95, 0, 0.25), 62, [frac(along(best.a, 0.6, 0.0))]);
+  { const e = await door(house.cz + 0.9, h), l = await door(house.cz - 0.1, 0.22);
+    await pair('03-house-door', e, l, 62, [[(e[0] - D.x) / R + 0.05, (e[2] - D.z) / R - 0.03]]); }
+  await pair('05-airlock-person-out', along(best.a, 0.66, 0, h), along(best.a, 1.15, 0, 0.25), 64, [frac(along(best.a, 0.8, 0.02))]);
+  await pair('06-glass-ceiling', along(best.a, 0.35, 0.02, 0.3), L(0.05, 0.1, 5), 80, []);
   if (info.yard) {
     const [yx, yz] = info.yard.chamber, ph = info.yard.phi;
     await pair('04-plant-yard-airlock', L(Math.sin(ph) * 0.35, Math.cos(ph) * 0.35, h), [D.x + yx, ground + 0.25, D.z + yz], 64, [[Math.sin(ph) * 0.7 + 0.04, Math.cos(ph) * 0.7]]);

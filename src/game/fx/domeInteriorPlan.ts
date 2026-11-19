@@ -1,10 +1,11 @@
 /**
  * What a big dome's floor is dressed with between the buildings (pure; drawn by DomeInterior.ts): a gravel path from each airlock in toward a central plaza,
  * benches along the paths, a supply crate stack and a sign at each door, planters round the plaza and lamp posts at the plaza. Everything keeps clear of
- * the buildings, the plant machinery, the airlock lanes and the shell (`Obstacle` circles in the dome's local frame: x = rho sin a, z = rho cos a, a from +z).
+ * the buildings, the plant machinery, the airlock lanes and the shell (`Obstacle` boxes in the dome's local frame: x = rho sin a, z = rho cos a, a from +z).
  * SCALE v2: a person is 0.28 tall, a path 0.3 wide (2 m), a bench seat 0.075 high.
  */
-export interface Obstacle { x: number; z: number; r: number }
+/** An axis-aligned box in the dome's local frame: center and half sizes (a round thing is a square of its radius). */
+export interface Obstacle { x: number; z: number; hx: number; hz: number }
 export interface PathSeg { x: number; z: number; rot: number; len: number }
 export interface Prop { x: number; z: number; rot: number }
 export interface InteriorPlan {
@@ -19,7 +20,7 @@ const hash = (n: number): number => { let h = (n | 0) * 374761393 + 668265263; h
 export function interiorPlan(tier: string, r: number, angles: readonly number[], obstacles: readonly Obstacle[], seed = 1): InteriorPlan {
   const out: InteriorPlan = { segs: [], benches: [], crates: [], planters: [], signs: [], lamps: [], plaza: null };
   if (tier !== 'glass' && tier !== 'arcology' && tier !== 'geodesic') return out;
-  const free = (x: number, z: number, pad: number, inner = 0.9): boolean => Math.hypot(x, z) < r * inner && !obstacles.some(o => Math.hypot(x - o.x, z - o.z) < o.r + pad);
+  const free = (x: number, z: number, pad: number, inner = 0.9): boolean => Math.hypot(x, z) < r * inner && !obstacles.some(o => Math.abs(x - o.x) < o.hx + pad && Math.abs(z - o.z) < o.hz + pad);
   const plazaR = Math.min(0.9, r * 0.11);
   const plazaOk = free(0, 0, plazaR + 0.25, 1);
   if (plazaOk) out.plaza = { x: 0, z: 0, r: plazaR };

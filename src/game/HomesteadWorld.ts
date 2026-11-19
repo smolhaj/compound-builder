@@ -554,7 +554,7 @@ export class HomesteadWorld {
       if (st.id === ref.st.id) continue;
       const lx = st.x - b.placed.x, lz = st.z - b.placed.z, def = KIT[st.kind];
       if (!def || Math.hypot(lx, lz) > ref.r) continue;
-      obs.push({ x: lx, z: lz, r: Math.hypot(def.cellsX, def.cellsZ) * CELL / 2 });
+      { const odd = ((st.rot % 2) + 2) % 2 === 1, hx = (odd ? def.cellsZ : def.cellsX) * CELL / 2, hz = (odd ? def.cellsX : def.cellsZ) * CELL / 2; obs.push({ x: lx, z: lz, hx, hz }); }
       sig.push(`${st.id}@${Math.round(lx * 20)},${Math.round(lz * 20)}`);
     }
     const angles = (standingDomes(game).find(d => d.id === ref.st.id)?.airlocks ?? []).map(a => a.angle);
@@ -565,7 +565,7 @@ export class HomesteadWorld {
     for (const q of plantLayout(ref.tier, ref.r, filtering, { rot: b.placed.rot }).parts) {
       if (q.onShell || Math.hypot(q.x, q.z) > ref.r * 0.97) continue;
       const rr = q.shape === 'box' ? Math.hypot(q.w, q.d) / 2 : q.r;
-      if (rr > 0.06) obs.push({ x: q.x, z: q.z, r: rr });
+      if (rr > 0.06) obs.push({ x: q.x, z: q.z, hx: rr, hz: rr });
     }
     const gx = b.placed.x, gz = b.placed.z, y0 = b.group.position.y;
     const fx = makeDomeInterior(interiorPlan(ref.tier, ref.r, angles, obs, b.placed.rot + 1), (lx, lz) => this.parcel.height(gx + lx, gz + lz) - y0 + 0.01, dark);

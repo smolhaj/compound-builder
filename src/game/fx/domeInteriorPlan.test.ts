@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { interiorPlan, PATH_W, BENCH, type Obstacle } from './domeInteriorPlan';
 
 const R = 6, angles = [0, 2.094, 4.189];
-const clear = (o: readonly Obstacle[], pts: Array<{ x: number; z: number }>, pad: number): boolean => pts.every(p => !o.some(q => Math.hypot(p.x - q.x, p.z - q.z) < q.r + pad));
+const clear = (o: readonly Obstacle[], pts: Array<{ x: number; z: number }>, pad: number): boolean => pts.every(p => !o.some(q => Math.abs(p.x - q.x) < q.hx + pad && Math.abs(p.z - q.z) < q.hz + pad));
 
 describe('dome interior plan', () => {
   it('a glass dome gets paths from every airlock, benches, crates, signs, a plaza with planters and lamps', () => {
@@ -13,7 +13,7 @@ describe('dome interior plan', () => {
   });
   it('an earthen dome has nothing', () => { const p = interiorPlan('earthen', 1, [0], []); expect(p.segs.length + p.benches.length).toBe(0); });
   it('nothing is put on a building, and everything stays under the shell', () => {
-    const obs: Obstacle[] = [{ x: -0.8, z: 0.8, r: 0.9 }, { x: 2, z: -1, r: 1 }, { x: 0, z: 4.3, r: 0.6 }];
+    const obs: Obstacle[] = [{ x: -0.8, z: 0.8, hx: 0.9, hz: 0.5 }, { x: 2, z: -1, hx: 1, hz: 1 }, { x: 0, z: 4.3, hx: 0.6, hz: 0.6 }];
     const p = interiorPlan('glass', R, angles, obs);
     const all = [...p.segs, ...p.benches, ...p.crates, ...p.signs, ...p.planters, ...p.lamps];
     expect(clear(obs, p.segs, PATH_W / 2)).toBe(true);
