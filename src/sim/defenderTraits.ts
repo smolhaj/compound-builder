@@ -86,17 +86,17 @@ export function lastWords(t: DefenderTraits, ctx: { first: string; lostName?: st
   const pick = <T,>(a: readonly T[]): T => a[Math.floor(r() * a.length)];
   const partner = t.kin.find(k => k.rel === 'partner'), child = t.kin.find(k => k.rel === 'child'), parent = t.kin.find(k => k.rel === 'parent'), sib = t.kin.find(k => k.rel === 'sibling');
   const pool: string[] = [];
-  if (partner) pool.push(`Tell ${partner.name} — tell ${partner.name} I —`, `${partner.name}… I'm sorry. I'm so sorry.`, `Go to ${partner.name}. Don't — don't let ${partner.name} come out.`);
-  if (child) pool.push(`Keep ${child.name} down in the cellar. Don't let ${child.name} see.`, `${child.name}… look after ${child.name}. Please.`);
-  if (parent && !child) pool.push(`Tell ${parent.name} I tried. I tried.`);
-  if (sib) pool.push(`${sib.name}, get down — get DOWN —`);
-  if (t.veteran) pool.push('Hold the line. Don\'t stop shooting.', 'Cover the door. Go. GO.', 'Keep your sectors. I\'m fine. Keep your sectors.');
-  if (t.history.includes('lost_before') && ctx.lostName) pool.push(`${ctx.lostName}… I'm coming.`, `Not like ${ctx.lostName}. Not this way.`);
-  else if (t.history.includes('lost_before')) pool.push('Not again. Not again…');
-  if (t.firstFight) pool.push('I didn\'t think it would — it\'s not like —', 'I\'m sorry, I can\'t — I can\'t feel my —');
-  if (t.history.includes('born_here')) pool.push('This is my house. This is my house…');
-  if (t.history.includes('elder')) pool.push('Well. I had a good long run.', 'Get the young ones out. Go on.');
-  if (!pool.length) pool.push(`Tell them I… tell them —`, 'Oh. Oh no.', `Stay down. Stay down, all of you.`);
+  if (partner) pool.push(`Tell ${partner.name}. Tell ${partner.name} I...`, `${partner.name}. I'm sorry. I'm sorry.`, `Go to ${partner.name}. Don't let ${partner.name} come out.`);
+  if (child) pool.push(`Keep ${child.name} in the cellar. Don't let ${child.name} see.`, `${child.name}. Look after ${child.name}. Please.`);
+  if (parent && !child) pool.push(`Tell ${parent.name} I tried.`);
+  if (sib) pool.push(`${sib.name}, get down. Get down.`);
+  if (t.veteran) pool.push('Keep the door. Keep the door.', 'Stay on your line. I\'m fine.', 'Hold your sectors. I\'m fine.');
+  if (t.history.includes('lost_before') && ctx.lostName) pool.push(`${ctx.lostName}. I'm coming.`, `Not like ${ctx.lostName}. Not like that.`);
+  else if (t.history.includes('lost_before')) pool.push('Not again. Not again.');
+  if (t.firstFight) pool.push('I didn\'t think it would. It\'s not like.', 'I\'m sorry. I can\'t feel my...');
+  if (t.history.includes('born_here')) pool.push('This is my house. This is my house.');
+  if (t.history.includes('elder')) pool.push('Well. I had a good run.', 'Get the young ones out. Go on.');
+  if (!pool.length) pool.push(`Tell them I... tell them.`, 'Oh. Oh no.', `Stay down. All of you. Stay down.`);
   void ctx.first;
   return pick(pool);
 }
