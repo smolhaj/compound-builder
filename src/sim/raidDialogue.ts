@@ -37,7 +37,7 @@ export const LINES: Record<Role, Partial<Record<Ctx, Variants>>> = {
     approach: {
       scouts: ['Two windows lit. One dog.', 'Count the vehicles. Stay off the fence.', 'Quiet. Roofline first, then the gate.', 'Man on the tower. Mark it.', 'Light in the barn. Remember that.', 'Stay low. Just looking.', 'Don\'t know if they saw us.', 'Back a little. Slow.'],
       crowd: ['Lights are on. They\'re home.', 'Come out! We know you\'ve got food!', 'Spread out. Make some noise.', 'Bang on the gate. Let them hear.', 'We\'re hungry, damn it! Open up!', 'Get the fence. Go.'],
-      crew: ['Two left, two right. Walk it in.', 'Eyes on the roofline. Hold at the ditch.', 'No talking. Wait for me.', 'Tower, east corner. Marked.', 'Slow. Let them fire first.', 'Five yards apart. Check your spacing.'],
+      crew: ['Two left, two right. Walk it in.', 'Eyes on the roofline. Hold at the ditch.', 'No talking. Wait for me.', 'Tower, east corner. Marked.', 'Slow. Let them fire first.', 'Five yards apart. Check your spacing.', 'Damn dogs. Slow down.', 'Fuck. Wire on the left. Mark it.', 'Gate\'s chained. Note it.', 'Truck at the barn. Count it.', 'Quiet. Wait for the signal.', 'Lights in the upstairs. Note it.'],
       families: ['Please. We just need water.', 'Anybody there? We have kids.', 'We\'re not armed. Please open the gate.', 'Two days on foot. Just a little food.', 'Hands out where they can see. Slow.', 'Stay behind me. Close.'],
       opportunists: ['Nice setup. Check the shed first.', 'Lights off. Roll up slow.', 'Grab what you can carry.', 'Anybody home? Looks quiet.', 'Kill the engine. We walk from here.', 'Fuel cans by the barn. See them?'],
     },
@@ -46,22 +46,23 @@ export const LINES: Record<Role, Partial<Record<Ctx, Variants>>> = {
       scouts: ['Contact. They saw us. Back to the ditch.', 'They know. Go.'],
       families: ['Don\'t shoot! We\'re not armed!', 'Kids down! Down!', 'Stop! Please, stop!'],
       crowd: ['They\'re shooting at us!', 'Rush the fence! Now!', 'Keep going! Don\'t stop!'],
-      crew: ['Contact left. Shooting.', 'Single shots. Pick a target.', 'Stay in your lane. Watch your rounds.'],
+      crew: ['Contact left. Shooting.', 'Single shots. Pick a target.', 'Stay in your lane. Watch your rounds.', 'Shit. Contact left. Down.', 'They shot first. Fine. Fuck it, shoot back.', 'Left lane. Hold it.', 'Reloading. Cover.', 'Moving. Cover left.', 'Tower. Put rounds on the tower.', 'Steady. Aimed shots.'],
       opportunists: ['Hell, they\'re awake. Go!', 'Forget the shed. Cover!'],
     },
     fight: {
-      any: ['Heads down on that wall!', 'Can\'t see past the wall.', 'Reloading. Cover me.', 'Up to the fence line.', 'Left. Watch the left.', 'Stay low.', 'He\'s on the high ground. Go around.', 'Who\'s got him? Anybody?', 'They\'re reloading. Move.', 'Keep shooting. Keep them down.'],
+      any: ['Say again? Left or right?', 'Who\'s firing? Was that us?', 'What? I can\'t hear you!', 'Missed him. Again.', 'Heads down on that wall!', 'Can\'t see past the wall.', 'Reloading. Cover me.', 'Up to the fence line.', 'Left. Watch the left.', 'Stay low.', 'He\'s on the high ground. Go around.', 'Who\'s got him? Anybody?', 'They\'re reloading. Move.', 'Keep shooting. Keep them down.'],
       scouts: ['Don\'t shoot. Just see where they shoot from.'],
+      crew: ['Where the hell is he? Anyone?', 'Damn it. No angle from here.', 'Left side. Anyone?', 'Hold your lanes.', 'Moving up on the left.', 'Get the truck between us and the wall.'],
       families: ['Please! We only want to talk!'],
     },
     raider_down: {
-      any: ['He\'s hit. He\'s hit!', 'Man down!', 'Oh no. They got him.', 'Drag him back!', 'He\'s not moving.', 'Get him out of the open.', 'Help him. Somebody help him!'],
+      any: ['He\'s hit. He\'s hit!', 'Man down!', 'Oh no. They got him.', 'Who? Who\'s hit?', 'Wait. Wait, he\'s moving. No. No, he\'s not.', 'Drag him back!', 'He\'s not moving.', 'Get him out of the open.', 'Help him. Somebody help him!'],
       families: ['They shot him. They shot him!'],
-      crew: ['Man down. Cover. Pull him back.'],
+      crew: ['Man down. Cover. Pull him back.', 'Shit. Man down. Cover him.', 'Hit. Where? Say where.', 'Get him behind the truck.', 'Tourniquet. Now.'],
     },
     retreat: {
       any: ['Pull back. Pull back!', 'Not worth it. Go!', 'Fall back to the road!', 'Go, go, get out of here!', 'We\'re done. Move!', 'Leave him! Go!', 'Back to the road!'],
-      crew: ['Break contact. Cover each other out.', 'Withdraw by pairs. Go.', 'Disengage. Now.'],
+      crew: ['Break contact. Cover each other out.', 'Withdraw by pairs. Go.', 'Disengage. Now.', 'Fuck this. Break off. Go.', 'Fuck you too. We\'re leaving.', 'Pairs. Go. Leave the truck.', 'Count off at the road.', 'Move. Move. Count at the trucks.'],
       crowd: ['Run! Everybody run!', 'To hell with this, I\'m leaving!', 'Too many guns!'],
       families: ['Come on, kids. Back to the road.', 'We never should have come. Go.', 'Keep walking. Don\'t look back.'],
       opportunists: ['Not worth it. In the truck!', 'Floor it!', 'Forget the cans. Drive!'],
@@ -77,8 +78,8 @@ export const LINES: Record<Role, Partial<Record<Ctx, Variants>>> = {
     charge_set: { any: ['Cover me. Setting the charge.', 'Stay low. Planting it.', 'Ten seconds on the wall.', 'Bag\'s on the wall. Wire it.'] },
     charge_call: { any: ['Charge! Get back from the wall!', 'It\'s set. Back, back!', 'Down! Cover your ears!', 'Ten seconds. Clear of the wall!'] },
     stack_door: { any: ['Door! Stack on the door.', 'On the wall by the door. Not in front.', 'Two on the hinge side, I take the other. On three.', 'Nobody in front of that door.', 'Wait. Wait. Now!'] },
-    clear_room: { any: ['Kitchen. Go.', 'Left side. Left!', 'Bedroom. Check it.', 'I\'ve got the hall. Move up.', 'Corner. Right corner!', 'Flush them out.', 'Cover the doorway while I cross.', 'Stay off the doorway.', 'Room on the left. Going in.', 'Hold the hall. I\'m checking the back.', 'Watch the window. I\'m on the door.', 'Two on the stairs, one on the hall.', 'Spread out. Don\'t bunch.', 'Eyes on the doors.', 'I\'m going left. Come in behind me.', 'Wall side. Slow.', 'Listen. Anyone moving?', 'One door at a time.'] },
-    search: { any: ['Where\'s the food? Where is it?', 'Pantry. Pull it open.', 'Look under the beds.', 'Try the cellar door.', 'Dump the bags.', 'Shelves. Cans, fuel, anything.', 'Trunk at the foot of the bed.', 'Behind the stove.', 'Boots, blankets, anything warm.', 'Cellar. Attic. Wherever they keep it.', 'Empty the drawers.', 'Look for a safe. A box. A false wall.'] },
+    clear_room: { crew: ['Damn it. Door\'s stuck.', 'Stairs. Watch the top.', 'Hall clear. Next.', 'Two in, one on the door.'], any: ['Kitchen. Go.', 'Left side. Left!', 'Bedroom. Check it.', 'I\'ve got the hall. Move up.', 'Corner. Right corner!', 'Flush them out.', 'Cover the doorway while I cross.', 'Stay off the doorway.', 'Room on the left. Going in.', 'Hold the hall. I\'m checking the back.', 'Watch the window. I\'m on the door.', 'Two on the stairs, one on the hall.', 'Spread out. Don\'t bunch.', 'Eyes on the doors.', 'I\'m going left. Come in behind me.', 'Wall side. Slow.', 'Listen. Anyone moving?', 'One door at a time.'] },
+    search: { crew: ['Where the hell is it? Keep looking.', 'Empty. Next room.', 'Cellar. Check it.', 'Upstairs. Check the closets.'], any: ['Where\'s the food? Where is it?', 'Pantry. Pull it open.', 'Look under the beds.', 'Try the cellar door.', 'Dump the bags.', 'Shelves. Cans, fuel, anything.', 'Trunk at the foot of the bed.', 'Behind the stove.', 'Boots, blankets, anything warm.', 'Cellar. Attic. Wherever they keep it.', 'Empty the drawers.', 'Look for a safe. A box. A false wall.'] },
     leaving: { any: ['That\'s all we can carry. Out.', 'Back to the gap.', 'Take it and go.', 'Out the way we came.', 'We\'re done. Go.'] },
     prisoner_reply: {
       desperate: ['Please. I only needed food.', 'Water. Please. Just water.', 'Don\'t shoot. I\'m done. I\'m done.', 'It hurts. Please.', 'I didn\'t want this. None of us did.'],
@@ -94,16 +95,16 @@ export const LINES: Record<Role, Partial<Record<Ctx, Variants>>> = {
       scouts: ['Two of them. They\'re counting us.', 'Stay low. Don\'t give them a reason.'],
     },
     first_shots: { any: ['Contact! At the fence!', 'They\'re shooting! Heads down!', 'Return fire. Aim low.', 'Stay on your spot. Don\'t chase.', 'Shots from the left!', 'Everybody okay? Call out.', 'Behind the wall. Let them waste ammo.'] },
-    fight: { any: ['Steady. Pick one.', 'Watch your ammo.', 'They\'re working round the east side.', 'Stay on your post.', 'Call out if you\'re hit.', 'Reload. I\'ve got you.', 'Short bursts.', 'Anybody see the one on the left?', 'Head down between shots.'] },
+    fight: { any: ['Steady. Pick one.', 'Watch your ammo.', 'They\'re working round the east side.', 'Stay on your post.', 'Call out if you\'re hit.', 'Reload. I\'ve got you.', 'Short bursts.', 'Anybody see the one on the left?', 'Head down between shots.', 'Say again? Left or right?', 'Missed. Missed him. Again.', 'What? I can\'t hear you. Say it again.', 'Was that you? Who fired?'] },
     raider_down: { any: ['One down.', 'Got one. He\'s not getting up.', 'He\'s down by the ditch.', 'That one\'s hit. Watch the rest.', 'Down. He\'s down.', 'One by the gate. Not moving.'] },
-    mate_down: { any: ['{n}! {n}, talk to me!', '{n}\'s hit! Medic!', 'No. {n}. Stay with me.', 'Cover me. Going to {n}.', '{n}\'s down! Somebody help!'] },
+    mate_down: { any: ['Who\'s hit? Is that {n}?', '{n}! {n}, talk to me!', '{n}\'s hit! Medic!', 'No. {n}. Stay with me.', 'Cover me. Going to {n}.', '{n}\'s down! Somebody help!'] },
     defender_hit: { any: ['I\'m hit. I\'m hit!', 'My arm!', 'Leg. I can still shoot.', 'It\'s bad. I need help.', 'Graze. Keep firing.', 'I can\'t feel my hand.', 'Somebody help me. I\'m hit.'] },
     retreat: { any: ['They\'re pulling back.', 'They\'re running. Hold your spots.', 'They\'re leaving. Don\'t follow.', 'Last of them going down the road.', 'Stay up. Could be a trick.', 'They broke. Watch the road.'] },
     fire: { any: ['Fire! Behind the barn!', 'Somebody get water on that!', 'Stay on your posts. That\'s what they want.', 'Watch the other side. It\'s a distraction.', 'Eyes on the fence, not the flames.'] },
     breach: { any: ['They\'re through the fence! Back to the house!', 'Wall\'s gone. Back!', 'Kids to the shelter!', 'Hold the door!', 'Everybody inside. Lock it!', 'Yard\'s lost. Get in the house.', 'They\'re in the yard!', 'Bar the door. Now.', 'Away from the windows!', 'Wounded first. Get them in.', 'Into the house!', 'Kids to the back room. Go.'] },
     ram_run: { any: ['Truck! Coming at the wall. Back!', 'It\'s not stopping. Move!', 'Headlights! Through the wall!', 'Off the fence line. Now!'] },
     charge_set: { any: ['What was that? Somebody\'s at the wall.', 'Somebody\'s at the wall with a bag. Down!', 'Get off the fence. They\'re going to blow it.'] },
-    hold_room: { any: ['Hold the doorway.', 'Stay down behind the couch.', 'Keep them out of the hall.', 'Cover the stairs. I\'ve got the door.', 'Reloading. Cover me.', 'Don\'t cross the doorway. Let them come.', 'Keep low. One at a time.', 'Watch the corner by the kitchen.', 'Get the kids in the back room.', 'They have to come through that door.', 'Stay behind cover. Shoot when you see them.', 'Count your rounds.', 'Nobody moves.', 'Low and quiet. They don\'t know where we are.', 'Eyes on the doorway.', 'Breathe. Aim. Wait.'] },
+    hold_room: { any: ['Hold the doorway.', 'Stay down behind the couch.', 'Keep them out of the hall.', 'Cover the stairs. I\'ve got the door.', 'Reloading. Cover me.', 'Don\'t cross the doorway. Let them come.', 'Keep low. One at a time.', 'Watch the corner by the kitchen.', 'Get the kids in the back room.', 'They have to come through that door.', 'Stay behind cover. Shoot when you see them.', 'Count your rounds.', 'Nobody moves.', 'Did you hear that? Hold on.', 'Door\'s holding. It\'s holding.', 'Low and quiet. They don\'t know where we are.', 'Eyes on the doorway.', 'Breathe. Aim. Wait.'] },
     drag: { any: ['I\'ve got you. Up. We\'re moving.', 'Easy. Back room. Almost there.', 'Stay with me. Hand on it.', 'Lean on me. Don\'t look back.', 'Just to the wall. Come on.'] },
     aftermath: { any: ['Everybody alive? Count off.', 'Check the perimeter first.', 'Medic to the yard. We have wounded.', 'Stay on your posts. They may not be gone.', 'Guns down. Slow. It\'s over for now.'] },
     held: { any: ['Okay. Okay. Take it.', 'There are kids in the house.', 'Don\'t shoot. We\'re done.', 'Take it and go.', 'Easy. Hands are up.'] },
@@ -114,7 +115,7 @@ export const LINES: Record<Role, Partial<Record<Ctx, Variants>>> = {
       family: ['Not you. Not you, {n}.', 'Come back. Please.', 'That should have been me.', 'I\'m sorry. I\'m so sorry.'],
       ofChild: ['Not my child. Not my child.', 'Oh, sweetheart. No.', 'I should have kept you inside.'],
       kid: ['Please wake up.', 'Don\'t go. Please.', 'Why won\'t {n} get up?', 'Is {n} going to be okay?'],
-      elder: ['{n} saw us through everything.', 'A long life. And it ends in this yard.'],
+      elder: ['{n} saw us through everything.', 'A long life. And it ends in this yard.', 'Goddamn it, {n}. Lord, take {n} home.'],
       guard: ['{n} held that gate to the end.', '{n} stayed. We won\'t forget it.'],
     },
     tended: { any: ['Go see to {n}. I\'m fine.', 'It hurts. It really hurts.', 'Don\'t stop. Keep pressing.', 'I\'m okay. I\'m okay.', 'Thank you. Thank you.'] },
@@ -188,7 +189,7 @@ export function profileOfUnit(u: { civilian?: boolean; traits?: BattleUnit['trai
 }
 /** Tactical talk: what an untrained person never says (the user's list: covering fire, suppressing, flank, tango, breach, perimeter, and the like). */
 export const TACTICAL = /covering fire|cover fire|suppress|flank|tango|breach|perimeter|sector|contact|\bpie\b|slice|angle|funnel|stack|overwatch|fall ?back|rally|hold the (line|doorway|door|hall|room)|cover me|cover my|pinned|keep (their|his|her) heads? down|fire lane|move up|\bclear\b|watch the (left|right)|eyes on|on my count/i;
-/** Swearing: a scared adult may; a child, and a devout elder (who prays), never. */
+/** Swearing (owner, 2026-11-19): a scared adult may; an organized crew may, coldly and rarely; an elder may, rarely and bluntly, mixed with prayer; a child never. Words are written in full, never masked. */
 export const CURSE = /\b(fuck\w*|shit\w*|goddamn\w*|damn\w*|hell|son of a bitch|jesus christ)\b/i;
 const PROFILE_KEYS = ['vet', 'civ', 'kid', 'elder'];
 
@@ -225,7 +226,7 @@ export class LineDirector {
       if (prof === 'vet') mine = [...mine, ...own];
       else if (prof === 'civ') {
         base = base.filter(t => !TACTICAL.test(t)); mine = [...mine.filter(t => !TACTICAL.test(t)), ...own];
-        if (elder) { base = base.filter(t => !CURSE.test(t)); mine = [...mine.filter(t => !CURSE.test(t)), ...(pool.elder ?? [])]; }   // (an old, devout person prays)
+        if (elder) mine = [...mine.filter(t => !CURSE.test(t)), ...(pool.elder ?? [])];   // (an old, devout person prays, and swears only in their own few lines)
       } else { base = []; mine = [...mine.filter(t => !TACTICAL.test(t) && !CURSE.test(t)), ...own]; }
     }
     const all = [...new Set([...mine, ...base])];

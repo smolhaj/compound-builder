@@ -14,6 +14,7 @@ export const INTERIOR_LINES: Record<'raider' | 'defender', Partial<Record<Interi
     kick_door: {
       any: ['Kick it.', 'Again. By the lock.', 'It\'s barred. Shoulder.', 'One more.', 'Stand back. Breaking it.', 'Get it open.', 'They wedged something. Push.', 'Latch. Not the middle.', 'It\'s giving.', 'Again. They\'re right behind it.'],
       disciplined: ['Breacher up. On three.', 'Hold the stack. Door, then us.'],
+      crew: ['Fuck. It\'s barred. Again.', 'Latch. Hit the latch.', 'One more. Together.', 'Wedged. Back off, I\'ll shoot the lock.'],
       rush: ['Just bust it!', 'Everybody push!'],
     },
     stack_door: {
@@ -22,6 +23,7 @@ export const INTERIOR_LINES: Record<'raider' | 'defender', Partial<Record<Interi
     pie_corner: {
       any: ['Corner. Right corner.', 'I\'ve got the left. Nothing yet.', 'Slow. Slow. Don\'t rush the angle.', 'Movement behind the couch.', 'Left clear. Check right.', 'Table by the window. Two behind it.', 'Muzzle. Back corner.', 'Tell me what you see.', 'Hold there. Working the angle.', 'Far wall. Door. Closed.'],
       disciplined: ['Corners first. Then the middle.', 'Cut it slow. Don\'t step out.'],
+      crew: ['Shit. Movement left.', 'Table. Two behind it.', 'Left clear. Hold.', 'Eyes on the far corner.'],
     },
     funnel: {
       any: ['Don\'t bunch in the door!', 'They\'ve got the doorway. Off the line!', 'Get out of the doorway!', 'Don\'t stand there. Move through.', 'Everybody through. Don\'t stop in the door.', 'Keep going. Don\'t stop at the frame.'],
@@ -60,6 +62,7 @@ export const INTERIOR_LINES: Record<'raider' | 'defender', Partial<Record<Interi
     loot_item: {
       any: ['Grab the {item}. All of it.', 'Take the {item}. Leave the rest.', 'Got the {item}. Let\'s go.', 'That {item}\'s ours now.', 'Load the {item} on the truck.', 'Help me carry the {item}.', 'Don\'t drop the {item}.', 'More {item} in the back?', 'That\'s what we came for. The {item}.', 'Bag the {item}. Fast.'],
       crowd: ['It\'s ours! Take everything!', 'Mine! I saw it first!'],
+      crew: ['Fuck, that {item} is heavy. Two on it.', 'Not that {item}. The next one.', 'Take the {item}. Mark the rest.', 'Count the {item}. Then go.'],
     },
     arson: {
       hostile: ['Burn it.', 'Light the barn.', 'Pour it on the porch.', 'Throw the rag in. Back up.', 'Let it burn.', 'Set the house. We\'re leaving.', 'Watch it go.', 'Get the fuel can. Soak the door.', 'Leave nothing for the next ones.', 'Light it.'],

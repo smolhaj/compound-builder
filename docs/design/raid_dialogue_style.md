@@ -70,15 +70,15 @@ build sandbox, so no long transcripts were read; nothing here is quoted at lengt
 
 | Role | How they talk | Length | Profanity |
 | --- | --- | --- | --- |
-| Raider leader | Terse commands, counts, a direction, a deadline. Raises volume only to be heard. No explaining. | 2 to 7 words | None for `crew` (organized crews stay flat). Gangs and crowds may. |
-| Raider, organized crew (`crew`) | Short call-and-response ("Left." "Clear." "Moving."). Weapon status and position. | 1 to 6 | None |
+| Raider leader | Terse commands, counts, a direction, a deadline. Raises volume only to be heard. No explaining. | 2 to 7 words | Rare for `crew` (stress or contempt). Gangs and crowds more often. |
+| Raider, organized crew (`crew`) | Short call-and-response ("Left." "Clear." "Moving."). Weapon status and position. | 1 to 6 | A minority of lines |
 | Raider, crowd / opportunists | Louder, scattered, more repeated words, reactions, complaints about not being told. | 2 to 8 | Some, as reaction |
 | Raider, scouts | Whispers. Counts and marks. Never yell. | 3 to 8 | None |
 | Raider, families / desperate | Pleading, apologizing, asking for water and food, saying where the kids are. | 3 to 10 | None |
 | Defender, veteran or guard | Calm, flat, the same few words every time. Position and status. | 1 to 8 | Only when hit |
 | Defender, untrained adult | Fragments, names, "get down", asking where, repeating. No tactical words. | 1 to 8 | Some, as reaction |
 | Defender, child | One to four words, or a question. Never tactical. | 1 to 5 | Never |
-| Defender, elder | Prayer or a short plain sentence. | 2 to 8 | Never (prays) |
+| Defender, elder | Prayer or a short plain sentence; now and then a blunt curse. | 2 to 8 | Rare |
 | Parent to child | Name, one instruction, low voice. | 2 to 7 | Never in front of the child |
 | Guard at the gate | Standard challenge words: stop, hands, who's there, turn around. | 2 to 6 | None |
 | Negotiator / person at a parley | Slow, open questions, repeating the other side's words, no threats, no lies. | 4 to 12 | None |
@@ -87,18 +87,31 @@ build sandbox, so no long transcripts were read; nothing here is quoted at lengt
 | Burial, grief | Plain, one sentence, unfinished is fine. | 2 to 12 | Adults may |
 | Cleanup | Practical: who has the shovel, how many, what's left. | 3 to 10 | None |
 
-## 4. Profanity limit (unchanged)
+## 4. Profanity limit
 
-The repo already has a limit; this pass did not loosen it.
+Owner decision 2026-11-19: organized crew raiders and elders may swear too. Children never, kind questioning never, no slurs.
 
 - `CURSE` in `src/sim/raidDialogue.ts` is the one list: `fuck*`, `shit*`, `goddamn*`, `damn*`, `hell`, `son of a bitch`,
-  `jesus christ`. Nothing stronger, no slurs.
-- Tests enforce who may use it: a scared untrained adult sometimes (more than 5 in a scene set, under 30 percent of
-  lines), crowd and opportunist raiders (more than 8 in their pools), veterans only when hit (3 or fewer in their own
-  pools), organized `crew` raiders never, children never, elders never (they pray), kind questioning never.
+  `jesus christ`. Nothing stronger, no slurs. **Words are written in full** ("fuck off", "fuck you"), never masked or
+  abbreviated ("f off", "f***"); `peopleVoices.test.ts` checks the crew pools for masks.
+- Tests enforce who may use it and how much:
+  - scared untrained adult: sometimes (more than 5 in a scene set, under 30 percent of lines);
+  - crowd and opportunist raiders: more than 8 in their pools;
+  - organized `crew` raiders: terse and cold, a minority (more than 5, at most 30 percent of the crew pools). Swearing on stress (a bad door, no angle,
+    a man down) or contempt ("Fuck you too. We're leaving."), never in commands or at a captive;
+  - veterans (defenders): only when hit (3 or fewer in their own pools);
+  - elders: rare, blunt, heartfelt, mixed with prayer (at most 30 percent of their own pool, under 15 percent of what they say in a
+    scene), never comic ("Not in my house. Not in my damn house." then "Lord, keep them out.");
+  - children: never; kind questioning: never.
 - The dome branch (PR 395) limits its captions to "damn". Keep that for dome lines.
-- Rule of thumb used here: swear on the *first shock*, when *hit*, or on a *malfunction*. Not as filler, not in
-  commands, not at a captive.
+- Rule of thumb: swear on the first shock, when hit, on a malfunction, or in contempt. Not as filler.
+
+## 4a. Organic talk
+
+Real speech is not a list of tidy barks. Where the pools allow (seeded, no repeats), lines should: be interrupted ("Hon, what was that? The door?"),
+trail off ("I'm okay. I'm... no. No, I'm not."), repeat ("It's holding. Is it holding?"), answer the wrong thing or ask for a repeat ("Say again? Left or
+right?" "What? I can't hear you."), react to what just happened (a miss: "Missed. Damn it, I missed."; a man down: "Who's hit? Is that {n}?"; the door
+holding: "Door's holding."), and use names and pet names ("Hon", "kiddo", first names). Still too scripted: see the PR report.
 
 ## 5. What to avoid (and what replaces it)
 
@@ -128,6 +141,8 @@ The repo already has a limit; this pass did not loosen it.
 | defender, civ, first shots | "I didn't think they'd really shoot." | "They're shooting! Dad, get down!" |
 | defender, parent hiding kids | "Close your eyes and count. I am right here." | "Stay with me. Count to a hundred. Quiet." |
 | defender, kid | "I am scared." | "Mom?" |
+| raider crew, retreat | "Disengage. Now." | "Fuck this. Break off. Go." |
+| elder, last stand | "Please, God. Not the children." | "Not the children. Fuck you. Not the children." |
 | grave | "Thank you. For every single day." | "I'll look after the place. I told you I would." |
 | interrogation, harsh | "Who's coming next? Talk. You've got until the lamp burns down." | "Who's after you? How many?" |
 | interrogation, kind | "I brought you a plate. Who's coming after you?" | "Eat. Then tell me who else is out there." |
