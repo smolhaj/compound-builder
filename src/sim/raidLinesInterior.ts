@@ -12,13 +12,13 @@ export type InteriorCtx =
 export const INTERIOR_LINES: Record<'raider' | 'defender', Partial<Record<InteriorCtx, Variants>>> = {
   raider: {
     kick_door: {
-      any: ['Kick it.', 'Again. By the lock.', 'It\'s barred. Shoulder.', 'One more.', 'Stand back. Breaking it.', 'Get it open.', 'They wedged something. Push.', 'Latch. Not the middle.', 'It\'s giving.', 'Again. They\'re right behind it.'],
+      any: ['Did it move? It moved.', 'Again? It\'s not going.', 'Hold on. Somebody\'s behind it.', 'Kick it.', 'Again. By the lock.', 'It\'s barred. Shoulder.', 'One more.', 'Stand back. Breaking it.', 'Get it open.', 'They wedged something. Push.', 'Latch. Not the middle.', 'It\'s giving.', 'Again. They\'re right behind it.'],
       disciplined: ['Breacher up. On three.', 'Hold the stack. Door, then us.'],
       crew: ['Fuck. It\'s barred. Again.', 'Latch. Hit the latch.', 'One more. Together.', 'Wedged. Back off, I\'ll shoot the lock.'],
       rush: ['Just bust it!', 'Everybody push!'],
     },
     stack_door: {
-      any: ['Door. Stack up.', 'On the wall by the door. Not in front of it.', 'Two on the hinge side. I\'ve got the other. On three.', 'Nobody in front of that door.', 'Wait. Wait. Now.', 'Tight on the wall. Shoulder to shoulder.', 'Point, you go first. I\'m behind you.', 'Stay out of the doorway till I say.', 'Two, take the left corner. Three, the hall.', 'Quiet. Listen at the door.'],
+      any: ['Which door? This one?', 'Is it locked? Try it. Easy.', 'I said wait. Wait for the count.', 'Door. Stack up.', 'On the wall by the door. Not in front of it.', 'Two on the hinge side. I\'ve got the other. On three.', 'Nobody in front of that door.', 'Wait. Wait. Now.', 'Tight on the wall. Shoulder to shoulder.', 'Point, you go first. I\'m behind you.', 'Stay out of the doorway till I say.', 'Two, take the left corner. Three, the hall.', 'Quiet. Listen at the door.'],
     },
     pie_corner: {
       any: ['Corner. Right corner.', 'I\'ve got the left. Nothing yet.', 'Slow. Slow. Don\'t rush the angle.', 'Movement behind the couch.', 'Left clear. Check right.', 'Table by the window. Two behind it.', 'Muzzle. Back corner.', 'Tell me what you see.', 'Hold there. Working the angle.', 'Far wall. Door. Closed.'],
@@ -60,18 +60,18 @@ export const INTERIOR_LINES: Record<'raider' | 'defender', Partial<Record<Interi
       any: ['You come with us. Walk.'],
     },
     loot_item: {
-      any: ['Grab the {item}. All of it.', 'Take the {item}. Leave the rest.', 'Got the {item}. Let\'s go.', 'That {item}\'s ours now.', 'Load the {item} on the truck.', 'Help me carry the {item}.', 'Don\'t drop the {item}.', 'More {item} in the back?', 'That\'s what we came for. The {item}.', 'Bag the {item}. Fast.'],
-      crowd: ['It\'s ours! Take everything!', 'Mine! I saw it first!'],
+      any: ['Is that all the {item}? Check again.', 'Where\'d the rest of the {item} go?', 'Leave it. Too heavy. Take the {item}.', 'Grab the {item}. All of it.', 'Take the {item}. Leave the rest.', 'Got the {item}. Let\'s go.', 'That {item}\'s ours now.', 'Load the {item} on the truck.', 'Help me carry the {item}.', 'Don\'t drop the {item}.', 'More {item} in the back?', 'That\'s what we came for. The {item}.', 'Bag the {item}. Fast.'],
+      crowd: ['It\'s ours! Take the {item}, take everything!', 'Mine! I saw the {item} first!'],
       crew: ['Fuck, that {item} is heavy. Two on it.', 'Not that {item}. The next one.', 'Take the {item}. Mark the rest.', 'Count the {item}. Then go.'],
     },
     arson: {
       hostile: ['Burn it.', 'Light the barn.', 'Pour it on the porch.', 'Throw the rag in. Back up.', 'Let it burn.', 'Set the house. We\'re leaving.', 'Watch it go.', 'Get the fuel can. Soak the door.', 'Leave nothing for the next ones.', 'Light it.'],
     },
     tribute: {
-      any: ['That\'s enough. We take that and go.', 'Hand it over and nobody else gets hurt.', 'Put the {item} on the ground. Step back.', 'That settles it. Don\'t follow us.', 'We have a deal. Remember it.', 'Count it out. All of it.', 'Fair enough. Walk away from this.', 'You keep the house. We keep the {item}.', 'That\'s what we asked for. No more.', 'We won\'t be back if this is all of it.'],
+      any: ['That\'s all of it? Count it again.', 'Is that everything? Don\'t lie to me.', 'Okay. That\'s fine. That\'s... fine.', 'That\'s enough. We take that and go.', 'Hand it over and nobody else gets hurt.', 'Put the {item} on the ground. Step back.', 'That settles it. Don\'t follow us.', 'We have a deal. Remember it.', 'Count it out. All of it.', 'Fair enough. Walk away from this.', 'You keep the house. We keep the {item}.', 'That\'s what we asked for. No more.', 'We won\'t be back if this is all of it.'],
     },
     passage: {
-      any: ['We only want to pass. Open the gate.', 'Let us through to the road.', 'Open the gate. We\'re gone.', 'We walk out the way we came. Agreed?', 'Clear a way and we leave.', 'Put the guns down. Let us leave.', 'Safe passage to the county road.', 'We take our wounded and go. Don\'t shoot.', 'Back off the gate. We\'ll go slow.', 'Hold your fire. We\'re leaving.'],
+      any: ['You\'ll let us through? Just like that?', 'Is it a trick? Watch the wall.', 'Open it slow. Slow.', 'We only want to pass. Open the gate.', 'Let us through to the road.', 'Open the gate. We\'re gone.', 'We walk out the way we came. Agreed?', 'Clear a way and we leave.', 'Put the guns down. Let us leave.', 'Safe passage to the county road.', 'We take our wounded and go. Don\'t shoot.', 'Back off the gate. We\'ll go slow.', 'Hold your fire. We\'re leaving.'],
     },
     wounded_fallback: {
       any: ['Get him out of here. Cover them.', 'Take him back to the gap.', 'Help me. Grab his feet.', 'I\'ve got him. Go.', 'Stay with me. Stay awake.', 'Somebody help me with him.', 'Leave the rifle. Get his arm.', 'Behind the truck.', 'Hold on. I\'m taking you out.', 'Don\'t leave him in the house.'],
@@ -125,13 +125,13 @@ export const INTERIOR_LINES: Record<'raider' | 'defender', Partial<Record<Interi
       any: ['They\'re burning the house!', 'Fire! The barn!', 'Buckets! The barn\'s burning!', 'The porch! Get out!', 'The roof\'s on fire!', 'Put it out!', 'It\'s all going up!', 'Smoke! Everybody out!', 'Our home. They burned our home.', 'The animals. Get the animals out!'],
     },
     loot_item: {
-      any: ['That\'s our {item}. That\'s all we have.', 'Not the {item}. We need it.', 'They\'re taking the {item}.', 'Let them have the {item}. Just let them go.', 'That {item} was for winter.', 'They have the {item}. Let them leave.', 'All our {item}. Gone.', 'Let it go. It\'s only {item}.', 'They took the {item} out the back.', 'Count what they took. The {item} first.'],
+      any: ['Not that. Please, not the... take the {item}.', 'Hon, let it go. It\'s only {item}.', 'That\'s... that was the last of the {item}.', 'That\'s our {item}. That\'s all we have.', 'Not the {item}. We need it.', 'They\'re taking the {item}.', 'Let them have the {item}. Just let them go.', 'That {item} was for winter.', 'They have the {item}. Let them leave.', 'All our {item}. Gone.', 'Let it go. It\'s only {item}.', 'They took the {item} out the back.', 'Count what they took. The {item} first.'],
     },
     tribute: {
-      any: ['Here. Take it. That\'s all we have.', 'That\'s the {item}. Now go.', 'That\'s the deal. You leave, we don\'t follow.', 'Take the {item} and go.', 'We agreed. Keep to it.', 'That\'s what you wanted. Leave us alone.', 'Fine. Take it.', 'That\'s it. Nothing else.', 'Kids go inside first. Then we hand it over.', 'We won\'t come after you. Go.'],
+      any: ['That\'s all of it. I swear that\'s all.', 'Is that enough? Is it enough?', 'Take it. Take... what are you waiting for?', 'Here. Take it. That\'s all we have.', 'That\'s the {item}. Now go.', 'That\'s the deal. You leave, we don\'t follow.', 'Take the {item} and go.', 'We agreed. Keep to it.', 'That\'s what you wanted. Leave us alone.', 'Fine. Take it.', 'That\'s it. Nothing else.', 'Kids go inside first. Then we hand it over.', 'We won\'t come after you. Go.'],
     },
     passage: {
-      any: ['Open the gate. Let them through.', 'Let them go. Nobody shoots.', 'They\'re leaving. Don\'t stop them.', 'Let them carry their wounded out.', 'Hold your fire. They\'re going.', 'Walk them to the road. Nobody fires.', 'Let them pass.', 'Gate\'s open. Go on.', 'They kept their word. So do we.', 'Stand down. They\'re going.'],
+      any: ['You sure? Are you sure about this?', 'Open it. Open it slow.', 'Watch them. Watch their hands.', 'Open the gate. Let them through.', 'Let them go. Nobody shoots.', 'They\'re leaving. Don\'t stop them.', 'Let them carry their wounded out.', 'Hold your fire. They\'re going.', 'Walk them to the road. Nobody fires.', 'Let them pass.', 'Gate\'s open. Go on.', 'They kept their word. So do we.', 'Stand down. They\'re going.'],
     },
     rally: {
       any: ['Hold on. They\'re tiring.', 'We can do this. Hold.', 'Keep shooting.', 'Not an inch of this house.', 'For the kids. Hold.', 'This is our home. Hold it.'],

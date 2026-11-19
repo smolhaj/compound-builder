@@ -113,6 +113,19 @@ trail off ("I'm okay. I'm... no. No, I'm not."), repeat ("It's holding. Is it ho
 right?" "What? I can't hear you."), react to what just happened (a miss: "Missed. Damn it, I missed."; a man down: "Who's hit? Is that {n}?"; the door
 holding: "Door's holding."), and use names and pet names ("Hon", "kiddo", first names). Still too scripted: see the PR report.
 
+## 4b. Exchanges (third pass)
+
+Scenes that are a conversation are written as a short exchange, not as one statement and one reply. White-flag, toll, redirect and gate talk in
+`siege.ts` use `Beat` scripts: `[seconds, speaker, line]`, chosen with the scene seed (an opening of 3 variants plus a closing per stance). Rules:
+
+- Someone **asks**, the other **pushes back** or answers the wrong thing ("That's all of it?" "It's what you asked for.").
+- **Pauses** are real seconds between lines; **talking over** is two lines under a second apart, the first cut off with "..." ("I'm not armed. We just want to..." "Stop. I said stop.").
+- A man of the crew speaks up from behind the envoy ("Is this a trick?" "Quiet. Walk."); the envoy can be called by a nickname ("Mack").
+- In the pools (breach, ram, stack, tribute, loot, passage, prisoner replies, grief, burial) lines are written to *sound like a reply* even though
+  the picker does not know the previous line: "Which door? This one?", "I said wait.", "That's all of it? Count it again.", "Is it a trick? Watch the wall.",
+  "Somebody say something. Anybody." Pools stay seeded and never repeat in a scene.
+- The renderer shows the last four lines as a feed (`BattleRenderer.lines`), so close lines already read as overlapping.
+
 ## 5. What to avoid (and what replaces it)
 
 | Avoid | Why | Use |
