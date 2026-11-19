@@ -13,12 +13,12 @@ const armed = args.includes('--armed'), port = Number(opt('--port', 5977)), out 
 mkdirSync(out, { recursive: true });
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise((ok, fail) => { vite.stdout.on('data', d => { if (/localhost:\d+/.test(String(d).replace(/\x1b\[[0-9;]*m/g, ''))) ok(); }); vite.on('exit', c => fail(new Error('vite exited ' + c))); });
-const browser = await chromium.launch();
+const browser = await chromium.launch({ args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
 try {
   const page = await browser.newPage({ viewport: { width: 1100, height: 700 }, deviceScaleFactor: 1 });
   page.setDefaultTimeout(240000);
   page.on('pageerror', e => console.error('pageerror:', e.message));
-  await page.goto(`http://localhost:${port}/?seed=7`);
+  await page.goto(`http://localhost:${port}/?seed=7&lowrender=0.7`);
   await page.waitForFunction(() => window.__cb, null, { timeout: 180000 });
   const info = await page.evaluate(async armed => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp;
@@ -44,16 +44,16 @@ try {
   console.log(JSON.stringify(info));
   await page.waitForSelector('[data-testid="hide-cost"]');
   await page.waitForTimeout(2500);
-  await page.screenshot({ path: `${out}/${armed ? 'armed' : 'unarmed'}_card.png` });
+  await page.evaluate(() => window.__cb.qa.renderNow?.()); await page.screenshot({ path: `${out}/${armed ? 'armed' : 'unarmed'}_card.png` });
   await page.locator('[data-testid=stance-hide]').dispatchEvent('click');
   await page.getByRole('button', { name: 'Watch', exact: true }).dispatchEvent('click');
   for (let i = 0; i < 40; i++) {
     await page.waitForTimeout(3000);
     const ph = await page.evaluate(() => window.__cb.game.getState().cutscene?.phase ?? 'none');
-    if (i % 3 === 0) await page.screenshot({ path: `${out}/${armed ? 'armed' : 'unarmed'}_scene${String(i).padStart(2, '0')}.png` });
+    if (i % 3 === 0) await page.evaluate(() => window.__cb.qa.renderNow?.()); await page.screenshot({ path: `${out}/${armed ? 'armed' : 'unarmed'}_scene${String(i).padStart(2, '0')}.png` });
     console.log(i, ph);
     if (ph === 'aftermath' || ph === 'report' || ph === 'none') break;
   }
   await page.waitForTimeout(1500);
-  await page.screenshot({ path: `${out}/${armed ? 'armed' : 'unarmed'}_report.png` });
+  await page.evaluate(() => window.__cb.qa.renderNow?.()); await page.screenshot({ path: `${out}/${armed ? 'armed' : 'unarmed'}_report.png` });
 } finally { await browser.close(); vite.kill(); setTimeout(() => process.exit(0), 200); }

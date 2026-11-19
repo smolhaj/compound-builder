@@ -50,7 +50,7 @@ export const SALLY = {
   W: 0.3,
   /** Ports counted, at most (a port never shortens the rings' hold: a stronger lot is never an easier raid). */
   MAX: 2,
-  /** The defenders' share of extra hits on crews held at the line for each port (a sortie from the flank), up to `MAX` ports. */
+  /** The defenders' share of extra hits on crews held at the line for each port (a counterattack from the flank), up to `MAX` ports. */
   SORTIE: 0.06,
   /** What a port costs the family on top of the wall: a plank door, straps and a lock. */
   BILL: { lumber: 3, hardware: 2 } as Partial<Stock>,
@@ -330,7 +330,7 @@ export function ringsHolding(s: GameState): number {
 /** The finished sally ports on the rings (a standing wall with a port gate in it). */
 export const sallyPorts = (s: GameState): number => s.perimeter.reduce((a, r) => a + (runFinished(r) ? r.gates.filter(g => g.sally).length : 0), 0);
 
-/** Extra hits the defenders get on crews held at the line: a sortie from the sally port's flank (1 = none). */
+/** Extra hits the defenders get on crews held at the line: a counterattack from the sally port's flank (1 = none). */
 export const sortieFactor = (s: GameState): number => 1 + Math.min(SALLY.MAX, sallyPorts(s)) * SALLY.SORTIE;
 
 /** Seconds a raid spends at the line for the manned inner rings (0 with one ring or none);  */
