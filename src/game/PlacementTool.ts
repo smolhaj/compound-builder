@@ -288,7 +288,7 @@ export class PlacementTool {
     if (isGradedTier(tier)) { const g = gradeSquare({ x, z, half: footR }, this._site.height); work = { cutCy: g.cutCy, fillCy: g.fillCy, wallSf: g.wallSf }; workLine = gradingLine(g); }
     // bunker pieces already under the footprint: their floors must be covered, and the dome's foundation pays for the footing that does it
     const deep = deepestUnder(def.id, x, z, this._turn, this._site.height, placed as never);
-    let foot: { ft: number; yd: number } | undefined, footLine: string | undefined;
+    let foot: { ft: number; yd: number; goods?: Record<string, number>; usd?: number } | undefined, footLine: string | undefined;
     if (deep !== null) {
       const c = coverOf(tier, deep);
       const fb = c.extra > 0 ? footingBill({ tier, cells }, c.extra) : null;

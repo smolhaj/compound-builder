@@ -2033,7 +2033,14 @@ export class HomesteadWorld {
     this.lived.enabled = !on;
     this.stream.setEdgesVisible(!on);
     for (const [id, g] of this._runGroups) if (['escape_tunnel', 'underground_passage'].includes(this._runs.find(r => r.id === id)?.kind ?? '')) this._applyTunnelView(g.group);
-    // a bed of dark earth under the bunkers, so the see-through ground reads as a cut-away section, not sky
+    this._earthBed(on || this._coveredIds.size > 0);
+    for (const b of this._built.values()) { b.key = ''; this._applyView(b); }
+    this._digKeys.clear(); if (this._lastStructures.length) this._syncDomeDigs(this._lastStructures);
+    if (!on) this._syncCovered(this._lastStructures);
+    this._ws.invalidateShadows();
+  }
+  /** A bed of dark earth under the bunkers, so the see-through ground reads as a cut-away section, not sky. */
+  private _earthBed(on: boolean): void {
     if (on) {
       const y = this._earthY();
       this._earth ??= new THREE.Mesh(new THREE.PlaneGeometry(PARCEL_SIZE + 60, PARCEL_SIZE + 60).rotateX(-Math.PI / 2),
@@ -2042,9 +2049,22 @@ export class HomesteadWorld {
       this._earth.receiveShadow = true;
       this._ws.scene.add(this._earth);
     } else if (this._earth) this._ws.scene.remove(this._earth);
-    for (const b of this._built.values()) { b.key = ''; this._applyView(b); }
-    this._digKeys.clear(); if (this._lastStructures.length) this._syncDomeDigs(this._lastStructures);
-    this._ws.invalidateShadows();
+  }
+  /**
+   * The Cutaway (V) view over a finished dome with a bunker under it: the ground goes see-through over the whole place (the same trick as the Underground view,
+   * without hiding the trees or ghosting the buildings) and the rooms inside the skirt ring show. `_coveredIds` are those rooms.
+   */
+  private readonly _coveredIds = new Set<string>();
+  private _syncCovered(list: readonly Structure[]): void {
+    const before = [...this._coveredIds].join();
+    this._coveredIds.clear();
+    if (this._view === 'cutaway' && !this._under) {
+      const domes = list.filter(x => tierOfKind(x.kind) && tierOfKind(x.kind) !== 'earthen' && x.stage >= BLUEPRINTS[x.kind].stages.length).map(x => domeAt(x.kind, x.x, x.z, x.rot)!);
+      for (const st of list) if (st.kind.startsWith('bunker_') && domes.some(d => Math.hypot(st.x - d.x, st.z - d.z) < usableR(d) + 0.25)) this._coveredIds.add(st.id);
+    }
+    if ([...this._coveredIds].join() === before) return;
+    if (!this._under) { this.terrain.setOpacity(this._coveredIds.size ? 0.32 : 1); this._earthBed(this._coveredIds.size > 0); }
+    for (const b of this._built.values()) if (b.under) { b.key = ''; this._applyView(b); }
   }
   /** Height of the earth bed: just under the deepest bunker room or passage (a passage built after the view went on moves it down). */
   private _earthY(): number {
@@ -2374,6 +2394,7 @@ export class HomesteadWorld {
     }
     this._syncPits(list);
     this._lastStructures = list;
+    this._syncCovered(list);
     this._syncDomeDigs(list);
   }
 
@@ -2444,6 +2465,7 @@ export class HomesteadWorld {
   setBuildingView(v: BuildingView): void {
     if (v === this._view) return;
     this._view = v;
+    if (this._lastStructures.length) this._syncCovered(this._lastStructures);
     for (const b of this._built.values()) { b.key = ''; this._applyView(b); }
     this._digKeys.clear(); if (this._lastStructures.length) this._syncDomeDigs(this._lastStructures);
     this._ws.invalidateShadows();
@@ -2454,7 +2476,7 @@ export class HomesteadWorld {
     const v = this._under ? (b.under ? 'cutaway' : 'ghost') : this._view;
     // a finished bunker room is drawn only where somebody can see it (the underground view, walking below): from the surface the earth hides it, so skip its draw calls
     // (an entrance stays: its shaft or stairwell is part of the yard)
-    if (b.under) b.group.visible = !this._inCrater(b.placed.id) && (!b.finished || this._under || this._below || this._belowCam || isEntry(KIT[b.placed.kind]));
+    if (b.under) b.group.visible = !this._inCrater(b.placed.id) && (!b.finished || this._under || this._below || this._belowCam || this._coveredIds.has(b.placed.id) || isEntry(KIT[b.placed.kind]));
     for (const o of b.group.children) {
       const m = o as THREE.Mesh;
       if (!m.isMesh) continue;
