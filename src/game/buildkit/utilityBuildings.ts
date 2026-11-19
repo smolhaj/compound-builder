@@ -108,11 +108,11 @@ function wellHand(_def: KitPieceDef, seed = 1): THREE.Group {
   return g;
 }
 
-function shed(spec: { W: number; D: number; outer: Parameters<typeof buildGabled>[0]['outer']; front: Parameters<typeof buildGabled>[0]['front'] }, furnish: (c: FurnishCtx) => void, seed: number, extras?: (p: Parts) => void): THREE.Group {
+function shed(spec: { W: number; D: number; outer: Parameters<typeof buildGabled>[0]['outer']; front: Parameters<typeof buildGabled>[0]['front']; over?: Partial<Parameters<typeof buildGabled>[0]> }, furnish: (c: FurnishCtx) => void, seed: number, extras?: (p: Parts) => void): THREE.Group {
   return buildGabled({
     W: spec.W, D: spec.D, floor: 0.03, wallH: 0.4, wallT: 0.02, rise: 0.12, eave: 0.04, gableOver: 0.03, porch: 0,
     foundation: 'concrete', floorMat: 'concrete', outer: spec.outer, inner: null, roof: 'metal_roof', trim: 'trim',
-    front: spec.front, left: [{ kind: 'window', at: 0, w: 0.1, h: 0.1, sill: 0.22 }], corners: 'boards',
+    front: spec.front, left: [{ kind: 'window', at: 0, w: 0.1, h: 0.1, sill: 0.22 }], corners: 'boards', ...spec.over,
   }, furnish, new Parts(seed), extras).group;
 }
 
@@ -195,11 +195,45 @@ function filtrationShed(_def: KitPieceDef, seed = 1): THREE.Group {
     c.parts.collide({ x0: 0.1 * M, z0: -1.08 * M, x1: 0.76 * M, z1: -0.88 * M });
     c.C({ x: c.right - 0.03, z: 0.1 }, a => Clutter.bucket(a), 0.7);
     c.C({ x: c.left + 0.002, z: 0.12, y: c.y0 + 1.4 * M, rot: Math.PI / 2 }, a => Equipment.sign(a), 0.8);
-  }, seed);
+  }, seed, filtrationOutside);
+}
+
+/**
+ * What tells the water shed from the battery shed at a glance (outside, real size): two blue pressure
+ * tanks on a manifold at the right wall, a media hopper on legs by the left wall, a turbine vent on the
+ * ridge and a white vent stack up the back. Drawn in the 'openings' layer so cutaway keeps them.
+ */
+function filtrationOutside(p: Parts): void {
+  const hw = 0.15, hd = 0.2, L = 'openings' as const;
+  // two blue tanks on a concrete skid, a steel manifold into the wall with a red valve wheel
+  p.add('steel', box(0.12, 0.02, 0.26, hw + 0.075, -0.005, -0.02), L);
+  for (const z of [-0.1, 0.06]) {
+    p.add('blue_tank', cyl(0.04, 0.25, hw + 0.075, 0.015, z, 14), L);
+    p.add('blue_tank', new THREE.SphereGeometry(0.04, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).translate(hw + 0.075, 0.265, z), L);
+    p.add('steel', cyl(0.043, 0.012, hw + 0.075, 0.015, z, 14), L);
+    p.add('steel', cyl(0.012, 0.03, hw + 0.075, 0.295, z, 8), L);                                       // the head valve
+    p.add('steel', pipe([hw + 0.04, 0.07, z], [hw + 0.015, 0.07, z], 0.006, 6), L);
+  }
+  p.add('steel', pipe([hw + 0.02, 0.07, -0.1], [hw + 0.02, 0.07, 0.06], 0.006, 6), L);
+  p.add('steel', new THREE.TorusGeometry(0.018, 0.004, 4, 10).rotateY(Math.PI / 2).translate(hw + 0.03, 0.12, -0.02), L);
+  // the media hopper: a steel cone on four legs by the left wall (back corner), a chute down to a bucket
+  const hx = -hw - 0.055, hz = -0.13;
+  p.add('steel', new THREE.ConeGeometry(0.055, 0.09, 12, 1, true).rotateX(Math.PI).translate(hx, 0.17, hz), L);
+  p.add('steel', cyl(0.055, 0.02, hx, 0.215, hz, 12), L);
+  for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) p.add('steel', box(0.008, 0.16, 0.008, hx + dx * 0.04, 0, hz + dz * 0.04), L);
+  p.add('steel', cyl(0.01, 0.03, hx, 0.095, hz, 6), L);
+  p.add('steel', cyl(0.025, 0.05, hx, 0, hz, 10), L);
+  // a turbine vent on the ridge and a white vent stack with a cap up the back wall
+  const ridge = 0.03 + 0.4 + 0.12;
+  p.add('steel', cyl(0.012, 0.03, 0, ridge - 0.005, -0.08, 8), L);
+  p.add('steel', new THREE.SphereGeometry(0.026, 10, 7).translate(0, ridge + 0.04, -0.08), L);
+  p.add('steel', new THREE.TorusGeometry(0.026, 0.003, 4, 12).rotateX(Math.PI / 2).translate(0, ridge + 0.04, -0.08), L);
+  p.add('steel', cyl(0.009, 0.5, 0.09, 0, -hd - 0.015, 8), L);
+  p.add('steel', cyl(0.014, 0.012, 0.09, 0.5, -hd - 0.015, 8), L);
 }
 
 function batteryShed(_def: KitPieceDef, seed = 1): THREE.Group {
-  return shed({ W: 0.42, D: 0.42, outer: 'board_batten', front: [{ kind: 'door', at: 0.08, w: 0.14, h: 0.33 }] }, c => {
+  return shed({ W: 0.46, D: 0.42, outer: 'metal_siding', over: { rise: 0.03, eave: 0.03, gableOver: 0.02, corners: 'none', trim: 'iron' }, front: [{ kind: 'door', at: 0.08, w: 0.14, h: 0.33 }] }, c => {
     c.I({ x: -0.085, z: c.back + 0.05 }, a => Equipment.batteryRack(a, 4, 1.0));
     c.I({ x: 0.085, z: c.back + 0.05 }, a => Equipment.batteryRack(a, 3, 1.0));
     c.I({ x: c.left + 0.002, z: 0.0, rot: Math.PI / 2 }, a => Equipment.inverterWall(a), false);
@@ -211,7 +245,40 @@ function batteryShed(_def: KitPieceDef, seed = 1): THREE.Group {
     c.C({ x: c.right - 0.002, z: -0.1, y: c.y0 + 1.2 * M, rot: -Math.PI / 2 }, a => Clutter.calendar(a), 0.6);
     c.C({ x: -0.1, z: 0.12 }, a => Clutter.broom(a), 0.5);
     c.parts.add('lamp', box(0.12, 0.01, 0.025, 0, c.yE - 0.03, 0), 'decor');
-  }, seed);
+  }, seed, batteryOutside);
+}
+
+/**
+ * Outside, the battery shed is a corrugated steel cabinet with a flat roof, not a board shed: corner
+ * posts, a wall-hung air conditioner condenser with its line set, a yellow warning placard and a red
+ * "battery room" band by the door, a meter and disconnect with conduit up to the service drop, and a roof
+ * vent. Real size: a 3 ft condenser, a 1 ft placard.
+ */
+function batteryOutside(p: Parts): void {
+  const hw = 0.23, hd = 0.21, top = 0.43, L = 'openings' as const;
+  // corner posts and a roof curb (a shipping-container style frame)
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.add('iron', box(0.022, top, 0.022, sx * (hw + 0.004), 0.03, sz * (hd + 0.004)), 'walls');
+  p.add('iron', box(hw * 2 + 0.05, 0.016, 0.016, 0, top + 0.01, hd + 0.01), 'roof');
+  p.add('iron', box(hw * 2 + 0.05, 0.016, 0.016, 0, top + 0.01, -hd - 0.01), 'roof');
+  // the condenser on the right wall: a box on a bracket, a fan grille, a line set into the wall
+  p.add('steel', box(0.05, 0.13, 0.17, hw + 0.03, 0.12, -0.02), L);
+  p.add('iron', new THREE.CylinderGeometry(0.052, 0.052, 0.006, 14).rotateZ(Math.PI / 2).translate(hw + 0.058, 0.18, -0.02), L);
+  p.add('glass', new THREE.CylinderGeometry(0.014, 0.014, 0.008, 8).rotateZ(Math.PI / 2).translate(hw + 0.058, 0.18, -0.02), L);
+  p.add('iron', box(0.012, 0.012, 0.15, hw + 0.01, 0.07, -0.02), L);                                 // bracket arm
+  p.add('copper', pipe([hw + 0.005, 0.2, 0.08], [hw + 0.03, 0.2, 0.08], 0.005, 6), L);
+  p.add('rubber', pipe([hw + 0.005, 0.18, 0.1], [hw + 0.03, 0.18, 0.1], 0.007, 6), L);
+  // a yellow warning diamond with a red band under it, on the front wall beside the door
+  p.add('paint_yellow', box(0.07, 0.07, 0.006, 0, 0, 0).rotateZ(Math.PI / 4).translate(-0.12, 0.26, hd + 0.012), L);
+  p.add('iron', box(0.012, 0.04, 0.008, -0.12, 0.24, hd + 0.014), L);
+  p.add('paint_red', box(0.1, 0.02, 0.006, -0.12, 0.12, hd + 0.012), L);
+  // meter and disconnect on the left wall, conduit up to a service drop over the roof edge
+  p.add('steel', box(0.04, 0.07, 0.05, -hw - 0.02, 0.2, 0.1), L);
+  p.add('glass', new THREE.CylinderGeometry(0.014, 0.014, 0.006, 10).rotateZ(Math.PI / 2).translate(-hw - 0.043, 0.22, 0.1), L);
+  p.add('iron', box(0.04, 0.09, 0.05, -hw - 0.02, 0.3, 0.1), L);
+  p.add('iron', pipe([-hw - 0.02, 0.345, 0.1], [-hw - 0.02, top + 0.09, 0.1], 0.007, 6), L);
+  p.add('iron', pipe([-hw - 0.02, top + 0.09, 0.1], [-hw - 0.0, top + 0.1, 0.1], 0.007, 6), L);
+  // a roof vent
+  p.add('steel', box(0.09, 0.03, 0.06, 0.06, top + 0.03, -0.06), 'roof');
 }
 
 function generatorShed(_def: KitPieceDef, seed = 1): THREE.Group {

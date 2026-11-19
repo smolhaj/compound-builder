@@ -75,7 +75,7 @@ export interface StarterOpts {
   /** Piece keys the player dropped from the proposal ("yard" drops the fence). */
   skip?: readonly string[];
   /** The standing trees on the land that could be felled (kind and size). A log house is proposed only when these, the yard and the marked trees add up to its logs; omitted: none are known. */
-  trees?: ReadonlyArray<{ kind: 'conifer' | 'oval' | 'broad'; scale: number }>;
+  trees?: ReadonlyArray<{ kind: 'conifer' | 'oval' | 'broad' | 'juniper' | 'mesquite' | 'paloverde'; scale: number }>;
 }
 
 /** The reason a piece has no spot (it is not a cash matter). */

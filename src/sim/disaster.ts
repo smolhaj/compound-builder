@@ -420,7 +420,7 @@ export const DISASTERS: Partial<Record<DisasterKind, DisasterDef>> = {
     hints: [
       ['Record heat dome over the interior; the weather service says "once in a thousand years" for the third time.', 'Dead lawns and a county burn ban in June. The farm store is out of window units.', 'City cooling centers are full, and the hospital counts heat deaths for the week.'],
       ['The utility asks everyone to run no appliances between 3 and 8 p.m.; brownouts on the afternoons.', 'Neighbors are buying generators and shade cloth. Hens are panting in the coop.', 'A wet-bulb alert: the weather service says to stay out of the sun until dark.'],
-      ['Rolling blackouts every afternoon. The pavement softens on the county road.', 'The grain elevator is half the usual price of wheat, because nobody is sure of the harvest.', 'People up the road say they are leaving for the north before the next summer.'],
+      ['Rolling blackouts every afternoon. The asphalt softens on the county road.', 'The grain elevator is half the usual price of wheat, because nobody is sure of the harvest.', 'People up the road say they are leaving for the north before the next summer.'],
     ],
     hit: ['The heat does not break: {cause}. The afternoons are not safe to work in and the grid is failing on the hot days.'],
     chain: [{ kind: 'mass_exodus', p: 0.4, after: [30, 120] }, { kind: 'water_war', p: 0.35, after: [60, 240] }, { kind: 'global_famine', p: 0.3, after: [90, 300] }, { kind: 'wildfire', p: 0.4, after: [5, 60] }, { kind: 'lawless', p: 0.3, after: [120, 360] }],
