@@ -186,7 +186,7 @@ export function wallTarget(runs: readonly PerimeterRun[], home: { x: number; z: 
       const den = dir.x * ez - dir.z * ex;
       if (len > 1e-9 && Math.abs(den) > 1e-9) {
         const t = ((ax - home.x) * ez - (az - home.z) * ex) / den, u = ((ax - home.x) * dir.z - (az - home.z) * dir.x) / den;
-        if (t > 1 && t <= maxD && u >= 0 && u <= 1 && (!best || t > best.d)) best = { run, d: t, at: acc + u * len, px: ax + ex * u, pz: az + ez * u, hx: ex / len, hz: ez / len };
+        if (t > (run.kind.startsWith('shell_') ? 0.3 : 1) && t <= maxD && u >= 0 && u <= 1 && (!best || t > best.d)) best = { run, d: t, at: acc + u * len, px: ax + ex * u, pz: az + ez * u, hx: ex / len, hz: ez / len };
       }
       acc += len;
     }

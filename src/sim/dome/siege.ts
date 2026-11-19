@@ -32,18 +32,18 @@ export const tierOfShell = (k: string): DomeTier | null => (Object.keys(SHELL_KI
 
 /** The chance ONE truck hit (ram) or ONE satchel (blast) opens a panel, before the counters. The berm and the stem wall are what a truck meets on a geodesic dome; the ring beam on a glass one. */
 export const SHELL_ODDS: Record<DomeTier, { ram: number; blast: number }> = {
-  earthen: { ram: 0.2, blast: 0.4 },
-  geodesic: { ram: 0.1, blast: 0.25 },
-  glass: { ram: 0.03, blast: 0.15 },   // (PROPOSED: the 0.8 satchel needs a heavy crew, `HEAVY_BLAST`; an ordinary crew's satchel is a tenth of it)
+  earthen: { ram: 0.6, blast: 0.8 },
+  geodesic: { ram: 0.15, blast: 0.4 },
+  glass: { ram: 0.04, blast: 0.2 },   // (PROPOSED: the 0.8 satchel needs a heavy crew, `HEAVY_BLAST`; an ordinary crew's satchel is a tenth of it)
   arcology: { ram: 0, blast: 0 },
 };
 /** A glass dome's satchel odds hold only for a heavy crew: late in the collapse (this share of the way) and with at least this many satchels (PROPOSED). Anyone else's is a tenth. */
 export const HEAVY_BLAST = { late: 0.5, satchels: 2, otherwise: 0.1 } as const;
 /** The same against an airlock's outer door (the gate odds): the doors of a dome are a vestibule's, not a farm gate's. */
 export const AIRLOCK_DOOR: Record<DomeTier, { ram: number; blast: number }> = {
-  earthen: { ram: 0.4, blast: 0.6 },
-  geodesic: { ram: 0.15, blast: 0.4 },
-  glass: { ram: 0.04, blast: 0.15 },
+  earthen: { ram: 0.7, blast: 0.9 },
+  geodesic: { ram: 0.3, blast: 0.6 },
+  glass: { ram: 0.08, blast: 0.3 },
   arcology: { ram: 0, blast: 0 },
 };
 /** Odds at an airlock door for a shell kind (null: not a shell). */

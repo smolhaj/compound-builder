@@ -283,7 +283,7 @@ export const needsMeans = (kind: PerimeterKind): boolean => wallHp(kind) >= 190;
  * times this). Tougher walls hold much longer; a wall that needs means is almost never climbed. `growth` is a hedge's grown share.
  */
 /** How fast a crew with ladders and hand tools gets through a dome's shell (PROPOSED, docs/design/dome_raids.md): the older hit-point rule let a 16-man crew cut laminated glass in a minute. */
-export const SHELL_CLIMB_K: Partial<Record<PerimeterKind, number>> = { shell_earthen: 0.12, shell_geodesic: 0.06, shell_glass: 0.012, link_walk_earthen: 0.12, link_walk_geodesic: 0.06, link_walk_glass: 0.012 };
+export const SHELL_CLIMB_K: Partial<Record<PerimeterKind, number>> = { shell_earthen: 0.5, shell_geodesic: 0.25, shell_glass: 0.05, link_walk_earthen: 0.5, link_walk_geodesic: 0.25, link_walk_glass: 0.05 };
 export const climbRateK = (kind: PerimeterKind, growth = 1): number => (SHELL_CLIMB_K[kind] !== undefined && !PERIMETER[kind].impervious ? SHELL_CLIMB_K[kind]! : PERIMETER[kind].impervious ? 0 : needsMeans(kind) ? 0.12 : Math.max(0.35, Math.min(1.6, 60 / Math.max(10, wallHp(kind) * Math.max(0.2, growth)))));
 /** Extra seconds a crew spends at a wall before the first can be across (ladders, cutters): longer for a tougher wall. */
 export const climbHoldS = (kind: PerimeterKind, growth = 1): number => Math.min(8, wallHp(kind) * growth / 30);

@@ -1498,7 +1498,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     // (round 4) clubs against rifles need far more of them to rush the line; going over a wall, every rifle at a post on it slows them
     const outnumber = armedR ? 2 : 4;
     const onWall = H.filter(f => !f.out && !f.shelter && f.arm !== FISTS && t >= f.readyAt && f.post?.kind !== 'open' && atLine.some(x => sight(f, x) !== 'blocked')).length;   // (every rifle that bears on the climbers)
-    if (!breached && !peace && atLine.length && ((wallDown && !gapOnly) || hNow === 0 || (rUp.length > hNow * outnumber && !isShellKind(wallKind))) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (hNow === 0 || t - lineSince >= (synth ? STAGE_HOLD[stage] : ringK === 0 ? ringHold : ringStay)) && (!climbing || (t - lineSince >= 10 + wallClimbHold + (moat && ringK === 0 ? moat.holdS : 0) && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) * wallTop.climb * climbWeak * wallClimbK / (1 + onWall)))) {
+    if (!breached && !peace && atLine.length && ((wallDown && !gapOnly) || (hNow === 0 && (wallDown || !isShellKind(wallKind))) || (rUp.length > hNow * outnumber && (wallDown || !isShellKind(wallKind)))) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (hNow === 0 || t - lineSince >= (synth ? STAGE_HOLD[stage] : ringK === 0 ? ringHold : ringStay)) && (!climbing || (t - lineSince >= 10 + wallClimbHold + (moat && ringK === 0 ? moat.holdS : 0) && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) * wallTop.climb * climbWeak * wallClimbK / (1 + onWall)))) {
       if (ringK < ringRs.length) fallBack(t);
       else openLine(t, pendingHow, rUp);
     }
