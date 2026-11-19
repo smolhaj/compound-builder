@@ -110,7 +110,8 @@ try {
     const info = await page.evaluate(async () => {
       const { collapseLook } = await import('/src/sim/collapseLook.ts'); const l = collapseLook(window.__cb.game.getState().game);
       const { getSeasonUniformValues } = await import('/src/engine/world/season/seasonShader.ts'); const s = getSeasonUniformValues();
-      return { scorch: l.scorch, snowCover: l.snowCover, freeze: l.freeze, sunScale: l.sunScale, sunLower: l.sunLower, seaB: s.b, seaC: s.c };
+      const { shellClimateNow } = await import('/src/game/fx/DomeShell.ts'); const { domeOf, stateOf } = await import('/src/sim/dome/live.ts'); const gg = window.__cb.game.getState().game, dd = domeOf(gg), ss = dd ? stateOf(gg, dd) : null;
+      return { shell: shellClimateNow(), dome: ss && { outF: ss.outF, indoorF: ss.indoorF }, scorch: l.scorch, snowCover: l.snowCover, freeze: l.freeze, sunScale: l.sunScale, sunLower: l.sunLower, seaB: s.b, seaC: s.c };
     });
     lap('look ' + JSON.stringify(info));
   }

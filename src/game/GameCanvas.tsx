@@ -608,7 +608,7 @@ export function GameCanvas() {
       climOverlay.scorch = lookRaw.scorch; climOverlay.snow = lookRaw.snowCover; climOverlay.freeze = lookRaw.freeze;
       world.tick(dt, dayOfYear, totalDays, seasonMode, climOverlay, waterLockOf(lookRaw.freeze));
       shellAcc += dt;
-      if (shellAcc >= 0.4) {
+      if (shellAcc >= 0.4 || renderReq.quality) {
         shellAcc = 0;
         const d0 = domeOf(game), st0 = d0 ? stateOf(game, d0) : null;
         setShellClimate(st0 ? shellFrostOf(st0.outF, st0.indoorF) : 0, st0 ? shellBleachOf(lookRaw.scorch, st0.outF) : 0);
