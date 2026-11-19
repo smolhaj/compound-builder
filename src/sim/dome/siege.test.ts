@@ -153,7 +153,7 @@ describe('the shell in a raid', () => {
     const g = withDome(place(3, 'standard', 'armed'), 'glass');
     const w = withDomeShell(g, { x: 0, z: 0 });
     const run = w.perimeter.find(r => r.id === 'dome:dm')!;
-    expect(run.kind).toBe('shell_glass'); expect(run.gates.length).toBe(1);   // (the person airlock and the vehicle port are ONE gate complex: one entrance) expect(isShellKind(run.kind)).toBe(true);
+    expect(run.kind).toBe('shell_glass'); expect(run.gates.length).toBe(1); expect(isShellKind(run.kind)).toBe(true);   // (the person airlock and the vehicle port are ONE gate complex: one entrance)
     expect(withDomeShell(g, { x: 500, z: 500 })).toBe(g);
     expect(shellRun(domesOf(g)[0], [1]).gates.filter(x => (x as { breach?: boolean }).breach).length).toBe(1);
     const p = shellPointAt(domesOf(g)[0], run.gates[0].at);
