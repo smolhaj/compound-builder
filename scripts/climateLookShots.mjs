@@ -75,6 +75,7 @@ try {
   // the world at `yrs` game years after the hit, at the day of the year and the hour; the disaster's tracks follow
   const setYear = (yrs, hour) => page.evaluate(async ([k, yrs, hour, doy]) => {
     const { triggerDisaster, tracksAt } = await import('/src/sim/disaster.ts');
+    const { newDomeState, domesOf, ownState } = await import('/src/sim/dome/live.ts');
     const G = window.__cb.game, dk = k === 'ice' ? 'ice_age' : 'runaway_heat';
     G.setState(s => {
       const g = structuredClone(s.game);
@@ -83,6 +84,10 @@ try {
       g.clock.t = t; g.clock.startDoy = doy - Math.floor(t) % 365; g.clock.startDoy = ((g.clock.startDoy % 365) + 365) % 365 || 365;
       g.clock.speed = 0; g.gate.pending = null; g.gate.incoming = null;
       g.disaster.phase = 'survival'; g.disaster.tracks = tracksAt(g.disaster, g.clock.t);
+      // (the dome scene: the dome's last reading, since the clock is paused: cold and unheated, or scorching outside)
+      const [o, i] = k === 'ice' ? [-20, -15] : [118, 100];
+      for (const dr of domesOf(g)) ownState(g, dr);   // (files a state for each dome so there is one to set)
+      for (const d of [g.dome, ...Object.values(g.domes ?? {})]) if (d) { d.outF = o; d.indoorF = i; }
       return { game: g, resumeTo: null };
     });
   }, [kind === 'dome' ? (climate === 'cold' ? 'ice' : 'heat') : kind, yrs, hour, doy]);
