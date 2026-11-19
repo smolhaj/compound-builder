@@ -307,44 +307,57 @@ export function approachRoute(drive: readonly Pt[], k: Keepout, f: PortFrame, ga
     for (const p of drive) near = Math.min(near, Math.hypot(p[0] - k.cx, p[1] - k.cz) - k.footR);
     if (near > ATTACH) return null;
   }
-  // back up a few stations so the road does not hug the keep-out where it turns, but never past the gate or into the keep-out
-  if (cut) j = Math.max(gateIndex + 1, j - 3);
-  while (j > gateIndex + 1 && inKeepout(k, drive[j][0], drive[j][1])) j--;
-  const B = drive[j], prev = drive[Math.max(0, j - 1)];
   // the ring's radius: out past the yard (the farthest corner) or the footprint, and the straight run starts beyond it
   const yardOut = k.yard ? Math.max(...k.yard.map(([x, z]) => Math.hypot(x - k.cx, z - k.cz))) : 0;
-  const ring = Math.max(k.footR + 0.5, yardOut + 0.6, Math.hypot(B[0] - k.cx, B[1] - k.cz));
-  const aDist = Math.max(f.r + STRAIGHT_LEN, ring + 1.0);
-  const A = at(f.cx, f.cz, f.u, aDist), E = f.apronEnd, O = f.outer;
+  const ringBase = Math.max(k.footR + 0.5, yardOut + 0.6);
   const exemptApron = (x: number, z: number): boolean => onApron(f, x, z, 0.15) || (Math.abs((x - f.cx) * f.u[1] - (z - f.cz) * f.u[0]) < 0.2 && (x - f.cx) * f.u[0] + (z - f.cz) * f.u[1] > f.r - 0.1);
-  // a gentle curve from B (leaving in the old drive's heading) onto the axis (arriving along it): a cubic with handles a third of the way
-  const hd: Pt = (() => { const dx = B[0] - prev[0], dz = B[1] - prev[1], l = Math.hypot(dx, dz) || 1; return [dx / l, dz / l]; })();
-  const dist = Math.hypot(A[0] - B[0], A[1] - B[1]), h = Math.max(0.5, dist * 0.38);
-  const P1: Pt = [B[0] + hd[0] * h, B[1] + hd[1] * h], P2: Pt = [A[0] + f.u[0] * h, A[1] + f.u[1] * h];
-  const curve: Pt[] = [];
-  for (let i = 0; i <= 14; i++) {
-    const t = i / 14, s = 1 - t;
-    curve.push([s * s * s * B[0] + 3 * s * s * t * P1[0] + 3 * s * t * t * P2[0] + t * t * t * A[0], s * s * s * B[1] + 3 * s * s * t * P1[1] + 3 * s * t * t * P2[1] + t * t * t * A[1]]);
+  const startJ = cut ? Math.max(gateIndex + 1, j - 3) : j;
+  let body: Pt[] | null = null, aDist = f.r + STRAIGHT_LEN;
+  // a gentle curve from a station of the old drive (leaving in its heading) onto the axis (arriving along it): a cubic with handles a third of the way. The join is the first
+  // station, walking back from the keep-out, from which the turn is under 55 degrees and the curve is clear: a road that has to double back joins farther up instead
+  for (let q = startJ; q > gateIndex && q >= startJ - 60 && !body; q--) {
+    const B = drive[q];
+    if (inKeepout(k, B[0], B[1])) continue;
+    const prev = drive[Math.max(0, q - 1)], A = at(f.cx, f.cz, f.u, aDist);
+    const dx = B[0] - prev[0], dz = B[1] - prev[1], l = Math.hypot(dx, dz) || 1, hd: Pt = [dx / l, dz / l], dist = Math.hypot(A[0] - B[0], A[1] - B[1]);
+    const turn = Math.acos(Math.max(-1, Math.min(1, (hd[0] * (A[0] - B[0]) + hd[1] * (A[1] - B[1])) / (dist || 1))));
+    // (a drive whose end already lies at the port needs no limit on the turn)
+    if (turn > 0.96 && q > gateIndex + 1) continue;
+    for (const hk of [0.38, 0.25, 0.55, 0.18]) {
+      const h = Math.max(0.4, dist * hk), P1: Pt = [B[0] + hd[0] * h, B[1] + hd[1] * h], P2: Pt = [A[0] + f.u[0] * h, A[1] + f.u[1] * h], curve: Pt[] = [];
+      for (let i = 0; i <= 14; i++) {
+        const t = i / 14, s = 1 - t;
+        curve.push([s * s * s * B[0] + 3 * s * s * t * P1[0] + 3 * s * t * t * P2[0] + t * t * t * A[0], s * s * s * B[1] + 3 * s * s * t * P1[1] + 3 * s * t * t * P2[1] + t * t * t * A[1]]);
+      }
+      // gentle: no bend over about 35 degrees between samples (a loop or a kink is refused)
+      let bend = 0;
+      for (let i = 2; i < curve.length; i++) bend = Math.max(bend, angDist(Math.atan2(curve[i - 1][0] - curve[i - 2][0], curve[i - 1][1] - curve[i - 2][1]), Math.atan2(curve[i][0] - curve[i - 1][0], curve[i][1] - curve[i - 1][1])));
+      if (bend < 0.6 && curve.every((p, i) => i === 0 || sampleOk(k, curve[i - 1], p, exemptApron))) { body = curve; j = q; break; }
+    }
   }
-  let body: Pt[];
-  if (curve.every((p, i) => i === 0 || sampleOk(k, curve[i - 1], p, exemptApron))) body = curve;
-  else {
-    // round the dome on a ring (the shorter way), then out or in along the axis to A
-    const tB = Math.atan2(B[0] - k.cx, B[1] - k.cz), tA = f.angle;
+  if (!body) {
+    // round the dome on a ring (the shorter way), then out or in along the axis
+    j = startJ; while (j > gateIndex + 1 && inKeepout(k, drive[j][0], drive[j][1])) j--;
+    const B = drive[j], prev = drive[Math.max(0, j - 1)], ring = Math.max(ringBase, f.r + STRAIGHT_LEN + 1.4, Math.hypot(B[0] - k.cx, B[1] - k.cz));
+    aDist = f.r + STRAIGHT_LEN;
+    const A = at(f.cx, f.cz, f.u, aDist), tB = Math.atan2(B[0] - k.cx, B[1] - k.cz), tA = f.angle;
     let d = normAngle(tA - tB); if (d > Math.PI) d -= TAU;
-    const steps = Math.max(2, Math.ceil(Math.abs(d) / 0.12)), pts: Pt[] = [B];
-    for (let i = 1; i <= steps; i++) { const a = tB + d * i / steps; pts.push([k.cx + Math.sin(a) * ring, k.cz + Math.cos(a) * ring]); }
-    pts.push(A);
-    body = smooth([prev, ...pts], 0.4).slice(1);
-    // the smoothing may not move the last leg off the axis: it is exactly the axis below
-    body = body.filter(p => (p[0] - k.cx) * f.u[0] + (p[1] - k.cz) * f.u[1] < aDist - 0.3 || false);
-    body.push(A);
+    // the arc stops a little short of the axis (`lead` radians before it), and a cubic carries the road in from there onto the axis, heading in along it
+    const lead = Math.min(Math.abs(d), 1.3 / ring) * Math.sign(d), dArc = d - lead, steps = Math.max(1, Math.ceil(Math.abs(dArc) / 0.12)), pts: Pt[] = [B];
+    for (let i = 1; i <= steps; i++) { const a = tB + dArc * i / steps; pts.push([k.cx + Math.sin(a) * ring, k.cz + Math.cos(a) * ring]); }
+    const X = pts[pts.length - 1], tx: Pt = [Math.cos(tB + dArc) * Math.sign(d), -Math.sin(tB + dArc) * Math.sign(d)], hh = 0.8;
+    const P1: Pt = [X[0] + tx[0] * hh, X[1] + tx[1] * hh], P2: Pt = [A[0] + f.u[0] * hh, A[1] + f.u[1] * hh];
+    for (let i = 1; i <= 8; i++) { const t = i / 8, s = 1 - t; pts.push([s * s * s * X[0] + 3 * s * s * t * P1[0] + 3 * s * t * t * P2[0] + t * t * t * A[0], s * s * s * X[1] + 3 * s * s * t * P1[1] + 3 * s * t * t * P2[1] + t * t * t * A[1]]); }
+    // (smoothed with the old drive's last station ahead of it for the heading; the samples up to B are dropped)
+    body = smooth([prev, ...pts], 0.4).slice(Math.max(1, Math.ceil(Math.hypot(B[0] - prev[0], B[1] - prev[1]) / 0.4)));
+  } else {
+    // the curve reached A at aDist; the straight finish below carries on from there
+    aDist = Math.hypot(body[body.length - 1][0] - f.cx, body[body.length - 1][1] - f.cz);
   }
   // the exact straight finish: A, the apron's far edge, the outer gate
   const finish: Pt[] = [];
   for (let d = aDist - 0.5; d > f.r + 0.001; d -= 0.5) finish.push(at(f.cx, f.cz, f.u, d));
-  void E;
-  const route: Pt[] = [...drive.slice(0, j + 1), ...body.slice(1), ...finish, O];
+  const O = f.outer, route: Pt[] = [...drive.slice(0, j + 1), ...body.slice(1), ...finish, O];
   return { route, joinAt: j, cut };
 }
 

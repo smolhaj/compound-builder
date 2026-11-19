@@ -155,3 +155,22 @@ describe('the road plan the world draws', () => {
     for (let i = 1; i < pr.plan.pts.length; i++) expect(pr.plan.pts[i].s).toBeGreaterThan(pr.plan.pts[i - 1].s);
   });
 });
+
+describe('the new stretch of road has no sharp kink', () => {
+  it('a winding drive that ends past the dome joins and bends no more than about 60 degrees at a station', () => {
+    const tier: DomeTier = 'glass', r = radius(tier), cx = 40, cz = 40;
+    // an S-shaped drive from the north-east that ends on the dome's far side (the owner's shot: a zigzag into the yard)
+    const drive: Pt[] = [];
+    for (let i = 0; i <= 80; i++) { const t = i / 80; drive.push([cx + 30 - 34 * t, cz - 26 + 30 * t + 5 * Math.sin(t * 9)]); }
+    for (let rt = 0; rt < 4; rt++) for (const want of [0.5, 1.0, 2.0, 3.5, 5.0]) {
+      const keep = { cx, cz, footR: r + 0.03, yard: yardCorners(tier, cx, cz, r, rt) }, ang = choosePortAngle({ tier, r, rot: rt }, want).angle, f = portFrame(tier, cx, cz, r, ang)!;
+      const a = approachRoute(drive, keep, f, 0)!;
+      let worst = 0;
+      for (let i = a.joinAt; i + 2 < a.route.length; i++) {
+        const p = a.route[i], q = a.route[i + 1], s = a.route[i + 2], d1 = Math.atan2(q[0] - p[0], q[1] - p[1]), d2 = Math.atan2(s[0] - q[0], s[1] - q[1]);
+        worst = Math.max(worst, angDist(d1, d2));
+      }
+      expect(worst, `rot ${rt} want ${want}`).toBeLessThan(1.05);
+    }
+  });
+});
