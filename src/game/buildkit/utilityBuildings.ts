@@ -206,30 +206,30 @@ function filtrationShed(_def: KitPieceDef, seed = 1): THREE.Group {
 function filtrationOutside(p: Parts): void {
   const hw = 0.15, hd = 0.2, L = 'openings' as const;
   // two blue tanks on a concrete skid, a steel manifold into the wall with a red valve wheel
-  p.add('concrete', box(0.12, 0.02, 0.26, hw + 0.075, -0.005, -0.02), L);
+  p.add('steel', box(0.12, 0.02, 0.26, hw + 0.075, -0.005, -0.02), L);
   for (const z of [-0.1, 0.06]) {
     p.add('blue_tank', cyl(0.04, 0.25, hw + 0.075, 0.015, z, 14), L);
     p.add('blue_tank', new THREE.SphereGeometry(0.04, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).translate(hw + 0.075, 0.265, z), L);
     p.add('steel', cyl(0.043, 0.012, hw + 0.075, 0.015, z, 14), L);
     p.add('steel', cyl(0.012, 0.03, hw + 0.075, 0.295, z, 8), L);                                       // the head valve
-    p.add('copper', pipe([hw + 0.04, 0.07, z], [hw + 0.015, 0.07, z], 0.006, 6), L);
+    p.add('steel', pipe([hw + 0.04, 0.07, z], [hw + 0.015, 0.07, z], 0.006, 6), L);
   }
-  p.add('copper', pipe([hw + 0.02, 0.07, -0.1], [hw + 0.02, 0.07, 0.06], 0.006, 6), L);
-  p.add('paint_red', new THREE.TorusGeometry(0.018, 0.004, 4, 10).rotateY(Math.PI / 2).translate(hw + 0.03, 0.12, -0.02), L);
+  p.add('steel', pipe([hw + 0.02, 0.07, -0.1], [hw + 0.02, 0.07, 0.06], 0.006, 6), L);
+  p.add('steel', new THREE.TorusGeometry(0.018, 0.004, 4, 10).rotateY(Math.PI / 2).translate(hw + 0.03, 0.12, -0.02), L);
   // the media hopper: a steel cone on four legs by the left wall (back corner), a chute down to a bucket
   const hx = -hw - 0.055, hz = -0.13;
   p.add('steel', new THREE.ConeGeometry(0.055, 0.09, 12, 1, true).rotateX(Math.PI).translate(hx, 0.17, hz), L);
   p.add('steel', cyl(0.055, 0.02, hx, 0.215, hz, 12), L);
   for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]] as const) p.add('steel', box(0.008, 0.16, 0.008, hx + dx * 0.04, 0, hz + dz * 0.04), L);
   p.add('steel', cyl(0.01, 0.03, hx, 0.095, hz, 6), L);
-  p.add('blue_tank', cyl(0.025, 0.05, hx, 0, hz, 10), L);
+  p.add('steel', cyl(0.025, 0.05, hx, 0, hz, 10), L);
   // a turbine vent on the ridge and a white vent stack with a cap up the back wall
   const ridge = 0.03 + 0.4 + 0.12;
   p.add('steel', cyl(0.012, 0.03, 0, ridge - 0.005, -0.08, 8), L);
   p.add('steel', new THREE.SphereGeometry(0.026, 10, 7).translate(0, ridge + 0.04, -0.08), L);
-  p.add('iron', new THREE.TorusGeometry(0.026, 0.003, 4, 12).rotateX(Math.PI / 2).translate(0, ridge + 0.04, -0.08), L);
-  p.add('enamel', cyl(0.009, 0.5, 0.09, 0, -hd - 0.015, 8), L);
-  p.add('enamel', cyl(0.014, 0.012, 0.09, 0.5, -hd - 0.015, 8), L);
+  p.add('steel', new THREE.TorusGeometry(0.026, 0.003, 4, 12).rotateX(Math.PI / 2).translate(0, ridge + 0.04, -0.08), L);
+  p.add('steel', cyl(0.009, 0.5, 0.09, 0, -hd - 0.015, 8), L);
+  p.add('steel', cyl(0.014, 0.012, 0.09, 0.5, -hd - 0.015, 8), L);
 }
 
 function batteryShed(_def: KitPieceDef, seed = 1): THREE.Group {

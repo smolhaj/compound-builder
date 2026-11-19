@@ -62,4 +62,25 @@ describe('an upgrade run is drawn beside the old one', () => {
     const c = offsetPts([[0, 0], [6, 0], [6, 6]], UPGRADE_OFFSET);
     expect(c[1][0]).toBeCloseTo(6 - UPGRADE_OFFSET); expect(c[1][1]).toBeCloseTo(UPGRADE_OFFSET);
   });
+
+  it('the four tall tiers read apart at mid height (the cab is out of frame): distinct width, mass and marks', () => {
+    const sig = (kind: TowerKind) => {
+      const g = buildLayers(KIT[kind]);
+      let minX = Infinity, maxX = -Infinity, n = 0;
+      g.traverse(o => {
+        const m = o as unknown as { isMesh?: boolean; geometry?: { getAttribute(n: string): { count: number; getX(i: number): number; getY(i: number): number } } };
+        if (!m.isMesh || !m.geometry) return;
+        const pos = m.geometry.getAttribute('position');
+        for (let i = 0; i < pos.count; i++) { const y = pos.getY(i); if (y > 0.3 && y < 0.95) { minX = Math.min(minX, pos.getX(i)); maxX = Math.max(maxX, pos.getX(i)); n++; } }
+      });
+      return { w: maxX - minX, n };
+    };
+    const tiers: TowerKind[] = ['watchtower_concrete', 'watchtower_flood', 'watchtower_mount', 'watchtower_turret'];
+    const s4 = tiers.map(sig);
+    for (let a = 0; a < 4; a++) for (let b = a + 1; b < 4; b++) {
+      expect(Math.abs(s4[a].n - s4[b].n) + Math.abs(s4[a].w - s4[b].w) * 1000, `${tiers[a]} vs ${tiers[b]}`).toBeGreaterThan(40);
+    }
+    expect(s4[2].w).toBeGreaterThan(s4[0].w + 0.08);     // the mount tier's battered skirt and lockers are wider than a bare shaft
+    expect(s4[1].w).toBeGreaterThan(s4[0].w + 0.08);     // the floodlight banks stick out of the shaft
+  });
 });
