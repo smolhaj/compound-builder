@@ -6,6 +6,10 @@
 import { KIT, footprint } from '../buildkit/kit';
 import { PERIMETER } from '../../sim/perimeter';
 import type { GameState } from '../../sim/state';
+import { domesOf } from '../../sim/dome/standing';
+
+/** An airlock module on a dome's shell: a block about 5 m across and 4 m tall that the camera may not fly into (a shot inside one is black). */
+export const AIRLOCK_HALF = 0.55, AIRLOCK_H = 0.75;
 
 export interface Box { x0: number; z0: number; x1: number; z1: number; h: number; kind: 'building' | 'wall' | 'tree' | 'brush'; /** The structure's kind id (a crate, a well, a truck), for the buildings. */ id?: string; /** Height of the underside above the ground (a tree's crown; default 0). */ y0?: number }
 
@@ -25,6 +29,10 @@ export function obstaclesOf(g: GameState): Box[] {
     // the body to the roof line; the porch and steps in front of the door as a low deck only (open above: posts and rails do not hide a person)
     out.push({ ...footprint(def, st.x, st.z, st.rot, false), h: buildingHeight(st.kind, def.floorY), kind: 'building', id: st.kind });
     if (def.frontCells > 0) out.push({ ...footprint(def, st.x, st.z, st.rot, true), h: PORCH_HEIGHT, kind: 'building' });
+  }
+  for (const d of domesOf(g)) for (const l of d.airlocks) {
+    const cx = d.x + Math.sin(l.angle) * d.r, cz = d.z + Math.cos(l.angle) * d.r;
+    out.push({ x0: cx - AIRLOCK_HALF, x1: cx + AIRLOCK_HALF, z0: cz - AIRLOCK_HALF, z1: cz + AIRLOCK_HALF, h: AIRLOCK_H, kind: 'building', id: 'dome_airlock' });
   }
   for (const run of g.perimeter) {
     const def = PERIMETER[run.kind];

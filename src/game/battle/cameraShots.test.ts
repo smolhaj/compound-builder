@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Director, MAX_SURFACE_COVER, MAX_WALL_COVER, wallCover, STANDOFF, auditPose, bestEye, surfaceCover, brushCover, MAX_BRUSH_COVER, figurePx, lensProblem, poseAt, shotProblems, type Actor, type Box, type Shot } from './director';
 import { obstaclesOf, treeBoxes } from './cameraObstacles';
+import { place } from '../../sim/raidTestKit';
+import { domesOf } from '../../sim/dome/standing';
 import { lightLabel } from './lightLabel';
 import { planSiege, sceneCaption, segments, type SceneKind } from '../../sim/siege';
 import type { EncounterKind } from '../../sim/encounters';
@@ -186,6 +188,15 @@ describe('every raid-cutscene shot frames its subject and stays out of the geome
     expect(shotProblems({ ...base, eye: { x: 0, y: 0.5, z: -3 }, look: { x: 0, y: 0.2, z: 3 } }, ctx).join()).toMatch(/subjects in frame/);
     expect(shotProblems({ ...base, eye: { x: 0, y: 0.5, z: 3.8 }, look: { x: 0, y: 0.2, z: 3 } }, ctx).join()).toMatch(/too close/);
     expect(shotProblems({ ...base, eye: { x: 2.5, y: 0.5, z: 6 }, look: { x: 0, y: 0.2, z: 3 } }, ctx)).toEqual([]);
+  });
+});
+
+describe('a dome\'s airlock modules are solid to the camera', () => {
+  it('gives each person airlock a box at the shell, so no shot sits inside one', () => {
+    const g = place(3, 'hardcore', 'armed'); g.structures.push({ id: 'dm', kind: 'dome_glass', x: 0, z: 0, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 });
+    const dome = domesOf(g)[0], boxes = obstaclesOf(g).filter(b => b.id === 'dome_airlock');
+    expect(dome.airlocks.length).toBeGreaterThan(0); expect(boxes.length).toBe(dome.airlocks.length);
+    for (const l of dome.airlocks) expect(boxes.some(b => Math.hypot((b.x0 + b.x1) / 2 - Math.sin(l.angle) * dome.r, (b.z0 + b.z1) / 2 - Math.cos(l.angle) * dome.r) < 0.01)).toBe(true);
   });
 });
 
