@@ -15,10 +15,14 @@ import { atTheRoad, log } from './economy';
 import { chronicleUpkeep } from './lineage';
 import { payUpkeep, toolHold, wearTools, workSpeed } from './tools';
 import type { GameState, Structure } from './state';
+import { bunkerBlueprint, footedBlueprint, holdDome, holdFor, type Piece } from './dome/bunker';
+import { tierOfKind } from './dome/tiers';
 import { lengthText } from './units';
 
 export function blueprintOf(st: Structure) {
-  const bp = BLUEPRINTS[st.kind];
+  let bp = BLUEPRINTS[st.kind];
+  if (st.underDome) bp = bunkerBlueprint(bp, st.underDome);
+  else if (st.domeFoot) bp = footedBlueprint(bp, st.domeFoot.yd, st.domeFoot.goods);
   return st.grade ? gradedBlueprint(styledBlueprint(bp, st.mat), st.grade) : styledBlueprint(bp, st.mat);
 }
 
@@ -55,10 +59,25 @@ export function planStructure(s: GameState, kind: string, x: number, z: number, 
   return st;
 }
 
+/** The order a dome and the bunker built with it keep (sim/dome/bunker.ts): the bunker digs when the crater is deep enough, the dome backfills when the bunker has walls and a roof. */
+export function orderHold(s: GameState, st: Structure): string | null {
+  if (st.underDome?.with) {
+    const d = s.structures.find(x => x.id === st.underDome!.id), tier = d && tierOfKind(d.kind);
+    if (!d || !tier || isFinished(d)) return null;
+    const bp = BLUEPRINTS[d.kind].stages[d.stage];
+    return holdFor(st as unknown as Piece, { tier, stage: d.stage, f: d.supplied && bp ? d.done / bp.hours : 0 }, st.underDome.floorFt);
+  }
+  if (st.stage === 2 && !isFinished(st) && tierOfKind(st.kind)) {
+    const linked = s.structures.filter(x => x.underDome?.id === st.id && x.underDome.with) as unknown as Piece[];
+    return linked.length ? holdDome(st.stage, linked) : null;
+  }
+  return null;
+}
+
 /** Why work on this structure can't go on now (null = it can). */
 export function blockedReason(s: GameState, st: Structure): string | null {
   if (isFinished(st)) return 'finished';
-  const hold = permitHold(s, st);
+  const hold = permitHold(s, st) ?? orderHold(s, st);
   if (hold) return hold;
   if (st.supplied) return null;
   const need = blueprintOf(st).stages[st.stage].materials;
@@ -74,7 +93,7 @@ export const roadWaiting = (s: GameState, miss: Partial<Stock>): boolean => { co
 
 /** `blockedReason(s, st) === null` without building the message (the engine asks this every quarter-hour). */
 export function canGoOn(s: GameState, st: Structure): boolean {
-  if (isFinished(st) || permitHold(s, st)) return false;
+  if (isFinished(st) || permitHold(s, st) || orderHold(s, st)) return false;
   if (!(st.supplied || hasAll(s.stock, blueprintOf(st).stages[st.stage].materials))) return false;
   return toolHold(s, { kind: 'build', stage: blueprintOf(st).stages[st.stage].id }) === null;   // (a tool it can't do without: sim/tools.ts)
 }
@@ -106,7 +125,7 @@ export function addWork(s: GameState, st: Structure, personHours: number, own = 
   let left = own ? payUpkeep(s, personHours) : personHours;
   const bp = blueprintOf(st);
   while (left > 1e-9 && !isFinished(st)) {
-    if (!supply(s, st)) break;
+    if (orderHold(s, st) || !supply(s, st)) break;
     const stage = bp.stages[st.stage];
     const need = stage.hours - st.done;
     const task = { kind: 'build', stage: stage.id } as const;

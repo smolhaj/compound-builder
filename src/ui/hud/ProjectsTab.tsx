@@ -27,6 +27,7 @@ import { TONE, DIM, LINE, btn, usd } from './style';
 import { pluralize } from '../../sim/words';
 import { digLabel, digState, digVolumes } from '../../sim/dome/dig';
 import { TIER, cellsOfKind, tierOfKind } from '../../sim/dome/tiers';
+import { bunkerShellPct } from '../../sim/dome/bunkerLive';
 import { blueprintOf } from '../../sim/construction';
 import type { Structure } from '../../sim/state';
 
@@ -119,6 +120,7 @@ export function ProjectsTab() {
           <div ref={el => { if (el && g.selected === sel.id && selSeen.current !== sel.id) { selSeen.current = sel.id; el.scrollIntoView?.({ block: 'start' }); } }} />
           <Row label="Stage" value={sel.pre ? 'Came with the land' : isFinished(sel) ? 'Finished' : BLUEPRINTS[sel.kind].stages[sel.stage].name} />
           {!sel.pre && !isFinished(sel) && <DigLine st={sel} />}
+          {sel.underDome && <div data-testid="bunker-under-dome-line"><Note>{sel.underDome.with ? 'Built with the dome: it shares the crater, so it takes about half the hours.' : 'Dug under the dome\'s floor with shoring: it takes longer than in the open.'}{sel.underDome.footFt > 0 ? ` Its deep footing takes the skirt ${sel.underDome.footFt} ft deeper.` : ''}</Note></div>}
           {isFinished(sel) && <ResidentsLine id={sel.id} />}
           {(sel.fixes ?? []).length > 0 && <>
             {(sel.fixes ?? []).map(f => <div key={f.part} style={{ display: 'flex', justifyContent: 'space-between', gap: 6, marginTop: 3 }}>
@@ -247,8 +249,11 @@ export function ProjectsTab() {
 
 /** A dome's ground works, in words: what the crew is doing now (the crater, the utilities, the skirt, the backfill) and how much dirt there is. */
 export function DigLine({ st }: { st: Structure }) {
+  const game = useGameStore(g => g.game);
   const tier = tierOfKind(st.kind);
   if (!tier) return null;
   const hrs = blueprintOf(st).stages[st.stage]?.hours ?? 1, d = digState(tier, st.stage, st.done / hrs, st.supplied), cells = cellsOfKind(st.kind) ?? TIER[tier].cells;
-  return <div data-testid="dome-dig-line"><Note>{digLabel(tier, d, d.phase === 'excavation' ? digVolumes(tier, cells, d.depthFt) : undefined)}</Note></div>;
+  const shell = bunkerShellPct(game, st.id);
+  return <div data-testid="dome-dig-line"><Note>{digLabel(tier, d, d.phase === 'excavation' ? digVolumes(tier, cells, d.depthFt) : undefined)}</Note>
+    {shell !== null && <Note tone={st.stage === 2 && shell < 100 ? 'warn' : undefined}><span data-testid="dome-bunker-shell">Bunker shell: {shell} percent{shell < 100 ? ' (the crater is not backfilled until its walls and roof stand)' : ''}</span></Note>}</div>;
 }
