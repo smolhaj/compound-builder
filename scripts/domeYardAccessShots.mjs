@@ -18,7 +18,7 @@ try {
   const page = await browser.newPage({ viewport: { width: W, height: H } });
   page.setDefaultTimeout(900000);
   page.on('pageerror', e => console.error('pageerror:', e.message));
-  await page.goto(`http://localhost:${port}/?seed=7${process.env.PANEL ? '&layout=a' : '&clean'}&lowrender=${PR}&region=${process.env.REGION ?? 'mountain_west'}&acres=40&relief=${process.env.RELIEF ?? 1}&lotseed=${process.env.LOTSEED ?? 8}`);
+  await page.goto(`http://localhost:${port}/?seed=7${process.env.PANEL ? '&layout=a' : '&clean'}&lowrender=${PR}&region=${process.env.REGION ?? 'mountain_west'}&acres=40&relief=${process.env.RELIEF ?? 0}&lotseed=${process.env.LOTSEED ?? 8}`);
   await page.waitForFunction(() => window.__cb?.qa?.lowrender, null, { timeout: 300000 });
   await page.evaluate(() => window.__cb.store.getState().setQuality?.('high', true));
   const frames = async (n = 1) => { for (let i = 0; i < n; i++) await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(250); };
@@ -28,7 +28,7 @@ try {
     const cb = window.__cb, G = cb.game, c = cb.world.camp; G.getState().setSpeed(0);
     G.setState(s => ({ game: { ...s.game, money: 900_000_000 } }));
     const put = (kind, x, z, r = 4) => { const sp = cb.tool.findSpot(kind, x, z, 0, r); if (!sp) return null; G.getState().plan(kind, sp[0], sp[1], 0); return { id: G.getState().game.structures.at(-1).id, x: sp[0], z: sp[1], kind }; };
-    const domes = { arc: put('dome_arcology_30', c.x - 6, c.z + 2, 14), glass: put('dome_glass_18', c.x + 9, c.z + 3, 14), geo: put('dome_geodesic_8', c.x + 3, c.z - 9, 12), earth: put('dome_earthen_3', c.x + 13, c.z - 6, 12) };
+    const domes = { arc: put('dome_arcology_30', c.x - 7, c.z - 4, 14), glass: put('dome_glass_18', c.x + 8, c.z - 3, 14), geo: put('dome_geodesic_8', c.x - 1, c.z + 9, 12), earth: put('dome_earthen_3', c.x + 10, c.z + 9, 12) };
     const inside = (d, R, list) => { for (const [k, fx, fz] of list) { const sp = cb.tool.findSpot(k, d.x + fx * R, d.z + fz * R, 0, 2); if (sp) G.getState().plan(k, sp[0], sp[1], 0); } };
     if (domes.arc) inside(domes.arc, 7.5, [['log_house', -0.12, 0.1], ['barn', 0.34, -0.3], ['workshop', 0.18, 0.3], ['garden', -0.3, -0.2], ['greenhouse', -0.46, 0.0]]);
     if (domes.glass) inside(domes.glass, 4.5, [['log_house', -0.1, 0.0], ['garden', 0.3, -0.2]]);
@@ -49,14 +49,15 @@ try {
   if (!info.domes.arc || !info.domes.glass) throw new Error('missing domes ' + JSON.stringify(info.domes));
   await frames(3);
   const gd = (x, z) => page.evaluate(([x, z]) => window.__cb.world.groundAt(x, z), [x, z]);
-  const pose = (e, l, fov = 60) => page.evaluate(([e, l, fov]) => { window.__cb.qa.pose = { x: e[0], y: e[1], z: e[2], lx: l[0], ly: l[1], lz: l[2], fov }; }, [e, l, fov]);
+  const pose = async (e, l, fov = 60) => { if (e[1] < 0) { e = [e[0], (await gd(e[0], e[2])) + -e[1], e[2]]; } return poseRaw(e, l, fov); };
+  const poseRaw = (e, l, fov = 60) => page.evaluate(([e, l, fov]) => { window.__cb.qa.pose = { x: e[0], y: e[1], z: e[2], lx: l[0], ly: l[1], lz: l[2], fov }; }, [e, l, fov]);
   const person = async (x, z) => page.evaluate(async ([x, z]) => { const m = await import('/src/game/HomesteadWorld.ts'); window.__cb.ws.scene.add(m.scaleFigure(x, z, window.__cb.world.groundAt(x, z))); }, [x, z]);
   await set(`const s = cb.store.getState(); s.setTimeOfDay(16.6); s.setBuildingView('full'); s.setSeasonMode?.('summer'); s.setWeatherMode('clear');`);
   const A = info.domes.arc, G2 = info.domes.glass, ga = info.geo.arc, gg = info.geo.glass;
   const yc = (d, g) => [d.x + g.y.center[0], d.z + g.y.center[1]];
   const ya = yc(A, ga), yg = yc(G2, gg), gA = await gd(A.x, A.z), gG = await gd(G2.x, G2.z);
   const cx = (A.x + G2.x) / 2, cz = (A.z + G2.z) / 2;
-  if (want('hero')) { await pose([cx + 6, gA + 12, cz + 24], [cx + 1, gA + 1.5, cz - 2], 52); await shot('hero-aerial-four-domes'); await pose([cx - 20, gA + 6, cz + 10], [cx + 2, gA + 1.5, cz - 1], 55); await shot('hero-side-four-domes'); }
+  if (want('hero')) { await pose([cx + 3, gA + 11, cz + 32], [cx + 1, gA + 1, cz + 4], 52); await shot('hero-aerial-four-domes'); await pose([cx - 26, gA + 5, cz + 14], [cx + 1, gA + 1.5, cz + 3], 55); await shot('hero-side-four-domes'); }
   if (want('eye')) {
     // eye level on the glass dome's yard (wall continuous, no gate) with a person beside the wall
     const e = gg.y.er, t = gg.y.et;
