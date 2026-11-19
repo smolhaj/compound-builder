@@ -671,7 +671,7 @@ export function GameCanvas() {
         wx.haze = Math.max(wx.haze ?? 0.4, look.haze);
         wx.snow = Math.max(wx.snow, 0.5 * look.ash);
       }
-      ws.setCollapseLook({ dim: look.dim, tint: look.skyTint, amt: look.skyAmt, night: look.skyNight, cast: look.cast, sat: look.sat, contrast: look.contrast, sunScale: look.sunScale, sunLower: look.sunLower, townGlow: look.townGlow, flicker: look.flicker, fireGlow: look.fireGlow, smoke: look.smoke, nightLift: look.nightLift, nightGlow: look.nightGlow,
+      ws.setCollapseLook({ dim: look.dim, tint: look.skyTint, amt: look.skyAmt, night: look.skyNight, cast: look.cast, sat: look.sat, contrast: look.contrast, sunScale: look.sunScale, sunLower: look.sunLower, wash: look.scorch, townGlow: look.townGlow, flicker: look.flicker, fireGlow: look.fireGlow, smoke: look.smoke, nightLift: look.nightLift, nightGlow: look.nightGlow,
         fog: look.fog, haze: look.haze, townLights: look.townLights, traffic: look.traffic, convoy: look.convoy, flashes: look.flashes, aurora: look.aurora, comet: look.comet, az: look.az });
       ws.cutsceneLift = player.active ? 1 : 0;
       ws.setWeather(wx, Math.max(weather.flash, look.flash, 0.6 * (getHitLive()?.flash ?? 0)), weather.skyLightning);

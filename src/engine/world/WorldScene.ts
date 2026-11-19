@@ -113,7 +113,7 @@ export class WorldScene {
   private _envBakeCloud = 0;
   private _envBakeTint = 0;
   /** The collapse's look (setCollapseLook): sun dim, sky tint, grade cast. Neutral = nothing. */
-  private readonly _collapse = { dim: 1, tint: new THREE.Color(), amt: 0, night: false, cast: new THREE.Color(1, 1, 1), sat: 1, contrast: 0, townGlow: 1, flicker: 0, fireGlow: 0, smoke: 0, nightLift: 0, nightGlow: new THREE.Color(0, 0, 0), fog: 0, haze: 0, townLights: 0, traffic: 0, convoy: 0, flashes: 0, aurora: 0, comet: 0, sunScale: 1, sunLower: 0, az: { town: 3.14, road: 3.09, fire: 3.14, war: 3.14 } };
+  private readonly _collapse = { dim: 1, tint: new THREE.Color(), amt: 0, night: false, cast: new THREE.Color(1, 1, 1), sat: 1, contrast: 0, townGlow: 1, flicker: 0, fireGlow: 0, smoke: 0, nightLift: 0, nightGlow: new THREE.Color(0, 0, 0), fog: 0, haze: 0, townLights: 0, traffic: 0, convoy: 0, flashes: 0, aurora: 0, comet: 0, sunScale: 1, sunLower: 0, wash: 0, az: { town: 3.14, road: 3.09, fire: 3.14, war: 3.14 } };
   /** The oasis contrast grade (setOasis): warm inside a held compound, cold and ashy outside. Neutral = nothing (peacetime). */
   private _oasis: GradeDelta = gradeDelta(oasisFactors({ collapse: 0, safety: 1, inside: 1 }), 0, 0);
   private readonly _oasisIn = { collapse: 0, safety: 1, inside: 1 };
@@ -270,13 +270,13 @@ export class WorldScene {
    * at night for an aurora), and the grade's cast, saturation and contrast. Pass the neutral values to clear it.
    */
   setCollapseLook(l: { dim: number; tint: readonly number[]; amt: number; night: boolean; cast: readonly number[]; sat: number; contrast: number; townGlow?: number; flicker?: number; fireGlow?: number; smoke?: number; nightLift?: number; nightGlow?: readonly number[];
-    fog?: number; haze?: number; townLights?: number; traffic?: number; convoy?: number; flashes?: number; aurora?: number; comet?: number; sunScale?: number; sunLower?: number; az?: { town: number; road: number; fire: number; war: number } }): void {
+    fog?: number; haze?: number; townLights?: number; traffic?: number; convoy?: number; flashes?: number; aurora?: number; comet?: number; sunScale?: number; sunLower?: number; wash?: number; az?: { town: number; road: number; fire: number; war: number } }): void {
     const c = this._collapse;
     c.dim = l.dim; c.tint.setRGB(l.tint[0], l.tint[1], l.tint[2]); c.amt = l.amt; c.night = l.night;
     c.cast.setRGB(l.cast[0], l.cast[1], l.cast[2]); c.sat = l.sat; c.contrast = l.contrast;
     c.townGlow = l.townGlow ?? 1; c.flicker = l.flicker ?? 0; c.fireGlow = l.fireGlow ?? 0; c.smoke = l.smoke ?? 0; c.nightLift = l.nightLift ?? 0;
     if (l.nightGlow) c.nightGlow.setRGB(l.nightGlow[0], l.nightGlow[1], l.nightGlow[2]); else c.nightGlow.setRGB(0, 0, 0);
-    c.fog = l.fog ?? 0; c.haze = l.haze ?? 0; c.townLights = l.townLights ?? 0; c.traffic = l.traffic ?? 0; c.convoy = l.convoy ?? 0; c.flashes = l.flashes ?? 0; c.aurora = l.aurora ?? 0; c.comet = l.comet ?? 0; c.sunScale = l.sunScale ?? 1; c.sunLower = l.sunLower ?? 0;
+    c.fog = l.fog ?? 0; c.haze = l.haze ?? 0; c.townLights = l.townLights ?? 0; c.traffic = l.traffic ?? 0; c.convoy = l.convoy ?? 0; c.flashes = l.flashes ?? 0; c.aurora = l.aurora ?? 0; c.comet = l.comet ?? 0; c.sunScale = l.sunScale ?? 1; c.sunLower = l.sunLower ?? 0; c.wash = l.wash ?? 0;
     if (l.az) c.az = l.az;
   }
 
@@ -719,6 +719,15 @@ export class WorldScene {
     const pull = (c: THREE.Color, k: number) => { const l = Math.max(0.02, lum(c)); tmp.copy(t).multiplyScalar(l / Math.max(0.02, lum(t))); c.lerp(tmp, Math.min(1, amt * k)); };
     pull(sky.zenith, 0.95); pull(sky.horizonSun, 1); pull(sky.horizonAnti, 1); pull(sky.fog, 1);
     pull(sky.cloudLit, 0.9); pull(sky.cloudShade, 0.9);
+    const wash = this._collapse.wash;
+    if (wash > 0.001 && !this._collapse.night) {
+      // runaway heat: the sky is washed to a pale, hot white-yellow (the tint alone keeps each part's brightness, which reads as a dull olive grey)
+      sky.zenith.lerp(tmp.setRGB(0.80, 0.78, 0.66), 0.6 * wash);
+      sky.horizonSun.lerp(tmp.setRGB(1.0, 0.95, 0.78), 0.65 * wash);
+      sky.horizonAnti.lerp(tmp.setRGB(0.96, 0.92, 0.78), 0.65 * wash);
+      sky.fog.lerp(tmp.setRGB(0.92, 0.88, 0.74), 0.65 * wash);
+      sky.cloudLit.lerp(tmp.setRGB(1.0, 0.97, 0.88), 0.5 * wash);
+    }
     if (!this._collapse.night) {
       sky.sunDisc *= 1 - 0.8 * amt; sky.sunGlow *= 1 - 0.6 * amt;
       sky.cloudCover += (0.97 - sky.cloudCover) * Math.min(1, amt * 0.8);
