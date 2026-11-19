@@ -69,6 +69,15 @@ export interface LoadOpts {
   powered?: boolean;
   /** Share 0..1 of the roof vents that open (damaged or lost vent hatches, sim/dome/plantUnits.ts). */
   ventK?: number;
+  /**
+   * The plant's limits in a climate disaster (sim/dome/plantClimate.ts, PROPOSED). All default to the flat model above, so with none given nothing
+   * changes: the chiller's COP (default COP_COOL), the heat pump's COP (default COP_HEAT), the most heat the chiller can remove (Btu per hour,
+   * default unlimited: what it cannot take is left to float the air) and the share of the evaporative pads' work the wet-bulb allows (default 1).
+   */
+  copCool?: number;
+  copHeat?: number;
+  chillCapBtu?: number;
+  evapK?: number;
 }
 
 const earthK = (tier: DomeTier): number => tier === 'earthen' ? 0.6 : tier === 'geodesic' ? 0.12 : 0;
@@ -96,7 +105,7 @@ export function domeLoad(tier: DomeTier, cells: number, outsideF: number, sun: n
     if (!powered) return { ...base, kwThermal: 0, kwElectric: 0, kwhPerDay: 0, indoorF: free };
     const loss = SHELL_U[tier] * g.surfaceSf * (lo - ref);
     const gain = PEAK_SUN * clamp01(sun) * g.footprintSf * SOLAR_GAIN[tier];
-    const net = Math.max(0, loss - gain), kwT = net / BTU_PER_KWH, kwE = kwT / COP_HEAT;
+    const net = Math.max(0, loss - gain), kwT = net / BTU_PER_KWH, kwE = kwT / (o.copHeat ?? COP_HEAT);
     return { ...base, kwThermal: kwT, kwElectric: kwE, kwhPerDay: kwE * 24, indoorF: lo, stage: 'heating' };
   }
   if (free <= hi) return { ...base, kwThermal: 0, kwElectric: 0, kwhPerDay: 0, indoorF: free };
@@ -116,11 +125,15 @@ export function domeLoad(tier: DomeTier, cells: number, outsideF: number, sun: n
   }
   if (need() > 0) { gain = Math.min(gain, solar * COOL.SHADE_LEFT + Math.max(0, gain - solar)); kwE += COOL.SHADE_KW_KSF * ksf; stage = 'shade'; }
   if (need() > 0 && powered) {
-    const cap = COOL.EVAP_BTU_SF * g.footprintSf * clamp01(o.dry ?? 0.5);
+    const cap = COOL.EVAP_BTU_SF * g.footprintSf * clamp01(o.dry ?? 0.5) * clamp01(o.evapK ?? 1);
     const take = Math.min(need(), cap);
     kwE += COOL.EVAP_KW_KSF * ksf * Math.min(1, take / Math.max(1, cap)); water += take / COOL.BTU_PER_GAL * 24; gain -= take; stage = 'evap';
   }
-  if (need() > 0 && powered) { kwE += need() / BTU_PER_KWH / COP_COOL; stage = 'chill'; gain -= need(); }
+  if (need() > 0 && powered) {
+    // the chiller takes what its capacity allows (all of it unless a limit is given); the rest is left to float the air up
+    const ask = need(), take = Math.min(ask, Math.max(0, o.chillCapBtu ?? Infinity));
+    kwE += take / BTU_PER_KWH / (o.copCool ?? COP_COOL); stage = 'chill'; gain -= take;
+  }
   const left = need();
   const indoor = left > 0 ? Math.min(free, hold + left / (SHELL_U[tier] * g.surfaceSf)) : hold;
   return { ...base, kwThermal: -(solar - gain) / BTU_PER_KWH, kwElectric: kwE, kwhPerDay: kwE * 24, indoorF: Math.max(hold, Math.min(free, indoor)), stage, waterGalDay: water };

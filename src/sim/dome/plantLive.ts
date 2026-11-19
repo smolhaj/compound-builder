@@ -14,6 +14,8 @@ import type { RaidDamage } from '../raidDamage';
 import { isFinished } from '../construction';
 import { TIER, cellsOfKind, shellFt, tierOfKind } from './tiers';
 import { feederPartners, supplemented } from './links';
+import { isSlowKind } from '../slowClimate';
+import { batteryTempK, leadStretch } from './plantClimate';
 
 type Ref = Pick<DomeRef, 'st' | 'tier' | 'cells' | 'r'>;
 
@@ -28,7 +30,7 @@ export function unitsOf(s: GameState, d: Ref, st: DomeState): PlantUnit[] {
 }
 
 /** What the plant as it stands lets the dome do. */
-export const rawFxOf = (s: GameState, d: Ref, st: DomeState): PlantFx => plantFx(unitsOf(s, d, st), s.clock.t);
+export const rawFxOf = (s: GameState, d: Ref, st: DomeState): PlantFx => plantFx(unitsOf(s, d, st), s.clock.t, isSlowKind(s.disaster.kind) ? batteryTempK(st.indoorF) : 1);
 
 /** A partner dome's own plant shares (not supplemented: the feeder never chains), or null when it is not a finished dome. */
 function partnerFx(s: GameState, id: string): PlantFx | null {
@@ -85,12 +87,19 @@ export function damagePlant(s: GameState, d: Ref, st: DomeState, unitId: string,
   const open = jobOf(s, d.st.id, unitId);
   if (open && (open.cond === 'down' || open.cond === cond)) return null;
   if (!open && plantJobs(s, d.st.id).length >= MAX_PLANT_JOBS) return null;
-  const spec = repairSpec(d.tier, d.cells, u.kind, cond), day = dayIndex(s.clock.t), at = unitSpot(d, st, unitId);
+  const base = repairSpec(d.tier, d.cells, u.kind, cond), day = dayIndex(s.clock.t), at = unitSpot(d, st, unitId);
+  // in a climate disaster the parts take longer as deliveries fall (up to 4 times; PROPOSED, doc 1.5)
+  const spec = isSlowKind(s.disaster.kind) ? { ...base, leadDays: Math.round(base.leadDays * leadStretch(s.disaster.tracks.deliveries)) } : base;
   const what = `the ${u.spare ? PLANT_SHORT[u.kind] + ' (spare)' : PLANT_SHORT[u.kind]}`;
   if (open) {
     Object.assign(open, { cond, hours: spec.hours, done: 0, supplied: Object.keys(spec.bill).length === 0, bill: spec.bill, readyDay: day + spec.leadDays, at: s.clock.t, cause });
   } else {
     (s.raidDamage ??= []).push({ id: `d${s.nextId++}`, kind: 'plant', x: at.x, z: at.z, day, hours: spec.hours, done: 0, supplied: Object.keys(spec.bill).length === 0, bill: spec.bill, readyDay: day + spec.leadDays, structure: d.st.id, unit: unitId, cond, cause, at: s.clock.t, what });
+  }
+  if (cause === 'heat' || cause === 'load' || cause === 'cold') {
+    const line = `${what[0].toUpperCase()}${what.slice(1)} ${cond === 'down' ? (cause === 'cold' ? 'froze up' : 'burned out') : 'is straining'} ${cause === 'heat' ? 'in the heat' : cause === 'cold' ? 'in the cold' : 'under the load'}: ${stepWord(u.kind, cond)}`;
+    log(s, line);
+    return line;
   }
   const verb = cause === 'raid' ? (cond === 'down' ? 'wrecked' : 'damaged') : cause === 'fire' ? (cond === 'down' ? 'burned out' : 'scorched') : (cond === 'down' ? 'knocked out' : 'damaged');
   const line = `${what[0].toUpperCase()}${what.slice(1)} was ${verb}${cause === 'storm' ? ' by the storm' : cause === 'fire' ? ' by fire' : ''}: ${stepWord(u.kind, cond)}`;
