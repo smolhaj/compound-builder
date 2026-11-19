@@ -669,7 +669,7 @@ export interface SiteQuery {
   rule?(kind: string, x: number, z: number): PlaceProblem | null;
 }
 
-export type PlaceProblem = 'cross_slope' | 'needs_house' | 'needs_slope' | 'no_climb' | 'no_creek' | 'no_head' | 'no_water' | 'not_connected' | 'not_on_bank' | 'not_shore' | 'off_parcel' | 'overlaps' | 'pad_clash' | 'pad_over_road' | 'straddles_dome' | 'straddles_skirt' | 'airlock_lane' | 'skirt_too_shallow' | 'thin_cover' | 'too_deep' | 'too_much_climb' | 'too_steep' | 'water';
+export type PlaceProblem = 'cross_slope' | 'needs_house' | 'needs_slope' | 'no_climb' | 'no_creek' | 'no_head' | 'no_water' | 'not_connected' | 'not_on_bank' | 'not_shore' | 'off_parcel' | 'overlaps' | 'pad_clash' | 'pad_over_road' | 'straddles_dome' | 'straddles_skirt' | 'airlock_lane' | 'skirt_too_shallow' | 'earthen_hut' | 'thin_cover' | 'too_deep' | 'too_much_climb' | 'too_steep' | 'water';
 
 const levelOf = (d: KitPieceDef) => d.level ?? 'surface';
 /** Do pieces at these levels compete for the same ground? (Bunker rooms go under the yard and houses.) */

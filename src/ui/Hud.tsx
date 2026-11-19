@@ -3,6 +3,7 @@ import { MAX_QUESTIONS, QUESTIONS, QUESTION_NAME, type Question } from '../sim/i
 import { flowLine } from '../sim/flow';
 import { PlansOrderButton } from './hud/SpendConfirm';
 import { DomeSizeCard } from './hud/DomeSizeCard';
+import { BunkerDomeCard } from './hud/BunkerDomeCard';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { EDGE, hudLayout, useBox } from './hudLayout';
 import { clock, dateLabel } from './hud/dateText';
@@ -340,6 +341,7 @@ export function Hud() {
       {!A && <ToastLine />}
       <CursorHint />
       <DomeSizeCard />
+      <BunkerDomeCard />
       <SightHint />
       <WeakHint />
       <TerrainLegendChip />
