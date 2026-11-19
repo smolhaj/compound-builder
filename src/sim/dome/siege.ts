@@ -23,7 +23,7 @@ import { repairLeadDays } from '../structureDamage';
 import { TIER, type DomeTier } from './tiers';
 import { STOPS, type Weapon } from './protection';
 import { domesOf, PANELS, type Dome } from './standing';
-import type { MaterialId, Stock } from '../materials';
+import { MATERIALS, type MaterialId, type Stock } from '../materials';
 import type { GameState } from '../state';
 
 export const SHELL_KIND: Record<DomeTier, PerimeterKind> = { earthen: 'shell_earthen', geodesic: 'shell_geodesic', glass: 'shell_glass', arcology: 'shell_arcology' };
@@ -113,17 +113,25 @@ export const domeIdOfRun = (runId: string): string | null => (runId.startsWith('
 
 // ── what a raid leaves ──
 
-/** The glazier's job for `panels` lost panels: the goods, the work, and the days before the special order arrives. */
-export function panelJob(tier: DomeTier, panels: number, o: { wealth?: number } = {}): { bill: Partial<Stock>; hours: number; leadDays: number } {
-  const per: Record<DomeTier, { good: MaterialId; sqft: number; hours: number; order: number }> = {
-    earthen: { good: 'dome_earthbag', sqft: 60, hours: 40, order: 0 },
-    geodesic: { good: 'dome_geodesic_kit', sqft: 38, hours: 3, order: 4 },
-    glass: { good: 'dome_glass_kit', sqft: 120, hours: 9, order: 21 },
-    arcology: { good: 'dome_arcology_kit', sqft: 190, hours: 14, order: 45 },
+/** Replacement panels are sold by the 100 sq ft (the earthbag shell always was). PROPOSED, docs/design/dome_pricing.md. */
+export const PANEL_UNIT_SF = 100;
+const PANEL_GOOD: Record<DomeTier, MaterialId> = { earthen: 'dome_earthbag', geodesic: 'dome_geodesic_panels', glass: 'dome_glass_panels', arcology: 'dome_arcology_panels' };
+
+/**
+ * The glazier's job for `panels` lost panels: the goods, the work, and the days before the special order arrives. The goods are billed by the 100 sq ft of
+ * panel lost (to the nearest 100, at least one), so a repair costs what the area costs: about $65,000 a 100 sq ft of glass and $500,000 of arcology panel,
+ * not a whole 1,000 sq ft kit. `usd` is the quote for the goods.
+ */
+export function panelJob(tier: DomeTier, panels: number, o: { wealth?: number } = {}): { bill: Partial<Stock>; hours: number; leadDays: number; sqft: number; usd: number } {
+  const per: Record<DomeTier, { sqft: number; hours: number; order: number }> = {
+    earthen: { sqft: 60, hours: 40, order: 0 },
+    geodesic: { sqft: 38, hours: 3, order: 4 },
+    glass: { sqft: 120, hours: 9, order: 21 },
+    arcology: { sqft: 190, hours: 14, order: 45 },
   };
   const p = per[tier], n = Math.max(1, Math.round(panels));
-  const share = Math.min(1, n / PANELS[tier]);
-  return { bill: { [p.good]: Math.max(1, Math.ceil(n * p.sqft / 1000)) } as Partial<Stock>, hours: Math.round(n * p.hours), leadDays: Math.round(p.order + repairLeadDays(share) * (1 - Math.min(0.8, o.wealth ?? 0))) };
+  const share = Math.min(1, n / PANELS[tier]), units = Math.max(1, Math.round(n * p.sqft / PANEL_UNIT_SF)), good = PANEL_GOOD[tier];
+  return { bill: { [good]: units } as Partial<Stock>, hours: Math.round(n * p.hours), leadDays: Math.round(p.order + repairLeadDays(share) * (1 - Math.min(0.8, o.wealth ?? 0))), sqft: n * p.sqft, usd: units * (MATERIALS[good].price ?? 0) };
 }
 
 /** Is the shell open to the outside right now (a panel down, an airlock door held open)? The lockdown state reads this: a sealed dome with an open shell is an emergency. */
