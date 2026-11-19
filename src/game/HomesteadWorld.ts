@@ -2645,7 +2645,7 @@ export class HomesteadWorld {
         const def = KIT[b.placed.kind], area = def.cellsX * def.cellsZ / 4;
         // warm, low lamplight (incandescent-ish), not a bright work light
         // (the tunnel is lined in dark boards on a low arch: it takes nearly twice the light to read as lit)
-        b.light.intensity = (this._blackout ? 0.05 : this._under ? 0.25 : 0.34) * Math.min(1, 0.2 + 0.8 * area) * (b.placed.kind === 'bunker_corridor' ? 1.8 : 1);
+        b.light.intensity = (this._blackout ? 0.05 : this._under ? 0.25 : 0.34) * Math.min(1, 0.2 + 0.8 * area) * (b.placed.kind === 'bunker_corridor' ? 2.4 : 1);
         b.light.color.set(this._blackout ? 0xff8a5c : 0xffd49e);
         if (pick) this._noteLight(cands, b, above);
         continue;
