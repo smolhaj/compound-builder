@@ -16,6 +16,8 @@
  */
 import { CELL, footprint, KIT, placementProblem, rotQ, type KitPieceDef, type Placed, type PlaceProblem, type SiteQuery } from './kit';
 import { WALLLESS, planPad } from '../../sim/retainPlan';
+import { againstSkirt, bunkerProblemUnder, domeAt, floorFt, type BunkerProblem, type DomeAt } from '../../sim/dome/bunker';
+import { parseDomeKind } from '../../sim/dome/tiers';
 
 /** Floor of a bunker below the ground at its entrance (world units; ≈ 4.8 m). */
 export const DEPTH = 0.8;
@@ -163,7 +165,39 @@ export function undergroundProblem(def: KitPieceDef, x: number, z: number, rot: 
 
 /** Every placement rule, surface and underground (null = it can go here). */
 export function siteProblem(def: KitPieceDef, x: number, z: number, rot: number, site: SiteQuery, placed: readonly Placed[]): PlaceProblem | null {
-  return placementProblem(def, x, z, rot, site, placed) ?? undergroundProblem(def, x, z, rot, site.height, placed) ?? padOverBlocked(def, x, z, rot, site);
+  return placementProblem(def, x, z, rot, site, placed) ?? undergroundProblem(def, x, z, rot, site.height, placed) ?? domeBunkerProblem(def, x, z, rot, site.height, placed) ?? padOverBlocked(def, x, z, rot, site);
+}
+
+const domesIn = (placed: readonly Placed[]): DomeAt[] => placed.flatMap(p => (parseDomeKind(p.kind) ? [domeAt(p.kind, p.x, p.z, p.rot)!] : []));
+
+/** The ground over a rectangle, highest point (a bunker's floor is deepest under the high side). */
+const topOf = (r: Rect, height: (x: number, z: number) => number): number => { let m = -Infinity; for (const [x, z] of [[r.x0, r.z0], [r.x1, r.z0], [r.x0, r.z1], [r.x1, r.z1], [(r.x0 + r.x1) / 2, (r.z0 + r.z1) / 2]]) m = Math.max(m, height(x, z)); return m; };
+
+/**
+ * A bunker piece inside a dome's skirt ring (sim/dome/bunker.ts), or a dome staked over bunker pieces already there: wholly inside the ring with a cell of clear
+ * ground, clear of the airlocks, and not so deep that the skirt cannot be taken down to cover it. Pieces wholly outside every ring are ordinary.
+ */
+export function domeBunkerProblem(def: KitPieceDef, x: number, z: number, rot: number, height: (x: number, z: number) => number, placed: readonly Placed[]): PlaceProblem | null {
+  if (isUnderground(def)) {
+    const doms = domesIn(placed);
+    if (!doms.length) return null;
+    const r = footprint(def, x, z, rot, false), datum = previewDatum(def, x, z, rot, height, placed);
+    if (datum === null) return null;
+    for (const d of doms) { const why: BunkerProblem | null = bunkerProblemUnder(d, r, floorFt(topOf(r, height), datum)); if (why) return why; }
+    return null;
+  }
+  const dd = parseDomeKind(def.id) ? domeAt(def.id, x, z, rot) : null;
+  if (!dd) return null;
+  const ds = datums(placed, height);
+  for (const p of placed) {
+    const od = KIT[p.kind];
+    if (!od || !isUnderground(od)) continue;
+    const r = rectOf(p), where = againstSkirt(dd, r);
+    if (where === 'straddles') return 'straddles_skirt';
+    const datum = ds.get(p.id);
+    if (where === 'inside' && datum !== undefined) { const why = bunkerProblemUnder(dd, r, floorFt(topOf(r, height), datum)); if (why) return why; }
+  }
+  return null;
 }
 
 /**
@@ -236,3 +270,24 @@ export function tunnelDoorsOf(p: Placed, starts: readonly Pt[]): Partial<Record<
   return out;
 }
 
+
+/** How far down the floor of a piece about to be placed would lie (ft), or null when it cannot join a bunker here. */
+export function floorDepthFt(def: KitPieceDef, x: number, z: number, rot: number, height: (x: number, z: number) => number, placed: readonly Placed[]): number | null {
+  const datum = previewDatum(def, x, z, rot, height, placed);
+  return datum === null ? null : floorFt(topOf(footprint(def, x, z, rot, false), height), datum);
+}
+
+/** The deepest bunker floor (ft) under a dome at (x, z) of this kind, over the pieces standing there already; null when there are none. */
+export function deepestUnder(domeKind: string, x: number, z: number, rot: number, height: (x: number, z: number) => number, placed: readonly Placed[]): number | null {
+  const dd = domeAt(domeKind, x, z, rot);
+  if (!dd) return null;
+  const ds = datums(placed, height);
+  let deep: number | null = null;
+  for (const p of placed) {
+    const od = KIT[p.kind];
+    if (!od || !isUnderground(od)) continue;
+    const r = rectOf(p), datum = ds.get(p.id);
+    if (datum !== undefined && againstSkirt(dd, r) === 'inside') deep = Math.max(deep ?? 0, floorFt(topOf(r, height), datum));
+  }
+  return deep;
+}

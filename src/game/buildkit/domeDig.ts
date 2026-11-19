@@ -304,13 +304,66 @@ export interface DigSiteOpts {
   rot?: number;
   /** Ground sensors fitted (stock): posts round the skirt in the moat. */
   sensors?: number;
+  /** Bunker pieces being built in the crater (local frame: x and z from the dome's center, y from the pad): drawn in the open pit only. */
+  bunker?: CraterPiece[];
 }
+/** One bunker piece in the open crater at its stage (0 stake-out, 1 dig and floor slab, 2 walls, 3 roof slab, 4+ fit-out) and its progress `f` through it. */
+export interface CraterPiece { id: string; x0: number; z0: number; x1: number; z1: number; floorY: number; roofY: number; stage: number; f: number; entry: boolean;
+  /** Not built with the dome (it stood first, or is dug under later): the crater is dug round it and it stands on a plinth of earth. */
+  plinth?: boolean }
 export interface DigSite {
   group: THREE.Group;
   /** The circle cut out of the ground: outer radius (the rim) and inner (0 for a pit; the skirt for a moat). */
   hole: { r: number; rIn: number };
   /** The faces (for the tests): the pit skin geometry. */
   skin: THREE.BufferGeometry;
+}
+
+/**
+ * Bunker pieces going in at the crater floor (the dome's crew, haul road and spoil are shared): a gravel bed from the crater floor up to the room's floor, the floor slab,
+ * walls inside plywood forms with rebar standing above them, the roof slab on shoring props, then the finished concrete box under its membrane; an entrance has a
+ * timber-shored stair shaft with a ladder up to the dome floor. Merged into the site's own meshes (no extra draw calls beyond the few materials). Pure geometry.
+ */
+export function craterBunker(b: Bits, parts: readonly CraterPiece[], craterFloorY: number): void {
+  const T = 0.05, ROOF = 0.05;     // wall and roof slab thickness (units: 1 ft = 0.05)
+  for (const p of parts) {
+    const w = p.x1 - p.x0, d = p.z1 - p.z0, cx = (p.x0 + p.x1) / 2, cz = (p.z0 + p.z1) / 2, f = Math.max(0, Math.min(1, p.f)), h = p.roofY - p.floorY;
+    if (p.stage <= 0) { for (const [x, z] of [[p.x0, p.z0], [p.x1, p.z0], [p.x0, p.z1], [p.x1, p.z1]]) b.add('paint_yellow', box(0.025, 0.14, 0.025, x, craterFloorY, z)); continue; }
+    const bed = p.floorY - 0.06 - craterFloorY;
+    if (bed > 0.01) b.add(p.plinth ? 'soil' : 'gravel', box(w + (p.plinth ? 0.02 : 0.12), bed, d + (p.plinth ? 0.02 : 0.12), cx, craterFloorY, cz));
+    const slab = p.stage === 1 ? 0.05 * Math.min(1, f * 2) : 0.05;
+    if (slab > 0.004) b.add('concrete', box(w, slab, d, cx, p.floorY - 0.05, cz));
+    if (p.stage === 1) {
+      if (f > 0.3) for (let i = -Math.floor(w / 0.1); i <= Math.floor(w / 0.1); i++) b.add('rust', box(0.012, 0.012, d - 0.06, cx + i * 0.05, p.floorY + 0.01, cz));
+      continue;
+    }
+    // walls: poured up inside the forms through stage 2, whole after
+    const wallH = p.stage === 2 ? h * Math.min(1, 0.1 + f) : h;
+    for (const [bw, bd, x, z] of [[w, T, cx, p.z0 + T / 2], [w, T, cx, p.z1 - T / 2], [T, d - 2 * T, p.x0 + T / 2, cz], [T, d - 2 * T, p.x1 - T / 2, cz]] as const) b.add('concrete', box(bw, wallH, bd, x, p.floorY, z));
+    if (p.stage === 2) {
+      // plywood forms and walers just outside, rebar starters standing above the pour
+      for (const [bw, bd, x, z] of [[w + 0.1, 0.012, cx, p.z0 - 0.01], [w + 0.1, 0.012, cx, p.z1 + 0.01], [0.012, d, p.x0 - 0.01, cz], [0.012, d, p.x1 + 0.01, cz]] as const) {
+        b.add('frame', box(bw, h * 0.9, bd, x, p.floorY, z));
+        b.add('wood_mid', box(bw > 0.1 ? bw : 0.03, 0.03, bd > 0.1 ? bd : 0.03, x, p.floorY + h * 0.3, z + (bd < 0.1 && bw > 0.1 ? Math.sign(z - cz) * 0.02 : 0)));
+      }
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.add('rust', box(0.014, h * 1.15, 0.014, cx + sx * (w / 2 - 0.05), p.floorY, cz + sz * (d / 2 - 0.05)));
+      continue;
+    }
+    // roof slab on shoring props, then the finished box under its membrane
+    const roofH = p.stage === 3 ? ROOF * Math.min(1, f * 1.6) : ROOF;
+    if (roofH > 0.004) b.add('concrete', box(w, roofH, d, cx, p.roofY, cz));
+    if (p.stage === 3 && f < 0.6) for (const [x, z] of [[-0.3, -0.3], [0.3, -0.3], [-0.3, 0.3], [0.3, 0.3]] as const) b.add('wood_mid', box(0.03, h, 0.03, cx + x * w, p.floorY, cz + z * d));
+    if (p.stage >= 4) b.add('wood_dark', box(w + 0.02, 0.008, d + 0.02, cx, p.roofY + ROOF, cz));
+    // the way in: a shored stair shaft up to the dome floor
+    if (p.entry) {
+      const top = 0.0, sh = Math.max(0, top - p.roofY - ROOF);
+      if (sh > 0.02) {
+        for (const [bw, bd, x, z] of [[0.3, 0.015, cx, cz - 0.15], [0.3, 0.015, cx, cz + 0.15], [0.015, 0.3, cx - 0.15, cz], [0.015, 0.3, cx + 0.15, cz]] as const) b.add('frame', box(bw, sh, bd, x, p.roofY + ROOF, z));
+        for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.add('wood_mid', box(0.025, sh, 0.025, cx + sx * 0.14, p.roofY + ROOF, cz + sz * 0.14));
+        for (let y = 0.04; y < sh; y += 0.05) b.add('steel', box(0.2, 0.01, 0.01, cx, p.roofY + ROOF + y, cz + 0.13));
+      }
+    }
+  }
 }
 
 /** The crater, its road, spoil and crew at the state's moment. */
@@ -431,6 +484,7 @@ export function buildDigSite(o: DigSiteOpts): DigSite {
     const n = Math.min(24, o.sensors!);
     for (let i = 0; i < n; i++) { const a = (i + 0.5) * TAU / n, r = k.rOut + 0.025, d = -s.depthU * (0.25 + 0.5 * hash(i, 5)); const [x, , z] = at(r, a, 0); b.add('led_green', box(0.03, 0.03, 0.03, x, d, z)); b.add('iron', pipe([x, d, z], at(r + 0.12, a, d), 0.006, 4)); }
   }
+  if (mode === 'pit' && o.bunker?.length) craterBunker(b, o.bunker, -depthU);
   const props = b.finish();
   props.traverse(q => { q.userData.own = true; });
   group.add(props);
@@ -447,7 +501,9 @@ export function disposeSite(g: THREE.Object3D): void {
 
 /** How far the cut slab reaches out from the section plane toward the viewer (units). */
 export const SECTION_LEN = 14;
-export interface SectionOpts { tier: DomeTier; cells: number; ground: Ground; sensors?: number }
+/** A bunker room cut by the section plane: its x range along the face, floor and roof-slab-top heights (local y), and whether it is an entrance (a stair shaft up to the dome floor). */
+export interface SectionRoom { x0: number; x1: number; floorY: number; roofY: number; entry: boolean }
+export interface SectionOpts { tier: DomeTier; cells: number; ground: Ground; sensors?: number; bunker?: SectionRoom[] }
 const rulerTex = new Map<string, THREE.Texture>();
 function label(text: string, w = Math.max(256, text.length * 27), h = 64, fg = '#f6efe0', bg = 'rgba(20,28,40,0.78)'): THREE.Texture {
   const key = `${text}|${fg}|${bg}|${w}`;
@@ -534,6 +590,21 @@ export function buildSection(o: SectionOpts): THREE.Group {
   band(DIG_DEPTH_FT[1] + DIG_DEEPER, DIG_DEPTH_FT[1] + DIG_DEEPER + 0.25, 'paint_red');
   void SKIRT_MARGIN_FT;
   if ((o.sensors ?? 0) > 0) for (const sg of [-1, 1]) for (const f of [0.3, 0.6]) b.add('led_green', box(0.03, 0.03, 0.03, sg * (k.rOut + 0.04), -k.depthU * f, 0.004));
+  // bunker rooms under the dome, cut by the plane: slab, walls and roof in concrete, the dark room inside, the stair shaft of an entrance up to the dome floor
+  for (const r of o.bunker ?? []) {
+    const wall = 0.05, slab = 0.05, roof = 0.05, top = r.roofY + roof;
+    b.add('concrete', box(r.x1 - r.x0, slab, 0.012, (r.x0 + r.x1) / 2, r.floorY - slab, 0.004));
+    b.add('concrete', box(r.x1 - r.x0, roof, 0.012, (r.x0 + r.x1) / 2, r.roofY, 0.004));
+    b.add('concrete', box(wall, r.roofY - r.floorY, 0.012, r.x0 + wall / 2, r.floorY, 0.004)); b.add('concrete', box(wall, r.roofY - r.floorY, 0.012, r.x1 - wall / 2, r.floorY, 0.004));
+    b.add('wood_dark', box(r.x1 - r.x0 - 2 * wall, r.roofY - r.floorY, 0.004, (r.x0 + r.x1) / 2, r.floorY, 0.0035));
+    b.add('wood_mid', box(r.x1 - r.x0 - 2 * wall - 0.1, 0.03, 0.006, (r.x0 + r.x1) / 2, r.floorY, 0.0045));   // a bench and a locker: the room is furnished
+    if (r.entry) {
+      const cx = (r.x0 + r.x1) / 2, gy = ground(cx, 0);
+      b.add('concrete', box(0.05, gy - top, 0.012, cx - 0.15, top, 0.004)); b.add('concrete', box(0.05, gy - top, 0.012, cx + 0.15, top, 0.004));
+      b.add('wood_dark', box(0.25, gy - top, 0.004, cx, top, 0.0035));
+      for (let y = 0.04; y < gy - top; y += 0.05) b.add('steel', box(0.2, 0.01, 0.008, cx, top + y, 0.005));
+    }
+  }
   const props = b.finish(false); props.traverse(q => { q.userData.own = true; });
   g.add(props);
   // labels: depth marks and the lines' names (sprites that always face the camera, drawn over the face)
@@ -548,6 +619,7 @@ export function buildSection(o: SectionOpts): THREE.Group {
   sprite(`Skirt: ${TIER[tier].skirtFt} ft deep, ${TIER[tier].skirtThickFt} ft thick`, -half * 0.5, rulerTop - k.depthU - 0.25 * sc, 0.03, 3.4, 'rgba(110,112,118,0.85)');
   sprite(`A plain crew digs ${DIG_DEPTH_FT[0]} to ${DIG_DEPTH_FT[1]} ft`, half * 0.62, rulerTop - DIG_DEPTH_FT[1] / FT_PER_UNIT - 0.14, 0.03, 2.4, 'rgba(120,90,10,0.85)');
   sprite(`A crew that has learned the ground: ${DIG_DEPTH_FT[0] + DIG_DEEPER} to ${DIG_DEPTH_FT[1] + DIG_DEEPER} ft`, half * 0.62, rulerTop - (DIG_DEPTH_FT[1] + DIG_DEEPER) / FT_PER_UNIT - 0.14, 0.03, 3.6, 'rgba(150,40,30,0.85)');
+  for (const r of (o.bunker ?? []).slice(0, 1)) sprite(`Bunker: floor ${Math.round(-r.floorY * FT_PER_UNIT + 1)} ft down, inside the skirt`, r.x1 + 1.7 * sc, (r.floorY + r.roofY) / 2, 0.03, 3.0, 'rgba(30,60,80,0.88)');
   let ys = 0; for (const st of STRATA.slice(0, 4)) { const mid = (st.fromFt + Math.min(st.toFt, D * FT_PER_UNIT)) / 2; if (st.fromFt < D * FT_PER_UNIT) sprite(st.name, -half + 1.0, rulerTop - mid / FT_PER_UNIT, 0.02, 1.4); ys++; }
   void ys;
   return g;

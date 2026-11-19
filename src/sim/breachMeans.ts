@@ -64,6 +64,8 @@ export const WALL_RESIST: Record<PerimeterKind, { ram: number; blast: number }> 
   tunnel_bridge: { ram: 0.2, blast: 0.4 }, slope_tunnel: { ram: 0.2, blast: 0.4 }, rock_tunnel: { ram: 0.1, blast: 0.3 }, drain_channel: { ram: 0.9, blast: 0.9 },
   // the shell of a dome (sim/dome/siege.ts): one table there, by tier
   shell_earthen: SHELL_ODDS.earthen, shell_geodesic: SHELL_ODDS.geodesic, shell_glass: SHELL_ODDS.glass, shell_arcology: SHELL_ODDS.arcology,
+  // a dome link's walkway is clad in its tier's shell and takes the shell's odds (sim/dome/links.ts)
+  link_walk_earthen: SHELL_ODDS.earthen, link_walk_geodesic: SHELL_ODDS.geodesic, link_walk_glass: SHELL_ODDS.glass, link_walk_arcology: SHELL_ODDS.arcology,
 };
 const resistOf = (k: string): { ram: number; blast: number } => WALL_RESIST[k as PerimeterKind] ?? { ram: 0.4, blast: 0.6 };
 

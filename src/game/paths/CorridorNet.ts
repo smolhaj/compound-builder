@@ -11,6 +11,9 @@ import { buildReach, doorOf, linkOf, routeLinked, type Link, type Reach, type Wp
 export function deckFn(c: Pick<Corridor, 'kind' | 'a' | 'b' | 'lenU'>, ground: (x: number, z: number) => number): (s: number, x: number, z: number) => number {
   const ya = ground(c.a[0], c.a[1]), yb = ground(c.b[0], c.b[1]);
   if (c.kind === 'slope_tunnel') return (_s, x, z) => ground(x, z) - 0.15;
+  // a dome link: a tunnel runs buried (the walker is under the terrain, in the underground view), a walkway's deck stands 1.6 ft up on its piers
+  if (c.kind === 'underground_passage') return (_s, x, z) => ground(x, z) - 0.3;
+  if (c.kind === 'covered_walkway' || c.kind.startsWith('link_walk_')) return (_s, x, z) => ground(x, z) + 0.085;
   return s => ya + (yb - ya) * Math.min(1, Math.max(0, s / (c.lenU || 1))) + 0.01;
 }
 
@@ -24,10 +27,13 @@ export class CorridorNet {
   get any(): boolean { return this.links.length > 0; }
 
   private _dirty = false;
+  /** Dome links as corridors (their runs are walkway and passage kinds, not the vehicle corridors `standingCorridors` reads): set by the world (`setExtra`), counted in `sync`. */
+  private _extra: Corridor[] = [];
+  setExtra(cs: Corridor[]): void { this._extra = cs; this._sig += '|x'; }
 
   /** Note the runs (cheap): the links are rebuilt on the next `ensure` when a corridor stands, falls or is cleared. */
   sync(runs: readonly PerimeterRun[]): boolean {
-    const cs = standingCorridors({ perimeter: runs as PerimeterRun[] });
+    const cs = [...standingCorridors({ perimeter: runs as PerimeterRun[] }), ...this._extra];
     const sig = cs.map(c => `${c.id}:${c.collapsed ? 1 : 0}:${c.a.join(',')}:${c.b.join(',')}`).join('|');
     if (sig === this._sig) return false;
     this._sig = sig;

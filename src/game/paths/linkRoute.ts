@@ -213,3 +213,23 @@ export function lengthOf(from: Pt, route: readonly Wp[]): number {
 
 /** Game seconds a walker takes along a route (units to metres at the walking pace). */
 export const walkTime = (units: number, mps = 1.35): number => units / U_PER_M / mps;
+
+/**
+ * The route through one link from `from` to `to`, entering at the end nearer `from`: the ordinary route to that end's mouth, the deck points (door tags at both
+ * ends), then the ordinary route from the far mouth. Used for the walk between two domes that a tunnel or a walkway joins (the people take the covered way
+ * rather than the open ground between); `idx` is the link's index in `links`.
+ */
+export function routeViaLink(from: Pt, to: Pt, links: readonly Link[], idx: number, ordinary: (a: Pt, b: Pt) => readonly Wp[]): Wp[] | null {
+  const l = links[idx];
+  if (!l || l.blocked) return null;
+  const d0 = Math.hypot(l.mouth[0][0] - from[0], l.mouth[0][1] - from[1]), d1 = Math.hypot(l.mouth[1][0] - from[0], l.mouth[1][1] - from[1]);
+  const e: 0 | 1 = d0 <= d1 ? 0 : 1, near = l.mouth[e], far = l.mouth[1 - e as 0 | 1], seq = e === 0 ? l.deck : [...l.deck].reverse();
+  const out: Wp[] = [];
+  for (const p of ordinary(from, near)) out.push(p);
+  out.push([near[0], near[1], seq[0][2]]);
+  seq.forEach((p, k) => out.push([p[0], p[1], p[2], k === 0 ? doorId(idx, e) : k === seq.length - 1 ? doorId(idx, (1 - e) as 0 | 1) : undefined]));
+  out.push([far[0], far[1], seq[seq.length - 1][2]]);
+  for (const p of ordinary(far, to)) out.push(p);
+  out.push([to[0], to[1]]);
+  return out;
+}

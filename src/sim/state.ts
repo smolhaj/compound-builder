@@ -47,7 +47,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 103;
+export const SAVE_VERSION = 104;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -140,6 +140,10 @@ export interface Structure {
   /** County permit (sim/paperwork.ts): under review, approved, built without one, or stopped by the inspector; when review / the stop ends. */
   permit?: 'review' | 'ok' | 'none' | 'stopped';
   /** The earthwork paid for a graded dome pad (sim/dome/grading.ts): cubic yards cut and filled, retaining wall face in square feet, and what it cost. */
+  /** A bunker piece standing inside a dome's skirt ring (sim/dome/bunker.ts): which dome, whether it was staked with the dome's crater open, and the deep footing it pays for (optional, so no save bump). */
+  underDome?: import('./dome/bunker').UnderDome;
+  /** A dome staked over a bunker that was already there: the deep footing its foundation pays for (cu yd of concrete; optional, so no save bump). */
+  domeFoot?: { ft: number; yd: number; goods?: Record<string, number>; usd?: number };
   siteWork?: { cutCy: number; fillCy: number; wallSf: number; usd: number };
   permitAt?: number;
   /** The permit was rushed (sim/shelterBridge.ts): paid through the expedite desk, or the runner was caught and the review started over (optional; save v101). */
@@ -331,6 +335,8 @@ export interface GameState {
   dogs: Dog[];
   /** Breaks a raid left that are still to be mended: fence gaps, a broken gate, burned wrecks (sim/raidDamage.ts; save v85). Absent: none. */
   raidDamage?: import('./raidDamage').RaidDamage[];
+  /** Tunnels and enclosed walkways that join domes (sim/dome/links.ts; save v104). Absent: none. */
+  domeLinks?: import('./dome/linkGraph').DomeLink[];
   /** Fires a raid set that are still burning (sim/raidFire.ts; save v87). Absent: none. */
   raidFires?: import('./raidFire').RaidFire[];
   /** Raiders who will be back with a story (sim/raiderStory.ts; save v88). Absent: none. */

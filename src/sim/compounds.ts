@@ -21,6 +21,8 @@ import { enclosure, nearest, ownedRects } from './enclosure';
 import { inGarage } from './garage';
 import { PERIMETER, fenceLive, runFinished, type PerimeterRun, type Pt } from './perimeter';
 import type { GameState } from './state';
+import { domesOf } from './dome/standing';
+import { linkGroups } from './dome/linkGraph';
 
 /** Point in a closed polyline (ray casting). */
 export function insideRing(pts: readonly Pt[], x: number, z: number): boolean {
@@ -92,6 +94,13 @@ export function coveredRoute(s: GameState, ringA: string, ringB: string): boolea
 
 /** A trip between two points: exposed (outside the walls for part of it) unless both are in the same yard or the yards are joined. */
 export function tripExposed(s: GameState, from: Pt, to: Pt): boolean {
+  // two domes joined by an open tunnel or walkway: the trip never leaves cover (sim/dome/links.ts); a dome alone is covered inside its own shell
+  const ds = s.domeLinks?.length || s.structures.some(st => st.kind.startsWith('dome_')) ? domesOf(s) : [];
+  if (ds.length) {
+    const under = (p: Pt): string | null => ds.find(d => Math.hypot(p[0] - d.x, p[1] - d.z) < d.r)?.id ?? null;
+    const da = under(from), db = under(to);
+    if (da && db) return da === db ? false : !linkGroups(s).some(g => g.includes(da) && g.includes(db));
+  }
   const rings = yardRings(s);
   const a = yardAt(rings, from), b = yardAt(rings, to);
   if (a && a === b) return false;
@@ -131,7 +140,7 @@ export function hatches(s: GameState, rings: readonly PerimeterRun[] = yardRings
     ([0, 1] as const).forEach(end => {
       const at = end === 0 ? r.pts[0] : r.pts[r.pts.length - 1];
       const yard = yardAt(rings, at);
-      out.push({ runId: r.id, end, at, yard, exposed: yard === null && !insideClosedLine(s, at), locked: !r.unlocked });
+      out.push({ runId: r.id, end, at, yard, exposed: yard === null && !insideClosedLine(s, at) && !domesOf(s).some(d => Math.hypot(at[0] - d.x, at[1] - d.z) < d.r), locked: !r.unlocked });
     });
   }
   return out;

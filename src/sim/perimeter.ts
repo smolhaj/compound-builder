@@ -23,7 +23,8 @@ import { cuYdText, lengthText } from './units';
 
 export type PerimeterKind = 'split_rail' | 'barbed_wire' | 'woven_wire' | 'thorn_hedge' | 'log_palisade' | 'container_wall' | 'earth_berm' | 'ditch' | 'creek_bars' | 'chain_link' | 'wrought_iron' | 'iron_barbed' | 'steel_wall' | 'electric_steel' | 'water_pipe' | 'power_cable' | 'escape_tunnel' | 'covered_walkway' | 'underground_passage' | 'concrete_wall' | 'wall_walk' | 'stone_wall' | 'container_stack' | 'tunnel_bridge' | 'slope_tunnel' | 'rock_tunnel' | 'bar_fence' | 'drain_channel' | 'moat' | 'covered_bridge'
   /** The shell of a dome as the raid sim sees it (sim/dome/siege.ts `withDomeShell`): never drawn as a run, never in the Build menu, never saved. */
-  | 'shell_earthen' | 'shell_geodesic' | 'shell_glass' | 'shell_arcology';
+  | 'shell_earthen' | 'shell_geodesic' | 'shell_glass' | 'shell_arcology'
+  | 'link_walk_earthen' | 'link_walk_geodesic' | 'link_walk_glass' | 'link_walk_arcology';
 
 export interface PerimeterDef {
   id: PerimeterKind;
@@ -109,6 +110,12 @@ export const PERIMETER: Record<PerimeterKind, PerimeterDef> = {
   shell_earthen: { id: 'shell_earthen', name: 'Earthen dome shell', blurb: 'Plastered earthbag courses on a stem wall.', hours: 0, materials: {}, height: 0.5, blocks: { people: 0.95, animals: 1, vehicles: 1 }, sight: 0.9, growYears: 0, shell: true },
   shell_geodesic: { id: 'shell_geodesic', name: 'Geodesic dome shell', blurb: 'Twin-wall polycarbonate in an aluminum frame.', hours: 0, materials: {}, height: 1.4, blocks: { people: 0.7, animals: 1, vehicles: 0.8 }, sight: 0.1, growYears: 0, shell: true },
   shell_glass: { id: 'shell_glass', name: 'Glass dome shell', blurb: 'Laminated glass in a steel gridshell on a concrete ring beam.', hours: 0, materials: {}, height: 3.2, blocks: { people: 0.9, animals: 1, vehicles: 1 }, sight: 0.1, growYears: 0, shell: true },
+  // the walkway of a dome link (sim/dome/links.ts): a sealed tube clad in the shell of the dome it joins (the stronger of the two), so it takes that tier's wall,
+  // ram, blast and weather rating. Materials per world unit (20 ft) are the tier's shell goods for a 34 sq ft cross-section tube (a test holds them to sim/dome/cost.ts); hours are PROPOSED.
+  link_walk_earthen: { id: 'link_walk_earthen', name: 'Earth-covered walkway', blurb: 'A sealed adobe corridor under a sod roof, the same shell as an earthen dome.', hours: 30, materials: { dome_earthbag: 6.8, hardware: 0.2, cable: 0.1 }, height: 0.44, blocks: { people: 0.95, animals: 1, vehicles: 1 }, sight: 0.6, growYears: 0, walkway: true },
+  link_walk_geodesic: { id: 'link_walk_geodesic', name: 'Polycarbonate walkway', blurb: 'A sealed tube of twin-wall polycarbonate in a triangulated aluminum frame, the same shell as a geodesic dome.', hours: 20, materials: { dome_geodesic_kit: 0.68, hardware: 0.2, cable: 0.1 }, height: 0.44, blocks: { people: 0.7, animals: 1, vehicles: 0.8 }, sight: 0.1, growYears: 0, walkway: true },
+  link_walk_glass: { id: 'link_walk_glass', name: 'Glass walkway', blurb: 'A sealed tube of laminated glass in a steel gridshell, the same shell as a glass dome.', hours: 24, materials: { dome_glass_kit: 0.68, hardware: 0.2, cable: 0.1 }, height: 0.44, blocks: { people: 0.9, animals: 1, vehicles: 1 }, sight: 0.1, growYears: 0, walkway: true },
+  link_walk_arcology: { id: 'link_walk_arcology', name: 'Armored walkway', blurb: 'A sealed tube of armored polycarbonate-composite panels on a space frame, with a solid armored band: the same shell as an arcology.', hours: 44, materials: { dome_arcology_kit: 0.68, hardware: 0.2, cable: 0.1 }, height: 0.52, blocks: { people: 1, animals: 1, vehicles: 1 }, sight: 0.1, growYears: 0, walkway: true, impervious: true },
   shell_arcology: { id: 'shell_arcology', name: 'Arcology dome shell', blurb: 'Armored polycarbonate-composite panels on a space frame.', hours: 0, materials: {}, height: 9, blocks: { people: 1, animals: 1, vehicles: 1 }, sight: 0.1, growYears: 0, shell: true, impervious: true },
 };
 
@@ -194,7 +201,7 @@ export interface PerimeterRun {
  */
 export const PREDATOR_BLOCK: Record<PerimeterKind, number> = {
   split_rail: 0.02, barbed_wire: 0.1, woven_wire: 0.35, thorn_hedge: 0.75, log_palisade: 0.97, container_wall: 1, earth_berm: 0.2, ditch: 0.2,
-  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0, covered_walkway: 1, underground_passage: 0, concrete_wall: 1, wall_walk: 0, stone_wall: 1, container_stack: 1, tunnel_bridge: 1, slope_tunnel: 1, rock_tunnel: 1, bar_fence: 0.97, drain_channel: 0, moat: 0.5, covered_bridge: 0, shell_earthen: 1, shell_geodesic: 1, shell_glass: 1, shell_arcology: 1,
+  creek_bars: 0.95, chain_link: 0.9, wrought_iron: 0.97, iron_barbed: 0.98, steel_wall: 1, electric_steel: 1, water_pipe: 0, power_cable: 0, escape_tunnel: 0, covered_walkway: 1, underground_passage: 0, concrete_wall: 1, wall_walk: 0, stone_wall: 1, container_stack: 1, tunnel_bridge: 1, slope_tunnel: 1, rock_tunnel: 1, bar_fence: 0.97, drain_channel: 0, moat: 0.5, covered_bridge: 0, shell_earthen: 1, shell_geodesic: 1, shell_glass: 1, shell_arcology: 1, link_walk_earthen: 1, link_walk_geodesic: 1, link_walk_glass: 1, link_walk_arcology: 1,
 };
 
 /** The next tier up, where there is one (upgraded in place: sim `upgradeRun`). */
@@ -254,6 +261,8 @@ export const WALL_HP: Partial<Record<PerimeterKind, number>> = {
   steel_wall: 210, electric_steel: 220, concrete_wall: 250,
   // a dome's shell: twin-wall polycarbonate is cut with snips, laminated glass takes a crew with axes and a long while, the arcology's panels are not a wall a crew can work
   shell_earthen: 150, shell_geodesic: 45, shell_glass: 120, shell_arcology: 1000,
+  // a dome link's walkway wears its tier's shell (the same hit points)
+  link_walk_earthen: 150, link_walk_geodesic: 45, link_walk_glass: 120, link_walk_arcology: 1000,
 };
 /** The toughest wall in the table (concrete): the top of the scale. */
 export const WALL_HP_TOP = 250;
