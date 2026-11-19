@@ -83,6 +83,7 @@ import { prisonersDay } from './aftermath';
 import { storyDay } from './raiderStory';
 import { isAway, rescueDay } from './rescue';
 import { stepDome, domeDay } from './dome/live';
+import { linkDay } from './dome/links';
 import { falloutDay, isNuclear, SHELTER_DAYS } from './nuclear';
 import { fxApplyServiceMods, fxOnHit, fxOnWarning } from './disasterFx';
 import { tallyDay } from './report';
@@ -301,6 +302,7 @@ function subStep(s: GameState): void {
     if (before !== 'impact' && s.disaster.phase === 'impact') for (const line of fxOnHit(s)) log(s, line);   // (nuclear's strike lives in sim/disasters/nuclear.ts)
     for (const line of falloutDay(s)) log(s, line);
     for (const line of domeDay(s)) log(s, line);
+    linkDay(s);
     for (const line of effectsDay(s)) log(s, line);
     for (const line of choresDay(s, mulberry32(s.seed * 6151 + dayIndex(s.clock.t) * 3))) log(s, line);
     for (const line of gatheringsDay(s)) log(s, line);

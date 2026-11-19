@@ -57,6 +57,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   101: s => ({ ...s, version: 102 }),
   // 102 → 103: the dome plant (sim/dome/plantUnits.ts): optional `DomeState.spares` and plant fields on `RaidDamage` (kind 'plant'); nothing to back-fill
   102: s => ({ ...s, version: 103 }),
+  // 103 → 104: dome links (sim/dome/links.ts): optional `domeLinks` (absent: none), `Dig.link`, the dome's tunnel counterattack card; nothing to back-fill
+  103: s => ({ ...s, version: 104 }),
   97: s => ({ ...s, version: 98 }),
   // 95 → 96: hiding in the bunker (sim/bunkerHide.ts): `Outcome.bunker` on the gate card, optional; no old-save work
   95: s => ({ ...s, version: 96 }),

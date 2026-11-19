@@ -47,7 +47,7 @@ import type { QuartersState } from './quarters';
 import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
-export const SAVE_VERSION = 103;
+export const SAVE_VERSION = 104;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -331,6 +331,8 @@ export interface GameState {
   dogs: Dog[];
   /** Breaks a raid left that are still to be mended: fence gaps, a broken gate, burned wrecks (sim/raidDamage.ts; save v85). Absent: none. */
   raidDamage?: import('./raidDamage').RaidDamage[];
+  /** Tunnels and enclosed walkways that join domes (sim/dome/links.ts; save v104). Absent: none. */
+  domeLinks?: import('./dome/linkGraph').DomeLink[];
   /** Fires a raid set that are still burning (sim/raidFire.ts; save v87). Absent: none. */
   raidFires?: import('./raidFire').RaidFire[];
   /** Raiders who will be back with a story (sim/raiderStory.ts; save v88). Absent: none. */

@@ -31,9 +31,9 @@ import { dayIndex, type GameState, type Structure } from '../state';
 import { isFinished } from '../construction';
 import { pluralize } from '../words';
 import { towersBuilt } from '../towers';
-import { yardRings, yardAt } from '../compounds';
+import { yardRings } from '../compounds';
 import { WALK_MPS, DRIVE_MPS } from '../corridors';
-import { type DomeLink, type LinkEnd, type LinkKind, type DownWhy, linksOf, linkRun, linkState, linkOpen, runKindOf, linkName, linkGroups, groupOf, linksBetween } from './linkGraph';
+import { type DomeLink, type LinkEnd, type LinkKind, type DownWhy, linksOf, linkRun, linkState, linkOpen, capacityOf, runKindOf, linkName, groupOf, linksBetween } from './linkGraph';
 
 export * from './linkGraph';
 
@@ -376,7 +376,7 @@ export function tripSeconds(s: GameState, l: DomeLink, who: 'family' | 'vehicle'
     // an airlock cycle is the interlock between two doors: it runs whenever the dome is sealed, and once for the sleeve either way
     if (d && sealed(e.id)) { cycles++; t += AIRLOCK_CYCLE_S[d.tier]; }
   }
-  return { seconds: Math.round(move / capacityOf(s, l).valueOf() + t), cycles };
+  return { seconds: Math.round(move / Math.max(0.25, capacityOf(s, l)) + t), cycles };
 }
 /** The best open link between two nodes for a trip (the quickest), or null: isolated. */
 export function bestLink(s: GameState, a: string, b: string, who: 'family' | 'vehicle' = 'family', sealed?: (id: string) => boolean): Trip | null {
@@ -417,13 +417,6 @@ export function feederPartners(s: GameState, domeId: string): string[] {
     if (x.type === 'dome' && y.type === 'dome') { if (x.id === domeId) out.add(y.id); if (y.id === domeId) out.add(x.id); }
   }
   return [...out];
-}
-
-/** Is a point (in the open, or in a yard) joined by link to another? Used by the daily-trip exposure check. */
-export function linkedPoints(s: GameState, from: Pt, to: Pt): boolean {
-  const ds = domesOf(s), under = (p: Pt): string | null => ds.find(d => Math.hypot(p[0] - d.x, p[1] - d.z) < d.r)?.id ?? yardAt(yardRings(s), p);
-  const a = under(from), b = under(to);
-  return !!a && !!b && a !== b && linkGroups(s).some(g => g.includes(a) && g.includes(b));
 }
 
 export { domeFrom, linksOf };

@@ -11,3 +11,4 @@ export * from './standing';
 export * from './crossing';
 export * from './siege';
 export * from './watched';
+export * from './linkGraph';
