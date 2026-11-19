@@ -4,6 +4,7 @@
  * small cabin burns ~4–5 cords a winter (≈ 0.12 rick a day in January).
  * Running out is logged (comfort / health effects come with needs). Pure.
  */
+import { slowWoodK } from './slowClimate';
 import { log } from './economy';
 import { burnRick } from './upkeep';
 import { calendarOf, dayIndex, type GameState } from './state';
@@ -32,7 +33,7 @@ export const BURN_PER_DAY = 0.12;
 
 /** Today's heating demand (0 = none, ~1.6 = a bitter cold snap), with a leaky roof. */
 export function demandNow(s: GameState): number {
-  return Math.min(2, (heatDemand(calendarOf(s.clock).doy) * regionFor(s.site).cold + climate(s).cold) * roofLoss(s) * heatFactor(s) * heatWindK(s) * insulationHeat(s) * domeHeatK(s));
+  return Math.min(2, (heatDemand(calendarOf(s.clock).doy) * regionFor(s.site).cold + climate(s).cold) * roofLoss(s) * heatFactor(s) * heatWindK(s) * insulationHeat(s) * domeHeatK(s) * slowWoodK(s));
 }
 
 /** Burn `days` worth of firewood (called each sub-step). */

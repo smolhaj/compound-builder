@@ -11,6 +11,7 @@ import { award, chronicle } from './lineage';
 import { dayJob } from './family';
 import { REGIONS } from './regions';
 import { dayIndex, type GameState } from './state';
+import { eraHoldDays } from './slowClimate';
 
 export const roman = (n: number) => {
   const R: Array<[number, string]> = [[10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
@@ -43,7 +44,9 @@ export function erasDay(s: GameState): string[] {
   }
   // wait for the world to settle where it's going to: back, at its new level, or a year of nothing
   const since = t - d.hitAt;
-  const settled = s.stats.okSince >= 0 || (d.fate === 'never' && since >= 365) || since >= 3 * 365;
+  // (a slow climate kind holds the era open until its curve is done plus a year, then it settles as the new normal: sim/slowClimate.eraHoldDays; 0 for every other kind)
+  const hold = eraHoldDays(d);
+  const settled = hold > 0 ? since >= hold : s.stats.okSince >= 0 || (d.fate === 'never' && since >= 365) || since >= 3 * 365;
   if (!settled) return out;
   L.era++;
   L.settling = false;

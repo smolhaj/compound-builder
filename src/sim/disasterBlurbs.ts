@@ -34,4 +34,6 @@ export const BLURB: Record<DisasterKind, string> = {
   water_war: 'A river compact breaks and a reservoir dies. Wells drop, ditch riders and tanker gangs rule, and water rights are life.',
   cult_takeover: 'A movement captures the council and tithes the valley. A nonviolent enemy: recruiters, a Common Store and a hard choice.',
   mass_exodus: 'The cities empty onto your county road under martial law. Hospitality, billeting orders and checkpoints.',
+  runaway_heat: 'The summers climb a few degrees a year until the middle of the day is closed. Failing grid, scorched crops and a falling water table; a cool underground room, a deep well and stored food decide it. A long game: it plays out over years.',
+  ice_age: 'The sun dims and the snow stays. The growing season collapses, roofs load up and the woodpile is everything. Keep the stove going, treat the fuel, shovel the roofs. A long game: it plays out over years.',
 };

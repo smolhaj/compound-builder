@@ -22,6 +22,7 @@ import type { Person } from './family';
 import { calendarOf, dayIndex } from './state';
 import { DRINK_L } from './water';
 import { frailty } from './cold';
+import { heatThirstK } from './slowClimate';
 
 /** Body weight lost a day with nothing to drink (%, a resting adult in mild weather), and when it kills. */
 export const DRY_LOSS_PER_DAY = 3, DRY_FATAL = 15;
@@ -36,9 +37,10 @@ export function heatWave(s: GameState): boolean {
 
 /** How hard the day is on the body's water: a heat wave, a desert summer. */
 export function heatFactor(s: GameState): number {
-  if (heatWave(s)) return 1.7;
   const doy = calendarOf(s.clock).doy;
-  return s.site.region === 'desert' && doy >= 150 && doy <= 250 ? 1.3 : 1;
+  const slow = heatThirstK(s, doy);   // (a runaway-heat summer: sim/slowClimate.ts; 1 otherwise)
+  if (heatWave(s)) return Math.max(1.7, slow);
+  return Math.max(s.site.region === 'desert' && doy >= 150 && doy <= 250 ? 1.3 : 1, slow);
 }
 
 /** One person's drinking and cooking water a day (L): more in the heat. */
