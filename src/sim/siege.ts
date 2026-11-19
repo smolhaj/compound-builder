@@ -523,18 +523,18 @@ export function gateScene(s: GameState, e: Pick<Encounter, 'size' | 'kind' | 'id
     ev.push({ t: r2(14 + r() * 3), kind: 'move', unit: `r${i}`, x: r2(b.x), z: r2(b.z) });
   }
   if (hiding) {
-    say(16, pickOf(r, ['Anybody here? The lights were on an hour ago.', 'Check the house. Somebody lives here.', 'Look at the garden. Somebody has been working this ground.']), 'r0');
+    say(16, pickOf(r, ['Anybody here? Lights were on an hour ago.', 'Somebody lives here. Check the house.', 'Garden\'s been worked. Somebody\'s here.']), 'r0');
     if (tone === 'bad') {
-      say(24, pickOf(r, ['Shop first. Grab the cans, all of it, and whatever fuel there is.', 'Load the truck. Get everything with a label on it.']), 'r0');
+      say(24, pickOf(r, ['Shop first. Cans, all of it. Fuel too.', 'Load the truck. Anything with a label.']), 'r0');
       for (let i = 0; i < n; i++) { const p = at(1.2 + (i % 3) * 0.6, (i - (n - 1) / 2) * 0.8); ev.push({ t: r2(28 + r() * 8), kind: 'move', unit: `r${i}`, x: r2(p.x), z: r2(p.z) }); }
       if (bunker && bunker.fight !== 'hidden') {
         // they found the way down: the crew gathers at the house, and what is said at the hatch is the scene (the fight below is on the outcome card)
-        say(34, pickOf(r, ['Hatch! There is a hatch under the rug!', 'Here. Steel door. Somebody is down there.', 'Stairs. Look, stairs. They are under us.']), 'r1');
-        say(42, bunker.fight === 'door_held' ? pickOf(r, ['It will not move. Forget it.', 'Solid steel. We are wasting our time.']) : bunker.fight === 'shootout' ? pickOf(r, ['Open it. Open it, go!', 'On three. One man at a time.']) : pickOf(r, ['Open it. They have nothing down there.', 'Get the door. Everyone out of there.']), 'r0');
+        say(34, pickOf(r, ['Hatch. There\'s a hatch under the rug.', 'Here. Steel door. Somebody\'s down there.', 'Stairs. Under us. Look.']), 'r1');
+        say(42, bunker.fight === 'door_held' ? pickOf(r, ['It won\'t move. Forget it.', 'Solid steel. We\'re wasting time.']) : bunker.fight === 'shootout' ? pickOf(r, ['Open it. Go.', 'On three. One at a time.']) : pickOf(r, ['Open it. They\'ve got nothing down there.', 'Get the door. Everybody out.']), 'r0');
       }
       for (let i = 0; i < n; i++) { const p = at(start, (i - 3) * 1.8); ev.push({ t: r2(52 + r() * 8), kind: 'move', unit: `r${i}`, x: r2(p.x), z: r2(p.z) }); }
     } else {
-      say(26, pickOf(r, ['Nobody. Empty. Let\'s go.', 'Nothing here. Back in the truck.']), 'r0');
+      say(26, pickOf(r, ['Nobody. Empty. Let\'s go.', 'Nothing here. Truck.']), 'r0');
       for (let i = 0; i < n; i++) { const p = at(start, (i - 3) * 1.8); ev.push({ t: r2(30 + r() * 6), kind: 'move', unit: `r${i}`, x: r2(p.x), z: r2(p.z) }); }
     }
   } else if (stance.startsWith('flag_')) {
@@ -545,43 +545,43 @@ export function gateScene(s: GameState, e: Pick<Encounter, 'size' | 'kind' | 'id
     ev.push({ t: 15, kind: 'move', unit: envoy, x: r2(gate.x), z: r2(gate.z), walk: true });
     // the rest of the crew waits where it stopped, down on a knee
     for (let i = 1; i < n; i++) { const p = at(11 + r() * 2, (i - (n - 1) / 2) * 1.2); ev.push({ t: r2(15 + r() * 2), kind: 'cover', unit: `r${i}`, x: r2(p.x), z: r2(p.z) }); }
-    say(16, pickOf(r, ['That is a white cloth. Hold your fire!', 'One man, walking. He has his hand up.', 'Nobody shoots. Let us hear what he wants.']), who);
-    say(19, pickOf(r, ['We are not here to fight. We want to talk.', 'Hold your fire! I am unarmed! Hear me out.', 'Nobody has to get hurt tonight.']), envoy);
+    say(16, pickOf(r, ['White cloth. Hold your fire.', 'One man, walking. Hand up.', 'Nobody shoots. Let\'s hear him.']), who);
+    say(19, pickOf(r, ['We\'re not here to fight. We want to talk.', 'Hold your fire. I\'m unarmed. Hear me out.', 'Nobody has to get hurt tonight.']), envoy);
     if (stance === 'flag_pay') {
-      say(22, 'Here. This is the toll. Take it and go.', who);
+      say(22, 'Here. That\'s what you asked for. Go.', who);
       if (who) ev.push({ t: 23, kind: 'move', unit: who, x: r2(meet.x), z: r2(meet.z), walk: true });
       ev.push({ t: 26, kind: 'loot', by: envoy, what: 'food and fuel', n: 1, from: 'yard' });
-      say(27, 'That is fair. You will not see us again.', envoy);
+      say(27, 'That\'s fair. You won\'t see us again.', envoy);
       for (let i = 0; i < n; i++) { const p = at(start, (i - 3) * 1.8); ev.push({ t: r2(30 + r() * 5), kind: 'move', unit: `r${i}`, x: r2(p.x), z: r2(p.z) }); }
       if (who) ev.push({ t: 29, kind: 'move', unit: who, x: r2(wall.x), z: r2(wall.z), walk: true });
     } else if (stance === 'flag_pass') {
-      say(22, 'You want the road? Take the road. Keep walking.', who);
-      say(26, 'Single file. Eyes front. Nobody looks at the house.', envoy);
+      say(22, 'You want the road. Take it. Keep walking.', who);
+      say(26, 'Single file. Eyes front. Keep walking.', envoy);
       for (let i = 0; i < n; i++) { const a = at(11, 7 + i * 0.7), b = at(11, -9 - i * 0.7); ev.push({ t: r2(24 + i * 0.8), kind: 'move', unit: `r${i}`, x: r2(a.x), z: r2(a.z), walk: true }); ev.push({ t: r2(34 + i * 1.2), kind: 'move', unit: `r${i}`, x: r2(b.x), z: r2(b.z), walk: true }); }
     } else if (stance === 'flag_bluff') {
-      say(22, 'Look at the wall. Look at the tower. Count them, if you can.', who);
+      say(22, 'Look at the wall. The tower. Count us.', who);
       // the defenders show themselves along the wall: more of them than the crew saw
       [who, other].forEach((id, i) => { if (!id) return; const p = at(4.6, (i ? 3.5 : -3.5)); ev.push({ t: 21 + i, kind: 'move', unit: id, x: r2(p.x), z: r2(p.z) }); });
-      say(27, tone === 'good' ? 'There are too many. Back, back to the truck.' : 'They are bluffing. Probably.', envoy);
+      say(27, tone === 'good' ? 'Too many. Back to the truck.' : 'They\'re bluffing. Probably.', envoy);
       for (let i = 0; i < n; i++) { const p = at(start, (i - 3) * 1.8); ev.push({ t: r2(30 + r() * 5), kind: 'move', unit: `r${i}`, x: r2(p.x), z: r2(p.z) }); }
     } else {
       // flag_shoot: someone shoots the man under the flag. It is not a fight yet; it is a murder in the road, and the crew runs for cover
       if (who) { ev.push({ t: 22, kind: 'shot', from: who, to: envoy, hit: true }); }
       ev.push({ t: 22.2, kind: 'death', unit: envoy, executed: true });
-      say(23.5, 'He had a flag! He had a white flag!', 'r1');
-      say(25, 'Get down! Get back, get back to the truck!', 'r2');
+      say(23.5, 'He had a flag. He had a white flag!', 'r1');
+      say(25, 'Get down! Back to the truck!', 'r2');
       for (let i = 1; i < n; i++) { const p = at(start, (i - 3) * 1.8); ev.push({ t: r2(26 + r() * 4), kind: 'move', unit: `r${i}`, x: r2(p.x), z: r2(p.z) }); }
     }
   } else {
     const who = faces[0] ? `h_${faces[0].id}` : undefined;
-    const line = stance === 'neg_toll' ? 'Here. This is what we can spare. Take it and go.' : stance === 'neg_aid' ? 'There is food on the fence post. Eat, and then move on.' : stance === 'neg_redirect' ? 'The next place up the road has a lot more than we do. Go see.' : stance === 'warn' ? 'This is private property. Turn around.' : stance === 'trade' ? 'We can make a trade. Nobody has to get hurt.' : stance === 'parley' ? 'Say what you came to say. From there.' : 'Stay where you are.';
+    const line = stance === 'neg_toll' ? 'Here. That\'s what we can spare. Take it and go.' : stance === 'neg_aid' ? 'There\'s food on the fence post. Eat. Then move on.' : stance === 'neg_redirect' ? 'Next place up the road has more than we do. Try there.' : stance === 'warn' ? 'This is private property. Turn around.' : stance === 'trade' ? 'We can trade. Nobody has to get hurt.' : stance === 'parley' ? 'What do you need? Stay where you are.' : 'Stay where you are.';
     say(18, line, who);
     if (stance === 'neg_toll' || stance === 'neg_aid' || stance === 'neg_redirect') {
-      say(21, stance === 'neg_aid' ? 'Thank you. God, thank you.' : stance === 'neg_toll' ? 'That will do. We were never here.' : 'Up the road, you say? How far?', 'r0');
-      say(27, stance === 'neg_redirect' ? 'Come on. Back in the truck.' : 'Let\'s go. Nobody says a word about this.', 'r0');
+      say(21, stance === 'neg_aid' ? 'Thank you. God. Thank you.' : stance === 'neg_toll' ? 'That\'ll do. We were never here.' : 'Up the road? How far?', 'r0');
+      say(27, stance === 'neg_redirect' ? 'Come on. Truck.' : 'Let\'s go. Nobody talks about this.', 'r0');
     } else {
-    say(21, tone === 'bad' ? 'Open the gate or we take it.' : pickOf(r, ['We\'re not looking for trouble. Just what you can spare.', 'Easy. We can talk about this.']), 'r0');
-    say(27, tone === 'good' ? pickOf(r, ['Forget it. Not worth it. Come on.', 'They\'re ready for us. Back to the truck.']) : 'Put it by the gate and we go. Slowly.', 'r0');
+    say(21, tone === 'bad' ? 'Open the gate. Last time.' : pickOf(r, ['We\'re not looking for trouble. Whatever you can spare.', 'Easy. We can talk.']), 'r0');
+    say(27, tone === 'good' ? pickOf(r, ['Forget it. Not worth it. Come on.', 'They\'re ready for us. Truck.']) : 'Put it by the gate. We go. Slow.', 'r0');
     }
     for (let i = 0; i < n; i++) { const p = at(start, (i - 3) * 1.8); ev.push({ t: r2(32 + r() * 6), kind: 'move', unit: `r${i}`, x: r2(p.x), z: r2(p.z) }); }
   }
@@ -606,11 +606,11 @@ export function breakInScene(s: GameState, e: Pick<Encounter, 'size'>, stance: S
   ev.push({ t: 0, kind: 'alarm', what: (s.stock.dog ?? 0) >= 1 ? 'dog' : 'watch' });
   if (stance === 'shout') {
     ev.push({ t: 2, kind: 'lights' });
-    say(3, 'Every light on! The sheriff is on the way!');
-    say(6, 'Shit — go, go, GO!', 'r0');
+    say(3, 'Lights on! I\'m on the phone with the sheriff!');
+    say(6, 'Shit. Go, go. Out!', 'r0');
   } else {
-    say(5, 'Quiet. Check the kitchen. Look for the guns.', 'r0');
-    say(18, 'Take the laptop. Tools in the shop. Come on.', 'r0');
+    say(5, 'Quiet. Kitchen first. Look for guns.', 'r0');
+    say(18, 'Laptop. Tools in the shop. Come on.', 'r0');
   }
   for (let i = 0; i < n; i++) {
     const door = at(0.5 + i * 0.4, (i - 1) * 0.7), out = at(36, (i - 1) * 2);

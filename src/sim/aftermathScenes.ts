@@ -28,10 +28,10 @@ export interface BurialInput { name: string; age: number; kid: boolean; elder: b
 
 // What people say at a grave: broken, plain, spoken (contractions, fragments, a name; grief and anger can swear in an adult; a child says a few words and never
 // curses; an old, devout person prays).
-const WORDS_KIN = ['"God. I don\'t know what to say. You were just here."', '"{n}. {n}, I\'ll keep the place. I promise."', '"Thank you. For every single day."', '"Fuck. Fuck, {n}. Why you?"', '"I\'m sorry. I\'m so sorry, {n}."', '"Goddamn it, {n}. Goddamn it."'];
-const WORDS_KID = ['"Is {n} cold down there?"', '"Can I put this on top? It was {n}\'s."', '"I\'ll be quiet now. Please come back."', '"I want {n} back."'];
-const WORDS_ANY = ['"Rest now. We\'ve got it from here."', '"{n} didn\'t run. Remember that."', '"Shit. Shit, {n}."', '"Jesus. I can\'t believe it."', '"He\'d have done it for any of us."'];
-const WORDS_ELDER = ['"Lord, take {n} home."', '"Dear God, hold {n}. We have nothing else to give."', '"Eternal rest, grant unto {n}, O Lord..."'];
+const WORDS_KIN = ['"God. You were just here this morning."', '"{n}. I\'ll keep the place. I told you I would."', '"I should have been out there."', '"Fuck. Fuck, {n}. Why you?"', '"I\'m sorry. I\'m sorry, {n}."', '"Goddamn it, {n}. Goddamn it."'];
+const WORDS_KID = ['"Is {n} cold down there?"', '"Can I put this on top? It was {n}\'s."', '"I\'ll be quiet now. Come back."', '"I want {n} back."'];
+const WORDS_ANY = ['"{n} stayed on the wall. That\'s all I\'ve got."', '"{n} didn\'t run. Remember that."', '"Shit. Shit, {n}."', '"Jesus. I still can\'t believe it."', '"{n} would have done it for any of us."'];
+const WORDS_ELDER = ['"Lord, take {n} home."', '"Dear God, keep {n}. It\'s all we can give."', '"Eternal rest grant unto {n}, O Lord..."'];
 
 export function burialWords(inp: BurialInput): SceneLine[] {
   const r = mulberry32(inp.seed * 31 + 7), used = new Set<string>(), v = { n: inp.name };
@@ -57,7 +57,7 @@ export function cleanupCaptions(raker: string, fallen: string, hammerer: string)
 }
 
 export interface Shaken { id: string; name: string; trauma: number }
-const FLINCH = ['{c} stands frozen.', '{c} can\'t move.', '{c} stopped where they stood, and can\'t start again.', '{c} stares at nothing.'];
+const FLINCH = ['{c} stands frozen.', '{c} can\'t move.', '{c} stopped where they stood and can\'t start again.', '{c} stares at nothing.'];
 /** The people who are still shaking: trauma at 25 or above, the worst first, at most three. */
 export function traumaBeats(people: readonly Shaken[], seed: number): Array<SceneLine & { kind: 'caption' }> {
   const r = mulberry32(seed * 13 + 5), used = new Set<string>();
@@ -78,17 +78,17 @@ export function raiderFace(name: string, seed: number): Face {
 
 export interface Exchange { who: 'you' | 'note'; text: string }   // (his answers are the sim's own lines, told in the third person: notes, not quotes)
 const ASK_KIND: Record<Question, string[]> = {
-  next_crew: ['"I brought you a plate. Who\'s coming after you?"', '"Sit. Eat. Is there another crew behind yours?"'],
-  who_sent: ['"I\'m not going to hurt you. Who runs your outfit?"', '"Somebody gave the orders. Who?"'],
-  stash: ['"You took things from other places. Where\'s it kept?"', '"I\'d like to know where the food went. Will you tell me?"'],
+  next_crew: ['"Eat. Then tell me who else is out there."', '"Is there another crew behind yours?"'],
+  who_sent: ['"Nobody\'s going to hurt you. Who runs your outfit?"', '"Somebody gave the orders. Who?"'],
+  stash: ['"You took things from other places. Where do you keep it?"', '"Where did the food go? I\'d like to know."'],
 };
 const ASK_HARSH: Record<Question, string[]> = {
-  next_crew: ['"Who\'s coming next? Talk. You\'ve got until the lamp burns down."', '"Who else is out there? Tell me, or you spend the night in the cold."', '"Who\'s coming? Say it, goddamn it."'],
-  who_sent: ['"Name. Now. Who gave the order?"', '"I\'ll ask once. Who sent you?"', '"Who sent you, you son of a bitch?"'],
-  stash: ['"Where\'s the loot? Don\'t make me ask the rope."', '"Where did you hide it?"', '"Where\'s the fucking stash?"'],
+  next_crew: ['"Who\'s after you? How many?"', '"Who else is out there? Say it, or you sit in the cold."', '"Who\'s coming? Say it, goddamn it."'],
+  who_sent: ['"Name. Who gave the order?"', '"I\'m asking once. Who sent you?"', '"Who sent you, you son of a bitch?"'],
+  stash: ['"Where\'s the stuff you took? Where?"', '"Where did you hide it?"', '"Where\'s the fucking stash?"'],
 };
-const SILENT_KIND = ['He looks at the floor. "I don\'t know. I\'m sorry."', 'He shakes his head slowly and won\'t meet your eye.'];
-const SILENT_HARSH = ['He spits on the boards and says nothing.', 'His jaw is tight. He stares at the wall. "Go to hell."'];
+const SILENT_KIND = ['He looks at the floor. "I don\'t know. I\'m sorry."', 'He shakes his head and won\'t meet your eye.'];
+const SILENT_HARSH = ['He spits on the boards and says nothing.', 'His jaw is tight. He stares at the wall. "No."'];
 const LINE = ['He thinks about it a long moment.', 'He wets his lips.'];
 
 /** The questioning as lines on a screen: your question, then his answer (the sim's own words) or his silence. */
