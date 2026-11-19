@@ -89,7 +89,7 @@ try {
       g.clock.speed = 0; g.gate.pending = null; g.gate.incoming = null;
       g.disaster.phase = 'survival'; g.disaster.tracks = tracksAt(g.disaster, g.clock.t);
       // (the dome scene: the dome's last reading, since the clock is paused: cold and unheated, or scorching outside)
-      const [o, i] = k === 'ice' ? [-20, -15] : [118, 100];
+      const [o, i] = k === 'ice' ? [-20, 68] : [118, 76];   // (outside, and inside a heated / cooled dome)
       for (const dr of domesOf(g)) ownState(g, dr);   // (files a state for each dome so there is one to set)
       const list = domesOf(g);
       list.forEach((dr, idx) => {
