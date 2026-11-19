@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Director, MAX_SURFACE_COVER, MAX_WALL_COVER, wallCover, STANDOFF, auditPose, bestEye, surfaceCover, figurePx, lensProblem, poseAt, shotProblems, type Actor, type Box, type Shot } from './director';
+import { Director, MAX_SURFACE_COVER, MAX_WALL_COVER, wallCover, STANDOFF, auditPose, bestEye, surfaceCover, brushCover, MAX_BRUSH_COVER, figurePx, lensProblem, poseAt, shotProblems, type Actor, type Box, type Shot } from './director';
 import { obstaclesOf, treeBoxes } from './cameraObstacles';
 import { lightLabel } from './lightLabel';
 import { planSiege, sceneCaption, segments, type SceneKind } from '../../sim/siege';
@@ -377,6 +377,21 @@ describe('every scene of every raid has a caption for each part', () => {
   });
 });
 
+
+describe('a bush close to the camera may not fill the picture', () => {
+  const bush: Box = { x0: -1.5, x1: 1.5, z0: 0.3, z1: 0.9, h: 0.6, kind: 'brush' };
+  const eye = { x: 0, y: 0.3, z: 0 }, look = { x: 0, y: 0.25, z: 4 };
+  it('flags a leaf wall just ahead of the lens, and not one far away or beside the view', () => {
+    expect(brushCover(eye, look, 42, [bush], ground)).toBeGreaterThan(MAX_BRUSH_COVER);
+    expect(brushCover({ x: 0, y: 0.3, z: -6 }, look, 42, [bush], ground)).toBe(0);
+    expect(brushCover({ x: 4, y: 0.3, z: 0 }, look, 42, [bush], ground)).toBe(0);
+  });
+  it('shotProblems rejects such a shot', () => {
+    const s = { kind: 'close', since: 0, hold: 3, eye, look, fov: 42, drift: { x: 0, y: 0, z: 0 }, subjects: [] } as unknown as Shot;
+    const bad = shotProblems(s, { boxes: [bush], ground, live: false, actors: new Map() });
+    expect(bad.some(p => p.includes('bush'))).toBe(true);
+  });
+});
 
 describe('a surface close to the camera may not fill the picture', () => {
   const roof: Box = { x0: -3, x1: 3, z0: -3, z1: 3, h: 1.3, kind: 'building' };

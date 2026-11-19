@@ -161,6 +161,10 @@ export type BattleEvent =
    * false: it is really giving (a saw through polycarbonate). Never changes an outcome.
    */
   | { t: number; kind: 'probe'; unit: string; what: 'rifle' | 'sledge' | 'saw' | 'torch' | 'pry'; x: number; z: number; /** Unit vector pointing out of the dome at the spot. */ ox: number; oz: number; tier: 'earthen' | 'geodesic' | 'glass' | 'arcology'; holds: boolean; secs?: number }
+  /** A raider fires at the shell (presentation only, no wound, no hit on anyone: sim/dome/domeBeats.ts). `bounce`: the round glances off, or comes back at the shooter, who is rocked for `down` seconds (never a wound). (x, z) is the point on the shell; (ox, oz) the outward unit vector. */
+  | { t: number; kind: 'dome_shot'; unit: string; x: number; z: number; ox: number; oz: number; tier: 'earthen' | 'geodesic' | 'glass' | 'arcology'; bounce: 'glance' | 'back'; down?: number }
+  /** Someone at the shell makes a sign at the crew (presentation only): a wave-off, a pointing at the gate, a raised fist, facing (x, z). */
+  | { t: number; kind: 'gesture'; unit: string; what: 'wave' | 'point' | 'fist'; x: number; z: number; secs: number }
   | { t: number; kind: 'end'; result: 'repelled' | 'fled' | 'breached' | 'overrun' };
 
 export type RaidOrderKind = 'hold' | 'fallback' | 'counter';
