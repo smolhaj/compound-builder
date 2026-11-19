@@ -139,7 +139,7 @@ function woodTower(_def: KitPieceDef, seed = 1): THREE.Group {
 // ─────────────────────────────────────────────────────────────────────────
 // Tiers 3–6: the concrete and steel tower (and its floodlit, armed forms)
 // ─────────────────────────────────────────────────────────────────────────
-interface ConcreteOpts { floorY: number; mast: boolean; ring: boolean; turret: boolean }
+interface ConcreteOpts { floorY: number; mast: boolean; ring: boolean; turret: boolean; tier: 'concrete' | 'flood' | 'mount' | 'turret' }
 
 /** A floodlight head at (x, y, z) facing `yaw` (0 = +z): a housing, a dark lens, and (layer 'interior') a glowing panel the world lights with power. */
 function lamp(p: Parts, x: number, y: number, z: number, yaw: number): void {
@@ -148,6 +148,44 @@ function lamp(p: Parts, x: number, y: number, z: number, yaw: number): void {
   p.add('steel', at(box(0.09, 0.01, 0.05, 0, 0.025, 0)), 'openings');
   p.add('bulb', at(new THREE.PlaneGeometry(0.07, 0.04).translate(0, 0, 0.0205)), 'interior');
   p.add('glass', at(new THREE.PlaneGeometry(0.075, 0.044).translate(0, 0, 0.021)), 'openings');
+}
+
+/**
+ * What tells the four tall tiers apart from the ground, on the shaft at mid height (eye level and the
+ * default oblique view never see the cab): a plain bare shaft with one pale tier band (concrete); a rack of
+ * three floodlight heads on a bracket with a conduit (flood); a battered concrete skirt, hazard stripes and
+ * olive ammunition lockers (mount); a wide red band, a radar dish and camera domes (turret).
+ * Real size: a lamp head is 1.5 ft, a locker 3 ft, the dish 4 ft across.
+ */
+function shaftMarks(p: Parts, tier: ConcreteOpts['tier'], shaft: number): void {
+  const L = 'openings' as const, w = shaft * 2;
+  const band = (mat: 'iron' | 'paint_red' | 'paint_yellow' | 'paint_green' | 'steel' | 'paint_bunker', y: number, h: number) => p.add(mat, box(w + 0.012, h, w + 0.012, 0, y, 0), L);
+  if (tier === 'concrete') {
+    band('paint_bunker', 0.6, 0.05);
+    p.add('iron', pipe([shaft + 0.008, 0.1, -0.08], [shaft + 0.008, 0.95, -0.08], 0.006, 5), L);          // a conduit up the side
+  } else if (tier === 'flood') {
+    // a bracket arm on each side face with a bank of three lamp heads, wired down a conduit
+    for (const [sx, yaw] of [[1, Math.PI / 2], [-1, -Math.PI / 2]] as const) {
+      p.add('steel', box(0.07, 0.016, 0.2, sx * (shaft + 0.035), 0.72, 0), L);
+      for (const z of [-0.07, 0, 0.07]) lamp(p, sx * (shaft + 0.07), 0.76, z, yaw);
+      p.add('iron', pipe([sx * (shaft + 0.008), 0.1, 0.08], [sx * (shaft + 0.008), 0.72, 0.08], 0.006, 5), L);
+    }
+    band('steel', 0.66, 0.03);
+  } else if (tier === 'mount') {
+    // a battered skirt widening toward the ground, hazard stripes, two olive ammunition lockers
+    const r = (ap: number) => ap / Math.cos(Math.PI / 4);
+    p.add('concrete', new THREE.CylinderGeometry(r(shaft + 0.01), r(0.29), 0.42, 4).rotateY(Math.PI / 4).translate(0, 0.21, 0), 'frame');
+    // stripes: alternating yellow and iron bars round the shaft above the skirt
+    for (let k = 0; k < 6; k++) { const m = k % 2 ? 'iron' : 'paint_yellow'; for (const f of [0, 1, 2, 3]) p.add(m, box(0.05, 0.05, 0.012, 0, 0, 0).translate(-0.125 + k * 0.05, 0.5, shaft + 0.008).rotateY(f * Math.PI / 2), L); }
+    for (const sx of [-1, 1]) p.add('paint_green', box(0.07, 0.09, 0.14, sx * (shaft + 0.04), 0.52, -0.02), L);
+  } else {
+    band('paint_red', 0.5, 0.12);
+    band('iron', 0.62, 0.02);
+    // radar dish on a bracket (left), camera domes (right)
+    p.add('iron', box(0.1, 0.014, 0.014, -shaft - 0.05, 0.85, 0), L);
+    p.add('steel', new THREE.SphereGeometry(0.1, 14, 6, 0, Math.PI * 2, 0, Math.PI / 3).rotateZ(-Math.PI / 2).translate(-shaft - 0.1, 0.85, 0), L);
+    for (const z of [-0.06, 0.06]) { p.add('iron', box(0.04, 0.03, 0.04, shaft + 0.02, 0.8, z), L); p.add('glass', new THREE.SphereGeometry(0.026, 8, 6).translate(shaft + 0.04, 0.8, z), L); }
+  }
 }
 
 function concreteTower(opts: ConcreteOpts): (def: KitPieceDef, seed?: number) => THREE.Group {
@@ -229,6 +267,7 @@ function concreteTower(opts: ConcreteOpts): (def: KitPieceDef, seed?: number) =>
       lamp(p, hc - 0.02, fy + cabH - 0.02, hc + 0.0, 0.5);
       lamp(p, -hc + 0.02, fy + cabH - 0.02, hc + 0.0, -0.5);
     }
+    shaftMarks(p, opts.tier, shaft);
     // the caged ladder on the +z face up to the cab hatch, and a steel door at its foot
     ladder(p, 0, shaft + 0.03, fy - 0.02, 'steel', true);
     p.add('iron', box(0.085, 0.16, 0.012, -0.08, 0.04, shaft + 0.006), 'openings');
@@ -344,8 +383,8 @@ export const TOWER_BUILDERS: Record<string, (def: KitPieceDef, seed?: number) =>
   watchtower_wood: woodTower,
   watchtower_octagon: octagonTower,
   watchtower_hex: hexTower,
-  watchtower_concrete: concreteTower({ floorY: 1.22, mast: false, ring: false, turret: false }),
-  watchtower_flood: concreteTower({ floorY: 1.27, mast: true, ring: false, turret: false }),
-  watchtower_mount: concreteTower({ floorY: 1.0, mast: true, ring: true, turret: false }),
-  watchtower_turret: concreteTower({ floorY: 1.05, mast: true, ring: true, turret: true }),
+  watchtower_concrete: concreteTower({ floorY: 1.22, mast: false, ring: false, turret: false, tier: 'concrete' }),
+  watchtower_flood: concreteTower({ floorY: 1.27, mast: true, ring: false, turret: false, tier: 'flood' }),
+  watchtower_mount: concreteTower({ floorY: 1.0, mast: true, ring: true, turret: false, tier: 'mount' }),
+  watchtower_turret: concreteTower({ floorY: 1.05, mast: true, ring: true, turret: true, tier: 'turret' }),
 };

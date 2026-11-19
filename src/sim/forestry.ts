@@ -26,10 +26,18 @@ export function stageHours(j: FellJob): number {
   }
 }
 
+/** Plain name of a felled tree. */
+export function treeName(kind: FellJob['kind']): string {
+  return kind === 'conifer' ? 'pine' : kind === 'oval' ? 'aspen' : kind === 'juniper' ? 'juniper' : kind === 'mesquite' ? 'mesquite' : kind === 'paloverde' ? 'palo verde' : 'cottonwood';
+}
+
 /** Logs and firewood (ricks) a tree yields. */
 export function yieldOf(kind: FellJob['kind'], scale: number): { logs: number; firewood: number } {
   if (kind === 'conifer') return { logs: Math.max(2, Math.round(2 + (scale - 0.75) * 4)), firewood: 1 };
   if (kind === 'oval') return { logs: 1, firewood: 1 };
+  if (kind === 'juniper') return { logs: 1, firewood: 1 };   // fence posts and a little firewood
+  if (kind === 'mesquite') return { logs: 0, firewood: 3 };  // dense, slow-burning firewood
+  if (kind === 'paloverde') return { logs: 0, firewood: 1 };
   return { logs: 0, firewood: 2 };
 }
 
@@ -88,7 +96,7 @@ export function addFellWork(s: GameState, j: FellJob, hours: number): void {
       stackGreen(s, y.firewood);
       s.forestry.jobs.splice(s.forestry.jobs.indexOf(j), 1);
       s.forestry.cleared.push(j.treeId);
-      const name = j.kind === 'conifer' ? 'pine' : j.kind === 'oval' ? 'aspen' : 'cottonwood';
+      const name = treeName(j.kind);
       log(s, `Felled a ${name}: ${y.logs ? `${y.logs} log${y.logs > 1 ? 's' : ''} and ` : ''}${y.firewood} face cord${y.firewood > 1 ? 's' : ''} of green firewood (it burns well once it's seasoned, in about nine months).`);
     }
   }

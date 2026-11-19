@@ -101,7 +101,7 @@ export interface WorldState {
   weakView: boolean;
   setWeakView: (on: boolean) => void;
   /** The standing trees on our land (set by the canvas): the weak-spot scan and the felling read them. */
-  wallTrees: (() => Array<{ id: number; x: number; z: number; scale: number; kind: 'conifer' | 'oval' | 'broad'; haulDist: number }>) | null;
+  wallTrees: (() => Array<{ id: number; x: number; z: number; scale: number; kind: 'conifer' | 'oval' | 'broad' | 'juniper' | 'mesquite' | 'paloverde'; haulDist: number }>) | null;
   setWallTrees: (f: WorldState['wallTrees']) => void;
   /** What the world knows of the land that the sim does not (the creek's line, the road gate): the "Wall my property" planner reads it. Set by the canvas. */
   siteGeo: PropertyGeometry | null;
