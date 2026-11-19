@@ -24,6 +24,10 @@ import { useEffect, useRef } from 'react';
 import type { GameState } from '../sim/state';
 import { MushroomCloud } from './fx/MushroomCloud';
 import { collapseLook, withWeather } from '../sim/collapseLook';
+import { shellBleachOf, shellFrostOf, waterLockOf } from '../sim/climateLook';
+import { domeOf, stateOf } from '../sim/dome/live';
+import { setShellClimate } from './fx/DomeShell';
+import type { ClimateOverlay } from '../engine/world/season/seasonState';
 import { OasisState } from './atmosphere/OasisState';
 import { applyDust, dustStorm } from '../engine/world/weather/dustStorm';
 import * as THREE from 'three';
@@ -308,6 +312,8 @@ export function GameCanvas() {
       world.setCropLook(felt.crop.dead, felt.crop.empty); world.stream.setDrop(felt.streamDrop);
     };
     let feltAcc = 9, hitOff = 0, hitBase = 0, hitHeld = false;
+    const climOverlay: ClimateOverlay = { scorch: 0, snow: 0, freeze: 0 };
+    let shellAcc = 9;
     const terrainOv = new TerrainOverlay(ws.scene, world.groundAt);
     const showTerrain = () => {
       const g = useGameStore.getState().game, m = useWorldStore.getState().terrainMode, t = terrainOf(g);
@@ -595,9 +601,18 @@ export function GameCanvas() {
       world.updateRoadLife(dt, game, speedK);
       const speed = game.clock.speed;
       const { timeOfDay: t, dayOfYear, totalDays, seasonMode, weatherMode } = useWorldStore.getState();
-      ws.setNightSky(moonPhase(dayOfYear + t / 24), (d0 => d0 + (1 - d0) * collapseLook(useGameStore.getState().game).blackout)(skyDarkness(world.climate, false)));
+      const lookRaw = collapseLook(game);   // (once a frame: the night sky, the ground's climate bend and the weather-adjusted look below all read it)
+      ws.setNightSky(moonPhase(dayOfYear + t / 24), (d0 => d0 + (1 - d0) * lookRaw.blackout)(skyDarkness(world.climate, false)));
       Object.assign(world.air, { hour: t, wind: weather.outputs.wind, daylight: 1 - ws.nightFactor * 0.85, viewportH: canvas.clientHeight || 800 });
-      world.tick(dt, dayOfYear, totalDays, seasonMode);
+      // the slow climate kinds bend the ground (scorched lawns, a lying snow pack, frozen still water) and the dome glass (frost, bleach)
+      climOverlay.scorch = lookRaw.scorch; climOverlay.snow = lookRaw.snowCover; climOverlay.freeze = lookRaw.freeze;
+      world.tick(dt, dayOfYear, totalDays, seasonMode, climOverlay, waterLockOf(lookRaw.freeze));
+      shellAcc += dt;
+      if (shellAcc >= 0.4) {
+        shellAcc = 0;
+        const d0 = domeOf(game), st0 = d0 ? stateOf(game, d0) : null;
+        setShellClimate(st0 ? shellFrostOf(st0.outF, st0.indoorF) : 0, st0 ? shellBleachOf(lookRaw.scorch, st0.outF) : 0);
+      }
       const sp = world.seasons.params;
       // Season grade, particles and damp ground follow the drawn (eased) visual season
       const vis: VisualSeason = seasonState.visual;
@@ -628,7 +643,7 @@ export function GameCanvas() {
       // dry country in a windy rainless spell lifts dust; a hot dry midday shimmers in a haze (weather/dustStorm.ts: from the weather already running)
       const dustIn = dustStorm({ region: seasonState.climate.id, season: vis, wind: wo.wind, rain: wo.rain, storm: wo.storm, snow: wo.snow, cloud: wo.cloud, hour: t });
       if (qa.dust !== undefined) dustIn.dust = qa.dust;
-      const look = applyDust(withWeather(collapseLook(gs), { rain: wo.rain, snow: wo.snow, season: vis }), weatherMode === 'off' ? { dust: 0, heat: 0 } : dustIn);
+      const look = applyDust(withWeather(gs === game ? lookRaw : collapseLook(gs), { rain: wo.rain, snow: wo.snow, season: vis }), weatherMode === 'off' ? { dust: 0, heat: 0 } : dustIn);
       const wx = weather.update({
         dt, speed: speed === 0 ? 1 : 60 / SECONDS_PER_DAY[speed], season: wxSeason, hour: t,
         mode: weatherMode, eventWetness: ws.eventWetness, night: ws.nightFactor,
@@ -653,7 +668,7 @@ export function GameCanvas() {
         wx.haze = Math.max(wx.haze ?? 0.4, look.haze);
         wx.snow = Math.max(wx.snow, 0.5 * look.ash);
       }
-      ws.setCollapseLook({ dim: look.dim, tint: look.skyTint, amt: look.skyAmt, night: look.skyNight, cast: look.cast, sat: look.sat, contrast: look.contrast, townGlow: look.townGlow, flicker: look.flicker, fireGlow: look.fireGlow, smoke: look.smoke, nightLift: look.nightLift, nightGlow: look.nightGlow,
+      ws.setCollapseLook({ dim: look.dim, tint: look.skyTint, amt: look.skyAmt, night: look.skyNight, cast: look.cast, sat: look.sat, contrast: look.contrast, sunScale: look.sunScale, sunLower: look.sunLower, townGlow: look.townGlow, flicker: look.flicker, fireGlow: look.fireGlow, smoke: look.smoke, nightLift: look.nightLift, nightGlow: look.nightGlow,
         fog: look.fog, haze: look.haze, townLights: look.townLights, traffic: look.traffic, convoy: look.convoy, flashes: look.flashes, aurora: look.aurora, comet: look.comet, az: look.az });
       ws.cutsceneLift = player.active ? 1 : 0;
       ws.setWeather(wx, Math.max(weather.flash, look.flash, 0.6 * (getHitLive()?.flash ?? 0)), weather.skyLightning);

@@ -343,6 +343,46 @@ export const SEASON_TAU_DAYS = 2.5;
 /** Easing time constant in real seconds while a Settings override changes. */
 export const SEASON_TAU_OVERRIDE_S = 0.6;
 
+/**
+ * The slow climate disasters on the drawn ground (sim/climateLook.ts through the game): `scorch` dries and thins the lawns and crowns, `snow`
+ * is a lying pack that no season melts, `freeze` locks the water under ice. All 0-1; all zeros change nothing (the same object comes back).
+ */
+export interface ClimateOverlay { scorch: number; snow: number; freeze: number }
+export const NO_OVERLAY: ClimateOverlay = { scorch: 0, snow: 0, freeze: 0 };
+
+/**
+ * Bend a day's season targets by the climate overlay. Pure; only raises the winter-ish parameters for cold and the dry ones for heat, never
+ * lowers anything the season already set, and every value stays 0-1 (so it eases through the controller's own smoothing, no popping).
+ */
+export function applyClimateOverlay(t: SeasonParams, c: SeasonClimate, o: ClimateOverlay | undefined): SeasonParams {
+  if (!o || (o.scorch <= 0 && o.snow <= 0 && o.freeze <= 0)) return t;
+  const cl = (x: number) => Math.max(0, Math.min(1, Number.isFinite(x) ? x : 0));
+  const sc = cl(o.scorch), sn = cl(o.snow), fz = cl(o.freeze);
+  const r: SeasonParams = { ...t };
+  // heat: tan, brittle lawns (dry and dormant read the same shader paths), crowns thin and brown a little, nothing flushes green
+  if (sc > 0) {
+    const live = 1 - Math.min(1, t.snow * 1.5);
+    r.dry = Math.max(r.dry, sc * live);
+    r.dormant = Math.max(r.dormant, 0.55 * sc * live);
+    r.fall = Math.max(r.fall, 0.3 * sc * live);
+    r.bare = Math.max(r.bare, 0.2 * sc * c.bareMax * live);
+    r.fresh = r.fresh * (1 - sc);
+    r.bloom = r.bloom * (1 - sc);
+  }
+  // cold: a pack that stays (more than the calendar's own snow), frozen water, dead brown grass, bare crowns, no spring
+  if (sn > 0) r.snow = Math.max(r.snow, sn);
+  if (fz > 0) {
+    r.ice = Math.max(r.ice, fz);
+    r.cold = Math.max(r.cold, fz);
+    r.dormant = Math.max(r.dormant, 0.9 * fz);
+    r.bare = Math.max(r.bare, c.bareMax * fz);
+    r.fresh = r.fresh * (1 - fz);
+    r.bloom = r.bloom * (1 - fz);
+  }
+  r.litter = r.litter * (1 - Math.min(1, r.snow * 1.1));
+  return r;
+}
+
 export interface SeasonFrame {
   locationId: string | null | undefined;
   /** Day of the year (1–365) of the game calendar. */
@@ -352,6 +392,8 @@ export interface SeasonFrame {
   mode: SeasonMode;
   /** Real seconds since last frame. */
   dt: number;
+  /** The slow climate kinds' bend on the ground (heat, a perennial snow pack, frozen water); omitted = none. */
+  overlay?: ClimateOverlay;
 }
 
 /**
@@ -371,7 +413,7 @@ export class SeasonController {
   update(f: SeasonFrame): SeasonParams {
     const climate = climateFor(f.locationId);
     const doy = f.mode === 'auto' ? f.doy : overrideDay(f.mode, climate);
-    const target = seasonTargets(climate, doy);
+    const target = applyClimateOverlay(seasonTargets(climate, doy), climate, f.overlay);
     const loc = f.locationId ?? '';
     const jump = !Number.isFinite(this._lastTotal) || f.totalDays < this._lastTotal || f.totalDays - this._lastTotal > 40;
     const snap = this._loc !== loc || jump;

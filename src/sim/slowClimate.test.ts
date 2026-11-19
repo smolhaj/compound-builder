@@ -372,8 +372,9 @@ describe('the ice age: the cold, the snow, the equipment', () => {
   });
   it('the sky and the snow cover come from the look hook; prices stay finite and rise', () => {
     const g = iceGame({ region: 'north_woods', years: 3 }); g.clock.startDoy = 25 - Math.floor(g.clock.t);
-    const l = iceFx.look!(g, { ashCover: 0 } as never);
-    expect(l.ashCover).toBeGreaterThan(0.5);
+    const l = iceFx.look!(g, { ashCover: 0, snowCover: 0 } as never);
+    expect(l.snowCover).toBeGreaterThan(0.5);   // (its own field now: a snowfall does not thin it, as it thins ash)
+    expect(l.ashCover).toBeUndefined();
     expect(fxPriceMod(g)).toBeGreaterThan(1.3);
   });
 });

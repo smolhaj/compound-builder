@@ -37,6 +37,8 @@ const B: V4 = { x: 0, y: 0, z: 0, w: 0 };
 const C: V4 = { x: 0, y: 1, z: 0, w: 0 };
 const P: V4 = { x: 0.25, y: 0.5, z: 0.75, w: 1 };
 const D: V4 = { x: 0, y: 0, z: 0, w: 0 };
+/** uSeaX = (water lock, 0, 0, 0): the ice age's grip on water (1 = every pond and creek frozen solid and still, whitened). */
+const X: V4 = { x: 0, y: 0, z: 0, w: 0 };
 
 /** Shared uniform objects (assign into shader.uniforms). */
 export const SEASON_UNIFORMS = {
@@ -45,6 +47,7 @@ export const SEASON_UNIFORMS = {
   uSeaC: { value: C },
   uSeaP: { value: P },
   uSeaD: { value: D },
+  uSeaX: { value: X },
 } as const;
 
 /** Write the eased season into the shared uniforms. */
@@ -71,6 +74,11 @@ export function writeSeasonExtras(frost: number, mud: number): void {
   D.z = Math.max(0, Math.min(1, mud));
 }
 
+/** The ice age's grip on water (0-1): the open lead of a fast creek closes and the ice goes white-blue. One value write. */
+export function writeWaterLock(lock: number): void {
+  X.x = Math.max(0, Math.min(1, Number.isFinite(lock) ? lock : 0));
+}
+
 /** Current uniform values (tests / QA). */
 export function getSeasonUniformValues(): { a: Readonly<V4>; b: Readonly<V4>; c: Readonly<V4>; p: Readonly<V4>; d: Readonly<V4> } {
   return { a: A, b: B, c: C, p: P, d: D };
@@ -84,6 +92,7 @@ uniform vec4 uSeaB;
 uniform vec4 uSeaC;
 uniform vec4 uSeaP;
 uniform vec4 uSeaD;
+uniform vec4 uSeaX;
 `;
 
 /**
@@ -384,9 +393,11 @@ export function seasonIceGlsl(worldPos: string, openWater = '0.0', iceExpr = 'uS
     // Snow lies in wind-blown drifts on the ice; skating-clear gray ice shows between
     float icDr = seaNoise( icXZ * 0.35 + 5.1 ) * 0.7 + seaNoise( icXZ * 2.2 ) * 0.3;
     icAlb = mix( icAlb, vec3( 0.80, 0.83, 0.88 ), clamp( uSeaB.x * smoothstep( 0.5, 0.72, icDr ), 0.0, 0.9 ) );
+    // an ice age's ice is deep, white-blue and still
+    icAlb = mix( icAlb, vec3( 0.74, 0.82, 0.92 ), 0.55 * uSeaX.x );
     vec3 icIrr = ( reflectedLight.directDiffuse + reflectedLight.indirectDiffuse ) / max( diffuseColor.rgb, vec3( 1e-3 ) );
     vec3 icCol = icIrr * icAlb + reflectedLight.directSpecular * 0.05;
-    float icOpen = clamp( ${openWater}, 0.0, 1.0 );
+    float icOpen = clamp( ${openWater}, 0.0, 1.0 ) * ( 1.0 - uSeaX.x );
     float icK = smoothstep( 0.0, 0.3, icAmt ) * icAmt * ( 1.0 - icOpen );
     outgoingLight = mix( outgoingLight, icCol, clamp( icK * 1.2, 0.0, 1.0 ) );
   }

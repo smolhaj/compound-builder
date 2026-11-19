@@ -113,7 +113,7 @@ export class WorldScene {
   private _envBakeCloud = 0;
   private _envBakeTint = 0;
   /** The collapse's look (setCollapseLook): sun dim, sky tint, grade cast. Neutral = nothing. */
-  private readonly _collapse = { dim: 1, tint: new THREE.Color(), amt: 0, night: false, cast: new THREE.Color(1, 1, 1), sat: 1, contrast: 0, townGlow: 1, flicker: 0, fireGlow: 0, smoke: 0, nightLift: 0, nightGlow: new THREE.Color(0, 0, 0), fog: 0, haze: 0, townLights: 0, traffic: 0, convoy: 0, flashes: 0, aurora: 0, comet: 0, az: { town: 3.14, road: 3.09, fire: 3.14, war: 3.14 } };
+  private readonly _collapse = { dim: 1, tint: new THREE.Color(), amt: 0, night: false, cast: new THREE.Color(1, 1, 1), sat: 1, contrast: 0, townGlow: 1, flicker: 0, fireGlow: 0, smoke: 0, nightLift: 0, nightGlow: new THREE.Color(0, 0, 0), fog: 0, haze: 0, townLights: 0, traffic: 0, convoy: 0, flashes: 0, aurora: 0, comet: 0, sunScale: 1, sunLower: 0, az: { town: 3.14, road: 3.09, fire: 3.14, war: 3.14 } };
   /** The oasis contrast grade (setOasis): warm inside a held compound, cold and ashy outside. Neutral = nothing (peacetime). */
   private _oasis: GradeDelta = gradeDelta(oasisFactors({ collapse: 0, safety: 1, inside: 1 }), 0, 0);
   private readonly _oasisIn = { collapse: 0, safety: 1, inside: 1 };
@@ -270,13 +270,13 @@ export class WorldScene {
    * at night for an aurora), and the grade's cast, saturation and contrast. Pass the neutral values to clear it.
    */
   setCollapseLook(l: { dim: number; tint: readonly number[]; amt: number; night: boolean; cast: readonly number[]; sat: number; contrast: number; townGlow?: number; flicker?: number; fireGlow?: number; smoke?: number; nightLift?: number; nightGlow?: readonly number[];
-    fog?: number; haze?: number; townLights?: number; traffic?: number; convoy?: number; flashes?: number; aurora?: number; comet?: number; az?: { town: number; road: number; fire: number; war: number } }): void {
+    fog?: number; haze?: number; townLights?: number; traffic?: number; convoy?: number; flashes?: number; aurora?: number; comet?: number; sunScale?: number; sunLower?: number; az?: { town: number; road: number; fire: number; war: number } }): void {
     const c = this._collapse;
     c.dim = l.dim; c.tint.setRGB(l.tint[0], l.tint[1], l.tint[2]); c.amt = l.amt; c.night = l.night;
     c.cast.setRGB(l.cast[0], l.cast[1], l.cast[2]); c.sat = l.sat; c.contrast = l.contrast;
     c.townGlow = l.townGlow ?? 1; c.flicker = l.flicker ?? 0; c.fireGlow = l.fireGlow ?? 0; c.smoke = l.smoke ?? 0; c.nightLift = l.nightLift ?? 0;
     if (l.nightGlow) c.nightGlow.setRGB(l.nightGlow[0], l.nightGlow[1], l.nightGlow[2]); else c.nightGlow.setRGB(0, 0, 0);
-    c.fog = l.fog ?? 0; c.haze = l.haze ?? 0; c.townLights = l.townLights ?? 0; c.traffic = l.traffic ?? 0; c.convoy = l.convoy ?? 0; c.flashes = l.flashes ?? 0; c.aurora = l.aurora ?? 0; c.comet = l.comet ?? 0;
+    c.fog = l.fog ?? 0; c.haze = l.haze ?? 0; c.townLights = l.townLights ?? 0; c.traffic = l.traffic ?? 0; c.convoy = l.convoy ?? 0; c.flashes = l.flashes ?? 0; c.aurora = l.aurora ?? 0; c.comet = l.comet ?? 0; c.sunScale = l.sunScale ?? 1; c.sunLower = l.sunLower ?? 0;
     if (l.az) c.az = l.az;
   }
 
@@ -481,7 +481,8 @@ export class WorldScene {
     const radius = 100;
     const elevation = Math.sin(angle) * 80;
     const sunX = Math.cos(angle) * radius;
-    const sunY = Math.max(elevation, -20);
+    // (an ice age pulls the day's arc down: a low, long-shadowed sun; zero in every other world)
+    const sunY = Math.max(elevation > 0 ? elevation * (1 - this._collapse.sunLower) : elevation, -20);
 
     const ph = this._phase;
     phaseWeights(timeOfDay, ph);
@@ -640,6 +641,7 @@ export class WorldScene {
       this._sky.setMoonDirection(tmpV);
       this._sky.setNight(wn);
       this._sky.setSmoke(col.smoke * (1 - 0.5 * overcast));
+      this._sky.setSunScale(col.sunScale);
       this._sky.setSkyline({ town: col.townLights, flashes: col.flashes, traffic: col.traffic, fire: Math.max(col.fireGlow, 0.8 * oa.horizonFire), convoy: col.convoy, twilight: wg, aurora: col.aurora, comet: col.comet, az: col.az });
       const sw = this._skyWeather;
       const nightSee = Math.max(0, Math.min(1, (wn - 0.35) / 0.65));

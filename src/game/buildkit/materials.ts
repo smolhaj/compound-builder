@@ -30,6 +30,8 @@ export type KitMaterialId = 'snow' | 'timber_lap' | 'trim' | 'fieldstone' | 'met
   'art_mountains' | 'art_sunset' | 'art_lake' | 'photo_family' | 'photo_couple' | 'poster_map' | 'poster_seeds' | 'sampler' | 'curtain' | 'curtain_red' | 'flowers'
   // greenhouse and orchard
   | 'polycarb' | 'aluminum' | 'fruit'
+  // the dome shells' own glazing (a copy of glass and polycarb, so frost and bleaching in game/fx/DomeShell.ts leave a house's windows and the greenhouses alone)
+  | 'dome_glass' | 'dome_polycarb'
   // the arcology's clear polycarbonate-composite armor panel (sim/dome/): faintly blue, lit from within at night
   | 'arcology'
   // the orchard's other fruit and its blossom (sim/orchard.ts: each kind blooms and ripens in its own weeks)
@@ -906,6 +908,8 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'hedge2': m = texMat(id, paintLeaves([70, 96, 48], 137), 3.5, 0.9, 0, 1.6); break;
     // twin-wall polycarbonate: milky, lets the light through, seen from both sides
     case 'arcology': m = new THREE.MeshStandardMaterial({ color: 0xc4e8f4, roughness: 0.1, metalness: 0.35, transparent: true, opacity: 0.4, depthWrite: false, side: THREE.DoubleSide, emissive: new THREE.Color(0.18, 0.5, 0.62), emissiveIntensity: 0.12 }); break;
+    case 'dome_glass': m = new THREE.MeshStandardMaterial({ color: 0x9fb4c0, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.28, depthWrite: false }); break;
+    case 'dome_polycarb': m = new THREE.MeshStandardMaterial({ color: 0xdfeef0, roughness: 0.25, metalness: 0.05, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide }); break;
     case 'polycarb': m = new THREE.MeshStandardMaterial({ color: 0xdfeef0, roughness: 0.25, metalness: 0.05, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide }); break;
     case 'aluminum': m = new THREE.MeshStandardMaterial({ color: 0xc4c8cc, roughness: 0.35, metalness: 0.7 }); break;
     case 'fruit': m = new THREE.MeshStandardMaterial({ color: 0xc23a22, roughness: 0.45 }); break;
