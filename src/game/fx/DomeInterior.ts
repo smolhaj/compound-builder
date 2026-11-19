@@ -75,6 +75,12 @@ export function makeDomeInterior(plan: InteriorPlan, ground: (lx: number, lz: nu
     for (const m of [heads, pools]) { m.instanceMatrix.needsUpdate = true; m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; group.add(m); }
     pools.renderOrder = 2; owned.push(hg, pg);
   }
+  if (plan.glows.length && !dark) {
+    const g1 = new THREE.CircleGeometry(1, 28); g1.rotateX(-Math.PI / 2);
+    const gl = new THREE.InstancedMesh(g1, kitMaterial('spill_electric_b'), plan.glows.length), m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), q0 = new THREE.Quaternion();
+    plan.glows.forEach((o, i) => { m4.compose(new THREE.Vector3(o.x, gy(o.x, o.z) + 0.022, o.z), q0, sc.set(o.r, 1, o.r)); gl.setMatrixAt(i, m4); });
+    gl.instanceMatrix.needsUpdate = true; gl.frustumCulled = false; gl.castShadow = false; gl.receiveShadow = false; gl.renderOrder = 1; group.add(gl); owned.push(g1);
+  }
   const key = `${plan.segs.length}:${plan.benches.length}:${plan.crates.length}:${plan.lamps.length}:${dark ? 1 : 0}`;
   return { plan, group, key, setUnder: on => { group.visible = !on; }, dispose: () => { for (const o of owned) o.dispose(); } };
 }

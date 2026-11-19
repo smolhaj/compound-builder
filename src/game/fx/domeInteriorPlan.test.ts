@@ -11,6 +11,11 @@ describe('dome interior plan', () => {
     expect(p.crates.length).toBe(3); expect(p.signs.length).toBe(3);
     expect(p.plaza).not.toBeNull(); expect(p.planters.length).toBeGreaterThan(0); expect(p.lamps.length).toBe(3);
   });
+  it('houses get a pool of light round them, and a ring path runs round the middle', () => {
+    const p = interiorPlan('glass', R, angles, [{ x: 1, z: 1, hx: 0.5, hz: 0.4, home: true }, { x: -2, z: 1, hx: 0.5, hz: 0.4 }]);
+    expect(p.glows.length).toBe(1);
+    expect(p.segs.filter(s => Math.abs(Math.hypot(s.x, s.z) - R * 0.6) < 0.05).length).toBeGreaterThan(20);
+  });
   it('an earthen dome has nothing', () => { const p = interiorPlan('earthen', 1, [0], []); expect(p.segs.length + p.benches.length).toBe(0); });
   it('nothing is put on a building, and everything stays under the shell', () => {
     const obs: Obstacle[] = [{ x: -0.8, z: 0.8, hx: 0.9, hz: 0.5 }, { x: 2, z: -1, hx: 1, hz: 1 }, { x: 0, z: 4.3, hx: 0.6, hz: 0.6 }];

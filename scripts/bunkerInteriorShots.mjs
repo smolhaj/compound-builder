@@ -57,7 +57,7 @@ try {
   const lights = on => page.evaluate(on => window.__cb.game.setState(s => ({ game: { ...s.game, opsec: { ...(s.game.opsec ?? {}), blackout: !on } } })), on);
   await set("cb.store.getState().setUnderground(false); cb.store.getState().setBuildingView('full'); cb.ws.outdoorLight = 0.04; cb.store.getState().setTimeOfDay(12);");
   await page.evaluate(() => window.__cb.world.bunkerFolk.setDebug([{ room: 'bunker_dorm', role: 'bed' }, { room: 'bunker_dorm', role: 'bed' }, { room: 'bunker_dorm', role: 'seat' }, { room: 'bunker_galley', role: 'seat' }, { room: 'bunker_comms', role: 'console' }, { room: 'bunker_medical', role: 'bed' }]));
-  for (const on of [true, false]) {
+  for (const on of (process.env.LIGHTS === 'on' ? [true] : [true, false])) {
     await lights(on); const L = on ? 'on' : 'off';
     await room('bunker_dorm', 0.3, 0.27, 0.3, -0.25, 0.1, -0.3); await shot(`${tag}-dorm-sleeping-${L}`);
     await room('bunker_dorm', -0.3, 0.27, -0.2, 0.2, 0.15, 0.3); await shot(`${tag}-dorm-tv-${L}`);

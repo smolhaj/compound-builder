@@ -5,12 +5,14 @@
  * SCALE v2: a person is 0.28 tall, a path 0.3 wide (2 m), a bench seat 0.075 high.
  */
 /** An axis-aligned box in the dome's local frame: center and half sizes (a round thing is a square of its radius). */
-export interface Obstacle { x: number; z: number; hx: number; hz: number }
+export interface Obstacle { x: number; z: number; hx: number; hz: number; /** A lived-in house: its lit windows throw a pool of light round it at night. */ home?: boolean }
 export interface PathSeg { x: number; z: number; rot: number; len: number }
 export interface Prop { x: number; z: number; rot: number }
 export interface InteriorPlan {
   segs: PathSeg[]; benches: Prop[]; crates: Prop[]; planters: Prop[]; signs: Prop[]; lamps: Array<{ x: number; z: number }>;
   plaza: { x: number; z: number; r: number } | null;
+  /** Pools of window light round the houses (center, radius). */
+  glows: Array<{ x: number; z: number; r: number }>;
 }
 export const PATH_W = 0.3, BENCH = { len: 0.17, dep: 0.06, seat: 0.075, back: 0.15 }, CRATE = 0.07;
 const STEP = 0.3;
@@ -18,9 +20,10 @@ const STEP = 0.3;
 const hash = (n: number): number => { let h = (n | 0) * 374761393 + 668265263; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 
 export function interiorPlan(tier: string, r: number, angles: readonly number[], obstacles: readonly Obstacle[], seed = 1): InteriorPlan {
-  const out: InteriorPlan = { segs: [], benches: [], crates: [], planters: [], signs: [], lamps: [], plaza: null };
+  const out: InteriorPlan = { segs: [], benches: [], crates: [], planters: [], signs: [], lamps: [], plaza: null, glows: [] };
   if (tier !== 'glass' && tier !== 'arcology' && tier !== 'geodesic') return out;
   const free = (x: number, z: number, pad: number, inner = 0.9): boolean => Math.hypot(x, z) < r * inner && !obstacles.some(o => Math.abs(x - o.x) < o.hx + pad && Math.abs(z - o.z) < o.hz + pad);
+  for (const o of obstacles) if (o.home) out.glows.push({ x: o.x, z: o.z, r: Math.max(o.hx, o.hz) * 1.9 });
   const plazaR = Math.min(0.9, r * 0.11);
   const plazaOk = free(0, 0, plazaR + 0.25, 1);
   if (plazaOk) out.plaza = { x: 0, z: 0, r: plazaR };
@@ -51,6 +54,21 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
       (kind === 'crate' ? out.crates : out.signs).push({ x, z, rot: Math.atan2(sx, sz) + hash(seed + ai) * 0.3 });
     }
   });
+  // a ring path round the middle of the dome, in pieces; the pieces a building or a spoke already covers are left out
+  { const rr = r * 0.6, n = Math.floor(2 * Math.PI * rr / STEP);
+    for (let i = 0; i < n; i++) {
+      const a = (i + 0.5) * 2 * Math.PI / n, x = Math.sin(a) * rr, z = Math.cos(a) * rr, d = 2 * Math.PI / n * rr + 0.02;
+      if (!free(x, z, PATH_W / 2 + 0.03)) continue;
+      const a0 = i * 2 * Math.PI / n, a1 = (i + 1) * 2 * Math.PI / n;
+      if (!free(Math.sin(a0) * rr, Math.cos(a0) * rr, PATH_W / 2) || !free(Math.sin(a1) * rr, Math.cos(a1) * rr, PATH_W / 2)) continue;
+      out.segs.push({ x, z, rot: Math.atan2(Math.cos(a), -Math.sin(a)), len: d });
+    }
+    // benches on the ring, facing inward
+    for (let i = 0; i < 8; i++) {
+      const a = (i + 0.5) * Math.PI / 4 + 0.2, off = rr + PATH_W / 2 + BENCH.dep / 2 + 0.06, x = Math.sin(a) * off, z = Math.cos(a) * off;
+      if (out.segs.some(s => Math.hypot(s.x - Math.sin(a) * rr, s.z - Math.cos(a) * rr) < STEP * 0.6) && free(x, z, BENCH.len / 2 + 0.04) && !angles.some(an => Math.abs(Math.atan2(Math.sin(a - an), Math.cos(a - an))) < 0.2)) out.benches.push({ x, z, rot: Math.atan2(-Math.sin(a), -Math.cos(a)) });
+    }
+  }
   if (out.plaza) {
     const k = 6, pr = out.plaza.r + 0.2;
     for (let i = 0; i < k; i++) {
