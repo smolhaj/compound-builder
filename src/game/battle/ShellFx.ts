@@ -11,9 +11,11 @@ export interface ShellHooks {
   puff: (p: THREE.Vector3, r0: number, r1: number, life: number, rise: number, color: number, o0: number, glow?: boolean) => void;
   flash: (p: THREE.Vector3, k: number, color: number) => void;
   shake: (v: number) => void;
+  tracer: (a: THREE.Vector3, b: THREE.Vector3) => void;
 }
 const MAX = 64;
 type Probe = Extract<BattleEvent, { kind: 'probe' }>;
+type DomeShot = Extract<BattleEvent, { kind: 'dome_shot' }>;
 
 let SOFT: THREE.CanvasTexture | null = null;
 export const soft = (): THREE.CanvasTexture => {
@@ -88,6 +90,26 @@ export class ShellFx {
       case 'pry':
         h.flash(p, 3, 0xffe9b8); spark(3, 0xffe2a0); h.shake(0.03);
         break;
+    }
+  }
+
+  /**
+   * A raider's round meets the shell: the muzzle flash and the tracer in, a white chip flash and a few sparks where it lands, and a streak glancing off.
+   * `muzzle` is the shooter's muzzle, `at` the height of the hit (world y). A `back` round streaks to the shooter's chest instead (the caller rocks him).
+   */
+  onDomeShot(e: DomeShot, muzzle: THREE.Vector3, chest: THREE.Vector3): void {
+    const h = this._h, y = h.ground(e.x, e.z) + 0.08 + this._rnd() * 0.22;
+    const p = new THREE.Vector3(e.x + e.ox * 0.012, y, e.z + e.oz * 0.012);
+    h.flash(muzzle, 3, 0xffc070);
+    h.tracer(muzzle, p);
+    h.flash(p, 7, 0xffffff);
+    for (let i = 0; i < 5; i++) h.puff(p.clone().addScaledVector(new THREE.Vector3(e.ox, 0, e.oz), 0.02 + i * 0.012), 0.004, 0.012, 0.2 + this._rnd() * 0.15, -0.04, 0xfff2cf, 1, true);
+    this._mark(p, e.ox, e.oz, e.tier === 'glass' ? 0.04 : 0.03, e.tier === 'glass' ? 0xe8f2ff : 0x2a2a2a, e.tier === 'glass' ? 1 : 0.7);
+    if (e.bounce === 'back') h.tracer(p, chest);
+    else {
+      // a glancing streak: out along the surface, sideways and up, short
+      const side = (this._rnd() - 0.5) * 2, out = new THREE.Vector3(e.ox, 0, e.oz), tan = new THREE.Vector3(-e.oz, 0, e.ox);
+      h.tracer(p, p.clone().addScaledVector(out, 0.5).addScaledVector(tan, side * 0.9).add(new THREE.Vector3(0, 0.25 + this._rnd() * 0.3, 0)));
     }
   }
 }

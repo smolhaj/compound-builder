@@ -236,7 +236,7 @@ export class BattleRenderer {
       ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c),
       boom: (x, y, z, r, dust) => this._boom(x, y, z, r, dust), shake: v => { this.shake = Math.max(this.shake, v); }, gap: (id, at, w) => this.onGap?.(id, at, w),
     });
-    this.shellFx = new ShellFx(this._group, { ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c), shake: v => { this.shake = Math.max(this.shake, v); } });
+    this.shellFx = new ShellFx(this._group, { ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c), shake: v => { this.shake = Math.max(this.shake, v); }, tracer: (a, b) => this._tracer(a, b) });
     this.props = new SceneProps(this._group, { ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c), glow: (i, p, k, c) => { const l = this._glows[i]; if (l) { l.position.copy(p); l.color.setHex(c); l.intensity = k; l.distance = 3 + k * 0.5; } }, shake: v => { this.shake = Math.max(this.shake, v); } });
     this.props.centerOf = () => ({ x: this._center.x, z: this._center.z });
     this._trGeo.setAttribute('position', new THREE.BufferAttribute(this._trPos, 3).setUsage(THREE.DynamicDrawUsage));
@@ -594,6 +594,22 @@ export class BattleRenderer {
         break;
       }
       case 'ram': case 'charge': case 'gap': this.invasion.onEvent(e); break;
+      case 'dome_shot': {
+        const u = U_(e.unit); if (!u || u.dead) break;
+        const p0 = this._muzzle(u, new THREE.Vector3()), chest = this._torso(u, new THREE.Vector3());
+        u.rot = Math.atan2(e.x - u.x, e.z - u.z); u.armed = true; u.aimUntil = this.time + 0.9; u.tx = u.x; u.tz = u.z;
+        this.shellFx.onDomeShot(e, p0, chest);
+        // the round that comes back rocks him: down on a knee for a moment, then up (no wound: nothing in the fight changes)
+        if (e.bounce === 'back') { u.proneUntil = this.time + (e.down ?? 2); this.shake = Math.max(this.shake, 0.06); }
+        break;
+      }
+      case 'gesture': {
+        const u = U_(e.unit); if (!u || u.dead) break;
+        u.rot = Math.atan2(e.x - u.x, e.z - u.z); u.tx = u.x; u.tz = u.z; u.crouch = false;
+        if (e.what === 'point') { u.armed = true; u.aimUntil = this.time + e.secs; }
+        else { u.hands = true; u.frozenUntil = this.time + e.secs; }   // (arms up: a wave-off, a raised fist)
+        break;
+      }
       case 'probe': { const u = U_(e.unit); if (u && !u.dead) u.rot = Math.atan2(-e.ox, -e.oz); this.shellFx.onEvent(e); break; }   // (he faces the shell while he works at it)
       case 'house_door': case 'loot': case 'fire': case 'ladder': case 'flare': case 'flag': case 'tool': case 'repair': this.props.onEvent(e); break;
       case 'grave': {

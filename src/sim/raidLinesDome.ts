@@ -5,102 +5,119 @@
  */
 type Variants = Partial<Record<string, readonly string[]>>;
 export type DomeCtx = 'dome_scout' | 'dome_shots' | 'dome_tool' | 'dome_cut' | 'dome_airlock' | 'dome_ram' | 'dome_blast' | 'dome_skirt' | 'dome_argue' | 'dome_order' | 'dome_panic' | 'dome_vow'
-  | 'dome_watch' | 'dome_fire' | 'dome_holds' | 'dome_gone';
+  | 'dome_watch' | 'dome_fire' | 'dome_holds' | 'dome_gone' | 'dome_angry' | 'dome_bounce' | 'dome_taunt';
 
 /** Every key of every pool, so a test can hold the planner to using each one. */
-export const DOME_RAIDER_CTX: readonly DomeCtx[] = ['dome_scout', 'dome_shots', 'dome_tool', 'dome_cut', 'dome_airlock', 'dome_ram', 'dome_blast', 'dome_skirt', 'dome_argue', 'dome_order', 'dome_panic', 'dome_vow'];
-export const DOME_DEFENDER_CTX: readonly DomeCtx[] = ['dome_watch', 'dome_fire', 'dome_holds', 'dome_gone'];
-export const DOME_VARIANT_KEYS: readonly string[] = ['any', 'desperate', 'hard', 'savage', 'small', 'large', 'leader'];
+export const DOME_RAIDER_CTX: readonly DomeCtx[] = ['dome_scout', 'dome_shots', 'dome_tool', 'dome_cut', 'dome_airlock', 'dome_ram', 'dome_blast', 'dome_skirt', 'dome_argue', 'dome_order', 'dome_panic', 'dome_vow', 'dome_angry', 'dome_bounce'];
+export const DOME_DEFENDER_CTX: readonly DomeCtx[] = ['dome_watch', 'dome_fire', 'dome_holds', 'dome_gone', 'dome_taunt'];
+export const DOME_VARIANT_KEYS: readonly string[] = ['any', 'desperate', 'hard', 'savage', 'small', 'large', 'leader', 'kid', 'civ', 'vet', 'elder'];
 
 export const DOME_LINES: Record<'raider' | 'defender', Partial<Record<DomeCtx, Variants>>> = {
   raider: {
     dome_scout: {
-      any: ['It is sealed up tight, and the lights are on.', 'No gap in it anywhere. The lights are on inside.', 'I walked the whole curve. It is sealed. They are warm in there.', 'Glass all the way round, and lights on. Somebody is home.', 'Two doors that I can see, and both are shut.', 'It is a lot bigger than it looked from the road.'],
-      small: ['Just the three of us and that thing is huge. Look at it.', 'We are not enough for this. Just saying.'],
-      large: ['Spread out along it. Look for anything loose.', 'Check every panel. Somebody built this in a hurry, somewhere.'],
-      leader: ['Report. Is there a way in or not?', 'Quiet. Tell me what you saw.'],
-      hard: ['Sealed, lights on, nobody outside. They are not scared of us.'],
+      any: ['Sealed. Lights on inside.', 'No gap. I walked the whole curve.', 'Two doors. Both shut.', 'They are in there. I saw a light move.', 'Nothing low enough to climb.'],
+      small: ['Three of us. That is not enough for this.'],
+      large: ['Spread out. Check every seam.', 'Two left, two right. Walk it.'],
+      leader: ['Report.', 'Anything?'],
+      hard: ['Sealed. They know we are here.'],
     },
     dome_shots: {
-      any: ['Why is it not breaking? Why is it not breaking!', 'I hit it six times. Six! It just shrugs it off.', 'That should have shattered. Damn it, that should have shattered.', 'The rounds are bouncing off. Bouncing!', 'It cracked, and then nothing. It just sits there.', 'What is this stuff made of?', 'My rifle is doing nothing to this thing.'],
-      desperate: ['Please just break. Please.', 'I do not understand. Glass breaks. Glass always breaks.'],
-      hard: ['Do not waste any more rounds on it. Look at it.', 'Keep firing. Something has to give.'],
-      savage: ['Break, you damn thing! Break!', 'I will shoot this whole thing to pieces. Keep firing!'],
-      small: ['It is just scratching the paint. We are wasting our shells.'],
-      large: ['Everybody on the glass! All at once!', 'Concentrate on one spot. Same spot!'],
+      any: ['That hit. Nothing.', 'Rounds are bouncing.', 'Again. Same spot.', 'Chipped. That is all.', 'Cease fire. You are wasting ammo.', 'One chip. Same as the rest.'],
+      desperate: ['Why is nothing happening?', 'It has to give. It has to.'],
+      hard: ['Hold your fire. Count your rounds.', 'Keep on it. One spot.'],
+      savage: ['Keep firing! Keep firing!'],
+      small: ['Save your ammo.'],
+      large: ['All on one spot!', 'Same panel. Go.'],
     },
     dome_tool: {
-      any: ['The sledge just bounces. Look at my hands, they are numb.', 'It does not even dent. Nothing.', 'The blade is skating right off it.', 'We have been at this ten minutes and there is not a mark.', 'I am cutting and cutting. It is like cutting a bank vault.', 'The torch only blackens it. That is all it does.', 'My arms are shaking and there is not a scratch.'],
-      desperate: ['Come on. Come on. Please give a little.'],
-      hard: ['Switch off. Somebody else take the sledge.'],
-      savage: ['Hit it harder! Put your back into it!', 'Damn thing! Damn thing!'],
-      small: ['There are too few of us for this kind of work.'],
-      large: ['Rotate out. Next pair on the wall.'],
+      any: ['Not even a dent.', 'My hands are numb.', 'The blade is skating off.', 'Ten minutes, and nothing.', 'Switch off. My arms are gone.'],
+      desperate: ['Come on. Come on.'],
+      hard: ['Swap out. Next pair.'],
+      savage: ['Harder! Put your back into it!'],
+      small: ['Too few of us for this.'],
+      large: ['Rotate. Next two.'],
     },
     dome_cut: {
-      any: ['It is giving! The blade is through the first layer!', 'Keep sawing. I can feel it going.', 'The panel is coming loose, a little at a time.', 'That is it, a few more minutes and we are in.', 'This is thin stuff. Keep cutting!'],
-      leader: ['Keep that saw moving. Do not stop.'],
+      any: ['Blade is through the first layer.', 'Keep cutting. It is giving.', 'Panel is coming loose.', 'A few more minutes.', 'Thin stuff. Keep going.'],
+      leader: ['Keep that saw moving.'],
     },
     dome_airlock: {
-      any: ['It will not open! The handle is not even turning!', 'There is a second door behind this one. The first one will not let go.', 'It is locked from inside. Damn it, it is locked from inside!', 'No keyhole, no hinge, nothing to grab. How do you open this?', 'Pry it! Get the bar in there!', 'I put my whole weight on it. It does not move.', 'It beeps, and then nothing. What does that mean?', 'Somebody built a door that you cannot kick in.'],
-      desperate: ['Open up, please. We only need food.', 'Somebody open the door. Please!'],
-      hard: ['Open the damn door!', 'We know you are in there. Open up.'],
-      savage: ['Open it or we burn the whole thing down!', 'Open up! Open up, I said!'],
-      small: ['Just us at the door. Nobody is going to open it for us.'],
-      large: ['Everybody on the bar. One, two, pull!'],
+      any: ['Handle will not turn.', 'There is a second door behind it.', 'Locked from the inside.', 'No hinge. Nothing to grab.', 'The bar will not bite.'],
+      desperate: ['Open the door. Please. We only need food.'],
+      hard: ['Open the door. We know you are in there.'],
+      savage: ['Open it or we burn it.'],
+      small: ['Nobody is opening that.'],
+      large: ['On the bar. One, two, pull!'],
     },
     dome_ram: {
-      any: ['The truck just bounced off it! It bounced!', 'We hit it dead on and it did not give an inch.', 'The whole front end is crushed. And the wall is fine.', 'That was our best shot. It did not even shake.', 'Engine is smoking. We are not getting that truck going again.'],
-      savage: ['Back it up and go again!', 'Again! Hit it again!'],
-      desperate: ['Is anyone hurt? Is the driver okay?'],
+      any: ['Truck bounced off.', 'Front end is crushed. The wall is fine.', 'Did not even shake.', 'Engine is smoking.', 'We are not getting that truck out.'],
+      savage: ['Back it up. Again.'],
+      desperate: ['Is the driver okay?'],
     },
     dome_blast: {
-      any: ['It went off, and all it did was leave a black mark.', 'The charge blew, and the panel is still there. How?', 'That was everything we had. Look at it. Just a scorch.', 'Where did it all go? The blast went nowhere!', 'All that for a smudge on the glass.'],
-      hard: ['We need a much bigger charge than that.'],
+      any: ['It went off. A black mark. That is all.', 'The panel is still there.', 'That was everything we had.', 'The blast went nowhere.', 'Scorch. Nothing else.'],
+      hard: ['We need a bigger charge.'],
     },
     dome_skirt: {
-      any: ['We dug down twenty feet and hit concrete. Solid concrete.', 'The tunnel stops at a wall. It goes down further than we can dig.', 'It runs right along the footing. There is no way under it.', 'We hit a buried wall and it kept going both ways.', 'Somebody poured that skirt deep. We wasted two days of digging.'],
-      leader: ['Fill it in. The only way left is the door.'],
+      any: ['Hit concrete at twenty feet.', 'The tunnel stops at a wall.', 'It runs along the footing. No way under.', 'Buried wall. It goes both ways.', 'Solid. Nothing to dig.'],
+      leader: ['Fill it in. The door is all that is left.'],
     },
     dome_argue: {
-      any: ['We are wasting our time here.', 'You said it would be easy. Does this look easy?', 'Another hour and they will have help up the road.', 'Look at the sun. We are going to be here all night.', 'Nobody told me about this. Nobody said a word about glass.', 'I did not sign up to stand here and get shot at by people we cannot reach.', 'Let us just go. There are easier farms.'],
-      desperate: ['We have nothing at home. If we leave, we have nothing at all.'],
-      hard: ['Stop whining. We stay until I say we go.'],
-      savage: ['Anyone who walks off this ground, I will remember.'],
-      small: ['It is just the three of us. Let us not die on this hill.'],
-      large: ['Half of us are out of ammunition. That is not a plan.'],
+      any: ['We are wasting time.', 'This is not what you told us.', 'Another hour and somebody calls it in.', 'It will be light soon.', 'I am almost out of rounds.'],
+      desperate: ['We have nothing at home. We cannot leave.'],
+      hard: ['We stay until I say.'],
+      savage: ['Anyone walks off, I remember it.'],
+      small: ['Just three of us. Let us go.'],
+      large: ['Half of us are dry on ammo.'],
     },
     dome_order: {
-      any: ['That is enough. Pull everyone back to the road.', 'Fall back. We are done here.', 'Stop shooting. Get in the trucks.', 'Everybody back to the road, now.', 'Enough. Nobody dies for a pane of glass.'],
-      leader: ['Listen to me. We are leaving. Collect your gear.', 'We are not breaking this. Pack it up.', 'Pull back. I will not lose another man to this.'],
-      hard: ['Back off. We will do this on our terms, not theirs.'],
-      savage: ['We go. But this is not over.'],
+      any: ['That is enough. Back to the road.', 'Fall back. We are done.', 'Stop shooting. Get in the trucks.', 'Everybody back. Now.', 'Pull out. Pull out.'],
+      leader: ['We are leaving. Get your gear.', 'It is not going to open. Pack up.', 'Back to the road. I will not lose anyone else.'],
+      hard: ['Back off. We do this differently.'],
+      savage: ['We go. This is not finished.'],
     },
     dome_panic: {
-      any: ['I am not going near that thing again. I am not.', 'They can see us the whole time! They are just watching!', 'I want to go home. I want to go home right now.', 'It is like it is looking at us. I do not like it.', 'We are all going to die out here and they will not even come out.', 'I cannot do this. I am sorry, I just cannot.'],
-      desperate: ['My kid is at the camp. I cannot get killed here.'],
+      any: ['I am not going near it again.', 'They are watching us the whole time.', 'I want to go home.', 'This is going to get us killed.', 'I am done. I am done.'],
+      desperate: ['My kid is back at camp. I cannot die here.'],
     },
     dome_vow: {
-      any: ['We will be back. With something bigger.', 'Remember where this is. We are coming back with a plan.', 'Next time we bring real tools. And more men.', 'Give us a month. We will find a way into that thing.', 'They will have to come out someday. We will be waiting.', 'We will learn how it is built. Everything breaks.'],
-      leader: ['Mark my words, we are not finished with this place.'],
-      savage: ['You hear me in there? We will be back, and we will burn it all!'],
-      desperate: ['Maybe they will open up when they get hungry. We can wait.'],
-      small: ['Three of us is not enough. Next time we bring a dozen.'],
-      large: ['We know the layout now. Next time we come with the right gear.'],
+      any: ['We come back with real equipment.', 'Remember where this is.', 'More men next time.', 'Give it a month. We find a way.', 'They have to come out sometime.'],
+      leader: ['We are not finished with this place.'],
+      savage: ['You hear me in there? We are coming back.'],
+      desperate: ['Maybe they open up when they run low. We wait.'],
+      small: ['Next time we bring a dozen.'],
+      large: ['We know the layout now.'],
+    },
+    dome_angry: {
+      any: ['Open fire. All of it!', 'Come out and face us!', 'Reloading!', 'It has to break. Keep firing!'],
+      hard: ['Concentrate. One spot.'],
+      desperate: ['Break. Please, just break.'],
+    },
+    dome_bounce: {
+      any: ['Who is shooting? Who is hit?', 'Something hit me. I am hit!', 'It came back! Get down!', 'Contact! Where did that come from?', 'My arm. I think it is my arm.'],
+      savage: ['Who fired? Who fired?'],
+      desperate: ['I am okay. I am okay. Stay down.'],
     },
   },
   defender: {
     dome_watch: {
-      any: ['They are at the east door again. Look at them.', 'Get a coffee. They are not getting through that.', 'One of them is just standing there with a sledge.', 'It is almost sad. They keep trying.', 'Look at his face. He cannot believe it.', 'They are going around the whole thing, looking for a way in.', 'I never thought I would watch a raid with a cup of tea.'],
+      any: ['Two at the east door.', 'One with a sledge. Left side.', 'They are spreading out.', 'I count ten. Maybe eleven.', 'Nobody has a way up.', 'Stay back from the wall.'],
     },
     dome_fire: {
-      any: ['I have a clean shot through the glass. Taking it.', 'Stay behind the frame. I will cover the east side.', 'They cannot hit us, but we can hit them. Steady.', 'One at a time. Do not waste any rounds.', 'Aim for the one with the sledge.'],
+      any: ['I have the left one.', 'Contact, east side.', 'Taking the one with the sledge.', 'Reloading. Cover me.', 'Wait for a clear shot.'],
     },
     dome_holds: {
-      any: ['It is holding. It is really holding.', 'Not a crack. Not a single crack.', 'Whoever built this knew what they were doing.', 'That was a truck. A whole truck. And look at the panel.', 'Feel that? Barely a hum. Good.', 'The inner door is shut. Nobody gets through that door.'],
+      any: ['It is holding.', 'Not a crack.', 'Barely felt that.', 'The inner door is shut.', 'They cannot get in. Stay calm.'],
     },
     dome_gone: {
-      any: ['They are going. They are actually going.', 'There they go, down the road. Keep watching, in case they turn around.', 'They have had enough. Let them go.', 'That is the last of them. Check the shell when it is light.', 'Somebody will have to clean those marks off tomorrow.'],
+      any: ['They are pulling back.', 'Going down the road. Keep watching.', 'They are leaving. Stay put.', 'That is the last of them. Check the shell at first light.', 'Stay inside until it is light.'],
+    },
+    dome_taunt: {
+      any: ['Go home. You are not getting in.', 'Leave now.', 'It is not opening. Give it up.', 'Go on. Walk away.'],
+      kid: ['Go away!', 'You cannot come in!', 'Leave us alone!'],
+      civ: ['Go home! You are not getting in. Leave now.', 'There is nothing for you here. Go to hell.', 'Give it up, damn it. Go home.', 'We told you. Leave.'],
+      vet: ['Back off. It is not opening.', 'You are wasting your time. Go home.', 'Eff off. We are not coming out.', 'Last warning. Walk away.'],
+      elder: ['Go home, friends. It will not open.', 'Please. Go home.'],
     },
   },
 };

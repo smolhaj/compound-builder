@@ -456,6 +456,7 @@ export class Director {
       if (want?.force) continue;
       if ((e.kind === 'wound' && !e.stopped) || e.kind === 'death' || e.kind === 'aid') { const u = byId.get(e.unit); if (u && (u.side === 'home' || this._r() < 0.5)) want = { kind: 'close', subject: e.unit, hold: 3.6 }; }
       else if (e.kind === 'breach' || e.kind === 'fallback' || e.kind === 'explosion' || e.kind === 'mine') want = { kind: 'wide', hold: 4.2 };
+      else if (e.kind === 'gesture' || (e.kind === 'dome_shot' && (e.bounce === 'back' || this._r() < 0.4))) { this._probe = { unit: e.unit, t: time }; want = { kind: 'close', subject: e.unit, hold: 3.6 }; }
       else if (e.kind === 'probe') { this._probe = { unit: e.unit, t: time }; if (e.what !== 'rifle' && this._r() < 0.85) want = { kind: 'close', subject: e.unit, hold: 3.8 }; }
       else if (e.kind === 'alarm' && !this.shot) want = { kind: 'house', hold: 5 };
       else if (e.kind === 'say' && e.who && !want) {

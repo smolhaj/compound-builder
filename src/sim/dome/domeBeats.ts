@@ -10,7 +10,7 @@ import type { Battle, BattleEvent, BattleUnit } from '../battleTypes';
 import type { LineDirector, Ctx } from '../raidDialogue';
 import type { RaiderTemper } from '../battle';
 import { mulberry32 } from '../rng';
-import { phasesOf } from '../raidDialogue';
+import { phasesOf, profileOfUnit } from '../raidDialogue';
 import type { Dome } from './standing';
 import { isShellKind } from './siege';
 
@@ -27,7 +27,7 @@ const r2 = (n: number): number => Math.round(n * 100) / 100;
 /** How close the crew starts to the shell (world units, 1 = 6 m), and how fast it walks to it. */
 const APPROACH = 5, WALK_SPEED = 1.0;
 /** Every dialogue key the planner can use (a test holds raidLinesDome.ts to it). */
-export const BEAT_CTX_USED: readonly string[] = ['dome_scout', 'dome_shots', 'dome_tool', 'dome_cut', 'dome_airlock', 'dome_ram', 'dome_blast', 'dome_skirt', 'dome_argue', 'dome_order', 'dome_panic', 'dome_vow', 'dome_watch', 'dome_fire', 'dome_holds', 'dome_gone'];
+export const BEAT_CTX_USED: readonly string[] = ['dome_scout', 'dome_shots', 'dome_tool', 'dome_cut', 'dome_airlock', 'dome_ram', 'dome_blast', 'dome_skirt', 'dome_argue', 'dome_order', 'dome_panic', 'dome_vow', 'dome_watch', 'dome_fire', 'dome_holds', 'dome_gone', 'dome_angry', 'dome_bounce', 'dome_taunt'];
 
 /** Does this fight's own timeline break the shell (a gap or a breach on a shell run)? Then the crew's tool work before it is real. */
 export const shellBroken = (b: Battle): boolean => b.events.some(e => (e.kind === 'breach' && !!e.where && isShellKind(e.where.kind)) || (e.kind === 'gap' && e.runId.startsWith('dome:')));
@@ -91,6 +91,7 @@ export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
   const sx = -Math.sin(a0) * pull, sz = -Math.cos(a0) * pull;
   const start = new Map<string, { x: number; z: number }>(raiders.map(u => [u.id, { x: r2(u.x + sx), z: r2(u.z + sz) }]));
   const pos = new Map(start), worked = new Set<string>();
+  for (const h of b.units) if (h.side === 'home' && !pos.has(h.id)) pos.set(h.id, { x: h.x, z: h.z });
   const crewIds = new Set([...workers.map(u => u.id), leader.id]);
   // where a man is, and how long it takes him to walk to the shell from there: he is sent early enough to arrive when the probe lands
   const goTo = (u: BattleUnit | undefined, tArrive: number, a: number, off: number): void => {
@@ -170,6 +171,37 @@ export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
   const circler = workers.find(u => !worked.has(u.id)) ?? crewOrder.find(u => !worked.has(u.id));
   if (circler && n >= 3) { for (let k = 0; k < 4; k++) stand(circler, at(0.45) + k * 2.2, a0 + 0.5 + k * 0.42, 0.5); }
   const moved = new Map<BattleEvent, BattleEvent>();
+  // 8. tempers: some of the crew get angry and shoot at the dome. The round sparks and glances off, and now and then it comes straight back at the man who fired it, who is rocked
+  //    and says so (a flinch and a drop to a knee: never a wound, never a death, and the shell is untouched: `holds` is always true on a `dome_shot`'s tier)
+  const mad = [...workers, ...crewOrder].filter((u, i, all) => all.indexOf(u) === i && !worked.has(u.id));
+  const nMad = Math.min(mad.length, o.temper === 'desperate' ? 1 : 2);
+  const kickback = rnd() < 0.85, kickIdx = Math.floor(rnd() * Math.max(1, nMad));
+  for (let i = 0; i < nMad; i++) {
+    const u = mad[i], a = a0 - 0.3 - i * 0.55, bt = at(0.26 + i * 0.24);
+    goTo(u, bt, a, 1.9);
+    const sp = onShell(a, 0), burst = 4;
+    for (let k = 0; k < burst; k++) {
+      const back = kickback && i === kickIdx && k === burst - 1;
+      out.push({ t: r2(bt + k * 0.34), kind: 'dome_shot', unit: u.id, x: r2(sp.x), z: r2(sp.z), ox: r2(Math.sin(a)), oz: r2(Math.cos(a)), tier, bounce: back ? 'back' : 'glance', ...(back ? { down: 2.2 } : {}) });
+    }
+    say(bt - 0.6, u, 'dome_angry');
+    if (kickback && i === kickIdx) { say(bt + burst * 0.34 + 0.7, u, 'dome_bounce'); say(bt + burst * 0.34 + 2.8, homeAt(5, bt + 4), 'dome_holds'); }
+  }
+  // 9. the household comes to the inside of the shell and taunts the crew through it (a kid, a parent, a guard: each in his own voice), with a sign
+  const people = home.concat(b.units.filter(u => u.side === 'home' && u.civilian && !u.bystander && !u.machine));
+  const byProf = (p: string) => people.find(h => profileOfUnit(h) === p || (p === 'elder' && h.traits?.history.includes('elder')));
+  const taunters = ['kid', 'civ', 'vet'].map(byProf).filter((u, i, all): u is BattleUnit => !!u && all.indexOf(u) === i);
+  for (const u of people) if (taunters.length < 3 && !taunters.includes(u)) taunters.push(u);
+  const SIGNS = ['wave', 'point', 'fist'] as const;
+  const tauntBase = at(0.44), muted = new Map<string, [number, number]>();
+  taunters.slice(0, 3).forEach((u, i) => {
+    const tt = tauntBase + i * 1.9, a = a0 + 0.25 * (i - 1);
+    goTo(u, tt, a, -0.55);
+    muted.set(u.id, [tt - 4, tt + 5]);
+    const face = onShell(a, 4);
+    out.push({ t: r2(tt + 0.2), kind: 'gesture', unit: u.id, what: SIGNS[(i + Math.floor(o.seed)) % 3], x: r2(face.x), z: r2(face.z), secs: 1.8 });
+    say(tt + 0.5, u, 'dome_taunt');
+  });
   // 6. what the truck and the satchel did, from the fight's own failed attempts
   for (const e of b.events) {
     if (e.kind === 'ram' && e.ok === false) { const driver = b.units.find(u => u.id === e.driver); say(e.t + e.secs + 1.1, driver, 'dome_ram'); say(e.t + e.secs + 3, homeAt(2, e.t + e.secs + 3), 'dome_holds'); }
@@ -197,7 +229,13 @@ export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
   [...crewOrder, leader].filter(u => !worked.has(u.id) && !drivers.has(u.id)).forEach((u, i) => goTo(u, 2 + i * 0.7, a0 + (i % 2 ? 1 : -1) * (0.55 + i * 0.12), 1.6 + (i % 3) * 0.5));
   if (!out.length) return b;
   const carriers = new Set([...moved.keys()].flatMap(e => (e.kind === 'charge' && e.carrier ? [e.carrier] : [])));
-  const keep = b.events.map(e => moved.get(e) ?? e).filter(e => !((e.kind === 'move' || e.kind === 'cover') && ((crewIds.has(e.unit) && !drivers.has(e.unit) && e.t < tEnd) || (carriers.has(e.unit) && e.t < tEnd))));
+  const dropped = (e: BattleEvent): boolean => {
+    if (e.kind !== 'move' && e.kind !== 'cover') return false;
+    const w = muted.get(e.unit);
+    if (w && e.t >= w[0] && e.t <= w[1]) return true;   // (a household member who came to the shell is not called back to his post mid-sentence)
+    return (crewIds.has(e.unit) && !drivers.has(e.unit) && e.t < tEnd) || (carriers.has(e.unit) && e.t < tEnd);
+  };
+  const keep = b.events.map(e => moved.get(e) ?? e).filter(e => !dropped(e));
   const units = b.units.map(u => (start.has(u.id) && pull > 0 && !u.job ? { ...u, ...start.get(u.id)! } : u));
   const soft = keep.map(e => (e.kind === 'say' && mildWording(e.text) !== e.text ? { ...e, text: mildWording(e.text) } : e));
   return { ...b, units, events: [...soft, ...out].sort((p, q) => p.t - q.t) };

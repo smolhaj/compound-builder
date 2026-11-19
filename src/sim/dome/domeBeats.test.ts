@@ -31,7 +31,7 @@ describe('raids on a dome are staged (presentation only)', () => {
         resetRaidMemory();
         const { b, dome } = fight(tier, seed);
         const out = domeBeats(b, { dome, seed, temper: 'hard', dir: new LineDirector(seed) });
-        expect(out.events.filter(e => e.kind !== 'say' && e.kind !== 'move' && e.kind !== 'cover' && e.kind !== 'probe' && e.kind !== 'tool')).toEqual(b.events.filter(e => e.kind !== 'say' && e.kind !== 'move' && e.kind !== 'cover'));
+        expect(out.events.filter(e => e.kind !== 'say' && e.kind !== 'move' && e.kind !== 'cover' && e.kind !== 'probe' && e.kind !== 'tool' && e.kind !== 'dome_shot' && e.kind !== 'gesture')).toEqual(b.events.filter(e => e.kind !== 'say' && e.kind !== 'move' && e.kind !== 'cover'));
         for (let i = 1; i < out.events.length; i++) expect(out.events[i].t).toBeGreaterThanOrEqual(out.events[i - 1].t);
         for (const e of out.events) if (e.kind === 'probe') {
           probes++; kinds.add(e.what);
@@ -41,7 +41,7 @@ describe('raids on a dome are staged (presentation only)', () => {
         }
         // nobody is sent into the dome: every added move stays outside the shell
         const before = new Set(b.events);
-        for (const e of out.events) if (e.kind === 'move' && !before.has(e)) expect(Math.hypot(e.x - dome.x, e.z - dome.z)).toBeGreaterThan(dome.r - 0.001);
+        for (const e of out.events) if (e.kind === 'move' && !before.has(e) && b.units.find(u => u.id === e.unit)?.side === 'raider') expect(Math.hypot(e.x - dome.x, e.z - dome.z)).toBeGreaterThan(dome.r - 0.001);
         // the crew starts within a short run of the shell, and every probe has its man standing at the shell when it lands
         const first = Math.min(...out.units.filter(u => u.side === 'raider' && !u.machine && !u.job).map(u => Math.hypot(u.x - dome.x, u.z - dome.z)));
         expect(first).toBeLessThan(dome.r + 8);
@@ -87,7 +87,7 @@ describe('dome voice tables', () => {
     for (const r of ['raider', 'defender'] as const) {
       const seen = new Set<string>();
       for (const { c, t } of all(r)) {
-        expect(t, t).not.toMatch(/\bsortie|\bfuck|\bshit|\bass\b|\bbitch|\bbastard|\bgoddamn|\bhell\b/i);
+        expect(t, t).not.toMatch(/\bsortie|\bfuck|\bshit|\bass\b|\bbitch|\bbastard|\bgoddamn/i);
         expect(t.length).toBeLessThan(110);
         const key = `${c}|${t}`; expect(seen.has(key), key).toBe(false); seen.add(key);
       }
@@ -143,5 +143,51 @@ describe('dome caption wording', () => {
       const { b, dome } = fight(tier, seed);
       for (const e of domeBeats(b, { dome, seed, temper: 'savage', dir: new LineDirector(seed) }).events) if (e.kind === 'say') expect(e.text).not.toMatch(/fuck|shit|jesus christ|goddamn/i);
     }
+  });
+});
+
+describe('anger, ricochets and the household at the shell (presentation only)', () => {
+  const run = (tier: DomeTier, seed: number, temper: 'hard' | 'savage' | 'desperate' = 'hard') => {
+    resetRaidMemory();
+    const { b, dome } = fight(tier, seed, 10);
+    return { b, dome, out: domeBeats(b, { dome, seed, temper, dir: new LineDirector(seed) }) };
+  };
+  it('some raiders fire on the shell, on the shell, in bursts, in order, and the beats are deterministic', () => {
+    for (const tier of ['glass', 'geodesic', 'arcology'] as const) {
+      let shots = 0;
+      for (let seed = 300; seed < 310; seed++) {
+        const { out, dome } = run(tier, seed);
+        const sh = out.events.filter((e): e is Extract<BattleEvent, { kind: 'dome_shot' }> => e.kind === 'dome_shot');
+        shots += sh.length;
+        for (const e of sh) { expect(Math.hypot(e.x - dome.x, e.z - dome.z)).toBeCloseTo(dome.r, 1); expect(e.t).toBeGreaterThan(0); expect(e.t).toBeLessThan(out.duration); }
+        // at most one round in a fight comes back at a shooter, and it is the last of its burst
+        const back = sh.filter(e => e.bounce === 'back');
+        expect(back.length).toBeLessThanOrEqual(1);
+        for (const e of back) { expect(sh.filter(x => x.unit === e.unit).pop()).toBe(e); expect(e.down).toBeGreaterThan(0); }
+        // his voice follows within a few seconds, and nobody is wounded or killed by it
+        for (const e of back) expect(out.events.some(s => s.kind === 'say' && s.ctx === 'dome_bounce' && s.who === e.unit && s.t > e.t && s.t < e.t + 3)).toBe(true);
+        expect(out.events.filter(e => e.kind === 'wound' || e.kind === 'death').length).toBe(run(tier, seed).b.events.filter(e => e.kind === 'wound' || e.kind === 'death').length);
+        expect(JSON.stringify(run(tier, seed).out)).toBe(JSON.stringify(out));
+      }
+      expect(shots, tier).toBeGreaterThan(10);
+    }
+  });
+  it('the household comes to the inside of the shell, makes a sign, and speaks in a voice of its own', () => {
+    let taunts = 0, signs = 0;
+    for (let seed = 300; seed < 310; seed++) {
+      const { out, dome, b } = run('glass', seed);
+      const before = new Set(b.events);
+      for (const e of out.events) {
+        if (e.kind === 'gesture') { signs++; expect(e.secs).toBeGreaterThan(0); }
+        if (e.kind === 'say' && e.ctx === 'dome_taunt') { taunts++; expect(e.who && out.units.find(u => u.id === e.who)?.side).toBe('home'); }
+        // a household member sent to the shell stands just inside it
+        if (e.kind === 'move' && !before.has(e) && out.units.find(u => u.id === e.unit)?.side === 'home' && Math.hypot(e.x - dome.x, e.z - dome.z) < dome.r + 1) expect(Math.hypot(e.x - dome.x, e.z - dome.z)).toBeLessThan(dome.r);
+      }
+    }
+    expect(taunts).toBeGreaterThan(5); expect(signs).toBeGreaterThan(5);
+  });
+  it('taunts name no stronger word than "damn", and never give a child or an elder a curse', () => {
+    for (const t of Object.values(DOME_LINES.defender.dome_taunt ?? {}).flat() as string[]) expect(t).not.toMatch(/fuck|shit|bitch|jesus/i);
+    for (const t of [...(DOME_LINES.defender.dome_taunt?.kid ?? []), ...(DOME_LINES.defender.dome_taunt?.elder ?? [])]) expect(t).not.toMatch(/damn|hell/i);
   });
 });
