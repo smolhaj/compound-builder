@@ -23,7 +23,7 @@ try {
   await page.waitForFunction(() => window.__cb?.qa?.lowrender, null, { timeout: 300000 });
   await page.evaluate(q => window.__cb.store.getState().setQuality(q), QUAL);
   const frames = async (n = 1) => { for (let i = 0; i < n; i++) await page.evaluate(() => window.__cb.qa.renderNow()); };
-  const shot = async (name) => { if (only && !name.includes(only)) return; await frames(3); await page.evaluate(() => { const cb = window.__cb, p = cb.qa.pose; if (p) cb.ws.camera.position.set(p.x, p.y, p.z); cb.world._updateLights(0.3); }); await frames(2); await page.evaluate(q => window.__cb.qa.renderFull(q), QUAL); await page.screenshot({ path: `${out}/${name}.png` }); lap(name); };
+  const shot = async (name) => { if (only && !name.includes(only)) return; await frames(3); await page.evaluate(() => { const cb = window.__cb, p = cb.qa.pose; if (p) cb.ws.camera.position.set(p.x, p.y, p.z); cb.world._updateLights(0.3); }); await frames(2); if (name.includes('control')) console.error('LIGHTS', JSON.stringify(await page.evaluate(() => [...window.__cb.world._built.values()].filter(b => b.under).map(b => [b.placed.kind.replace('bunker_', ''), b.light?.visible, b.light && +b.light.intensity.toFixed(2), b.light && b.light.position.toArray().map(v => +v.toFixed(2))])))); await page.evaluate(q => window.__cb.qa.renderFull(q), QUAL); await page.screenshot({ path: `${out}/${name}.png` }); lap(name); };
 
   // the compound: a house, a garden, solar; the bunker with every room; the family's gear
   await page.evaluate(t => { window.__tier = t; }, TIER);
