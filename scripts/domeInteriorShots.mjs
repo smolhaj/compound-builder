@@ -77,8 +77,8 @@ try {
   const segsOf = a => plan.segs.filter(s => Math.abs(Math.atan2(Math.sin(Math.atan2(s.x, s.z) - a), Math.cos(Math.atan2(s.x, s.z) - a))) < 0.08);
   const best = airlocks.map(a => ({ a, n: segsOf(a).length })).sort((p, q) => q.n - p.n)[0];
   lap('plan ' + JSON.stringify({ segs: plan.segs.length, benches: plan.benches.length, plaza: plan.plaza, best }));
-  const hs = await page.evaluate(async () => { const K = await import('/src/game/buildkit/kit.ts'), g = window.__cb.game.getState().game, w = window.__cb.world; return g.structures.filter(s => ['log_house', 'guest_house', 'workshop', 'barn'].includes(s.kind)).map(s => ({ id: s.id, kind: s.kind, x: s.x, z: s.z, cz: K.KIT[s.kind].cellsZ * K.CELL / 2, cx: K.KIT[s.kind].cellsX * K.CELL / 2 })); });
-  const house = hs.find(s => s.kind === 'log_house');
+  const hs = await page.evaluate(async () => { const K = await import('/src/game/buildkit/kit.ts'), g = window.__cb.game.getState().game, w = window.__cb.world; return g.structures.filter(s => ['log_house', 'timber_cabin', 'guest_house', 'workshop', 'barn'].includes(s.kind)).map(s => ({ id: s.id, kind: s.kind, x: s.x, z: s.z, cz: K.KIT[s.kind].cellsZ * K.CELL / 2, cx: K.KIT[s.kind].cellsX * K.CELL / 2 })); });
+  const house = hs.find(s => s.kind === 'log_house') ?? hs.find(s => s.kind === 'timber_cabin');
   const door = (dz, y, dx = 0) => page.evaluate(([id, dx, y, dz]) => { const e = window.__cb.world.localToWorld(id, dx, y, dz); return [e.x, e.y, e.z]; }, [house.id, dx, y, dz]);
   const segAt = (a, rho, hh = h) => { const ss = segsOf(a); if (!ss.length) return along(a, rho, 0, hh); const t = ss.sort((p, q) => Math.abs(Math.hypot(p.x, p.z) / R - rho) - Math.abs(Math.hypot(q.x, q.z) / R - rho))[0]; return L(t.x / R, t.z / R, hh); };
   const frac = p => [(p[0] - D.x) / R, (p[2] - D.z) / R];

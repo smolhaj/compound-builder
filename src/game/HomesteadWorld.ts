@@ -531,7 +531,9 @@ export class HomesteadWorld {
   /** The plant of one finished big dome (every dome has its own: its machinery, yard, roof hatches and lamps; sim/dome/plant.ts), redrawn when its equipment or damage changes. */
   private _syncPlant(b: Built, game: GameState): void {
     const ref = domesLive(game).find(x => x.st.id === b.placed.id);
-    if (!ref || !b.finished || !isGradedTier(ref.tier)) return;
+    if (!ref || !b.finished) return;
+    // (a geodesic dome has no yard or plant, but its floor is dressed all the same)
+    if (!isGradedTier(ref.tier)) { this._syncInterior(b, game, ref, domeStateOf(game, ref).filtering, false); return; }
     const dst = domeStateOf(game, ref), hurt: Record<string, 'ok' | 'damaged' | 'down'> = {};
     for (const u of plantUnitsOf(game, ref, dst)) if (u.cond !== 'ok') hurt[u.id] = u.cond;
     const plook: PlantLook = { loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark: plantFxOf(game, ref, dst).power === 'dark' };
@@ -563,7 +565,7 @@ export class HomesteadWorld {
     const key = sig.join('|'), cur = this._domeInteriors.get(b.placed.id);
     if (cur && cur.key === key) return;
     if (cur) { this._root.remove(cur.group); cur.dispose(); }
-    for (const q of plantLayout(ref.tier, ref.r, filtering, { rot: b.placed.rot }).parts) {
+    for (const q of isGradedTier(ref.tier) ? plantLayout(ref.tier, ref.r, filtering, { rot: b.placed.rot }).parts : []) {
       if (q.onShell || Math.hypot(q.x, q.z) > ref.r * 0.97) continue;
       const rr = q.shape === 'box' ? Math.hypot(q.w, q.d) / 2 : q.r;
       if (rr > 0.06) obs.push({ x: q.x, z: q.z, hx: rr, hz: rr });
