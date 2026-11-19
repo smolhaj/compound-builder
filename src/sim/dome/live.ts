@@ -38,6 +38,7 @@ import { ventsIced } from '../snowLoad';
 import type { PlantKind } from './plantUnits';
 import { damagePlant, fxOf, plantJobs, rushPlant, rushQuote, specOf, unitsOf } from './plantLive';
 import { PLANT_SHORT, plantKinds, spareProblem, spareUsd } from './plantUnits';
+import { billUpkeep } from './upkeep';
 import {
   FILTERING, LIMIT_PPM, O2, SCRUB, BED_CAP, freshAir, lockdownClock, sealedAir, advancedFilterUsd, closedEcologyUsd, scrubberUsd,
   type AirCtx, type Clock, type Filtering,
@@ -117,6 +118,8 @@ export interface DomeState {
   cistern?: boolean;
   /** Kinds of plant unit with a second (N+1) unit bought (save v103, optional; sim/dome/plantUnits.ts). */
   spares?: PlantKind[];
+  /** Upkeep (maintenance, insurance, staff) the family has not been able to pay, in dollars (save v105, optional; sim/dome/upkeep.ts). */
+  upkeepOwed?: number;
 }
 
 export const newDomeState = (): DomeState => ({
@@ -487,6 +490,7 @@ function domeDayOne(s: GameState, d: DomeRef, st: DomeState, multi: boolean): st
   }
   const powered = planPowered(s, d, st);
   const people = peopleUnder(s, d);
+  out.push(...billUpkeep(s, d, st, name));   // maintenance, insurance and staff, a 365th a day (sim/dome/upkeep.ts)
   // the closed ecology: upkeep, food, recovery, the dark
   if (st.filtering === 'closed') {
     const cost = Math.round(closedEcologyUsd(d.tier, d.cells) * LIVE.ECO_UPKEEP_DAY);

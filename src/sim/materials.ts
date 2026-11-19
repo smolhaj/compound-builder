@@ -41,7 +41,9 @@ export type MaterialId = 'lumber' | 'logs' | 'firewood' | 'fieldstone' | 'concre
   // the domed compound (sim/dome/): kits sold by the contractor, installed by their erectors
   | 'dome_earthbag' | 'dome_geodesic_kit' | 'dome_glass_kit' | 'dome_arcology_kit' | 'dome_air_plant' | 'dome_airlock' | 'dome_fitout'
   // the civil work under a dome and the hardened concrete of a bunker (sim/dome/pricing.ts); contractor services, sold by the unit
-  | 'dome_dig' | 'dome_rock' | 'dome_shoring' | 'dome_dewater' | 'dome_skirtwork' | 'bunker_works';
+  | 'dome_dig' | 'dome_rock' | 'dome_shoring' | 'dome_dewater' | 'dome_skirtwork' | 'bunker_works'
+  // replacement shell panels, sold by the 100 sq ft (the whole-dome kits above are 1,000 sq ft units): a glazier's repair order
+  | 'dome_geodesic_panels' | 'dome_glass_panels' | 'dome_arcology_panels';
 
 export interface MaterialDef {
   id: MaterialId;
@@ -245,6 +247,10 @@ export const MATERIALS: Record<MaterialId, MaterialDef> = {
   dome_geodesic_kit: { id: 'dome_geodesic_kit', name: 'Geodesic dome kit', unit: '1,000 sq ft of steel strut-and-hub frame with twin-wall polycarbonate and film glazing, erected', price: 75000 },
   dome_glass_kit: { id: 'dome_glass_kit', name: 'Glass and steel dome kit', unit: '1,000 sq ft of steel gridshell with laminated glass, crane-set', price: 650000 },
   dome_arcology_kit: { id: 'dome_arcology_kit', name: 'Arcology panel kit', unit: '1,000 sq ft of space frame with clear polycarbonate-composite armor panels, set by a contractor firm', price: 5000000 },
+  // replacement panels by the 100 sq ft, PROPOSED: a tenth of the matching kit (same price a square foot), so a repair is billed by the area lost, not by a whole 1,000 sq ft kit
+  dome_geodesic_panels: { id: 'dome_geodesic_panels', name: 'Geodesic replacement panels', unit: '100 sq ft of twin-wall polycarbonate or film glazing with frame members, cut to fit and set', price: 7500 },
+  dome_glass_panels: { id: 'dome_glass_panels', name: 'Glass replacement panels', unit: '100 sq ft of laminated insulated glass with gridshell members, crane-set', price: 65000 },
+  dome_arcology_panels: { id: 'dome_arcology_panels', name: 'Arcology replacement panels', unit: '100 sq ft of clear polycarbonate-composite armor panel with frame members, set by a contractor firm', price: 500000 },
   dome_air_plant: { id: 'dome_air_plant', name: 'Dome air plant', unit: 'per 10,000 cu ft of enclosed air: heat pumps, energy-recovery ventilators, particulate filters, ducts and controls', price: 22000 },
   dome_airlock: { id: 'dome_airlock', name: 'Dome airlock', unit: 'two sealed doors, a vestibule, a pressure gauge and an interlock', price: 160000 },
   // the civil work under a dome (sim/dome/pricing.ts), PROPOSED 2025 prices; a contractor's service, sold by the unit

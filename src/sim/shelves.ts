@@ -15,7 +15,7 @@ export const SHELF_TABS: ReadonlyArray<[ShelfTab, string]> = [
 ];
 
 /** The domed compound's kits (sim/dome/): ordered by the dome's stage bills; each is a contractor's kit with its erectors. */
-export const DOME_GOODS: MaterialId[] = ['dome_earthbag', 'dome_geodesic_kit', 'dome_glass_kit', 'dome_arcology_kit', 'dome_air_plant', 'dome_airlock', 'dome_fitout', 'dome_dig', 'dome_rock', 'dome_shoring', 'dome_dewater', 'dome_skirtwork', 'concrete', 'rebar'];
+export const DOME_GOODS: MaterialId[] = ['dome_earthbag', 'dome_geodesic_kit', 'dome_glass_kit', 'dome_arcology_kit', 'dome_geodesic_panels', 'dome_glass_panels', 'dome_arcology_panels', 'dome_air_plant', 'dome_airlock', 'dome_fitout', 'dome_dig', 'dome_rock', 'dome_shoring', 'dome_dewater', 'dome_skirtwork', 'concrete', 'rebar'];
 
 export const SHELVES: Record<ShelfTab, MaterialId[]> = {
   enclosure: DOME_GOODS,
