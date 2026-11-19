@@ -30,6 +30,7 @@ import { diffOf } from './difficulty';
 import { estateFactor } from './estate';
 import { DOME_KIND, DOME_TIERS, TIER, tierOfKind, withSizedDomes } from './dome/tiers';
 import { reviewDays as domeReview } from './dome/siting';
+import { domeCost } from './dome/cost';
 import { pluralize } from './words';
 
 export const CLOSING_COSTS = 0.03;
@@ -51,9 +52,9 @@ const PERMIT_BASE: Record<string, number> = {
   bunker_hatch: 600, bunker_floorhatch: 600, bunker_stairs: 600, bunker_corridor: 300, bunker_container: 600, bunker_dorm: 600, bunker_galley: 600, bunker_stores: 600, bunker_plant: 600, bunker_medical: 600, bunker_comms: 300,
 };
 // the enclosures (sim/dome): the engineered tiers need real permits (owner decision 8)
-for (const t of DOME_TIERS) if (TIER[t].permitFee > 0) PERMIT_BASE[DOME_KIND[t]] = TIER[t].permitFee;
-/** (a sized dome pays its tier's fee: the engineer's stamp does not depend on the diameter) */
-export const PERMIT_FEE: Record<string, number> = withSizedDomes(PERMIT_BASE, b => b);
+for (const t of DOME_TIERS) if (TIER[t].permitFee > 0) PERMIT_BASE[DOME_KIND[t]] = domeCost(t).permitUsd;
+/** (a sized dome pays about 1 percent of its build price, never under the tier's flat fee: sim/dome/pricing.ts `domePermitUsd`) */
+export const PERMIT_FEE: Record<string, number> = withSizedDomes(PERMIT_BASE, (b, p) => domeCost(p.tier, p.cells).permitUsd || b);
 export const needsPermit = (kind: string) => (PERMIT_FEE[kind] ?? 0) > 0;
 export const permitFee = (s: GameState, kind: string) => Math.round((PERMIT_FEE[kind] ?? 0) * (0.6 + 0.4 * COUNTY[s.site.region].strict) / 10) * 10;
 export const reviewDays = (s: GameState, kind: string) => tierOfKind(kind) ? Math.max(1, domeReview(tierOfKind(kind)!, COUNTY[s.site.region].strict, diffOf(s.disaster).permits)) : Math.max(1, Math.round((isHome(kind) || kind === 'log_house' ? 21 : 7) * COUNTY[s.site.region].strict * diffOf(s.disaster).permits));
