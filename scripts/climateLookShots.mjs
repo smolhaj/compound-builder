@@ -47,6 +47,7 @@ try {
   const shot = async (name) => {
     await frames(warmed ? 2 : 10); warmed = true;
     await page.evaluate(q => window.__cb.qa.renderFull(q), quality);
+    lap('shell ' + JSON.stringify(await page.evaluate(async () => { const m = await import('/src/game/fx/DomeShell.ts'); const { kitMaterial } = await import('/src/game/buildkit/materials.ts'); return { ...m.shellClimateNow(), op: kitMaterial('dome_glass').opacity, ro: kitMaterial('dome_glass').roughness }; })));
     const f = `${outDir}/${tag}-${name}.png`; await page.screenshot({ path: f }); lap(f);
   };
   // staging: a finished cabin, a person, and (for the dome scene) a dome with a house under it
@@ -102,6 +103,7 @@ try {
   await page.evaluate(([sp, R]) => { const w = window.__cb.world, [fx, fz] = w.openSpotNear(sp[0] + 2.6 + R, sp[1] + 4.2 + R, 0.3); w.qaFigure(fx, fz); }, [sp, R]);
   for (const hour of hours) for (const y of years) {
     await setYear(y, hour);
+    if (kind === 'dome') await frames(30);   // (the shell's frost and bleach follow the dome's reading within a few frames)
     for (const mode of views) {
       await view(mode);
       const hn = Object.entries(HOURS).find(([, v]) => v === hour)?.[0] ?? `h${hour}`;

@@ -19,7 +19,7 @@ export const INTERIOR_HIDE_DIST: Record<LodTier, number> = { high: 18, medium: 1
 export const LOD_HYSTERESIS = 1.5;
 
 /** Wall materials you can see through (their buildings never lose their inside). */
-const SEE_THROUGH = /^(kit_)?(glass|polycarb|wire_mesh|string|glow)/;
+const SEE_THROUGH = /^(kit_)?(glass|polycarb|dome_glass|dome_polycarb|wire_mesh|string|glow)/;
 
 export interface LodMesh { layer: string; material: string }
 

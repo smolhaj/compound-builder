@@ -12,9 +12,9 @@ import { kitMaterial, type KitMaterialId } from '../buildkit/materials';
 
 interface Base { color: THREE.Color; rough: number; metal: number; opacity: number }
 const IDS: readonly KitMaterialId[] = ['dome_glass', 'dome_polycarb', 'arcology'];
-const MILK = new THREE.Color(0xeaf2f7), PALE = new THREE.Color(0xf3ecd3);
+const MILK = new THREE.Color(0xc4d6e4), PALE = new THREE.Color(0xf3ecd3);
 /** How far each shell material goes at full frost / full bleach: roughness target, opacity target. */
-const FROST = { rough: 0.78, opacity: 0.66 }, BLEACH = { rough: 0.3, opacity: 0.42 };
+const FROST = { rough: 0.78, opacity: 0.82 }, BLEACH = { rough: 0.3, opacity: 0.42 };
 const _base = new Map<KitMaterialId, Base>();
 const _tmp = new THREE.Color();
 let _frost = 0, _bleach = 0;
