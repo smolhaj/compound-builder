@@ -19,7 +19,7 @@ describe('upkeep: the yearly bill', () => {
     const tot = (t: DomeTier) => domeCostSummary(t).running.totalUsd;
     expect(tot('arcology')).toBeGreaterThan(22e6); expect(tot('arcology')).toBeLessThan(26e6);
     expect(tot('glass')).toBeGreaterThan(0.8e6); expect(tot('glass')).toBeLessThan(1e6);
-    expect(tot('geodesic')).toBeGreaterThan(35e3); expect(tot('geodesic')).toBeLessThan(50e3);
+    expect(tot('geodesic')).toBeGreaterThan(35e3); expect(tot('geodesic')).toBeLessThan(60e3)   // (the 30 ft skirt of the raid ladder adds about $11k of yearly skirt upkeep: target now about $53k);
   });
   it('is monotone: a bigger dome never costs less, in a tier or across the tiers at their default size', () => {
     for (const t of DOME_TIERS) {
