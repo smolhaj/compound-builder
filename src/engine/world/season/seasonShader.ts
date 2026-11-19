@@ -296,6 +296,10 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD
     diffuseColor.rgb = mix( diffuseColor.rgb, seT, seGreen );
     // a maintained lawn under a climate-held dome: a richer, brighter green (the ice-age light outside the shell is dim and blue, and read as dark slate)
     diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.12, 0.30, 0.05 ) * ( 0.85 + 0.3 * seN1 ) * ( 1.0 - 0.6 * seLB.y ), seGreen * seaDomeM * 0.9 );
+#if defined( SEA_MUD ) && !defined( SEA_MUD_UV )
+    // (the regional ground itself, whatever its season-time albedo: a maintained lawn inside the dome)
+    diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.12, 0.30, 0.05 ) * ( 0.85 + 0.3 * seN1 ) * ( 1.0 - 0.6 * seLB.y ), seUp * seaDomeM * 0.92 );
+#endif
   }
   // Fallen leaves: drifts on lawns, along curbs and in road gutters
   if ( seLB.w > 0.003 ) {
@@ -371,7 +375,7 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD
   // day and night: a warm albedo cast plus a small warm self-light (no new light, pass or uniform)
   if ( seaDomeM > 0.002 ) {
     diffuseColor.rgb *= mix( vec3( 1.0 ), vec3( 1.1, 1.0, 0.82 ), seaDomeM );
-    totalEmissiveRadiance += diffuseColor.rgb * vec3( 1.0, 0.62, 0.26 ) * 1.1 * seaDomeM;
+    totalEmissiveRadiance += ( diffuseColor.rgb * vec3( 0.9, 0.55, 0.2 ) * 0.6 + vec3( 0.07, 0.04, 0.012 ) ) * seaDomeM;
   }
 #endif
 `;
