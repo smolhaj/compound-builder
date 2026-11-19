@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DOME_KIND, DOME_TIERS, TIER, shellFt, type DomeTier } from './tiers';
-import { blockedArcs, approachRoute, angDist, bearingToRoad, choosePortAngle, hasVehiclePort, inKeepout, insideLane, portBill, portFrame, portVestibule, portWords, straightRun, TRUCK, vehicleFits, vehicleTail, yardCorners, STRAIGHT_LEN, APRON_LEN, type Pt } from './vehiclePort';
+import { onApron, blockedArcs, approachRoute, angDist, bearingToRoad, choosePortAngle, hasVehiclePort, inKeepout, insideLane, portBill, portFrame, portVestibule, portWords, straightRun, TRUCK, vehicleFits, vehicleTail, yardCorners, STRAIGHT_LEN, APRON_LEN, type Pt } from './vehiclePort';
 import { domeFrom, FT_PER_UNIT } from './standing';
 import { yardGeometry } from './plantYard';
 import { domeCostSummary } from './costSummary';
@@ -172,5 +172,20 @@ describe('the new stretch of road has no sharp kink', () => {
       }
       expect(worst, `rot ${rt} want ${want}`).toBeLessThan(1.05);
     }
+  });
+});
+
+describe('the earthen dome keeps its low door: the road ends on a gravel apron in front of it', () => {
+  it('the frame has no chamber for a truck, the drive stops on the apron and never reaches the shell', () => {
+    const r = radius('earthen'), f = portFrame('earthen', 40, 40, r, 0.8)!;
+    expect(f.fits).toBe(false);
+    expect(insideLane(f)).toBeNull();
+    const drive: Pt[] = Array.from({ length: 61 }, (_, i) => [40 + 30 - i * 0.5, 40 + 12 - i * 0.2] as Pt);
+    const a = approachRoute(drive, { cx: 40, cz: 40, footR: r, yard: null }, f, 0)!;
+    const end = a.route[a.route.length - 1];
+    expect(onApron(f, end[0], end[1])).toBe(true);
+    expect(Math.hypot(end[0] - 40, end[1] - 40)).toBeGreaterThan(r + 0.5);
+    expect(straightRun(a.route, f)).toBeGreaterThanOrEqual(STRAIGHT_LEN - APRON_LEN * 0.6 - 1e-6);
+    expect(vehicleTail(f)).toEqual([f.outer]);
   });
 });

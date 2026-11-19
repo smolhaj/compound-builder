@@ -54,20 +54,21 @@ try {
   const a = dm.a, u = a ? [Math.sin(a.angle), Math.cos(a.angle)] : [1, 0], n = [u[1], -u[0]], R = dm.r;
   const E = (rho, lam, h) => [dm.x + u[0] * rho + n[0] * lam, h, dm.z + u[1] * rho + n[1] * lam];   // a point on the port's frame: rho out along its axis, lam across, h above the ground
   const gate = [dm.x + u[0] * R, 0.3, dm.z + u[1] * R];
+  const len = await page.evaluate(async ([t, r]) => (await import('/src/sim/dome/vehiclePort.ts')).portVestibule(t, r)?.len ?? 0.3, [dm.tier, R]), S = Math.max(1, R / 3.7);
   if (want('aerial')) {
     await pr(E(R + 12, -8, 9), E(R - 1, 0, 0), 55); await shot('aerial-from-port-side');
     await pr([dm.x - u[0] * R * 0.2 + n[0] * 3, R * 3.4, dm.z - u[1] * R * 0.2 + n[1] * 3], E(R + 3, 0, 0), 60); await shot('aerial-high');
   }
-  if (want('closeup')) { await pr(E(R + 6.5, -3.5, 2.2), gate, 52); await shot('port-closeup'); }
+  if (want('closeup')) { await pr(E(R + 6.5 * S, -3.5 * S, 2.2 * S), gate, 52); await shot('port-closeup'); }
   if (want('eye')) {
     await page.evaluate(() => { const w = window.__cb.world; const tl = w.truck.tail.reduce((a, p, i, l) => a + (i ? Math.hypot(p[0] - l[i - 1][0], p[1] - l[i - 1][1]) : 0), 0); w.truck.qaHold([{ material: 'lumber', qty: 6 }], w.truck.inLength - tl - 2.7); });
-    await person(...[E(R + 2.6, 0.9, 0)].map(p => [p[0], p[2]])[0]);
+    await person(...[E(R + 2.6 * S, 0.9 * S, 0)].map(p => [p[0], p[2]])[0]);
     await frames(2);
-    await pr(E(R + 6.2, -1.9, 0.5), [...gate.slice(0, 1), 0.3, ...gate.slice(2)], 58); await shot('eye-at-port-truck-person');
+    await pr(E(R + 5.2 * S, -1.9 * S, 0.5), [gate[0], 0.3 * S, gate[2]], 58); await shot('eye-at-port-truck-person');
   }
   if (want('inside')) {
-    await person(...[E(R - 2.2, 0.6, 0)].map(p => [p[0], p[2]])[0]);
-    await pr(E(R - 3.4, 0, 0.5), E(R + 1.5, 0, 0.4), 62); await shot('inside-looking-out');
+    await person(...[E(R - len - 1.6, 0.5, 0)].map(p => [p[0], p[2]])[0]);
+    await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await shot('inside-looking-out');
   }
   if (want('night')) {
     await set(`cb.store.getState().setTimeOfDay(21.5)`);

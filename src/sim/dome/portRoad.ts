@@ -14,9 +14,10 @@ export interface PortRoad { plan: RoadPlan; frame: PortFrame; approach: Approach
 /** The first dome (nearest the old yard) whose port the road is re-planned to, with the plan it makes; null when no dome with a port lies on or near the drive. */
 export function planToPort(plan: RoadPlan, domes: readonly Dome[], height: (x: number, z: number) => number): PortRoad | null {
   const drive = plan.pts.map(p => [p.x, p.z] as Pt), yard = plan.yard;
-  const cands = domes.filter(d => d.airlocks.some(a => a.role === 'vehicle')).sort((a, b) => Math.hypot(a.x - yard[0], a.z - yard[1]) - Math.hypot(b.x - yard[0], b.z - yard[1]) || (a.id < b.id ? -1 : 1));
+  const doorOf = (d: Dome) => d.airlocks.find(a => a.role === 'vehicle') ?? (d.tier === 'earthen' ? d.airlocks[0] : undefined);
+  const cands = domes.filter(d => doorOf(d)).sort((a, b) => Math.hypot(a.x - yard[0], a.z - yard[1]) - Math.hypot(b.x - yard[0], b.z - yard[1]) || (a.id < b.id ? -1 : 1));
   for (const d of cands) {
-    const ap = d.airlocks.find(a => a.role === 'vehicle')!, f = portFrame(d.tier, d.x, d.z, d.r, ap.angle);
+    const ap = doorOf(d)!, f = portFrame(d.tier, d.x, d.z, d.r, ap.angle);
     if (!f) continue;
     const keep: Keepout = { cx: d.x, cz: d.z, footR: d.footR, yard: yardCorners(d.tier, d.x, d.z, d.r, d.structure.rot) };
     const approach = approachRoute(drive, keep, f, plan.gateAt);
@@ -48,6 +49,6 @@ export function derive(plan: RoadPlan, a: Approach, yard: Pt, height: (x: number
 
 /** The frame of a standing dome's vehicle port (null: none). */
 export function portFrameOf(d: Dome): PortFrame | null {
-  const a = d.airlocks.find(x => x.role === 'vehicle');
+  const a = d.airlocks.find(x => x.role === 'vehicle') ?? (d.tier === 'earthen' ? d.airlocks[0] : undefined);
   return a ? portFrame(d.tier, d.x, d.z, d.r, a.angle) : null;
 }

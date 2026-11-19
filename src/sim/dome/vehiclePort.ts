@@ -58,6 +58,8 @@ export function portVestibule(tier: DomeTier, r: number): Vestibule | null {
   const b = BASE[tier], len = Math.max(b.t * 4 + b.w * 0.5, Math.min(b.len, r * 0.7)), cw = b.w - 2 * b.t;
   return { w: b.w, len, cw, dw: cw * b.door, t: b.t, h: b.h, dh: b.dh };
 }
+/** The earthen dome's low door, as a frame for the apron (no chamber: a pickup stops outside). */
+const EARTHEN_DOOR: Vestibule = { w: 0.24, len: 0.2, cw: 0.18, dw: 0.13, t: 0.03, h: 0.2, dh: 0.18 };
 /** Does a vehicle drive in (the chamber holds a pickup)? A small dome's port is a vehicle gate with the lot outside and a handcart inside. */
 export const vehicleFits = (v: Vestibule): boolean => v.len >= TRUCK.PICKUP && v.dw >= TRUCK.WIDTH + 0.2;
 
@@ -176,14 +178,13 @@ export interface PortFrame {
 
 const at = (cx: number, cz: number, u: Pt, rho: number, lam = 0): Pt => [cx + u[0] * rho + u[1] * lam, cz + u[1] * rho - u[0] * lam];
 
-/** The frame of the port of the dome at (cx, cz) whose shell has radius r, at `angle`. Null for earthen. */
+/** The frame of the port of the dome at (cx, cz) whose shell has radius r, at `angle`. The earthen dome has only its low door: the frame is that door with a gravel apron (no gates, no lane). */
 export function portFrame(tier: DomeTier, cx: number, cz: number, r: number, angle: number): PortFrame | null {
-  const v = portVestibule(tier, r);
-  if (!v) return null;
+  const v = portVestibule(tier, r) ?? EARTHEN_DOOR;
   const u: Pt = [Math.sin(angle), Math.cos(angle)], hw = v.dw / 2 + 0.45;
   const apronC = at(cx, cz, u, r + APRON_LEN / 2);
   const bollards: Pt[] = [];
-  const nb = BASE[tier as Exclude<DomeTier, 'earthen'>].bollards;
+  const nb = tier === 'earthen' ? 0 : BASE[tier].bollards;
   for (let i = 0; i < nb; i++) { const s = (i + 0.5) / nb * 2 - 1; bollards.push(at(cx, cz, u, r + APRON_LEN - 0.12, s * (hw + 0.1))); }
   return {
     angle, u, v, cx, cz, r,
@@ -191,7 +192,7 @@ export function portFrame(tier: DomeTier, cx: number, cz: number, r: number, ang
     apronEnd: at(cx, cz, u, r + APRON_LEN), straightStart: at(cx, cz, u, r + STRAIGHT_LEN),
     apron: { c: apronC, hl: APRON_LEN / 2, hw },
     bollards, camera: at(cx, cz, u, r + 0.35, -(v.cw / 2 + 0.3)), light: at(cx, cz, u, r + 0.35, v.cw / 2 + 0.3), booth: at(cx, cz, u, r + 0.55, v.cw / 2 + 0.75),
-    fits: vehicleFits(v),
+    fits: tier !== 'earthen' && vehicleFits(v),
   };
 }
 
@@ -357,7 +358,8 @@ export function approachRoute(drive: readonly Pt[], k: Keepout, f: PortFrame, ga
   // the exact straight finish: A, the apron's far edge, the outer gate
   const finish: Pt[] = [];
   for (let d = aDist - 0.5; d > f.r + 0.001; d -= 0.5) finish.push(at(f.cx, f.cz, f.u, d));
-  const O = f.outer, route: Pt[] = [...drive.slice(0, j + 1), ...body.slice(1), ...finish, O];
+  // (a port a truck drives into ends on the outer gate; the earthen door and a chamber too small for a truck end on the apron, where the truck stops)
+  const stop = f.fits ? f.r : f.r + APRON_LEN * 0.6, O = at(f.cx, f.cz, f.u, stop), route: Pt[] = [...drive.slice(0, j + 1), ...body.slice(1), ...finish.filter(p => (p[0] - f.cx) * f.u[0] + (p[1] - f.cz) * f.u[1] > stop + 1e-6), O];
   return { route, joinAt: j, cut };
 }
 

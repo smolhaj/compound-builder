@@ -471,9 +471,9 @@ export class HomesteadWorld {
   private _ports: PortFixtures | null = null;
   private _portTail: Array<[number, number]> = [];
   private _syncPorts(game: GameState): void {
-    const domes = standingDomes(game).filter(d => d.airlocks.some(a => a.role === 'vehicle'));
+    const domes = standingDomes(game).filter(d => portFrameOf(d));
     const guarded = guardCount(game) > 0;
-    const key = domes.map(d => `${d.id}:${d.x},${d.z}:${d.airlocks.find(a => a.role === 'vehicle')!.angle.toFixed(3)}`).join('|') + `|${this._baseRef.signature}|${this._drive ? 1 : 0}|${guarded ? 1 : 0}`;
+    const key = domes.map(d => `${d.id}:${d.x},${d.z}:${portFrameOf(d)!.angle.toFixed(3)}`).join('|') + `|${this._baseRef.signature}|${this._drive ? 1 : 0}|${guarded ? 1 : 0}`;
     if (key === this._portKey) return;
     this._portKey = key;
     const pr = planToPort(this._baseRef, domes, (x, z) => this.parcel.height(x, z));
@@ -485,7 +485,7 @@ export class HomesteadWorld {
     if (ins.length) { const f = makeVehiclePorts(ins, (x, z) => this.groundAt(x, z)); this._root.add(f.group); this._ports = f; }
     this._applyPlan(pr ? pr.plan : this._baseRef);
     this._portTail = pr ? vehicleTail(pr.frame).slice(1) : [];
-    this.truck.setLock(pr ? { x: pr.frame.outer[0], z: pr.frame.outer[1], s: portCycleSeconds(pr.dome.tier) } : null);
+    this.truck.setLock(pr && pr.dome.tier !== 'earthen' ? { x: pr.frame.outer[0], z: pr.frame.outer[1], s: portCycleSeconds(pr.dome.tier) } : null);
     this._tailKey = '';
   }
   /** Make `plan` the road in use: redraw the land along it, the road and the truck's way. */
