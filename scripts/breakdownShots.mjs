@@ -102,4 +102,9 @@ try {
   await frames(6);
   await page.waitForFunction(() => window.__cb.game.getState().cutscene?.phase === 'aftermath', null, { polling: 300 });
   await shot(bare ? 'aftermath-bare' : 'aftermath-fortress', 6);
+  // the breakdown rows are open by default; the "more" line holds the rounds and the extra notes: open it and look at those too
+  await page.getByRole('button', { name: /more \(/ }).click();
+  await shot(bare ? 'aftermath-bare-more' : 'aftermath-fortress-more', 3);
+  // fold the breakdown (headline only) and back, as a player can
+  const tg = page.getByTestId('raid-breakdown-toggle'); await tg.click(); await shot(bare ? 'aftermath-bare-folded' : 'aftermath-fortress-folded', 3);
 } finally { await browser.close(); vite.kill(); setTimeout(() => process.exit(0), 200); }

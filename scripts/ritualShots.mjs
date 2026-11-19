@@ -25,7 +25,7 @@ try {
   const shot = async (name) => { await frames(); await page.screenshot({ path: `${out}/${name}.png` }); lap(name); };
   const report = async tag => console.error(tag, JSON.stringify(await page.evaluate(() => {
     const cb = window.__cb, g = cb.game.getState().game, R = g.rituals;
-    return { hour: ((g.clock.ticks * 0.25 + 6) % 24).toFixed(2), calm: R && +R.calm.toFixed(2), tasks: g.personState.map(p => p.task), shown: [...cb.world.family.shown].length, who: g.people.map(p => { const q = cb.world.family.poseOf(p.id); return q ? [p.first, +q.x.toFixed(2), +q.z.toFixed(2)] : [p.first]; }), line: cb.store.getState().homeLine?.text };
+    return { house: window.__f, day: +g.clock.t.toFixed(2), hour: ((g.clock.ticks * 0.25 + 6) % 24).toFixed(2), calm: R && +R.calm.toFixed(2), tasks: g.personState.map(p => p.task), shown: [...cb.world.family.shown].length, who: g.people.map(p => { const q = cb.world.family.poseOf(p.id); return q ? [p.first, +q.x.toFixed(2), +q.z.toFixed(2)] : [p.first]; }), line: cb.store.getState().homeLine?.text };
   })));
   // jump the clock to an hour and let the people be where they should (a jump of more than 0.05 days puts everyone at their goals)
   const stage = async (hour, patch) => {
@@ -111,6 +111,9 @@ try {
   if (only === 'all' || only === 'raid') {
     await page.evaluate(() => window.__cb.store.getState().setTimeOfDay(18.6));
     await stage(18.4); await wait(9000);
+    // staged alert: the clock is a normal day (the gate timer stays parked far out so no card opens, but the clock itself is not touched),
+    // one grown person on watch and the rest at supper, then the QA raid flag turns the table into an alert
+    await stage(18.4, "g.personState.forEach((p, i) => { p.task = i === 0 ? 'watch' : 'meal'; });");
     await page.evaluate(() => { window.__cb.world.qaRaid = true; });
     await wait(3000); await frames(); await wait(6000); await frames(); await report('raid');
     await page.evaluate(() => { window.__cb.store.getState().setHudHidden(false); window.__cb.world._lineAcc = 99; });
