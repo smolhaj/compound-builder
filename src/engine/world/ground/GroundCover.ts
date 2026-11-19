@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import { VEG_WIND } from '../trees/treeGeometry';
 import { SEASON_UNIFORMS } from '../season/seasonShader';
+import { DOME_DECL, seaLocalGlsl, seaLocalize } from '../season/domeMask';
 import { seasonState } from '../season/seasonState';
 import type { Quality } from '../WorldScene';
 import { cardAtlas, litterAtlas, ATLAS_GRID } from './groundAtlas';
@@ -38,6 +39,7 @@ uniform vec4 uSeaA;
 uniform vec4 uSeaB;
 uniform vec4 uSeaC;
 uniform vec4 uSeaD;
+${DOME_DECL}
 `;
 
 const COMMON_PARS = /* glsl */`
@@ -68,7 +70,7 @@ float gcThin(float d, float r) {
 }
 `;
 
-const CARD_VERT = /* glsl */`
+const CARD_RAW = /* glsl */`
 vec4 gcBase = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
 float gcD = length(gcBase.xz - uGcCenter);
 float gcFade = 1.0 - smoothstep(uGcFade.x, uGcFade.y, gcD);
@@ -123,7 +125,7 @@ vGcTint = gcT;
 vGcSnow = gcStiff ? 0.0 : clamp(gcSnowB * 1.15, 0.0, 1.0) * smoothstep(0.0, 0.6, position.y + 0.15);
 `;
 
-const LITTER_VERT = /* glsl */`
+const LITTER_RAW = /* glsl */`
 vec4 gcBase = instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
 float gcD = length(gcBase.xz - uGcCenter);
 float gcFade = 1.0 - smoothstep(uGcFade.x, uGcFade.y, gcD);
@@ -149,6 +151,13 @@ vGcUv = (vec2(mod(aTile, uGcGrid), floor(aTile / uGcGrid)) + 0.02 + vec2(uv.x, 1
 vGcUv.y = 1.0 - vGcUv.y;
 vGcTint = gcT; vGcFlag = 0.0; vGcFlower = vec3(0.0);
 `;
+
+/** The cover inside a climate-controlled dome follows the dome's own season (domeMask.ts): local season copies after the instance's base point. */
+function inDomeSeason(src: string): string {
+  const k = src.indexOf('\n', src.indexOf('vec4 gcBase')) + 1;
+  return src.slice(0, k) + seaLocalGlsl('gcBase.xyz') + seaLocalize(src.slice(k));
+}
+const CARD_VERT = inDomeSeason(CARD_RAW), LITTER_VERT = inDomeSeason(LITTER_RAW);
 
 const FRAG_PARS = /* glsl */`
 uniform sampler2D uGcAtlas;
