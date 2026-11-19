@@ -7,7 +7,7 @@
  * Homestead teeth (no new art): the cold reaches every night through `supplyMods.cold` (housing.meanLow, cold.ts, heating.ts); wood use doubles
  * at a 30 F anomaly (heating.demandNow via slowWoodK); batteries lose up to half their charge and untreated diesel gels (utilities.ts);
  * solar follows the dim sun (physicalSolar.ts); roofs carry snow against the same capacity table as ash (`ashfall.ROOF_CAP`), through a thin
- * adapter here. The full building and dome snow model (`snowLoad.ts`) is a later PR.
+ * adapter here. The building roof model is `snowLoad.ts`; the dome shell's snow is `dome/snowLive.ts`.
  *
  * State in `disaster.fx.ice_age` (JSON-safe, no save bump): the ground load at each roof's last shoveling, roofs lost, one-time lines told.
  */
@@ -17,7 +17,8 @@ import { calendarOf } from '../state';
 import { kindBag, applyLevel, dice, physicalOf } from '../physical';
 import { isFinished } from '../construction';
 import { startCase } from '../medical';
-import { ROOF_CAP, density, fallChance, roofRatio, roofVerdict, shovelHours } from '../ashfall';
+import { fallChance, roofVerdict, shovelHours } from '../ashfall';
+import { roofLoad } from '../snowLoad';
 import { bulletin, clamp01, shelf, warnFrac, type Line } from './kit';
 import { COLD_RAMP_YEARS } from '../climateCurve';
 import { ROOF_SNOW_SHARE, SNOW_IN_PER_PSF, iceColdF, iceGroundPsf, iceProgress, iceWinter, slowYears, winterness } from '../slowClimate';
@@ -32,14 +33,11 @@ const money = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 /** Ground snow load now (psf). */
 export const groundPsf = (s: GameState): number => iceGroundPsf(s, doyOf(s));
 
-/** One roof's load against its capacity (the ash tables, through a thin adapter): snow psf on the roof now, the ratio and the verdict inputs. */
+/** One roof's load against its capacity (snowLoad.ts, the ash tables): snow psf on the roof now and the ratio, or null for a kind with no roof load. */
 export function roofSnow(s: GameState, st: { id: string; kind: string }): { psf: number; ratio: number } | null {
-  const cap = ROOF_CAP[st.kind];
-  if (cap === undefined) return null;
-  const I = iceOf(s), P = physicalOf(s);
-  const psf = Math.max(0, groundPsf(s) - (I.base[st.id] ?? 0)) * ROOF_SNOW_SHARE;
-  const braced = (P.retrofit[st.id] ?? []).includes('rafters');
-  return { psf, ratio: roofRatio(psf / density(false), cap, false, braced) };
+  const P = physicalOf(s), braced = (P.retrofit[st.id] ?? []).includes('rafters');
+  const rl = roofLoad(st.kind, groundPsf(s), { shoveledAtPsf: iceOf(s).base[st.id] ?? 0, braced });
+  return rl ? { psf: rl.psf, ratio: rl.ratio } : null;
 }
 
 /** Shovel every roof that has snow worth shoveling: the family (slow, a fall risk) or a paid crew. Returns the message. */

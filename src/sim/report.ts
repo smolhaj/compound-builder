@@ -48,6 +48,9 @@ export interface Ending { kind: EndKind; day: number; continued: boolean }
 
 import { placeLine } from './settlement';
 import { isGod } from './godMode';
+import { RICH_START } from './richStart';
+import { domeRunning } from './dome/runningLine';
+import { compactUsd } from './richStartCard';
 import { declareWipe, wipeSummary } from './wipe';
 import { CAUSE_TEXT, inferCause } from './deaths';
 import { pluralize } from './words';
@@ -114,8 +117,9 @@ export function reportCard(s: GameState): ReportCard {
   const survival = total ? alive / total : 0;
   const fed = st.days ? 1 - st.hungryDays / st.days : 1;
   const score = Math.round(100 * (0.5 * survival + 0.2 * fed + 0.15 * (g.humanity / 100) + 0.15 * (g.raidsHeld + g.raidsLost ? g.raidsHeld / (g.raidsHeld + g.raidsLost) : 1)));
-  const sandbox = isGod(s);
-  const grade = sandbox ? 'S' : end === 'wipe' ? 'F' : score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 65 ? 'C' : score >= 50 ? 'D' : 'F';
+  const sandbox = isGod(s), rich = !!s.richStart;
+  // a rich start is a sandbox-like convenience (sim/richStart.ts): not graded, so a family that began with millions is not scored against one that did not
+  const grade = sandbox ? 'S' : rich ? 'R' : end === 'wipe' ? 'F' : score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 65 ? 'C' : score >= 50 ? 'D' : 'F';
   const family = s.people[0]?.last ?? 'The family';
   const wipe = wipeSummary(s), away = wipe.elsewhere;
   /** The run ended before the collapse hit: no days are tallied after it. */
@@ -188,6 +192,8 @@ export function reportCard(s: GameState): ReportCard {
   if (s.perimeter.some(r => r.kind === 'escape_tunnel' && r.finishedAt !== null)) lines.push('The tunnel was never needed.');
   lines.push(placeLine(s, end === 'wipe'));
   if (sandbox) lines.push('Sandbox run: unlimited money, so this card is not graded.');
+  else if (rich) lines.push(`Rich start (${RICH_START[s.richStart!].name}): this run began with ${compactUsd(s.startFunds?.budget ?? RICH_START[s.richStart!].budget)}, so this card is not graded and the dynasty score and milestones do not count.`);
+  { const dr = domeRunning(s); if (dr.length) lines.push(`The ${dr.length === 1 ? 'dome' : `${dr.length} domes`} cost about ${compactUsd(dr.reduce((a, x) => a + x.totalUsd, 0))} a year to run (${compactUsd(dr.reduce((a, x) => a + x.upkeepUsd, 0))} upkeep, the rest power).${dr.some(x => x.owedUsd > 0) ? ' Upkeep was behind.' : ''}`); }
   const allies = s.neighbors.filter(n => n.disposition > 50 && n.status === 'home');
   if (allies.length) lines.push(`${allies.map(n => n.name[0].toUpperCase() + n.name.slice(1)).join(' and ')} stood with you.`);
   return {

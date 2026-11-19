@@ -7,7 +7,7 @@ import { MATERIALS, type MaterialId } from '../materials';
 import { CELL_FT, TIER, shellFt, type DomeTier } from './tiers';
 import { domeGeometry } from './geometry';
 import { yardBill } from './plantYard';
-import { earthwork, earthworkGoods, skirtCy, spanFactor, type Earthwork } from './pricing';
+import { domePermitUsd, earthwork, earthworkGoods, skirtCy, spanFactor, type Earthwork } from './pricing';
 /** The shop's crew wage and a crew's week (sim/crews.ts has the same two numbers; a test holds them equal: importing crews here would make a cycle through the blueprints). */
 export const CREW_RATE = 60, CREW_WEEK = 4 * 9 * 5;
 
@@ -68,7 +68,9 @@ export function domeCost(tier: DomeTier, cells: number = TIER[tier].cells, o: { 
   const bill = sum(stages.site, stages.foundation, stages.frame, stages.roof, stages.finish);
   const hours = t.hours * (g.footprintSf / domeGeometry(tier, shellFt(tier, t.cells)).footprintSf) ** 0.9;
   const materialsUsd = billUsd(bill), laborUsd = Math.round(hours * CREW_RATE / 100) * 100;
-  return { tier, cells, diameterFt: d, stages, bill, materialsUsd, laborUsd, permitUsd: t.permitFee, totalUsd: materialsUsd + laborUsd + t.permitFee, hours: Math.round(hours), crewWeeks: Math.max(1, ceil(hours / CREW_WEEK)), skirtYd: concrete, skirtFt, earthwork: work };
+  // PROPOSED: the county permit grows with the size of the job (about 1 percent of the build price, never under the tier's flat fee)
+  const permit = domePermitUsd(t.permitFee, materialsUsd + laborUsd);
+  return { tier, cells, diameterFt: d, stages, bill, materialsUsd, laborUsd, permitUsd: permit, totalUsd: materialsUsd + laborUsd + permit, hours: Math.round(hours), crewWeeks: Math.max(1, ceil(hours / CREW_WEEK)), skirtYd: concrete, skirtFt, earthwork: work };
 }
 
 /** Weeks with `crews` crews on it: more crews cut the labor weeks but never the cure floor (the shell, the glazing set). */

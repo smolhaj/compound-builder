@@ -50,7 +50,7 @@ export interface RaidDamage {
   /** A dome's plant unit (kind 'plant', sim/dome/plantUnits.ts): the unit id (`chiller`, `chiller2`...), how bad it is, what did it and the game time (days) it happened. The unit stays damaged until the job is done. */
   unit?: string;
   cond?: 'damaged' | 'down';
-  cause?: 'raid' | 'fire' | 'storm';
+  cause?: 'raid' | 'fire' | 'storm' | 'heat' | 'load' | 'cold';
   at?: number;
 }
 
@@ -130,7 +130,7 @@ export function applyRaidDamage(s: GameState, battle: Battle | null, overrun: bo
       const job = panelJob(tier, n, { wealth: 0 });
       const at = gate ? domeBreach.where : { ...domeBreach.where, ...awayFromAirlocks(d, domeBreach.where.x, domeBreach.where.z) };
       add({ kind: 'panel', x: at.x, z: at.z, structure: d.id, panels: n, hours: Math.max(4, job.hours), bill: job.bill, readyDay: day + job.leadDays, what: gate ? 'the airlock door' : 'the shell' });
-      lines.push(gate ? 'The outer door of the airlock was forced.' : `They cut through the shell: ${n} panels are down. A glazier has to order them (about ${job.leadDays} days).`);
+      lines.push(gate ? 'The outer door of the airlock was forced.' : `They cut through the shell: ${n} panels are down. A glazier has to order them (about ${job.leadDays} days, about $${job.usd.toLocaleString('en-US')} in panels).`);
       made++;
     }
   }

@@ -29,6 +29,10 @@ export const DOME_PRICING = {
   spanMin: 0.75, spanMax: 1.4,
 } as const;
 
+/** PROPOSED. The county permit scales with the job: about 1 percent of the build price (plan review, impact and environmental fees), never under the tier's old flat fee (`TIER[tier].permitFee`). */
+export const PERMIT_SHARE = 0.01;
+export const domePermitUsd = (flatUsd: number, buildUsd: number): number => (flatUsd > 0 ? Math.max(flatUsd, Math.round(buildUsd * PERMIT_SHARE / 1000) * 1000) : 0);
+
 /** Cubic yards of concrete in the skirt and its stem (the rule `domeCost` has always used). */
 export const skirtCy = (ringFt: number, skirtFt: number, thickFt: number): number => Math.ceil(ringFt * skirtFt * thickFt / 27) + Math.ceil(ringFt * 2 * 2 / 27);
 

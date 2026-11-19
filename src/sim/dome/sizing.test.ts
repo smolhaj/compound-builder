@@ -35,14 +35,14 @@ describe('the diameter handle: sized kinds', () => {
       expect(domeCost(t).totalUsd).toBe(domeCost(t, TIER[t].cells).totalUsd);
     }
   });
-  it('the blueprint of a sized kind is priced at that size, and the permit follows the tier', () => {
+  it('the blueprint of a sized kind is priced at that size, and the permit follows its size (about 1 percent of the build, never under the tier\'s flat fee; was a flat fee per tier before the pricing follow-ups)', () => {
     const k = kindOfCells('geodesic', 10), bp = BLUEPRINTS[k];
     expect(bp).toBeDefined();
     expect(bp.kind).toBe(k);
     expect(totalBill(bp)).toEqual(totalBill(domeBlueprint('geodesic', 10)));
     expect(totalBill(BLUEPRINTS.dome_geodesic)).toEqual(totalBill(domeBlueprint('geodesic')));
     expect(needsPermit(k)).toBe(true);
-    expect(PERMIT_FEE[k]).toBe(TIER.geodesic.permitFee);
+    expect(PERMIT_FEE[k]).toBeGreaterThanOrEqual(TIER.geodesic.permitFee); expect(PERMIT_FEE[k]).toBe(domeCost('geodesic', 10).permitUsd);
     expect(BLUEPRINTS['dome_geodesic_99']).toBeUndefined();   // outside the range
     expect(Object.keys(BLUEPRINTS).filter(x => x.startsWith('dome_'))).toHaveLength(4);   // enumeration lists only the base kinds
   });

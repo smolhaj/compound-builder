@@ -31,9 +31,14 @@ import { SHELL } from './protection';
 import { domeLoad, BAND, comfortAt, type ClimateMode, type CoolStage } from './climate';
 import { WATER_LOOPS, loopUsd, loopKw, rainCatchL, reuseL, condensateL, GAL_PER_L, type WaterLoop } from './waterLoop';
 import { stockCover } from './agro';
+import { climateOpts, plantWearDay } from './plantClimateLive';
+import { shellSnowDay } from './snowLive';
+import { climateCards } from './climateReadout';
+import { ventsIced } from '../snowLoad';
 import type { PlantKind } from './plantUnits';
 import { damagePlant, fxOf, plantJobs, rushPlant, rushQuote, specOf, unitsOf } from './plantLive';
 import { PLANT_SHORT, plantKinds, spareProblem, spareUsd } from './plantUnits';
+import { billUpkeep } from './upkeep';
 import {
   FILTERING, LIMIT_PPM, O2, SCRUB, BED_CAP, freshAir, lockdownClock, sealedAir, advancedFilterUsd, closedEcologyUsd, scrubberUsd,
   type AirCtx, type Clock, type Filtering,
@@ -113,6 +118,8 @@ export interface DomeState {
   cistern?: boolean;
   /** Kinds of plant unit with a second (N+1) unit bought (save v103, optional; sim/dome/plantUnits.ts). */
   spares?: PlantKind[];
+  /** Upkeep (maintenance, insurance, staff) the family has not been able to pay, in dollars (save v105, optional; sim/dome/upkeep.ts). */
+  upkeepOwed?: number;
 }
 
 export const newDomeState = (): DomeState => ({
@@ -265,7 +272,7 @@ export interface DayLoad { kwh: number; climateKwh: number; auxKwh: number; loop
 export function dayLoad(s: GameState, d: DomeRef, st: DomeState = stateOf(s, d)): DayLoad {
   let clim = 0, water = 0;
   const dry = dryAir(s);
-  for (const p of dayProfile(s)) { const l = domeLoad(d.tier, d.cells, p.f, p.sun, st.mode, { sealed: st.lockdown, dry }); clim += l.kwhPerDay / 4; water += l.waterGalDay / 4; }
+  for (const p of dayProfile(s)) { const l = domeLoad(d.tier, d.cells, p.f, p.sun, st.mode, { sealed: st.lockdown, dry, ...climateOpts(s, d, st, p.f) }); clim += l.kwhPerDay / 4; water += l.waterGalDay / 4; }
   const air = st.lockdown || st.filtering === 'closed' ? airPlantKw(d.tier, d.cells, st.filtering) * 24 : 0;
   const loopK = loopKw(d.tier, d.cells, st.loop ?? 'none') * 24, aux = auxKwhDay(d.tier, d.cells);
   clim *= fxOf(s, d, st).climate;
@@ -340,6 +347,8 @@ const difficultyOf = (s: GameState) => DIFFICULTY[s.disaster.difficulty ?? 'stan
 export const failScale = (s: GameState): number => ({ cozy: 0.35, standard: 1, hardcore: 1.4 } as const)[s.disaster.difficulty ?? 'standard'] * (difficultyOf(s) ? 1 : 1);
 
 const FILTER_SHARE = (f: Filtering): number => SCRUB[f].co2;
+/** A fixed die for a dome and a day (0..1): the roof vents ice shut on this share of cold, dark days (snowLoad.ts). */
+const dieRoll = (s: GameState, d: DomeRef): number => mulberry32(s.seed * 4003 + dayIndex(s.clock.t) * 17 + Array.from(d.st.id).reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 3))();
 /** The air at which the sealed dome's heat fail-safe opens the vents on its own (degrees F). */
 export const HEAT_VENT_F = 105;
 
@@ -365,8 +374,8 @@ function stepOne(s: GameState, d: DomeRef, st: DomeState, dtDays: number, multi:
   // the inside temperature: the plant holds the mode's band when it has power (and in a hot hour, rented chillers count as power), else the shell floats
   // with only the free parts of the ladder (vents when open, roof screens); a sealed dome with the plant dark floats
   const chill = s.clock.t < (st.chillUntil ?? 0);
-  const fx = fxOf(s, d, st), ventK = fx.vent;
-  const ld = domeLoad(d.tier, d.cells, o.f, o.sun, st.mode, { sealed: st.lockdown, dry: dryAir(s), powered: powered || chill, ventK });
+  const fx = fxOf(s, d, st), iced = ventsIced(o.f, powered, dieRoll(s, d)), ventK = fx.vent * (iced ? 0.5 : 1);
+  const ld = domeLoad(d.tier, d.cells, o.f, o.sun, st.mode, { sealed: st.lockdown, dry: dryAir(s), powered: powered || chill, ventK, ...climateOpts(s, d, st, o.f, chill) });
   // a damaged or lost climate plant holds the band by its share, and the air drifts toward what it would float at by the rest (rented chillers cover the gap)
   const held = chill ? 1 : fx.climate;
   if (held < 1 && powered) {
@@ -408,7 +417,7 @@ function stepOne(s: GameState, d: DomeRef, st: DomeState, dtDays: number, multi:
     }
     // the fail-safe vents: bad air, or a sealed shell cooking in the sun with the plant dark
     const hot = st.indoorF >= HEAT_VENT_F;
-    if (st.co2ppm >= LIVE.VENT_PPM || st.o2pct <= LIVE.VENT_O2 || hot) {
+    if ((st.co2ppm >= LIVE.VENT_PPM || st.o2pct <= LIVE.VENT_O2 || hot) && !iced) {
       st.lockdown = false; st.since = null; st.ventedAt = s.clock.t;
       out.push(hot && st.co2ppm < LIVE.VENT_PPM
         ? `${name}fail-safe vents opened on their own: the sealed shell had reached ${Math.round(st.indoorF)} F. The lockdown is over.${dirt > 0.2 ? ' There is dust in the air outside, and it is coming in.' : ''}`
@@ -481,6 +490,7 @@ function domeDayOne(s: GameState, d: DomeRef, st: DomeState, multi: boolean): st
   }
   const powered = planPowered(s, d, st);
   const people = peopleUnder(s, d);
+  out.push(...billUpkeep(s, d, st, name));   // maintenance, insurance and staff, a 365th a day (sim/dome/upkeep.ts)
   // the closed ecology: upkeep, food, recovery, the dark
   if (st.filtering === 'closed') {
     const cost = Math.round(closedEcologyUsd(d.tier, d.cells) * LIVE.ECO_UPKEEP_DAY);
@@ -512,6 +522,8 @@ function domeDayOne(s: GameState, d: DomeRef, st: DomeState, multi: boolean): st
     const unit = kind && unitsOf(s, d, st).find(u => u.kind === kind && u.cond === 'ok');
     if (unit) { const line = damagePlant(s, d, st, unit.id, r() < 0.2 ? 'down' : 'damaged', 'storm'); if (line) out.push(line); }
   }
+  // a climate disaster wears the plant and loads the shell (sim/dome/plantClimateLive.ts, snowLive.ts)
+  out.push(...plantWearDay(s, d, st, r, scale, dryAir(s)), ...shellSnowDay(s, d, st, r, scale));
   // a hot day the plant could not hold
   const hotH = st.overH ?? 0;
   if (hotH >= HOT_H && raise(s, st, 'hot', day)) out.push(`${name} ran hot for ${Math.round(hotH)} hours today (${Math.round(st.indoorF)} F inside): the beds are wilting and the animals are panting.`);
@@ -734,6 +746,7 @@ export function domeCards(s: GameState): FxCard[] {
       }
     }
   });
+  out.push(...climateCards(s, all));
   return out;
 }
 

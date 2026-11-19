@@ -4,6 +4,7 @@
  * tunnelers (decision 7). Pure (tested).
  */
 import { TIER, type DomeTier } from './tiers';
+import { domeCost } from './cost';
 
 export interface Circle { x: number; z: number; r: number }
 export interface Rect { x0: number; z0: number; x1: number; z1: number }
@@ -37,7 +38,7 @@ export function wealthGate(tier: DomeTier, cash: number): string | null {
 }
 
 /** County permit: fee scales with how strict the county is, the review is long. */
-export const permitFee = (tier: DomeTier, strict: number): number => Math.round(TIER[tier].permitFee * (0.6 + 0.4 * strict) / 10) * 10;
+export const permitFee = (tier: DomeTier, strict: number, cells: number = TIER[tier].cells): number => Math.round(domeCost(tier, cells).permitUsd * (0.6 + 0.4 * strict) / 10) * 10;
 export const reviewDays = (tier: DomeTier, strict: number, permitsK = 1): number => TIER[tier].reviewDays ? Math.max(1, Math.round(TIER[tier].reviewDays * strict * permitsK)) : 0;
 export const needsPermit = (tier: DomeTier): boolean => TIER[tier].permitFee > 0;
 
