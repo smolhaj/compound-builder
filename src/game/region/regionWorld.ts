@@ -155,7 +155,7 @@ export const REGION_WORLD: Record<RegionId, RegionWorld> = {
         { kind: 'paloverde', w: 0.16, scale: [0.8, 1.2] },                                     // foothill palo verde
         { kind: 'saguaro', w: 0.1, scale: [0.55, 1.2], sx: [0.9, 1.05], sy: [0.9, 1.1] },      // saguaro on the warm slopes (sparse)
       ],
-      riparian: { kind: 'broad', scale: [1.3, 1.8] },                                  // Fremont cottonwood where a creek really runs
+      riparian: { kind: 'broad', scale: [1.1, 1.5] },                                  // Fremont cottonwood where a creek really runs
       wash: { kind: 'mesquite', scale: [0.9, 1.3] },                                   // mesquite and palo verde line the dry wash (a cottonwood on every dry gully read as a green lollipop line)
       under: { thick: null, edge: null },
       palettes: { broad: COTTONWOOD, juniper: DESERT_JUNIPER },
