@@ -298,8 +298,8 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD
     diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.12, 0.30, 0.05 ) * ( 0.85 + 0.3 * seN1 ) * ( 1.0 - 0.6 * seLB.y ), seGreen * seaDomeM * 0.9 );
 #if defined( SEA_MUD ) && !defined( SEA_MUD_UV )
     // (the regional ground itself, whatever its season-time albedo: a maintained lawn inside the dome)
-    diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.09, 0.32, 0.035 ) * ( 0.85 + 0.3 * seN1 ) * ( 1.0 - 0.6 * seLB.y ), seUp * seaDomeM * 0.95 );
-    totalEmissiveRadiance += vec3( 0.05, 0.17, 0.02 ) * ( 0.8 + 0.4 * seN1 ) * ( 1.0 - 0.6 * seLB.y ) * seUp * seaDomeM;   // (keeps the grass green under the cold grade)
+    diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.05, 0.27, 0.02 ) * ( 0.85 + 0.3 * seN1 ) * ( 1.0 - 0.6 * seLB.y ), seUp * seaDomeM * 0.95 );
+    totalEmissiveRadiance += vec3( 0.008, 0.05, 0.004 ) * ( 0.8 + 0.4 * seN1 ) * ( 1.0 - 0.6 * seLB.y ) * seUp * seaDomeM;   // (keeps the grass green under the cold grade)
 #endif
   }
   // Fallen leaves: drifts on lawns, along curbs and in road gutters
@@ -375,8 +375,8 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD
   // a lit greenhouse: while the dome runs (seaDomeM follows its protection) everything under the shell keeps a warm light that the cold blue outside lacks,
   // day and night: a warm albedo cast plus a small warm self-light (no new light, pass or uniform)
   if ( seaDomeM > 0.002 ) {
-    diffuseColor.rgb *= mix( vec3( 1.0 ), vec3( 1.1, 1.0, 0.82 ), seaDomeM );
-    totalEmissiveRadiance += ( diffuseColor.rgb * vec3( 0.9, 0.55, 0.2 ) * 0.6 + vec3( 0.16, 0.085, 0.025 ) ) * seaDomeM;
+    diffuseColor.rgb *= mix( vec3( 1.0 ), vec3( 1.18, 0.98, 0.7 ), seaDomeM );
+    totalEmissiveRadiance += ( diffuseColor.rgb * vec3( 1.0, 0.5, 0.14 ) * 1.0 + vec3( 0.12, 0.06, 0.015 ) ) * seaDomeM;
   }
 #endif
 `;
