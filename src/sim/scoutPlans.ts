@@ -4,7 +4,7 @@
  *
  *   drive_off  warning shots over their heads: the scouts run and a crew that sees a place that shoots may think better of it (`driveOffDeters`).
  *              Costs a few rounds. If the crew comes anyway it comes warned and they know you shoot.
- *   capture    a sortie to grab one: the better armed and the more fighters, the likelier; in the dark it is harder. A captured scout is a prisoner you
+ *   capture    a raid party to grab one: the better armed and the more fighters, the likelier; in the dark it is harder. A captured scout is a prisoner you
  *              can question (sim/interrogation.ts) and the crew is two men short with no one to tell it the weak side. A failed grab hurts one of yours.
  *   ignore     do nothing: they saw the place and the crew knows its weak side, as if they had never been spotted.
  *   prepare    shift the defenders to the side they will come from and shut and chain the gates: the family is ready at once and a ram at a gate is
@@ -17,7 +17,7 @@ export const SCOUT_PLANS: readonly ScoutPlan[] = ['drive_off', 'capture', 'ignor
 export const SCOUT_NAME: Record<ScoutPlan, string> = { drive_off: 'Drive them off', capture: 'Capture one', ignore: 'Ignore them', prepare: 'Prepare' };
 export const SCOUT_HINT: Record<ScoutPlan, string> = {
   drive_off: 'Shots over their heads. They run, and the crew may think better of it. A few rounds.',
-  capture: 'A sortie to grab one for questioning. Needs rifles and light; a failed grab hurts someone.',
+  capture: 'Send a party out to grab one for questioning. Needs rifles and light; a failed grab hurts someone.',
   ignore: 'Nothing. They saw the place, so the crew will know your weak side.',
   prepare: 'Shift the defenders to the near side and chain the gates: ready at once, a ram at the gate is worth less.',
 };
@@ -33,7 +33,7 @@ export function driveOffDeters(c: ScoutCtx): number {
   return Math.max(0.03, Math.min(0.7, base + c.fortress / 100 * 0.3 + (c.armed ? 0.1 : -0.15) + Math.min(4, c.fighters) * 0.02 - (c.temper === 'desperate' ? 0.1 : 0)));
 }
 
-/** The chance a sortie takes one of the two scouts alive. */
+/** The chance a raid party takes one of the two scouts alive. */
 export function captureOdds(c: ScoutCtx): number {
   return Math.max(0.05, Math.min(0.8, 0.12 + Math.min(4, c.fighters) * 0.12 + (c.armed ? 0.15 : -0.1) - (c.night ? 0.15 : 0)));
 }

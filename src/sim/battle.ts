@@ -655,7 +655,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   // a moat across the way they come (sim/waterWorks.ts): held at the water, or filed across the covered bridge; only ever adds time and hurt
   const moat = opts.terrain === false || opts.insideBreach ? null : moatFx(s, [C.x, C.z], ang, night, detection);
   // the tunnel-bridge's doors lock at night and on the alarm (a watch good enough to call it before they arrive); by day, unwarned, they stand open
-  // (sim/doorBreach.ts) a locked door is a job: tools, a ram, a torch, charges against its tier, slowed by the towers that see it and a sortie from the sally port
+  // (sim/doorBreach.ts) a locked door is a job: tools, a ram, a torch, charges against its tier, slowed by the towers that see it and a counterattack from the sally port
   let door: DoorPlan | null = null;
   if (lane?.via && opts.ambush === undefined) {
     const run = s.perimeter.find(x => x.id === lane.via), chokeAt = lane.lane.choke?.at;
