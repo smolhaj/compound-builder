@@ -4,7 +4,7 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 const { chromium } = await import('/opt/node22/lib/node_modules/playwright/index.mjs');
-const out = process.argv[2] || 'shots/pricing2', port = Number(process.argv[3] || 5994);
+const out = process.argv[2] || 'shots/pricing2', port = Number(process.argv[3] || 5994), only = process.argv[4] || '';   // only='dome' skips the New Game and placing-card frames
 mkdirSync(out, { recursive: true });
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise((ok, fail) => { vite.stdout.on('data', d => { if (/localhost:\d+/.test(String(d).replace(/\x1b\[[0-9;]*m/g, ''))) ok(); }); vite.on('exit', c => fail(new Error('vite ' + c))); });
@@ -13,6 +13,7 @@ try {
   const page = await browser.newPage({ viewport: { width: 1400, height: 900 } });
   page.setDefaultTimeout(600000);
   page.on('pageerror', e => console.error('pageerror:', e.message));
+  if (only !== 'dome') {
   // 1. the New Game card
   await page.goto(`http://localhost:${port}/?new&lowrender`);
   await page.getByText('1. Region').waitFor();
@@ -26,6 +27,7 @@ try {
   await page.getByTestId('rich-starts').scrollIntoViewIfNeeded();
   await page.waitForTimeout(300);
   await page.screenshot({ path: `${out}/02-new-game-magnate.png` }); console.error('02');
+  }
   // 2. in a game: the placing card
   await page.goto(`http://localhost:${port}/?seed=7&lowrender=0.75&layout=a&region=mountain_west&acres=40&lotseed=8&relief=8`);
   await page.waitForFunction(() => window.__cb?.qa?.lowrender, null, { timeout: 300000 });
@@ -39,11 +41,13 @@ try {
     return { sp };
   });
   await page.waitForTimeout(600);
+  if (only !== 'dome') {
   await shot('03-placing-card-glass-150');
   console.error(await page.evaluate(() => document.querySelector('[data-testid=dome-size-card]')?.textContent));
   await page.evaluate(() => { const G = window.__cb.game; G.getState().setDomeCells('glass', 24); window.__cb.tool.hoverAt(...[window.__cb.world.camp.x - 6, window.__cb.world.camp.z - 6]); });
   await page.waitForTimeout(400);
   await shot('04-placing-card-glass-240');
+  }
   // 3. a finished glass dome and the Dome panel
   await page.evaluate(() => { window.__cb.tool.setKind(null); });
   const dome = await page.evaluate(async () => {
@@ -61,7 +65,7 @@ try {
   await shot('05-dome-panel-running-cost');
   console.error(await page.evaluate(() => document.querySelector('[data-testid=dome-running-cost]')?.textContent));
   // behind on upkeep: 20 days owed and little cash
-  await page.evaluate(() => { window.__cb.game.setState(s => { const g = structuredClone(s.game); g.money = 40_000; const id = g.structures.at(-1).id; (g.domes ??= {}); const st = g.domes[id] ?? g.dome; st.upkeepOwed = 20 * 880_000 / 365 * 1.0; g.domes[id] = st; g.dome = st; return { game: g }; }); });
+  await page.evaluate(async () => { const L = await import('/src/sim/dome/live.ts'); window.__cb.game.setState(s => { const g = structuredClone(s.game); g.money = 40_000; const id = g.structures.at(-1).id; (g.domes ??= {}); const st = g.domes[id] ?? g.dome ?? L.newDomeState(); st.id = id; st.upkeepOwed = Math.round(20 * 823_000 / 365); g.domes[id] = st; g.dome = st; return { game: g }; }); });
   await page.waitForTimeout(500);
   await shot('06-dome-panel-behind');
   console.error(await page.evaluate(() => document.querySelector('[data-testid=dome-running-cost]')?.textContent));
