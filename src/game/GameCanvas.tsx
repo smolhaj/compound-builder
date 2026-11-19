@@ -69,7 +69,7 @@ import { stepSegments } from '../sim/standingSurfaces';
 import { LineDirector } from '../sim/raidDialogue';
 import { fireBoxesOf } from './battle/lineOfFire';
 import { useCutsceneView } from '../store/cutsceneStore';
-import { isFinished } from '../sim/construction';
+import { blueprintOf, isFinished } from '../sim/construction';
 import { isHome } from '../sim/blueprints';
 import { calendarOf, hourOf, SECONDS_PER_DAY } from '../sim/state';
 import { setWindowGlow } from './buildkit/materials';
@@ -385,6 +385,7 @@ export function GameCanvas() {
       }),
       useWorldStore.subscribe(s => s.buildingView, v => world.setBuildingView(v)),
       useWorldStore.subscribe(s => s.underground, on => world.setUnderground(on)),
+      useWorldStore.subscribe(s => s.domeSection, id => world.setDomeSection(id)),
       useWorldStore.subscribe(s => s.sightMode, m => sight.set(m)),
       // the terrain overlay (sim/terrain.ts): high ground, lanes, water, sun
       useWorldStore.subscribe(s => s.terrainMode, showTerrain),
@@ -572,6 +573,7 @@ export function GameCanvas() {
           let dy = Math.PI - cam.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); cam.yaw += dy * k;
         }
       } else promptAt = -1;
+      world.setSensors(game.stock.ground_sensor ?? 0);
       world.syncProgress(game.structures);
       world.syncFood(game);
       world.syncBunker(game, now / 1000, hourOf(game.clock.t));
@@ -842,7 +844,17 @@ export function GameCanvas() {
           if (sp) {
             useGameStore.setState(s => ({ game: { ...s.game, money: Math.max(s.game.money, 500_000_000) } }));
             useGameStore.getState().plan(kind, sp[0], sp[1], 0);
-            useGameStore.setState(s => { const g = structuredClone(s.game); const st = g.structures[g.structures.length - 1]; if (st && st.kind === kind) { st.stage = 99; st.done = 0; st.finishedAt = 0; st.supplied = true; } return { game: g }; });
+            // (&domeprogress=0.25 leaves it that share of the way built, the crater open: the perf scene "dome_dig_*")
+            const dp = Number(qs.get('domeprogress') ?? 1);
+            useGameStore.setState(s => {
+              const g = structuredClone(s.game); const st = g.structures[g.structures.length - 1];
+              if (st && st.kind === kind) {
+                const bp = blueprintOf(st).stages, total = bp.reduce((a, x) => a + x.hours, 0);
+                if (dp >= 1) { st.stage = 99; st.done = 0; st.finishedAt = 0; } else { let left = dp * total, i = 0; while (i < bp.length - 1 && left >= bp[i].hours) { left -= bp[i].hours; i++; } st.stage = i; st.done = left; }
+                st.supplied = true;
+              }
+              return { game: g };
+            });
           }
         }
         // the new pieces' shaders compile behind the loading screen too

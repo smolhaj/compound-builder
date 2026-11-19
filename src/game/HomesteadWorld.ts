@@ -73,6 +73,10 @@ import { detailGeometryOn, setDetailTier } from './buildkit/buildingDetail';
 import { CELL, type KitPieceDef } from './buildkit/kit';
 import { yardSpur } from './buildkit/yardSite';
 import { sitePad } from './buildkit/sitePad';
+import { buildBuried, buildDigSite, buildSection, SECTION_LEN, disposeSite, showBuried, type DigSite as DomeDigSite } from './buildkit/domeDig';
+import { digState, pitShape, type DigState } from '../sim/dome/dig';
+import type { DomeTier } from '../sim/dome/tiers';
+import { cellsOfKind } from '../sim/dome/tiers';
 import { improvementSpots } from './buildkit/improvementSpots';
 import type { GameState } from '../sim/state';
 import type { WearSeason } from '../engine/world/people/crowdWear';
@@ -715,10 +719,13 @@ export class HomesteadWorld {
   }
 
   /** Parcel trees (near, detailed) inside the margin; regional far trees beyond it. */
+  /** Is (x, z) in (or within `m` of) a dome's open crater or the moat round its skirt? Trees and ground cover keep out. */
+  private _inPit(x: number, z: number, m = 0): boolean { for (const c of this._pitCircles) { const d = Math.hypot(x - c[0], z - c[1]); if (d < c[2] + m && d >= c[3] - m) return true; } return false; }
+
   private _plant(q: Quality): void {
     const margin = TREE_MARGIN;
     const inHome = (x: number, z: number) => x > -margin && x < PARCEL_SIZE + margin && z > -margin && z < PARCEL_SIZE + margin;
-    const blocked = (x: number, z: number) => this.onBuilding(x, z, 0.6, true, true) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5) || this.onPerimeterLine(x, z, 0.25);
+    const blocked = (x: number, z: number) => this.onBuilding(x, z, 0.6, true, true) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5) || this.onPerimeterLine(x, z, 0.25) || this._inPit(x, z, 0.4);
     // the home square, then each bought neighbor parcel (its own id range; the home square's ids never change)
     const plantAll = (density: number, block: (x: number, z: number) => boolean) => [
       ...planParcelTrees(this.parcel, { margin, density, blocked: block }),
@@ -773,6 +780,7 @@ export class HomesteadWorld {
       }
       const cd = Math.hypot(x - this.camp.x, z - this.camp.z);
       if (cd < 1.7) { density = Math.min(density, cd < 1.2 ? 0 : (cd - 1.2) / 0.5 * 0.6); worn = Math.max(worn, 0.5 * (1 - cd / 1.7)); }
+      if (this._pitCircles.length && this._inPit(x, z, 0.5)) density = 0;
       if (this.onAccess(x, z, 0.35)) density = 0;
       else if (this.onAccess(x, z, 0.8)) density = Math.min(density, 0.45);
       if (density > 0) {
@@ -1743,6 +1751,16 @@ export class HomesteadWorld {
     // a plan nobody has started is laid out in lime on the ground, so it reads from the air (the stakes alone don't)
     if (!below) group.add(planMark(def, opts.ground));
     this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000', opts, cover: def.level === 'cover', under, lod: below ? [] : this._lodLayers(group), far: false, fpPorch: r, fpBody: footprint(def, p.x, p.z, p.rot, false), wall });
+    // a dome's buried works (the skirt ring and the lines under it, sim/dome/dig.ts): drawn as the pit is worked, hidden under the earth once it is filled
+    if (def.level === 'cover') {
+      const tr = tierOfKind(p.kind);
+      if (tr) {
+        const bg = buildBuried(tr, cellsOfKind(p.kind) ?? def.cellsX);
+        bg.position.set(p.x, y, p.z); bg.rotation.y = p.rot * Math.PI / 2;
+        bg.visible = false; this._ws.scene.add(bg); this._buried.set(p.id, bg);
+        this._digKeys.delete(p.id);
+      }
+    }
     if (pad) this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1);
     if (below) this._syncUnderground();
     if (this._batchDepth > 0) this._plantDirty = true; else if (this._quality) this._plant(this._quality);
@@ -1773,6 +1791,12 @@ export class HomesteadWorld {
   /** The level pad under each graded dome (glass, arcology): what is built inside it is graded from this level. */
   /** The machinery, roof hatches and path lamps of each big dome (game/fx/DomePlant), in the world (not in the dome's group, which the building layers manage). */
   private readonly _domePlants = new Map<string, DomePlantFx>();
+  /** A dome's buried skirt and utilities, its open crater (while it is dug, or the moat of the Cutaway view) and the key each was drawn for. */
+  private readonly _buried = new Map<string, THREE.Group>();
+  private readonly _digSites = new Map<string, { site: DomeDigSite; group: THREE.Group }>();
+  private readonly _digKeys = new Map<string, string>();
+  private _pitCircles: Array<[number, number, number, number]> = [];
+  private _lastStructures: readonly Structure[] = [];
   private readonly _domeLevels = new Map<string, { x0: number; z0: number; x1: number; z1: number; y: number }>();
   private readonly _harden = new Map<string, { key: string; tiers: NonNullable<Structure['hardening']> }>();
 
@@ -2019,11 +2043,13 @@ export class HomesteadWorld {
       this._ws.scene.add(this._earth);
     } else if (this._earth) this._ws.scene.remove(this._earth);
     for (const b of this._built.values()) { b.key = ''; this._applyView(b); }
+    this._digKeys.clear(); if (this._lastStructures.length) this._syncDomeDigs(this._lastStructures);
     this._ws.invalidateShadows();
   }
   /** Height of the earth bed: just under the deepest bunker room or passage (a passage built after the view went on moves it down). */
   private _earthY(): number {
     const floors = [...this._built.values()].filter(b => b.under).map(b => b.under!.datum);
+    for (const [id, bg] of this._buried) { const b = this._built.get(id); if (b && bg.children.length) floors.push(b.group.position.y - new THREE.Box3().setFromObject(bg).getSize(new THREE.Vector3()).y); }
     for (const r of this._runs) if (r.kind === 'underground_passage' && r.pts.length > 1) floors.push(Math.min(...this._pathOf(r).map(p => p.floor)));
     return (floors.length ? Math.min(...floors) : this.groundAt(this.camp.x, this.camp.z) - DEPTH) - 0.08;
   }
@@ -2162,11 +2188,116 @@ export class HomesteadWorld {
     if (b.smoke) this._ws.scene.remove(b.smoke.points);
     this._built.delete(id);
     this._domeLevels.delete(id);
+    this._dropDig(id);
+    { const bg = this._buried.get(id); if (bg) { this._ws.scene.remove(bg); disposeSite(bg); this._buried.delete(id); } }
     { const pf = this._domePlants.get(id); if (pf) { this._root.remove(pf.group); pf.dispose(); this._domePlants.delete(id); } }
     this.walls.remove(id);
     this._harden.delete(id);
     if (b.under) this._syncUnderground();
     this._ws.invalidateShadows();
+  }
+
+
+  // ── a dome's ground works: the crater, the buried skirt and utilities, the moat and the section (sim/dome/dig.ts, buildkit/domeDig.ts) ──
+
+  private _dropDig(id: string): void {
+    const cur = this._digSites.get(id);
+    if (cur) { this._root.remove(cur.group); disposeSite(cur.group); this._digSites.delete(id); }
+    this._digKeys.delete(id);
+  }
+  /** The building view the moat of the Cutaway needs. */
+  private get _moatOn(): boolean { return !this._under && this._view === 'cutaway'; }
+
+  /**
+   * For each dome: the open crater while it is dug and backfilled (or the moat round a finished dome's skirt in the Cutaway view), the buried works as far as they
+   * are built, and the round hole in the ground over each. Rebuilt only when what is drawn changes (depth steps, the pour front, the crew, the view).
+   */
+  private _syncDomeDigs(list: readonly Structure[]): void {
+    const circles: Array<[number, number, number, number]> = [];
+    let changed = false;
+    for (const st of list) {
+      const b = this._built.get(st.id), bg = this._buried.get(st.id);
+      const tier = tierOfKind(st.kind);
+      if (!b || !bg || !tier) continue;
+      const cells = cellsOfKind(st.kind) ?? KIT[st.kind].cellsX, stages = blueprintOf(st).stages, done = st.stage >= stages.length;
+      const f = done ? 0 : st.done / stages[st.stage].hours;
+      const ds: DigState = digState(tier, done ? 5 : st.stage, f, st.supplied);
+      const moat = !ds.open && this._moatOn && done && !this._section;
+      const sensors = Math.min(24, Math.floor(this._sensors));
+      const q = (x: number): number => Math.round(x * 50);
+      const key = `${ds.open ? 'o' : moat ? 'm' : 'x'}:${q(ds.depthFt / Math.max(1, ds.fullFt))}:${q(ds.rebar)}:${q(ds.poured)}:${q(ds.utilities)}:${ds.phase}:${Object.values(ds.crew).map(Number).join('')}:${moat ? sensors : 0}`;
+      const open = ds.open || moat;
+      // the buried works show while the pit is open, in the Underground view, in the moat and in the Skirt section
+      const showB = ds.open || this._under || moat || this._section?.id === st.id;
+      showBuried(bg, ds, showB, done || this._under || moat || this._section?.id === st.id);
+      if (open) {
+        const gx = st.x, gz = st.z, y0 = b.group.position.y;
+        if (this._digKeys.get(st.id) !== key) {
+          this._digKeys.set(st.id, key); changed = true;
+          const old = this._digSites.get(st.id);
+          if (old) { this._root.remove(old.group); disposeSite(old.group); }
+          const ds2 = moat ? { ...ds, depthFt: ds.fullFt, phase: 'done' as const } : ds;
+          const site = buildDigSite({ tier, cells, state: ds2, ground: (lx, lz) => this.terrain.surfaceAt(gx + lx, gz + lz) - y0, seed: hashStr(st.id), mode: moat ? 'moat' : 'pit', rot: st.rot, sensors });
+          site.group.position.set(gx, y0, gz);
+          site.group.traverse(o => { const m = o as THREE.Mesh; if (m.isMesh) m.castShadow = m.userData.dig !== 'skin' && m.castShadow; });
+          this._root.add(site.group);
+          this._digSites.set(st.id, { site, group: site.group });
+        }
+        const cur = this._digSites.get(st.id)!;
+        circles.push([gx, gz, cur.site.hole.r, cur.site.hole.rIn]);
+      } else if (this._digSites.has(st.id)) { this._dropDig(st.id); changed = true; }
+    }
+    const ck = JSON.stringify(circles);
+    if (ck !== JSON.stringify(this._pitCircles) || changed) {
+      const grew = ck !== JSON.stringify(this._pitCircles);
+      this._pitCircles = circles;
+      this.terrain.setPits(circles);
+      // trees and ground cover keep out of the hole
+      if (grew) { this.cover.invalidate(); if (this._quality && this._batchDepth === 0) this._plant(this._quality); }
+      this._ws.invalidateShadows();
+    }
+  }
+  /** Ground sensors fitted (the stock): posts round the skirt in the Cutaway moat. Set from the game each sync. */
+  private _sensors = 0;
+  setSensors(n: number): void { if (n !== this._sensors) { this._sensors = n; for (const id of this._digKeys.keys()) { const k = this._digKeys.get(id)!; if (k.startsWith('m')) this._digKeys.delete(id); } if (this._lastStructures.length) this._syncDomeDigs(this._lastStructures); } }
+
+  // ── the Skirt section ──
+  private _section: { id: string; group: THREE.Group; plane: THREE.Plane; ax: number; az: number } | null = null;
+  private readonly _clipCache = new Map<THREE.Material, THREE.Material>();
+  get section(): string | null { return this._section?.id ?? null; }
+  /** Cut the ground and the dome open along a vertical plane through its center, facing the camera's side, to show the skirt in cross-section; null puts it back. */
+  setDomeSection(id: string | null): void {
+    const prev = this._section;
+    if (prev) { this._ws.scene.remove(prev.group); disposeSite(prev.group); this.terrain.clearCut(); }
+    this._section = null;
+    const b = id ? this._built.get(id) : undefined, st = id ? this._lastStructures.find(x => x.id === id) : undefined;
+    const tier = st ? tierOfKind(st.kind) : null;
+    if (id && b && st && tier) {
+      const cam = this._ws.camera.position, dx = cam.x - st.x, dz = cam.z - st.z;
+      // the face looks along the nearest axis toward the camera
+      const rot = Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? Math.PI / 2 : -Math.PI / 2) : (dz > 0 ? 0 : Math.PI);
+      const ax = Math.sin(rot), az = Math.cos(rot), y0 = b.group.position.y, gx = st.x, gz = st.z, cells = cellsOfKind(st.kind) ?? KIT[st.kind].cellsX;
+      const g = buildSection({ tier, cells, ground: (lx, lz) => { const wx = gx + lx * Math.cos(rot) + lz * Math.sin(rot), wz = gz - lx * Math.sin(rot) + lz * Math.cos(rot); return this.terrain.surfaceAt(wx, wz) - y0; }, sensors: Math.floor(this._sensors) });
+      g.position.set(gx, y0, gz); g.rotation.y = rot;
+      this._ws.scene.add(g);
+      const half = this._sectionHalf(tier, cells);
+      this.terrain.setCut(gx, gz, ax, az, half, SECTION_LEN);
+      const plane = new THREE.Plane(new THREE.Vector3(-ax, 0, -az), ax * gx + az * gz);
+      this._section = { id, group: g, plane, ax, az };
+      this._ws.renderer.localClippingEnabled = true;
+    }
+    this._digKeys.clear();
+    for (const bb of this._built.values()) { bb.key = ''; this._applyView(bb); }
+    if (this._lastStructures.length) this._syncDomeDigs(this._lastStructures);
+    this._ws.invalidateShadows();
+  }
+  private _sectionHalf(tier: DomeTier, cells: number): number { return pitShape(tier, cells).rTop + 0.6; }
+  /** A copy of a kit material that the section's plane clips (cached). */
+  private _clipped(m: THREE.Material, plane: THREE.Plane): THREE.Material {
+    let c = this._clipCache.get(m);
+    if (!c) { c = m.clone(); this._clipCache.set(m, c); }
+    c.clippingPlanes = [plane]; c.clipShadows = true; c.side = THREE.DoubleSide;
+    return c;
   }
 
   /** Show each structure at its construction stage (scaffold → frame → roof → siding). */
@@ -2196,11 +2327,14 @@ export class HomesteadWorld {
       }
       showStage(b.group, done ? 5 : st.stage, f, st.supplied);
       const mark = b.group.getObjectByName('planMark');
-      if (mark) mark.visible = st.stage === 0;
+      const dTier = b.cover ? tierOfKind(st.kind) : null;
+      if (mark) mark.visible = st.stage === 0 && (!dTier || digState(dTier, 0, f, st.supplied).phase === 'layout');
       if (done !== b.finished) { b.finished = done; if (b.light && !done) b.light.visible = false; this._ws.invalidateShadows(); }
       this._applyView(b);
     }
     this._syncPits(list);
+    this._lastStructures = list;
+    this._syncDomeDigs(list);
   }
 
   /**
@@ -2271,6 +2405,7 @@ export class HomesteadWorld {
     if (v === this._view) return;
     this._view = v;
     for (const b of this._built.values()) { b.key = ''; this._applyView(b); }
+    this._digKeys.clear(); if (this._lastStructures.length) this._syncDomeDigs(this._lastStructures);
     this._ws.invalidateShadows();
   }
 
@@ -2291,6 +2426,7 @@ export class HomesteadWorld {
       const floorSee = (v === 'cutaway' || v === 'xray') && b.finished && SEE_THROUGH_FLOOR.has(b.placed.kind) && m.name === 'bldg_deck_floorboards';
       const see = v === 'ghost' || (v === 'xray' && XRAY_LAYERS.includes(layer)) || floorSee;
       m.material = see ? xrayOf(ud.baseMat) : ud.baseMat;
+      if (this._section?.id === b.placed.id) m.material = this._clipped(m.material, this._section.plane);
       // (a foundation's banked earth and a dome's stem wall, berm and embankment hug the ground: no shadow pass cost)
       m.castShadow = !see && !['kit_glass', 'kit_string'].includes(ud.baseMat.name) && !ud.baseMat.name.startsWith('kit_glow') && !(layer === 'foundation' && (ud.baseMat.name === 'kit_earth' || b.cover)) && !(b.cover && layer === 'walls');
       if (layer === 'cutwalls') m.visible = v === 'cutaway' && b.finished;
