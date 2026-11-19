@@ -7,8 +7,10 @@ import { DOME_LINES, DOME_RAIDER_CTX, DOME_DEFENDER_CTX, DOME_VARIANT_KEYS } fro
 import { domeBeats, BEAT_CTX_USED } from './domeBeats';
 import { domesOf, PANELS } from './standing';
 import { addScars, visibleScars, SCAR_LIFE } from './scars';
-import { chooseHow } from '../breachMeans';
+import { blastOdds, ramOdds } from '../breachMeans';
+import { rate } from './domeOddsKit';
 import { SHELL_ODDS, AIRLOCK_DOOR, cutSeconds } from './siege';
+import { climbRateK } from '../perimeter';
 import type { BattleEvent } from '../battleTypes';
 import { dayIndex } from '../state';
 
@@ -95,14 +97,25 @@ describe('what a raid leaves on the shell, and the audit claims', () => {
     expect(visibleScars(g, dome).filter(s => s.kind === 'scorch').length).toBe(0);
     expect(dayIndex(g.clock.t)).toBeGreaterThan(0);
   });
-  it('the arcology is nearly, not literally, shut: a wall charge is 2 percent, the airlock door ram 3 percent, a saw never; one attempt a fight', () => {
-    expect(SHELL_ODDS.arcology.ram).toBe(0); expect(SHELL_ODDS.arcology.blast).toBeGreaterThan(0); expect(SHELL_ODDS.arcology.blast).toBeLessThan(0.04);
-    expect(chooseHow({ truck: true, satchels: 3 }, SHELL_ODDS.arcology.ram, SHELL_ODDS.arcology.blast)).toBe('charge');
-    expect(chooseHow({ truck: false, satchels: 0 }, 0, 0.02)).toBe('climb');
-    expect(cutSeconds('arcology', 40)).toBe(Infinity);
-    expect(AIRLOCK_DOOR.arcology.blast).toBeGreaterThan(0.04);   // the door is the soft spot, but a charge is aimed at the wall (owner decision: docs/design/dome_raids.md)
+  it('the arcology holds against raiders: no ram, satchel or tool opens a panel or an airlock door (PROPOSED ladder)', () => {
+    expect(SHELL_ODDS.arcology).toEqual({ ram: 0, blast: 0 }); expect(AIRLOCK_DOOR.arcology).toEqual({ ram: 0, blast: 0 });
+    for (const gate of [false, true]) { expect(ramOdds({ wallKind: 'shell_arcology', gate, difficulty: 'hardcore', bollards: false, gateBarrier: 0, vehicleBlocked: 0 })).toBe(0); expect(blastOdds({ wallKind: 'shell_arcology', gate, difficulty: 'hardcore', gateBarrier: 0, heavy: true })).toBe(0); }
+    expect(cutSeconds('arcology', 40)).toBe(Infinity); expect(climbRateK('shell_arcology')).toBe(0);
   });
-  it('glass and geodesic can be cut by a big crew with hand tools alone', () => {
-    expect(cutSeconds('glass', 16)).toBeLessThan(120); expect(cutSeconds('geodesic', 4)).toBeLessThan(60); expect(PANELS.glass).toBeGreaterThan(0);
+  it('hand tools: glass takes a long siege, the geodesic less, and a bigger crew is never slower', () => {
+    expect(cutSeconds('glass', 9)).toBeGreaterThan(cutSeconds('geodesic', 9));
+    for (const t of ['earthen', 'geodesic', 'glass'] as const) expect(cutSeconds(t, 16)).toBeLessThan(cutSeconds(t, 4));
+    expect(cutSeconds('glass', 16)).toBeGreaterThan(300); expect(PANELS.glass).toBeGreaterThan(0);
   });
+  it('the proposed ladder: arcology never, glass rarely (more for a heavy late crew), geodesic about a third, and a smaller crew is never better', () => {
+    const big = { truck: true, satchels: 2 }, none = { truck: false, satchels: 0 };
+    for (const n of [8, 12, 16]) expect(rate('arcology', n, big, 300, 24)).toBe(0);
+    expect(rate('glass', 8, { truck: true, satchels: 1 }, 60, 30)).toBeLessThanOrEqual(0.1);
+    const g8 = rate('glass', 8, big, 300, 30), g16 = rate('glass', 16, big, 300, 30);
+    expect(g8).toBeGreaterThan(0); expect(g16).toBeLessThanOrEqual(0.4); expect(g16).toBeGreaterThanOrEqual(g8);
+    const e = [8, 12, 16].map(n => rate('geodesic', n, big, 300, 30));
+    expect(e[0]).toBeLessThanOrEqual(e[1] + 0.05); expect(e[1]).toBeLessThanOrEqual(e[2] + 0.05);
+    expect((e[0] + e[1] + e[2]) / 3).toBeGreaterThan(0.2); expect((e[0] + e[1] + e[2]) / 3).toBeLessThan(0.55);
+    for (const t of ['geodesic', 'glass'] as const) expect(rate(t, 4, none, 60, 30)).toBeLessThanOrEqual(rate(t, 16, big, 300, 30));
+  }, 120000);
 });
