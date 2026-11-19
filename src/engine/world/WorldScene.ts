@@ -722,10 +722,10 @@ export class WorldScene {
     const wash = this._collapse.wash;
     if (wash > 0.001 && !this._collapse.night) {
       // runaway heat: the sky is washed to a pale, hot white-yellow (the tint alone keeps each part's brightness, which reads as a dull olive grey)
-      sky.zenith.lerp(tmp.setRGB(0.80, 0.78, 0.66), 0.6 * wash);
-      sky.horizonSun.lerp(tmp.setRGB(1.0, 0.95, 0.78), 0.65 * wash);
-      sky.horizonAnti.lerp(tmp.setRGB(0.96, 0.92, 0.78), 0.65 * wash);
-      sky.fog.lerp(tmp.setRGB(0.92, 0.88, 0.74), 0.65 * wash);
+      sky.zenith.lerp(tmp.setRGB(0.90, 0.84, 0.58), 0.7 * wash);
+      sky.horizonSun.lerp(tmp.setRGB(1.0, 0.93, 0.66), 0.75 * wash);
+      sky.horizonAnti.lerp(tmp.setRGB(0.98, 0.90, 0.64), 0.75 * wash);
+      sky.fog.lerp(tmp.setRGB(0.96, 0.88, 0.62), 0.75 * wash);
       sky.cloudLit.lerp(tmp.setRGB(1.0, 0.97, 0.88), 0.5 * wash);
     }
     if (!this._collapse.night) {

@@ -157,7 +157,7 @@ const PROFILES: Partial<Record<DisasterKind, Profile>> = {
   // heat: a washed, yellow-white sky, a pale big sun, a low haze band at the horizon and a bleached, flat light
   runaway_heat: { glow: [0.028, 0.02, 0.008], road: 0.4, flee: 0.5, fire: 0.2, smoke: 0.2, town: 0.6, townDays: 500, warn: 0.3, rise: 730, hold: 4000, fade: 400, floor: 0.7, cloud: 0.02, haze: 0.85, fog: 0.12, dim: 0.97, tint: [0.96, 0.92, 0.74], tintAmt: 0.5, cast: [1.1, 1.03, 0.88], sat: 0.7, contrast: -0.1 },
   // cold: a dim grey-blue sky, a low pale sun, ice fog, a cold blue horizon at night and a faint aurora
-  ice_age: { glow: [0.01, 0.022, 0.045], road: 0.3, flee: 0.7, town: 0.5, townDays: 400, aurora: 0.25, warn: 0.3, rise: 700, hold: 4000, fade: 400, floor: 0.7, cloud: 0.8, haze: 0.6, fog: 0.3, dim: 0.62, tint: [0.44, 0.54, 0.7], tintAmt: 0.65, cast: [0.9, 0.98, 1.1], sat: 0.55, contrast: 0.02 },
+  ice_age: { glow: [0.01, 0.022, 0.045], road: 0.3, flee: 0.7, town: 0.5, townDays: 400, aurora: 0.8, warn: 0.3, rise: 700, hold: 4000, fade: 400, floor: 0.7, cloud: 0.8, haze: 0.6, fog: 0.3, dim: 0.62, tint: [0.44, 0.54, 0.7], tintAmt: 0.65, cast: [0.9, 0.98, 1.1], sat: 0.55, contrast: 0.02 },
   unknown: { glow: [0.03, 0.012, 0.055], road: 0, town: 0.5, townDays: 3, warn: 0.4, rise: 1, hold: 30, fade: 90, floor: 0.1, haze: 0.5, tint: [0.5, 0.32, 0.72], tintAmt: 0.5, cast: [1, 0.95, 1.08], sat: 0.85 },
 };
 
