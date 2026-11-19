@@ -15,13 +15,13 @@ export const SHELF_TABS: ReadonlyArray<[ShelfTab, string]> = [
 ];
 
 /** The domed compound's kits (sim/dome/): ordered by the dome's stage bills; each is a contractor's kit with its erectors. */
-export const DOME_GOODS: MaterialId[] = ['dome_earthbag', 'dome_geodesic_kit', 'dome_glass_kit', 'dome_arcology_kit', 'dome_air_plant', 'dome_airlock', 'dome_fitout', 'concrete', 'rebar'];
+export const DOME_GOODS: MaterialId[] = ['dome_earthbag', 'dome_geodesic_kit', 'dome_glass_kit', 'dome_arcology_kit', 'dome_air_plant', 'dome_airlock', 'dome_fitout', 'dome_dig', 'dome_rock', 'dome_shoring', 'dome_dewater', 'dome_skirtwork', 'concrete', 'rebar'];
 
 export const SHELVES: Record<ShelfTab, MaterialId[]> = {
   enclosure: DOME_GOODS,
   build: ['lumber', 'fieldstone', 'concrete', 'roofing', 'hardware', 'wire', 'seedlings', 'greenhouse_kit', 'greenhouse_pro_kit', 'tunnel_kit_small', 'tunnel_kit_high', 'poly_film', 'aqua_kit', 'fruit_trees', 'modular_unit'],
   fencing: ['wire', 'hardware', 'lumber', 'seedlings', 'container', 'rebar', 'concrete', 'cable', 'roofing'],
-  bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'passage_hatch', 'lead_sheet', 'faraday_mesh'],
+  bunker: ['rebar', 'membrane', 'container', 'blast_door', 'blast_valve', 'nbc_filter', 'filter_set', 'culvert', 'egress_hatch', 'passage_hatch', 'lead_sheet', 'faraday_mesh', 'bunker_works'],
   water: ['water_jugs', 'ibc_tote', 'water_trailer', 'water_filter', 'ro_system', 'softener', 'greywater', 'hand_pump', 'pipe', 'fixtures', 'pump', 'drilling', 'tank', 'septic_tank'],
   power: ['solar_panel', 'battery', 'inverter', 'generator', 'cable', 'hydro_set', 'penstock', 'wind_turbine', 'tilt_tower'],
   food: ['seed', 'seed_heirloom', 'seed_cover', 'manure', 'lids', 'lids_reuse', 'canner', 'dehydrator', 'crocks', 'grain_mill', 'fishing_gear', 'snares', 'smoker', 'goat', 'cow', 'pig', 'sow', 'boar', 'steer', 'sheep', 'rabbit', 'hay', 'feed', 'vet_kit', 'cheese_kit', 'bee_nuc', 'hive_supplies', 'maple_taps', 'trout_fry', 'crayfish_stock', 'fish_feed', 'tilapia_fry', 'jon_boat', 'skiff'],
