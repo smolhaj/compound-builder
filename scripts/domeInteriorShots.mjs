@@ -22,7 +22,7 @@ try {
   await page.goto(`http://localhost:${port}/?seed=7&clean&lowrender=${PR}&region=${process.env.REGION ?? 'mountain_west'}&acres=20&relief=${process.env.RELIEF ?? 2}&lotseed=${process.env.LOTSEED ?? 8}`);
   await page.waitForFunction(() => window.__cb?.qa?.lowrender, null, { timeout: 300000 });
   const frames = async (n = 1) => { for (let i = 0; i < n; i++) await page.evaluate(() => window.__cb.qa.renderNow()); };
-  const shotRaw = async name => { await frames(3); await page.evaluate(() => { const cb = window.__cb, p = cb.qa.pose; if (p) cb.ws.camera.position.set(p.x, p.y, p.z); cb.world._updateLights(0.3); }); await frames(2); await page.evaluate(q => window.__cb.qa.renderFull(q), QUAL); await page.screenshot({ path: `${out}/${tier}-${name}.png` }); lap(name); };
+  const shotRaw = async name => { await frames(3); await page.evaluate(() => { const cb = window.__cb, p = cb.qa.pose; if (p) cb.ws.camera.position.set(p.x, p.y, p.z); cb.world._litNow = new Set(); cb.world._updateLights(0.3); }); await frames(2); await page.evaluate(q => window.__cb.qa.renderFull(q), QUAL); await page.screenshot({ path: `${out}/${tier}-${name}.png` }); lap(name); };
   const set = js => page.evaluate(js => new Function('cb', js)(window.__cb), js);
   const info = await page.evaluate(async ([tier, cells]) => {
     const cb = window.__cb, G = cb.game, c = cb.world.camp; G.getState().setSpeed(0);
