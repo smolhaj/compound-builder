@@ -39,7 +39,6 @@ const iceGame = (over: { region?: string; difficulty?: Difficulty; variant?: str
   g.clock.t = g.disaster.hitAt + 365 * (over.years ?? 0) * climateTune(g.disaster.difficulty).stretch;
   return g;
 };
-const doyOf = (g: GameState) => ((g.clock.startDoy - 1 + Math.floor(g.clock.t)) % 365) + 1;
 const SLOW = ['runaway_heat', 'ice_age'] as const;
 
 describe('the two kinds in the collapse clock', () => {
