@@ -14,8 +14,9 @@ try {
   for (const sc of [
     { name: 'heat-year3', kind: 'runaway_heat', variant: 'humid_furnace', region: 'hill_country', years: 3.6, doy: 196, hour: 15.2, tier: 'glass', cells: 15, damage: false },
     { name: 'ice-year3', kind: 'ice_age', variant: 'dimmed_sun', region: 'north_woods', years: 3, doy: 20, hour: 14, tier: 'glass', cells: 15, damage: false, dark: true },
+    { name: 'ice-year3-powered', kind: 'ice_age', variant: 'dimmed_sun', region: 'north_woods', years: 3, doy: 20, hour: 14, tier: 'glass', cells: 15, damage: false },
     { name: 'damaged-plant', kind: 'runaway_heat', variant: 'humid_furnace', region: 'hill_country', years: 3.6, doy: 196, hour: 15.2, tier: 'glass', cells: 15, damage: true },
-  ]) {
+  ].filter(sc => !process.env.ONLY || process.env.ONLY.split(',').includes(sc.name))) {
     const page = await browser.newPage({ viewport: { width: 1512, height: 940 } });
     page.setDefaultTimeout(900000);
     page.on('pageerror', e => console.error('pageerror:', e.message));
@@ -50,7 +51,7 @@ try {
     await page.evaluate(() => window.__cb.game.getState().focusHud({ right: 'utilities' })); await page.waitForTimeout(500);
     const chip = page.getByTestId('page-chip-dome'); if (await chip.count()) await chip.click();
     await page.mouse.move(700, 400); await page.waitForTimeout(500);
-    await page.evaluate(() => document.querySelector('[data-testid=dome-climate]')?.scrollIntoView({ block: 'start' })); await page.waitForTimeout(500);
+    await page.evaluate(() => { document.querySelector('[data-testid=dome-climate]')?.scrollIntoView({ block: 'start' }); let p = document.querySelector('[data-testid=dome-climate]')?.parentElement; while (p && p.scrollHeight <= p.clientHeight + 2) p = p.parentElement; if (p) p.scrollTop -= 70; }); await page.waitForTimeout(500);
     await page.evaluate(() => window.__cb.qa.renderNow());
     console.error(sc.name, await page.evaluate(() => document.querySelector('[data-testid=dome-climate]')?.innerText.slice(0, 700)));
     await page.screenshot({ path: `${out}/${sc.name}.png` });
