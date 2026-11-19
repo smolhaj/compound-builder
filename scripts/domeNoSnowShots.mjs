@@ -27,7 +27,7 @@ const quality = opt('--quality', 'medium');
 const port = Number(opt('--port', 5973));
 const climate = opt('--climate', 'cold');                 // (dome scene) heat | cold
 const domeTier = opt('--dome', 'glass');
-const doy = Number(opt('--doy', kind === 'ice' || climate === 'cold' ? 20 : 200));
+const doy = Number(opt('--doy', climate === 'cold' || climate === 'none' ? 20 : 200));
 const outDir = resolve(opt('--out', 'docs/ux/dome-no-snow'));
 const tag = opt('--tag', `${domeTier}-${climate}${two ? '-two' : ''}`);
 mkdirSync(outDir, { recursive: true });
@@ -83,28 +83,29 @@ try {
     const G = window.__cb.game, dk = k === 'ice' ? 'ice_age' : 'runaway_heat';
     G.setState(s => {
       const g = structuredClone(s.game);
-      if (g.disaster.kind !== dk) { g.disaster.mode = 'sandbox'; g.disaster.phase = 'peace'; triggerDisaster(g.disaster, 0, dk, g.seed, 14, dk === 'ice_age' ? 'dimmed_sun' : 'dry_furnace'); g.disaster.hitAt = 20; g.disaster.warnAt = 6; g.disaster.fate = 'full'; }
+      if (k !== 'none' && g.disaster.kind !== dk) { g.disaster.mode = 'sandbox'; g.disaster.phase = 'peace'; triggerDisaster(g.disaster, 0, dk, g.seed, 14, dk === 'ice_age' ? 'dimmed_sun' : 'dry_furnace'); g.disaster.hitAt = 20; g.disaster.warnAt = 6; g.disaster.fate = 'full'; }
       const t = g.disaster.hitAt + Math.floor(yrs * 365) + 0.25 + (hour - 12) / 24 + extra;
       g.clock.t = t; g.clock.startDoy = doy - Math.floor(t) % 365; g.clock.startDoy = ((g.clock.startDoy % 365) + 365) % 365 || 365;
       g.clock.speed = 0; g.gate.pending = null; g.gate.incoming = null;
-      g.disaster.phase = 'survival'; g.disaster.tracks = tracksAt(g.disaster, g.clock.t);
+      if (k !== 'none') { g.disaster.phase = 'survival'; g.disaster.tracks = tracksAt(g.disaster, g.clock.t); }
       // (the dome scene: the dome's last reading, since the clock is paused: cold and unheated, or scorching outside)
-      const [o, i] = k === 'ice' ? [-20, 68] : [118, 76];   // (outside, and inside a heated / cooled dome)
+      const [o, i] = k === 'ice' ? [-20, 68] : k === 'none' ? [18, 68] : [118, 76];   // (outside, and inside a heated / cooled dome)
       for (const dr of domesOf(g)) ownState(g, dr);   // (files a state for each dome so there is one to set)
       const list = domesOf(g);
       list.forEach((dr, idx) => {
         const d = ownState(g, dr), dark = (st === 'dark' && idx === 0) || (two && idx > 0);
-        d.outF = o; d.powered = !dark; d.indoorF = dark ? o + 4 : i;
+        d.outF = o; d.powered = !dark;   // ('breach': the plant runs but the shell has lost panels) d.indoorF = dark ? o + 4 : i;
         g.raidDamage = (g.raidDamage ?? []).filter(j => !(j.kind === 'panel' && j.structure === dr.st.id));
-        if (st === 'dark' && idx === 0) g.raidDamage.push({ id: 'qa' + idx, kind: 'panel', x: dr.st.x, z: dr.st.z + 1, structure: dr.st.id, day: 0, hours: 99, done: 0, supplied: true, bill: {}, panels: 90 });
+        if ((st === 'dark' || st === 'breach') && idx === 0) g.raidDamage.push({ id: 'qa' + idx, kind: 'panel', x: dr.st.x, z: dr.st.z + 1, structure: dr.st.id, day: 0, hours: 99, done: 0, supplied: true, bill: {}, panels: 90 });
       });
       return { game: g, resumeTo: null };
     });
-  }, [kind === 'dome' ? (climate === 'cold' ? 'ice' : 'heat') : kind, yrs, hour, doy, st, extra, two]);
+  }, [kind === 'dome' ? (climate === 'cold' ? 'ice' : climate === 'none' ? 'none' : 'heat') : kind, yrs, hour, doy, st, extra, two]);
   const view = (mode) => page.evaluate(([mode, sp, R]) => {
     const cb = window.__cb, gr = cb.world.groundAt;
     if (mode === 'sw') { const c = [sp[0], sp[1]]; cb.qa.pose = { x: c[0] - R * 1.5, y: gr(c[0], c[1]) + R * 1.15 + 1.2, z: c[1] + R * 1.6, lx: c[0], ly: gr(c[0], c[1]) + R * 0.25, lz: c[1], fov: 58 }; }
     else if (mode === 'inside') { const x = sp[0] - R * 0.15, z = sp[1] + R * 0.45; cb.qa.pose = { x, y: gr(x, z) + 0.34, z, lx: sp[0] - R * 0.2, ly: gr(x, z) + 0.45, lz: sp[1] - R * 0.9, fov: 70 }; }
+    else if (mode === 'ground') { const x = sp[0] - R * 0.1, z = sp[1] + R * 0.35; cb.qa.pose = { x, y: gr(x, z) + 0.12, z, lx: x - 0.4, ly: gr(x, z) + 0.02, lz: z - 1.2, fov: 62 }; }
     else if (mode === 'top') { cb.qa.pose = { x: sp[0] + 0.01, y: gr(sp[0], sp[1]) + R * 3.4, z: sp[1] + 0.8, lx: sp[0], ly: gr(sp[0], sp[1]), lz: sp[1], fov: 55 }; }
     else if (mode === 'eye') { const x = sp[0] + 2 + R, z = sp[1] + 7 + R; cb.qa.pose = { x, y: gr(x, z) + 0.34, z, lx: sp[0] - 1, ly: gr(sp[0], sp[1]) + 0.9, lz: sp[1] - 8, fov: 66 }; }
     else if (mode === 'sky') { const x = sp[0] + 2, z = sp[1] + 7; cb.qa.pose = { x, y: gr(x, z) + 0.5, z, lx: sp[0] + 14, ly: gr(x, z) + 3.3, lz: sp[1] - 10, fov: 80 }; }
@@ -119,7 +120,7 @@ try {
       await setYear(y, hour, 'ok', 0);
       // the protection is eased in game days: land on the protected value first (snap), then for a dark plant let `days` game days run with the plant dark and the shell breached
       await frames(14); await page.evaluate(() => window.__cb.domeInterior.snap()); await frames(14);
-      if (stName === 'dark') { await setYear(y, hour, 'dark', Number(stDays ?? 2)); await frames(14); }
+      if (stName === 'dark' || stName === 'breach') { await setYear(y, hour, stName, Number(stDays ?? 2)); await frames(14); }
       for (const mode of views) {
         await view(mode);
         const hn = Object.entries(HOURS).find(([, v]) => v === hour)?.[0] ?? `h${hour}`;
