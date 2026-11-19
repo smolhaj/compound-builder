@@ -40,7 +40,7 @@ describe('the link airlock', () => {
     const ang = (a: number, b: number) => { let x = Math.abs(a - b) % (Math.PI * 2); if (x > Math.PI) x = Math.PI * 2 - x; return x; };
     for (const p of person) expect(ang(links[0].angle, p.angle)).toBeGreaterThanOrEqual(LINK.MIN_AIRLOCK_GAP - 1e-9);
     const y = hasYard('glass') ? yardGeometry('glass', d.r, d.structure.rot) : null;
-    if (y) expect(ang(links[0].angle, y.phi)).toBeGreaterThanOrEqual(LINK.MIN_AIRLOCK_GAP - 1e-9);
+    if (y) expect(ang(links[0].angle, y.phi)).toBeGreaterThanOrEqual(y.W / 2 / d.r + 0.18 - 1e-9);
   });
   it('faces the partner dome when the way is free', () => {
     const g = two('geodesic', 'geodesic'); orderLink(g, 'dA', 'dB', 'tunnel');
@@ -54,7 +54,7 @@ describe('the link airlock', () => {
   });
   it('freeAngle keeps its distance from everything taken', () => {
     const g = two('glass', 'glass'); const d = domesOf(g)[0];
-    for (let k = 0; k < 40; k++) { const a = freeAngle(d, k * 0.157); for (const t of takenAngles(d)) { let x = Math.abs(a - t) % (Math.PI * 2); if (x > Math.PI) x = Math.PI * 2 - x; expect(x).toBeGreaterThanOrEqual(LINK.MIN_AIRLOCK_GAP - 1e-9); } }
+    for (let k = 0; k < 40; k++) { const a = freeAngle(d, k * 0.157); for (const t of takenAngles(d)) { let x = Math.abs(a - t.angle) % (Math.PI * 2); if (x > Math.PI) x = Math.PI * 2 - x; expect(x).toBeGreaterThanOrEqual(t.gap - 1e-9); } }
   });
 });
 const domeLinkOf = (g: GameState) => linksOf(g)[0];

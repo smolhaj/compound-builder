@@ -86,18 +86,18 @@ const centroid = (pts: readonly Pt[]): Pt => { let x = 0, z = 0; for (const p of
 const angleTo = (a: { x: number; z: number }, b: { x: number; z: number }): number => Math.atan2(b.x - a.x, b.z - a.z);
 const angDiff = (a: number, b: number): number => { let d = (a - b) % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return Math.abs(d); };
 
-/** The angles the dome's shell is already spoken for: person airlocks, the plant's service airlock, and other links. */
-export function takenAngles(d: Dome): number[] {
-  const out = d.airlocks.map(a => a.angle);
-  if (hasYard(d.tier)) { const y = yardGeometry(d.tier, d.r, d.structure.rot); if (y) out.push(y.phi); }
+/** The angles the dome's shell is already spoken for (person airlocks, the plant's service airlock with its yard, other links) and how far clear of each a link airlock must stand (radians). */
+export function takenAngles(d: Dome): Array<{ angle: number; gap: number }> {
+  const out: Array<{ angle: number; gap: number }> = d.airlocks.map(a => ({ angle: a.angle, gap: LINK.MIN_AIRLOCK_GAP }));
+  if (hasYard(d.tier)) { const y = yardGeometry(d.tier, d.r, d.structure.rot); if (y) out.push({ angle: y.phi, gap: y.W / 2 / d.r + 0.18 }); }
   return out;
 }
 
-/** A free angle on the shell as near as possible to `want`: never within MIN_AIRLOCK_GAP radians of a person airlock, the service airlock or another link's. */
+/** A free angle on the shell as near as possible to `want`: clear of every person airlock, of the service airlock and its yard, and of other links. */
 export function freeAngle(d: Dome, want: number): number {
-  const taken = takenAngles(d), ok = (a: number): boolean => taken.every(t => angDiff(a, t) >= LINK.MIN_AIRLOCK_GAP);
+  const taken = takenAngles(d), ok = (a: number): boolean => taken.every(t => angDiff(a, t.angle) >= t.gap);
   if (ok(want)) return want;
-  for (let k = 1; k <= 64; k++) for (const sgn of [1, -1]) { const a = want + sgn * k * 0.05; if (ok(a)) return a; }
+  for (let k = 1; k <= 120; k++) for (const sgn of [1, -1]) { const a = want + sgn * k * 0.05; if (ok(a)) return a; }
   return want;
 }
 
