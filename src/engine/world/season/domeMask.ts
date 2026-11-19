@@ -32,7 +32,16 @@ export interface DomeFootprint {
 /** The shared uniforms: footprints (x, z, r, k) then (x2, z2, y, edge); and (count, dormant look, 0, 0). */
 const BLOCK = new Float32Array(DOME_MAX * 8);
 const INFO = { x: 0, y: 0, z: 0, w: 0 };
-export const DOME_UNIFORMS = { uSeaDome: { value: BLOCK }, uSeaDomeI: { value: INFO } } as const;
+/** (1 / grade cast r, g, b, 1 / grade saturation): what the dome's surfaces pre-compensate so the frame's cold grade (ice age, ash) does not dull the lit inside. */
+const GRADE = { x: 1, y: 1, z: 1, w: 1 };
+export const DOME_UNIFORMS = { uSeaDome: { value: BLOCK }, uSeaDomeI: { value: INFO }, uSeaDomeC: { value: GRADE } } as const;
+
+/** The frame's grade (sim/collapseLook cast and saturation): written each frame; the inverse is clamped so a bad value never blows the interior out. */
+export function writeDomeGrade(cast: readonly number[], sat: number): void {
+  const inv = (v: number | undefined, lo: number, hi: number): number => (typeof v === 'number' && Number.isFinite(v) && v > 0.05 ? Math.max(lo, Math.min(hi, 1 / v)) : 1);
+  GRADE.x = inv(cast[0], 0.6, 1.6); GRADE.y = inv(cast[1], 0.6, 1.6); GRADE.z = inv(cast[2], 0.6, 1.6); GRADE.w = inv(sat, 1, 2.2);
+}
+export function domeGradeNow(): { x: number; y: number; z: number; w: number } { return { ...GRADE }; }
 
 const fin = (x: number | undefined, d: number): number => (typeof x === 'number' && Number.isFinite(x) ? x : d);
 const clamp01 = (x: number): number => Math.max(0, Math.min(1, x));
@@ -79,6 +88,7 @@ export function domeMaskAt(x: number, y: number, z: number): number {
 export const DOME_DECL = /* glsl */`
 uniform vec4 uSeaDome[${DOME_MAX * 2}];
 uniform vec4 uSeaDomeI;
+uniform vec4 uSeaDomeC;
 float seaDomeK( vec3 p ) {
   float m = 0.0;
   int n = int( uSeaDomeI.x + 0.5 );

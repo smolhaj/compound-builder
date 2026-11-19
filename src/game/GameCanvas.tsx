@@ -29,7 +29,7 @@ import { domeOf, stateOf } from '../sim/dome/live';
 import { setShellClimate } from './fx/DomeShell';
 import { DomeInteriorLook } from './fx/DomeInteriorLook';
 import { breachOf } from '../sim/dome/interiorClimate';
-import { clearDomeMask } from '../engine/world/season/domeMask';
+import { clearDomeMask, writeDomeGrade } from '../engine/world/season/domeMask';
 import type { ClimateOverlay } from '../engine/world/season/seasonState';
 import { OasisState } from './atmosphere/OasisState';
 import { applyDust, dustStorm } from '../engine/world/weather/dustStorm';
@@ -676,6 +676,7 @@ export function GameCanvas() {
         wx.haze = Math.max(wx.haze ?? 0.4, look.haze);
         wx.snow = Math.max(wx.snow, 0.5 * look.ash);
       }
+      writeDomeGrade(look.cast, look.sat);   // (the dome's lit inside undoes the frame's cold grade: season/domeMask)
       ws.setCollapseLook({ dim: look.dim, tint: look.skyTint, amt: look.skyAmt, night: look.skyNight, cast: look.cast, sat: look.sat, contrast: look.contrast, sunScale: look.sunScale, sunLower: look.sunLower, wash: look.scorch, townGlow: look.townGlow, flicker: look.flicker, fireGlow: look.fireGlow, smoke: look.smoke, nightLift: look.nightLift, nightGlow: look.nightGlow,
         fog: look.fog, haze: look.haze, townLights: look.townLights, traffic: look.traffic, convoy: look.convoy, flashes: look.flashes, aurora: look.aurora, comet: look.comet, az: look.az });
       ws.cutsceneLift = player.active ? 1 : 0;
