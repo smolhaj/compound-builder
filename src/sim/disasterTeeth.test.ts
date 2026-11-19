@@ -45,6 +45,9 @@ const BASELINE: Record<DisasterKind, FxColumn[]> = {
   water_war: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'medical', 'media'],
   cult_takeover: ['economy', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'media'],
   mass_exodus: ['economy', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'medical', 'media'],
+  // the slow climate kinds (docs/design/climate_disasters.md): every column
+  runaway_heat: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'buildings', 'medical', 'media'],
+  ice_age: ['economy', 'supplies', 'encounters', 'npcs', 'atmosphere', 'infrastructure', 'buildings', 'medical', 'media'],
 };
 
 describe('disaster teeth', () => {

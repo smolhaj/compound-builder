@@ -48,6 +48,8 @@ export const THEME: Record<FeltKind, Theme> = {
   water_war: { noun: 'the water war', frag: 'Ditch gates. Guns on the ditch. Don\'t go.' },
   cult_takeover: { noun: 'the Gathering', frag: 'They came to the door. Singing. Don\'t answer.' },
   mass_exodus: { noun: 'the evacuation', frag: 'Cars. Bumper to bumper. Everyone leaving.' },
+  runaway_heat: { noun: 'the heat', frag: 'Hundred and ten. Again. Nights won\'t cool.' },
+  ice_age: { noun: 'the cold', frag: 'Snow. Still. Sun\'s a smudge. Wood. Need wood.' },
 };
 
 export const dayN = (s: GameState): number => Math.max(0, Math.floor(s.clock.t - s.disaster.hitAt));

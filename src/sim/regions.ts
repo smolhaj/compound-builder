@@ -97,7 +97,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     timber: [0.3, 1.4], soil: { thin: 0.35, deep: 0.15 }, frost: [140, 263], zone: '4b–5b', cold: 1, rainMm: 400,
     snowCm: 140, julyHighF: 86, janLowF: 12,
     game: ['elk', 'deer', 'antelope', 'grouse', 'rabbit', 'trout'],
-    odds: { invasion: 1.5, civil_war: 1.5, wildfire: 2, drought: 1.5, ash_winter: 1.5, nuclear: 1.3, mega_quake: 1.6, dam_flood: 1.2, supervolcano: 2.5, crop_blight: 0.8, water_war: 2, reactor_meltdown: 0.3, oil_shock: 1.1, global_famine: 0.9, cult_takeover: 1.5, mass_exodus: 0.8 },
+    odds: { invasion: 1.5, civil_war: 1.5, wildfire: 2, drought: 1.5, ash_winter: 1.5, nuclear: 1.3, mega_quake: 1.6, dam_flood: 1.2, supervolcano: 2.5, crop_blight: 0.8, water_war: 2, reactor_meltdown: 0.3, oil_shock: 1.1, global_famine: 0.9, cult_takeover: 1.5, mass_exodus: 0.8, ice_age: 1.3 },
     // monsoon hail and dry lightning in July–August; spring snowmelt floods on the creek
     storms: { blizzard: 0.01, hail: 0.003, heat_wave: 0.003, flood: 0.0015 * 400 / 700, lightning_fire: 0.006 },
     houses: { farmhouse: 0.45, trailer: 0.35, timber_cabin: 0.13, log_house: 0.07 },
@@ -113,7 +113,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     timber: [1, 1.5], soil: { thin: 0.45, deep: 0.08 }, frost: [110, 293], zone: '6a–7a', cold: 0.6, rainMm: 1250,
     snowCm: 45, julyHighF: 85, janLowF: 25,
     game: ['deer', 'turkey', 'grouse', 'rabbit', 'trout', 'bass'],
-    odds: { civil_war: 1.2, grid_down: 1.4, financial: 1.2, pandemic: 1, wildfire: 0.6, drought: 0.6, mega_quake: 0.5, dam_flood: 2, supervolcano: 0.5, crop_blight: 1.1, livestock_plague: 0.9, water_war: 0.4, reactor_meltdown: 1.4, oil_shock: 1.1, cult_takeover: 1.6, mass_exodus: 1.2 },
+    odds: { civil_war: 1.2, grid_down: 1.4, financial: 1.2, pandemic: 1, wildfire: 0.6, drought: 0.6, mega_quake: 0.5, dam_flood: 2, supervolcano: 0.5, crop_blight: 1.1, livestock_plague: 0.9, water_war: 0.4, reactor_meltdown: 1.4, oil_shock: 1.1, cult_takeover: 1.6, mass_exodus: 1.2, ice_age: 0.9 },
     // hollows flash-flood (spring rains, and the remnants of Gulf hurricanes in
     // Aug–Oct: Helene 2024); ice storms glaze the ridges most winters; fall woods fires
     storms: { hail: 0.001, heat_wave: 0.004, flood: 0.0027, hurricane_remnants: 0.004, ice_storm: 0.003, tornado: 0.0004, lightning_fire: 0.001 },
@@ -130,7 +130,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     timber: [0.05, 0.4], soil: { thin: 0.6, deep: 0.05 }, frost: [110, 296], zone: '7a–8a', cold: 0.6, rainMm: 280,
     snowCm: 25, julyHighF: 92, janLowF: 20,
     game: ['javelina', 'deer', 'rabbit', 'antelope'],
-    odds: { invasion: 3, drought: 2.5, wildfire: 1.3, grid_down: 1.2, pandemic: 0.8, mega_quake: 0.8, dam_flood: 0.3, supervolcano: 0.6, crop_blight: 0.6, livestock_plague: 0.7, water_war: 3, reactor_meltdown: 0.6, oil_shock: 1.2, global_famine: 1.3, cult_takeover: 1.4, emp: 0.8 },
+    odds: { invasion: 3, drought: 2.5, wildfire: 1.3, grid_down: 1.2, pandemic: 0.8, mega_quake: 0.8, dam_flood: 0.3, supervolcano: 0.6, crop_blight: 0.6, livestock_plague: 0.7, water_war: 3, reactor_meltdown: 0.6, oil_shock: 1.2, global_famine: 1.3, cult_takeover: 1.4, emp: 0.8, runaway_heat: 2.0, ice_age: 0.5 },
     // July–September monsoon: flash floods down the washes, dry lightning, hail; June heat
     storms: { hail: 0.001, heat_wave: 0.008, flash_flood: 0.004, lightning_fire: 0.0039 },
     // manufactured homes on most improved desert parcels
@@ -146,7 +146,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     timber: [1.2, 1.6], soil: { thin: 0.5, deep: 0.1 }, frost: [152, 253], zone: '3b–4a', cold: 1.3, rainMm: 850,
     snowCm: 220, julyHighF: 77, janLowF: -6,
     game: ['moose', 'deer', 'grouse', 'rabbit', 'waterfowl', 'trout', 'panfish'],
-    odds: { invasion: 3, grid_down: 1.3, pandemic: 1, wildfire: 0.7, drought: 0.5, mega_quake: 0.15, dam_flood: 0.8, supervolcano: 0.5, livestock_plague: 0.8, water_war: 0.3, reactor_meltdown: 0.9, oil_shock: 1.2, global_famine: 0.9, cult_takeover: 1.2, mass_exodus: 0.5 },
+    odds: { invasion: 3, grid_down: 1.3, pandemic: 1, wildfire: 0.7, drought: 0.5, mega_quake: 0.15, dam_flood: 0.8, supervolcano: 0.5, livestock_plague: 0.8, water_war: 0.3, reactor_meltdown: 0.9, oil_shock: 1.2, global_famine: 0.9, cult_takeover: 1.2, mass_exodus: 0.5, runaway_heat: 0.4, ice_age: 2.0 },
     // Alberta clippers and lake-effect snow; the 1999 Boundary Waters derecho; a rare ice storm
     storms: { blizzard: 0.014, ice_storm: 0.001, derecho: 0.0008, hail: 0.001, heat_wave: 0.002, flood: 0.0021, lightning_fire: 0.001 },
     // hunting camps and log homes in the woods
@@ -161,7 +161,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     timber: [0.05, 0.4], soil: { thin: 0.1, deep: 0.5 }, frost: [121, 278], zone: '5b–6a', cold: 0.95, rainMm: 650,
     snowCm: 60, julyHighF: 92, janLowF: 16,
     game: ['deer', 'antelope', 'turkey', 'rabbit', 'waterfowl', 'catfish'],
-    odds: { civil_war: 1.5, drought: 1.6, grid_down: 1.2, financial: 1, wildfire: 0.8, mega_quake: 0.9, dam_flood: 1, supervolcano: 1.2, crop_blight: 1.8, livestock_plague: 1.6, water_war: 1.8, reactor_meltdown: 0.8, oil_shock: 1.2, global_famine: 1.5, cult_takeover: 1.2 },
+    odds: { civil_war: 1.5, drought: 1.6, grid_down: 1.2, financial: 1, wildfire: 0.8, mega_quake: 0.9, dam_flood: 1, supervolcano: 1.2, crop_blight: 1.8, livestock_plague: 1.6, water_war: 1.8, reactor_meltdown: 0.8, oil_shock: 1.2, global_famine: 1.5, cult_takeover: 1.2, runaway_heat: 1.5 },
     // Tornado Alley; the hail capital of the US; blizzards on the open grass; wind-driven grass fires
     storms: { blizzard: 0.011, tornado: 0.0018, derecho: 0.0012, hail: 0.006, heat_wave: 0.008, flood: 0.0014, ice_storm: 0.002, lightning_fire: 0.001 },
     houses: { farmhouse: 0.6, trailer: 0.3, timber_cabin: 0.06, log_house: 0.04 },
@@ -175,7 +175,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     timber: [1.2, 1.6], soil: { thin: 0.2, deep: 0.3 }, frost: [105, 298], zone: '8a–8b', cold: 0.6, rainMm: 1500,
     snowCm: 20, julyHighF: 80, janLowF: 34,
     game: ['elk', 'deer', 'grouse', 'rabbit', 'salmon', 'trout'],
-    odds: { invasion: 3, civil_war: 1.5, wildfire: 1.4, ash_winter: 1.2, grid_down: 1.1, drought: 0.6, mega_quake: 3, dam_flood: 1.2, supervolcano: 0.5, livestock_plague: 1.2, water_war: 0.8, reactor_meltdown: 0.7, oil_shock: 1.6, global_famine: 0.8, cult_takeover: 1.8, mass_exodus: 1.4, emp: 0.8 },
+    odds: { invasion: 3, civil_war: 1.5, wildfire: 1.4, ash_winter: 1.2, grid_down: 1.1, drought: 0.6, mega_quake: 3, dam_flood: 1.2, supervolcano: 0.5, livestock_plague: 1.2, water_war: 0.8, reactor_meltdown: 0.7, oil_shock: 1.6, global_famine: 0.8, cult_takeover: 1.8, mass_exodus: 1.4, emp: 0.8, runaway_heat: 0.5, ice_age: 0.8 },
     // atmospheric-river floods and windstorms Nov–Feb (Columbus Day 1962, Hanukkah Eve 2006);
     // east-wind fires in a dry September (Labor Day 2020); the 2021 heat dome
     storms: { flood: 0.003, windstorm: 0.002, ice_storm: 0.0015, heat_wave: 0.002, lightning_fire: 0.0015, hail: 0.0005 },
@@ -190,7 +190,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     timber: [0.5, 1.2], soil: { thin: 0.15, deep: 0.35 }, frost: [135, 273], zone: '4b–5a', cold: 1.1, rainMm: 850,
     snowCm: 130, julyHighF: 80, janLowF: 5,
     game: ['deer', 'turkey', 'grouse', 'rabbit', 'waterfowl', 'bass', 'panfish'],
-    odds: { invasion: 2, grid_down: 1.3, financial: 1.1, drought: 0.8, wildfire: 0.6, mega_quake: 0.8, dam_flood: 1, supervolcano: 0.8, crop_blight: 1.4, livestock_plague: 1.5, water_war: 0.2, reactor_meltdown: 1.2, oil_shock: 1.1, cult_takeover: 0.9, mass_exodus: 2 },
+    odds: { invasion: 2, grid_down: 1.3, financial: 1.1, drought: 0.8, wildfire: 0.6, mega_quake: 0.8, dam_flood: 1, supervolcano: 0.8, crop_blight: 1.4, livestock_plague: 1.5, water_war: 0.2, reactor_meltdown: 1.2, oil_shock: 1.1, cult_takeover: 0.9, mass_exodus: 2, runaway_heat: 0.8, ice_age: 1.6 },
     // lake-effect snow and clippers; summer derechos and tornadoes; spring flooding
     storms: { blizzard: 0.0125, tornado: 0.0012, derecho: 0.0008, hail: 0.004, heat_wave: 0.003, flood: 0.0018, ice_storm: 0.002 },
     houses: { farmhouse: 0.6, trailer: 0.25, timber_cabin: 0.08, log_house: 0.07 },
@@ -207,7 +207,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     timber: [0.9, 1.5], soil: { thin: 0.55, deep: 0.05 }, frost: [140, 265], zone: '4b–5a', cold: 1.1, rainMm: 1100,
     snowCm: 220, julyHighF: 80, janLowF: 6,
     game: ['deer', 'moose', 'turkey', 'grouse', 'rabbit', 'trout', 'bass'],
-    odds: { invasion: 3, grid_down: 1.3, financial: 1, wildfire: 0.4, drought: 0.6, mega_quake: 0.3, dam_flood: 1.3, supervolcano: 0.5, crop_blight: 1.3, livestock_plague: 0.9, water_war: 0.3, reactor_meltdown: 1.2, oil_shock: 1.6, global_famine: 0.9, cult_takeover: 0.7, mass_exodus: 1.5 },
+    odds: { invasion: 3, grid_down: 1.3, financial: 1, wildfire: 0.4, drought: 0.6, mega_quake: 0.3, dam_flood: 1.3, supervolcano: 0.5, crop_blight: 1.3, livestock_plague: 0.9, water_war: 0.3, reactor_meltdown: 1.2, oil_shock: 1.6, global_famine: 0.9, cult_takeover: 0.7, mass_exodus: 1.5, runaway_heat: 0.6, ice_age: 1.6 },
     // nor'easters; the 1998 ice storm; Irene (2011) flooding every valley in Vermont; spring floods
     storms: { blizzard: 0.012, ice_storm: 0.002, hurricane_remnants: 0.002, flood: 0.0025, hail: 0.001, heat_wave: 0.002 },
     // old capes and connected farmhouses; camps in the woods
@@ -224,7 +224,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     timber: [0.7, 1.4], soil: { thin: 0.6, deep: 0.05 }, frost: [102, 298], zone: '6b–7a', cold: 0.6, rainMm: 1150,
     snowCm: 30, julyHighF: 90, janLowF: 24,
     game: ['deer', 'turkey', 'rabbit', 'trout', 'bass', 'catfish'],
-    odds: { financial: 1.2, grid_down: 1.2, drought: 0.9, wildfire: 0.8, mega_quake: 1.4, dam_flood: 1.5, supervolcano: 0.5, livestock_plague: 1.4, water_war: 0.5, reactor_meltdown: 0.9, cult_takeover: 1.3, mass_exodus: 1.3 },
+    odds: { financial: 1.2, grid_down: 1.2, drought: 0.9, wildfire: 0.8, mega_quake: 1.4, dam_flood: 1.5, supervolcano: 0.5, livestock_plague: 1.4, water_war: 0.5, reactor_meltdown: 0.9, cult_takeover: 1.3, mass_exodus: 1.3, runaway_heat: 1.5, ice_age: 0.5 },
     // the 2009 ice storm; Joplin (2011) and spring tornadoes; flash floods down the hollows; hail and summer heat
     storms: { ice_storm: 0.003, tornado: 0.0012, derecho: 0.0006, flood: 0.003, hail: 0.003, heat_wave: 0.005, lightning_fire: 0.0008 },
     houses: { farmhouse: 0.35, trailer: 0.45, timber_cabin: 0.1, log_house: 0.1 },
@@ -240,7 +240,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     timber: [0.4, 1.1], soil: { thin: 0.7, deep: 0.05 }, frost: [84, 322], zone: '8a', cold: 0.3, rainMm: 800,
     snowCm: 3, julyHighF: 94, janLowF: 35,
     game: ['deer', 'turkey', 'javelina', 'rabbit', 'bass', 'catfish'],
-    odds: { invasion: 3, drought: 2, grid_down: 1.4, wildfire: 1.3, financial: 1, mega_quake: 0.15, dam_flood: 1.5, supervolcano: 0.5, crop_blight: 0.9, livestock_plague: 1.3, water_war: 2.2, reactor_meltdown: 0.8, oil_shock: 0.8, global_famine: 1.1, cult_takeover: 1.4, mass_exodus: 1.4 },
+    odds: { invasion: 3, drought: 2, grid_down: 1.4, wildfire: 1.3, financial: 1, mega_quake: 0.15, dam_flood: 1.5, supervolcano: 0.5, crop_blight: 0.9, livestock_plague: 1.3, water_war: 2.2, reactor_meltdown: 0.8, oil_shock: 0.8, global_famine: 1.1, cult_takeover: 1.4, mass_exodus: 1.4, runaway_heat: 1.8, ice_age: 0.4 },
     // "Flash Flood Alley" (the Guadalupe, July 2025); hail; 100 °F summers; cedar fires; Winter Storm Uri (Feb 2021)
     storms: { flash_flood: 0.004, hail: 0.003, heat_wave: 0.009, lightning_fire: 0.002, ice_storm: 0.0008, tornado: 0.0005 },
     // limestone ranch houses, manufactured homes on the smaller tracts
@@ -257,7 +257,7 @@ export const REGIONS: Record<RegionId, RegionDef> = {
     timber: [0.4, 1.1], soil: { thin: 0.25, deep: 0.2 }, frost: [125, 283], zone: '6a', cold: 0.85, rainMm: 950,
     snowCm: 140, julyHighF: 82, janLowF: 18,
     game: ['deer', 'turkey', 'rabbit', 'grouse', 'waterfowl', 'bass', 'panfish'],
-    odds: { bioweapon: 1.5, invasion: 1.5, financial: 1.4, grid_down: 1.2, lawless: 1.2, pandemic: 1.1, drought: 0.7, wildfire: 0.3, mega_quake: 0.3, dam_flood: 1.6, supervolcano: 0.5, livestock_plague: 0.8, water_war: 0.5, reactor_meltdown: 1.3, oil_shock: 1.5, global_famine: 1.4, cult_takeover: 1.5, mass_exodus: 1.8 },
+    odds: { bioweapon: 1.5, invasion: 1.5, financial: 1.4, grid_down: 1.2, lawless: 1.2, pandemic: 1.1, drought: 0.7, wildfire: 0.3, mega_quake: 0.3, dam_flood: 1.6, supervolcano: 0.5, livestock_plague: 0.8, water_war: 0.5, reactor_meltdown: 1.3, oil_shock: 1.5, global_famine: 1.4, cult_takeover: 1.5, mass_exodus: 1.8, runaway_heat: 0.9, ice_age: 1.4 },
     // lake-effect snow; the 2012 derecho; Ivan's remnants (2004); ice storms; spring floods
     storms: { blizzard: 0.008, ice_storm: 0.002, derecho: 0.0008, tornado: 0.0006, hail: 0.002, heat_wave: 0.003, flood: 0.002, hurricane_remnants: 0.001 },
     // old farmhouses and modular homes

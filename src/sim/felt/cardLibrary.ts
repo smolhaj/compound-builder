@@ -56,6 +56,7 @@ export const THEME: Record<FeltKind, Theme> = {
   drought: 'hunger', crop_blight: 'hunger', ash_winter: 'hunger', global_famine: 'hunger', water_war: 'hunger', asteroid: 'hunger',
   nuclear: 'fallout', reactor_meltdown: 'fallout',
   financial: 'money', oil_shock: 'money', mass_exodus: 'money',
+  runaway_heat: 'hunger', ice_age: 'hunger',
   unknown: 'unknown',
 };
 

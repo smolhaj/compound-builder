@@ -38,6 +38,8 @@ import { regionFor } from './climate';
 import { gallonsText } from './units';
 import { domeKwhDay, domeLoadPriority, domeWaterFlows } from './dome/live';
 import { tierOfKind } from './dome/tiers';
+import { coldBatteryK, dieselGelK, iceColdF } from './slowClimate';
+import { nightOf } from './housing';
 
 /** What utility buildings provide. */
 export interface UtilityDef {
@@ -420,7 +422,11 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     let l = groups.get(key); if (!l) groups.set(key, l = []); l.push(o);
   }
   // the battery's energy is one number for the place; split it among the banks by capacity so two banks never draw on the same charge
-  const capOf = (members: Node[]) => members.filter(o => !u.fried.includes(o.id)).reduce((a, o) => a + (UTILITY[o.kind]?.batteryKwh ?? 0), 0) * (1 - u.batteryFade);
+  // the long cold (an ice age, sim/slowClimate.ts): batteries give up about half their charge near zero, and untreated diesel gels in the generator's tank
+  const iceCold = s.disaster.kind === 'ice_age' ? iceColdF(s) : 0;
+  const coldBat = iceCold > 0 ? coldBatteryK(iceCold) : 1;
+  const gelK = iceCold > 0 ? dieselGelK(nightOf(s, undefined, true).lowF, (s.stock.stabilizer ?? 0) >= 1) : 1;
+  const capOf = (members: Node[]) => members.filter(o => !u.fried.includes(o.id)).reduce((a, o) => a + (UTILITY[o.kind]?.batteryKwh ?? 0), 0) * (1 - u.batteryFade) * coldBat;
   let capAll = 0;
   for (const members of groups.values()) capAll += capOf(members);
   const bat0 = u.batteryKwh;
@@ -429,8 +435,8 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
     if (typeof key === 'string' && !gridUp) continue;
     const loads = members.filter(o => loadOf(o) > 0).sort((a, b) => (domeLoadPriority(s, a.kind, a.id) ?? LOAD_PRIORITY[a.kind] ?? 2) - (domeLoadPriority(s, b.kind, b.id) ?? LOAD_PRIORITY[b.kind] ?? 2));
     const d = loads.reduce((a, o) => a + loadOf(o), 0);
-    const cap = members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.batteryKwh ?? 0), 0) * (1 - u.batteryFade);
-    const genKw = members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.genKw ?? 0), 0);
+    const cap = members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.batteryKwh ?? 0), 0) * (1 - u.batteryFade) * coldBat;
+    const genKw = members.filter(live).reduce((a, o) => a + (UTILITY[o.kind]?.genKw ?? 0), 0) * gelK;
     // grid-tied solar shuts off in a blackout unless a battery (hybrid inverter) is on the network
     const solarOk = gridUp || cap > 0 || !u.grid;
     // each array's ground faces the sun a little more or less (sim/terrainFx.ts: south-facing slope up to +25 %, north-facing down to -25 %)
