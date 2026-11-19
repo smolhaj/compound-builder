@@ -16,9 +16,9 @@
  *    (heard late), a charge is one bang at the end. The noise raises the
  *    alarm if the watch had not called the raid already.
  *  - Under fire the crew works slower: each tower with eyes on the door
- *    (`overwatch`) costs them time, and each sally port (a sortie from the
+ *    (`overwatch`) costs them time, and each sally port (a counterattack from the
  *    flank) more. A door nobody can get through in `GIVE_UP` s sends them
- *    home. A stronger door tier, more eyes or a sortie always make the hold
+ *    home. A stronger door tier, more eyes or a counterattack always make the hold
  *    longer: a lot with strong defenses is never an easier raid.
  *  - A door that stands open (by day, with no warning) holds them only
  *    `DOOR_OPEN_DELAY` s (sim/terrainFx.ts).
@@ -40,7 +40,7 @@ export const DOOR = {
   TORCH: 2.2, TORCH_BLAST: 0.8, TORCH_SETUP: 10,
   /** Explosives: the work one grenade / one rocket does (steel / blast), and the seconds to place a charge. */
   GRENADE: { steel: 9, blast: 4 } as Record<DoorTier, number>, ROCKET: { steel: 26, blast: 12 } as Record<DoorTier, number>, PLACE: 5,
-  /** Extra time (a share of the job) for each tower with eyes on the door and each sally port (a sortie from the flank). */
+  /** Extra time (a share of the job) for each tower with eyes on the door and each sally port (a counterattack from the flank). */
   OVERWATCH: 0.12, OVERWATCH_MAX: 4, SORTIE: 0.25, SORTIE_MAX: 2,
   /** A crew that cannot get through in this many seconds goes home. */
   GIVE_UP: 150,

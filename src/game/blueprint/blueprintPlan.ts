@@ -160,7 +160,7 @@ export function blueprintPlan(s: GameState): BlueprintPlan {
       const p = along(r.pts, g.at);
       gates++;
       const checks = !g.sally && ringNo !== undefined && ((ringNo === 1 && vetting.includes('outer')) || (ringNo === rings.length && rings.length >= 2 && vetting.includes('inner')));
-      marks.push({ id: `${r.id}:g${i}`, cat: 'gate', x: p[0], z: p[1], label: g.sally ? 'Sally port' : g.garage ? 'Gate garage' : 'Gate', sub: g.sally ? `defenders sortie · ${lengthText(Math.round(SALLY.W * 6 * 10) / 10)}` : `${lengthText(g.w * 6)} wide${checks ? ' · visitors checked here' : ''}`, prio: PRIO.gate, lift: 1.1 });
+      marks.push({ id: `${r.id}:g${i}`, cat: 'gate', x: p[0], z: p[1], label: g.sally ? 'Sally port' : g.garage ? 'Gate garage' : 'Gate', sub: g.sally ? `defenders counterattack from here · ${lengthText(Math.round(SALLY.W * 6 * 10) / 10)}` : `${lengthText(g.w * 6)} wide${checks ? ' · visitors checked here' : ''}`, prio: PRIO.gate, lift: 1.1 });
     }
   }
 
