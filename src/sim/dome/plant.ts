@@ -405,7 +405,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
     line('chill', 0.1, yardPoint(yard, -0.14 * yard.W, yard.D / 2), yardPoint(yard, -0.14 * yard.W, -0.1), inner(-0.14 * yard.W));
     line('feeder', 0.14, inner(0.06 * yard.W), polar(r * 0.45, sp0));
     if (n > 1 && (hasWater || hasBank)) line('water', 0.1, polar(r - 0.9, spans[1]), polar(r * 0.45, spans[1]));
-    line('passage', 0.02, yard.portal.from, yard.portal.to);
+    line('passage', 0.1, yard.portal.from, yard.portal.to);
     void pu;
   }
 

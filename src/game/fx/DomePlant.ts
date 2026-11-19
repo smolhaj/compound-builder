@@ -21,7 +21,7 @@ export interface PlantLook { loop?: WaterLoop; spares?: readonly PlantKind[]; ro
 export const plantKey = (tier: DomeTier, r: number, filtering: Filtering, o: PlantLook = {}): string =>
   `${tier}:${r.toFixed(2)}:${filtering}:${o.loop ?? 'none'}:${(o.spares ?? []).join(',')}:${o.rot ?? 0}:${Object.entries(o.hurt ?? {}).filter(([, c]) => c !== 'ok').map(([k, c]) => k + c).sort().join(',')}:${o.dark ? 1 : 0}`;
 
-const LINE_COLOR: Record<PlantLine['kind'], number> = { power: 0xd9822b, chill: 0x4f9bd0, water: 0x2f7fb5, feeder: 0xe0a030, passage: 0x3fb8a8 };
+const LINE_COLOR: Record<PlantLine['kind'], number> = { power: 0xd9822b, chill: 0x4f9bd0, water: 0x2f7fb5, feeder: 0xe0a030, passage: 0x35e0c8 };
 const CHAR = 0x1c1a18;
 const tint = (hex: number, cond: PlantCond | undefined): number => {
   if (!cond || cond === 'ok') return hex;
@@ -102,7 +102,7 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
       const rad = ln.kind === 'passage' ? 0.14 : ln.kind === 'feeder' ? 0.035 : 0.025;
       const g = new THREE.CylinderGeometry(rad, rad, len, 8);
       g.rotateZ(Math.PI / 2); g.rotateY(Math.atan2(-(bz - az), bx - ax));
-      const mx = (ax + bx) / 2, mz = (az + bz) / 2; g.translate(mx, ground(mx, mz) - ln.depth + (ln.kind === 'passage' ? 0.16 : 0), mz);
+      const mx = (ax + bx) / 2, mz = (az + bz) / 2; g.translate(mx, ground(mx, mz) - ln.depth, mz);
       g.deleteAttribute('uv'); const ng = g.toNonIndexed(), col = new THREE.Color(LINE_COLOR[ln.kind]), arr = new Float32Array(ng.attributes.position.count * 3);
       for (let k = 0; k < ng.attributes.position.count; k++) { arr[k * 3] = col.r; arr[k * 3 + 1] = col.g; arr[k * 3 + 2] = col.b; }
       ng.setAttribute('color', new THREE.BufferAttribute(arr, 3)); pieces.push(ng); g.dispose();
