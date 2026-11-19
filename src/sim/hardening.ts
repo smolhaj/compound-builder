@@ -24,9 +24,9 @@ export interface HardenDef { id: HardenId; name: string; tiers: [TierDef, TierDe
 export const HARDEN: Record<HardenId, HardenDef> = {
   fallout: {
     id: 'fallout', name: 'Fallout shielding', tiers: [
-      { name: 'Basic', blurb: 'Extra earth over the roof, a shielded hatch (PF 40)', hours: 40, materials: { spoil: 20, concrete: 2 } },
-      { name: 'Shelter', blurb: 'Dense-concrete lining, a baffled entry (PF 1,000)', hours: 90, materials: { concrete: 8, rebar: 4 } },
-      { name: 'Military', blurb: 'Lead and steel lining (PF 10,000+)', hours: 120, materials: { lead_sheet: 10, rebar: 4, concrete: 4 } },
+      { name: 'Basic', blurb: 'Extra earth over the roof, a shielded hatch (PF 40)', hours: 40, materials: { spoil: 20, concrete: 2, bunker_works: 2 } },
+      { name: 'Shelter', blurb: 'Dense-concrete lining, a baffled entry (PF 1,000)', hours: 90, materials: { concrete: 8, rebar: 4, bunker_works: 8 } },
+      { name: 'Military', blurb: 'Lead and steel lining (PF 10,000+)', hours: 120, materials: { lead_sheet: 10, rebar: 4, concrete: 4, bunker_works: 4 } },
     ],
   },
   faraday: {
@@ -46,8 +46,8 @@ export const HARDEN: Record<HardenId, HardenDef> = {
   blast: {
     id: 'blast', name: 'Blast hardening', tiers: [
       { name: 'Blast doors', blurb: 'Blast doors on every opening (15 psi)', hours: 24, materials: { blast_door: 1, hardware: 1 } },
-      { name: 'Reinforced', blurb: 'Thicker roof slab, shock-mounted bunks and shelves, blast valves (50 psi)', hours: 160, materials: { rebar: 20, concrete: 24, hardware: 4, blast_valve: 2 } },
-      { name: 'Hardened shell', blurb: 'Heavily reinforced shell, a second blast door, more valves (100 psi)', hours: 300, materials: { rebar: 40, concrete: 40, blast_valve: 4, blast_door: 1 } },
+      { name: 'Reinforced', blurb: 'Thicker roof slab, shock-mounted bunks and shelves, blast valves (50 psi)', hours: 160, materials: { rebar: 20, concrete: 24, bunker_works: 24, hardware: 4, blast_valve: 2 } },
+      { name: 'Hardened shell', blurb: 'Heavily reinforced shell, a second blast door, more valves (100 psi)', hours: 300, materials: { rebar: 40, concrete: 40, bunker_works: 40, blast_valve: 4, blast_door: 1 } },
     ],
   },
 };

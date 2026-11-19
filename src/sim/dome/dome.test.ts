@@ -23,8 +23,8 @@ describe('tiers', () => {
   });
   it('wealth gates: the small two always open, glass is Founder money, arcology Magnate money', () => {
     expect(wealthGate('earthen', 0)).toBeNull(); expect(wealthGate('geodesic', 0)).toBeNull();
-    expect(wealthGate('glass', 4_999_999)).toMatch(/Founder/); expect(wealthGate('glass', 5_000_000)).toBeNull();
-    expect(wealthGate('arcology', 59_000_000)).toMatch(/Magnate/); expect(wealthGate('arcology', 60_000_000)).toBeNull();
+    expect(wealthGate('glass', 14_999_999)).toMatch(/Founder/); expect(wealthGate('glass', 15_000_000)).toBeNull();
+    expect(wealthGate('arcology', 499_000_000)).toMatch(/Magnate/); expect(wealthGate('arcology', 500_000_000)).toBeNull();
   });
 });
 
@@ -48,9 +48,9 @@ describe('cost (docs/DOME_COMPOUND.md 4.1)', () => {
   const c = Object.fromEntries(DOME_TIERS.map(t => [t, domeCost(t)])) as Record<DomeTier, ReturnType<typeof domeCost>>;
   it('default totals sit in the design ranges', () => {
     expect(c.earthen.materialsUsd).toBeGreaterThan(8_000); expect(c.earthen.materialsUsd).toBeLessThan(30_000);
-    expect(c.geodesic.totalUsd).toBeGreaterThan(650_000); expect(c.geodesic.totalUsd).toBeLessThan(1_400_000);
-    expect(c.glass.totalUsd).toBeGreaterThan(5_000_000); expect(c.glass.totalUsd).toBeLessThan(11_000_000);
-    expect(c.arcology.totalUsd).toBeGreaterThan(60_000_000); expect(c.arcology.totalUsd).toBeLessThan(180_000_000);
+    expect(c.geodesic.totalUsd).toBeGreaterThan(1_000_000); expect(c.geodesic.totalUsd).toBeLessThan(2_600_000);   // 2026-11-19 pricing audit (docs/design/dome_pricing.md): the crater and a real airlock are in the bill
+    expect(c.glass.totalUsd).toBeGreaterThan(20_000_000); expect(c.glass.totalUsd).toBeLessThan(50_000_000);
+    expect(c.arcology.totalUsd).toBeGreaterThan(500_000_000); expect(c.arcology.totalUsd).toBeLessThan(2_000_000_000);
   });
   it('each tier costs more than the one below', () => {
     for (let i = 1; i < DOME_TIERS.length; i++) expect(c[DOME_TIERS[i]].totalUsd).toBeGreaterThan(c[DOME_TIERS[i - 1]].totalUsd);
