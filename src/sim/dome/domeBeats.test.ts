@@ -24,12 +24,12 @@ const say = (b: { events: BattleEvent[] }) => b.events.filter((e): e is Extract<
 describe('raids on a dome are staged (presentation only)', () => {
   it('every tier gets probes on the shell, voiced, in order, without changing the outcome', () => {
     for (const tier of ['geodesic', 'glass', 'arcology'] as const) {
-      let probes = 0, kinds = new Set<string>();
+      let probes = 0; const kinds = new Set<string>();
       for (let seed = 300; seed < 306; seed++) {
         resetRaidMemory();
         const { b, dome } = fight(tier, seed);
         const out = domeBeats(b, { dome, seed, temper: 'hard', dir: new LineDirector(seed) });
-        expect(out.result).toBe(b.result);
+        expect(out.events.filter(e => e.kind !== 'say' && e.kind !== 'move' && e.kind !== 'probe' && e.kind !== 'tool')).toEqual(b.events.filter(e => e.kind !== 'say' && e.kind !== 'move'));
         for (let i = 1; i < out.events.length; i++) expect(out.events[i].t).toBeGreaterThanOrEqual(out.events[i - 1].t);
         for (const e of out.events) if (e.kind === 'probe') {
           probes++; kinds.add(e.what);

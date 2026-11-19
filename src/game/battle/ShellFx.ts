@@ -16,7 +16,7 @@ const MAX = 64;
 type Probe = Extract<BattleEvent, { kind: 'probe' }>;
 
 let SOFT: THREE.CanvasTexture | null = null;
-const soft = (): THREE.CanvasTexture => {
+export const soft = (): THREE.CanvasTexture => {
   if (SOFT) return SOFT;
   const c = document.createElement('canvas'); c.width = c.height = 64;
   const g = c.getContext('2d')!, grd = g.createRadialGradient(32, 32, 2, 32, 32, 31);
