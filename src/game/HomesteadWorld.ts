@@ -175,6 +175,8 @@ import { makeVehiclePorts, type PortFixtures, type PortInput } from './fx/Vehicl
 import { planToPort, portFrameOf } from '../sim/dome/portRoad';
 import { insideLane, portCycleSeconds, vehicleTail } from '../sim/dome/vehiclePort';
 import { guardCount } from '../sim/guards';
+import { interiorPlan, type Obstacle } from './fx/domeInteriorPlan';
+import { plantLayout } from '../sim/dome/plant';
 import { makeLinkFixtures, linksKey, type LinkFixtureInput, type LinkFixtures } from './fx/DomeLinks';
 import { domeFrom, domesOf as standingDomes } from '../sim/dome/standing';
 import { linkState, linksOf } from '../sim/dome/linkGraph';
@@ -457,7 +459,8 @@ export class HomesteadWorld {
   updateAtmosphere(f: AtmosFrame, game: GameState, doy: number): void {
     this.atmos.update(f, game, doy);
     this._underfoot = { mud: this.atmos.mud, snow: f.snow, rain: f.rain };
-    this.lived.update(game, performance.now(), { night: f.night, lightsOut: lightsOutNow(game) });
+    this._blackout = lightsOutNow(game);
+    this.lived.update(game, performance.now(), { night: f.night, lightsOut: this._blackout });
     this._domeAir(game);
     this._syncLinks(game);
     this._syncPorts(game);
@@ -581,7 +584,8 @@ export class HomesteadWorld {
     if (!ref || !b.finished || !isGradedTier(ref.tier)) return;
     const dst = domeStateOf(game, ref), hurt: Record<string, 'ok' | 'damaged' | 'down'> = {};
     for (const u of plantUnitsOf(game, ref, dst)) if (u.cond !== 'ok') hurt[u.id] = u.cond;
-    const plook: PlantLook = { loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark: plantFxOf(game, ref, dst).power === 'dark' };
+    const dark = plantFxOf(game, ref, dst).power === 'dark', inter = this._interiorFor(b, game, ref, dst.filtering, dark);
+    const plook: PlantLook = { loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark, interior: inter.plan, interiorKey: inter.key };
     const key = plantKey(ref.tier, ref.r, dst.filtering, plook), cur = this._domePlants.get(b.placed.id);
     if (cur) cur.setView(this._view);
     if (!cur || cur.key !== key) {
@@ -592,6 +596,33 @@ export class HomesteadWorld {
       pf.group.position.set(gx, y0, gz);
       this._root.add(pf.group); this._domePlants.set(b.placed.id, pf);
     }
+  }
+
+  /** The floor dressing of a big dome (paths, benches, crates, signs, planters, lamps; game/fx/domeInteriorPlan) and its signature: it is laid out clear of the buildings inside, so it follows them. */
+  private _interiorFor(b: Built, game: GameState, ref: ReturnType<typeof domesLive>[number], filtering: Parameters<typeof plantLayout>[2], dark: boolean): { plan: ReturnType<typeof interiorPlan>; key: string } {
+    const obs: Obstacle[] = [], sig: string[] = [ref.tier, ref.r.toFixed(2), String(b.placed.rot), dark ? 'd' : 'l'];
+    for (const st of game.structures) {
+      if (st.id === ref.st.id) continue;
+      const lx = st.x - b.placed.x, lz = st.z - b.placed.z, def = KIT[st.kind];
+      if (!def || Math.hypot(lx, lz) > ref.r) continue;
+      { const odd = ((st.rot % 2) + 2) % 2 === 1, hx = (odd ? def.cellsZ : def.cellsX) * CELL / 2, hz = (odd ? def.cellsX : def.cellsZ) * CELL / 2; obs.push({ x: lx, z: lz, hx, hz, home: def.sleeps > 0 }); }
+      sig.push(`${st.id}@${Math.round(lx * 20)},${Math.round(lz * 20)}`);
+    }
+    const angles = (standingDomes(game).find(d => d.id === ref.st.id)?.airlocks ?? []).map(a => a.angle);
+    sig.push(angles.map(a => a.toFixed(2)).join('/'), filtering);
+    const key = sig.join('|'), hit = this._interiorCache.get(b.placed.id);
+    if (hit && hit.key === key) return hit;
+    for (const q of plantLayout(ref.tier, ref.r, filtering, { rot: b.placed.rot }).parts) {
+      if (q.onShell || Math.hypot(q.x, q.z) > ref.r * 0.97) continue;
+      const rr = q.shape === 'box' ? Math.hypot(q.w, q.d) / 2 : q.r;
+      if (rr > 0.06) obs.push({ x: q.x, z: q.z, hx: rr, hz: rr });
+    }
+    const plan = interiorPlan(ref.tier, ref.r, angles, obs, b.placed.rot + 1);
+    // the plant's equipment is lit at night: a pool of light round every unit (the yard and gallery read as a working place, not a dark plane)
+    for (const u of plantLayout(ref.tier, ref.r, filtering, { rot: b.placed.rot }).units) if (Math.hypot(u.x, u.z) < ref.r * 1.8) plan.glows.push({ x: u.x, z: u.z, r: 1.1 * Math.max(0.6, Math.min(1.5, ref.r / 6)) });
+    const made = { plan, key };
+    this._interiorCache.set(b.placed.id, made);
+    return made;
   }
 
   /** A gravel drive in to the yard (else a two-track, and the truck stops at the gate). */
@@ -1896,6 +1927,8 @@ export class HomesteadWorld {
     if (this._batchDepth === 0 && this._plantDirty) { this._plantDirty = false; if (this._quality) this._plant(this._quality); }
   }
   private _plantDirty = false;
+  /** Lights out (sim/blackout): the bunker lamps drop to a dim emergency glow. */
+  private _blackout = false;
   private readonly _naturalH = (x: number, z: number) => this.parcel.natural(x, z).h;
 
   /** A bunker room's doorways (its neighbors) and the ground above its surface point. */
@@ -1903,6 +1936,7 @@ export class HomesteadWorld {
   /** The level pad under each graded dome (glass, arcology): what is built inside it is graded from this level. */
   /** The machinery, roof hatches and path lamps of each big dome (game/fx/DomePlant), in the world (not in the dome's group, which the building layers manage). */
   private readonly _domePlants = new Map<string, DomePlantFx>();
+  private readonly _interiorCache = new Map<string, { plan: ReturnType<typeof interiorPlan>; key: string }>();
   /** A dome's buried skirt and utilities, its open crater (while it is dug, or the moat of the Cutaway view) and the key each was drawn for. */
   private readonly _buried = new Map<string, THREE.Group>();
   private readonly _digSites = new Map<string, { site: DomeDigSite; group: THREE.Group }>();
@@ -2324,6 +2358,7 @@ export class HomesteadWorld {
     this._domeLevels.delete(id);
     this._dropDig(id);
     { const bg = this._buried.get(id); if (bg) { this._ws.scene.remove(bg); disposeSite(bg); this._buried.delete(id); } }
+    this._interiorCache.delete(id);
     { const pf = this._domePlants.get(id); if (pf) { this._root.remove(pf.group); pf.dispose(); this._domePlants.delete(id); } }
     this.walls.remove(id);
     this._harden.delete(id);
@@ -2660,8 +2695,9 @@ export class HomesteadWorld {
         // scaled to the room: the same lamps light a small vestibule and a big bunkroom alike
         const def = KIT[b.placed.kind], area = def.cellsX * def.cellsZ / 4;
         // warm, low lamplight (incandescent-ish), not a bright work light
-        b.light.intensity = (this._under ? 0.25 : 0.48) * Math.min(1, 0.2 + 0.8 * area);
-        b.light.color.set(0xffd49e);
+        // (the tunnel is lined in dark boards on a low arch: it takes nearly twice the light to read as lit)
+        b.light.intensity = (this._blackout ? 0.05 : this._under ? 0.25 : 0.28) * Math.min(1, 0.2 + 0.8 * area) * (b.placed.kind === 'bunker_corridor' ? 2.9 : 1);
+        b.light.color.set(this._blackout ? 0xff8a5c : 0xffd49e);
         if (pick) this._noteLight(cands, b, above);
         continue;
       }
@@ -2690,8 +2726,10 @@ export class HomesteadWorld {
   /** One building's light as a candidate for the budget. A bunker room seen from above ground, or a house seen from the underground view, cannot be seen. */
   private _noteLight(cands: LightCandidate[], b: Built, above: boolean): void {
     const cam = this._ws.camera.position;
-    const weight = b.under ? (above && !this._under ? 0.03 : 1) : (this._under ? 0.15 : 1);
-    cands.push({ id: b.placed.id, intensity: b.light!.intensity, dist: Math.hypot(cam.x - b.group.position.x, cam.y - b.group.position.y, cam.z - b.group.position.z), was: this._litNow.has(b.placed.id), weight });
+    const dist = Math.hypot(cam.x - b.group.position.x, cam.y - b.group.position.y, cam.z - b.group.position.z);
+    // (the bunker room you stand in always keeps its lamp: the small rooms are dimmer and would lose the pick to a bright neighbor)
+    const weight = b.under ? (above && !this._under ? 0.03 : dist < 0.8 ? 4 : 1) : (this._under ? 0.15 : 1);
+    cands.push({ id: b.placed.id, intensity: b.light!.intensity, dist, was: this._litNow.has(b.placed.id), weight });
   }
 
   /** Vehicles: in their bays and the yard, and out the gate on a run. */
