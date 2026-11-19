@@ -7,6 +7,7 @@ import { MATERIALS, type MaterialId } from '../materials';
 import { CELL_FT, TIER, shellFt, type DomeTier } from './tiers';
 import { domeGeometry } from './geometry';
 import { yardBill } from './plantYard';
+import { earthwork, earthworkGoods, skirtCy, spanFactor, type Earthwork } from './pricing';
 /** The shop's crew wage and a crew's week (sim/crews.ts has the same two numbers; a test holds them equal: importing crews here would make a cycle through the blueprints). */
 export const CREW_RATE = 60, CREW_WEEK = 4 * 9 * 5;
 
@@ -37,6 +38,8 @@ export interface DomeCost {
   /** Skirt concrete (cu yd) and its depth (ft). */
   skirtYd: number;
   skirtFt: number;
+  /** The crater, rock, shoring, dewatering and skirt work, itemized (already inside `bill`, `materialsUsd` and `totalUsd`). */
+  earthwork: Earthwork;
 }
 
 const ceil = Math.ceil;
@@ -47,14 +50,15 @@ const sum = (...bs: Bill[]): Bill => { const o: Bill = {}; for (const b of bs) f
 export function domeCost(tier: DomeTier, cells: number = TIER[tier].cells, o: { skirtFt?: number; airlocks?: number } = {}): DomeCost {
   const t = TIER[tier], d = shellFt(tier, cells), g = domeGeometry(tier, d);
   const skirtFt = o.skirtFt ?? t.skirtFt, airlocks = o.airlocks ?? t.airlocks;
-  const shellN = ceil(g.surfaceSf / SHELL_UNIT[tier]);
+  // a wider shell needs a heavier frame (PROPOSED span factor, sim/dome/pricing.ts)
+  const shellN = ceil(g.surfaceSf / SHELL_UNIT[tier] * spanFactor(tier, cells));
   const frameN = ceil(shellN * 0.6), roofN = shellN - frameN;
-  const skirtYd = ceil(g.ringFt * skirtFt * t.skirtThickFt / 27);
-  const stemYd = ceil(g.ringFt * 2 * 2 / 27);
-  const concrete = skirtYd + stemYd;
+  const concrete = skirtCy(g.ringFt, skirtFt, t.skirtThickFt);
+  const work = earthwork(tier, cells, { skirtFt }), wg = earthworkGoods(work);
   const stages: DomeStages = {
-    site: {},
-    foundation: { concrete, rebar: ceil(concrete / 6) },
+    // the crater, rock, shoring and dewatering ride in the site stage; the skirt's concrete, steel and the crew that forms and pours it in the foundation (PROPOSED, sim/dome/pricing.ts)
+    site: { ...wg.site },
+    foundation: { concrete, rebar: ceil(concrete / 2.2), ...wg.foundation },
     frame: { [SHELL_GOOD[tier]]: frameN },
     roof: { [SHELL_GOOD[tier]]: roofN },
     // (the glass and arcology domes also get their hardened plant yard: wall, gate and the sleeves for the buried lines, sim/dome/plantYard.ts)
@@ -64,7 +68,7 @@ export function domeCost(tier: DomeTier, cells: number = TIER[tier].cells, o: { 
   const bill = sum(stages.site, stages.foundation, stages.frame, stages.roof, stages.finish);
   const hours = t.hours * (g.footprintSf / domeGeometry(tier, shellFt(tier, t.cells)).footprintSf) ** 0.9;
   const materialsUsd = billUsd(bill), laborUsd = Math.round(hours * CREW_RATE / 100) * 100;
-  return { tier, cells, diameterFt: d, stages, bill, materialsUsd, laborUsd, permitUsd: t.permitFee, totalUsd: materialsUsd + laborUsd + t.permitFee, hours: Math.round(hours), crewWeeks: Math.max(1, ceil(hours / CREW_WEEK)), skirtYd: concrete, skirtFt };
+  return { tier, cells, diameterFt: d, stages, bill, materialsUsd, laborUsd, permitUsd: t.permitFee, totalUsd: materialsUsd + laborUsd + t.permitFee, hours: Math.round(hours), crewWeeks: Math.max(1, ceil(hours / CREW_WEEK)), skirtYd: concrete, skirtFt, earthwork: work };
 }
 
 /** Weeks with `crews` crews on it: more crews cut the labor weeks but never the cure floor (the shell, the glazing set). */
