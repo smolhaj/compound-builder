@@ -33,7 +33,7 @@ export function shellSnowDay(s: GameState, d: Ref, st: DomeState, r: () => numbe
   if (s.disaster.kind !== 'ice_age') return [];
   const sn = shellSnowNow(s, d, st);
   if (!sn.breach || !(r() < breachChance(sn.ratio) * Math.min(1.4, Math.max(0.35, scale)))) return [];
-  const n = panelsLost(PANELS[d.tier], sn.ratio);
+  const n = Math.min(panelsLost(PANELS[d.tier], sn.ratio), PANELS[d.tier] - panelsDownOf(s, d.st.id));   // (never more panels down than the shell has)
   if (n <= 0) return [];
   const dome = domeFrom(d.st, panelsDownOf(s, d.st.id), s);
   if (!dome) return [];
