@@ -1,20 +1,29 @@
 /**
- * What a dome's vehicle sally port shows outside and in (sim/dome/vehiclePort.ts): the paved apron the access road ends at (with a center line and a stop bar), a row of
- * bollards across its mouth, a camera pole and a light pole beside the gate, a guard booth when guards are on staff, and inside the lane of pavement that runs from the inner
- * gate to a pad. The gates and the chamber are part of the dome's own group (buildkit/domeBuildings `airlock`). One merged vertex-colored mesh and one instanced set of lamp heads
- * for every port on the place. SCALE v2: 1 unit = 20 ft, a person 0.28, a door 0.37.
+ * What a dome's entrance complex shows outside and in (sim/dome/vehiclePort.ts): a smooth poured-concrete apron and inside lane with straight curbed edges (a planar ramp graded to the
+ * dome floor, skirted down to the ground, never a draped polygon), painted stripes, stop lines, a drain grate, bollards, a steel-clad gatehouse with a window and a hazard sign, an
+ * intercom and keypad post, a camera mast, floodlights, red and green state lamps over the gates, and a landing with a canopy, sign and bollards at every person airlock (the arcology's
+ * second entrance too). The gates and the sealed chamber are the dome's own geometry (buildkit/domeBuildings `airlock`). One merged vertex-colored mesh and two instanced lamp sets for every
+ * entrance on the place. SCALE v2: 1 unit = 20 ft, a person 0.28, a door 0.37, a truck about 0.75 long.
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { kitMaterial } from '../buildkit/materials';
 import { APRON_LEN, type InsideLane, type PortFrame } from '../../sim/dome/vehiclePort';
+import type { DomeTier } from '../../sim/dome/tiers';
 
-export interface PortInput { id: string; frame: PortFrame; lane: InsideLane | null; guarded: boolean }
+export interface PortInput {
+  id: string; tier: DomeTier; frame: PortFrame; lane: InsideLane | null; guarded: boolean;
+  /** Every person airlock of the dome: where its door stands (on the shell) and its axis angle (the main one beside the port, and the arcology's second). */
+  persons: Array<{ angle: number; x: number; z: number }>;
+  /** What the gates say: sealed (red), open (green: the outer gate stands open, the inner one shut). */
+  state: 'open' | 'sealed';
+}
 export interface PortFixtures { group: THREE.Group; key: string; dispose(): void }
 
-export const portsKey = (ins: readonly PortInput[]): string => ins.map(i => `${i.id}:${i.frame.angle.toFixed(3)}:${i.frame.cx.toFixed(2)},${i.frame.cz.toFixed(2)}:${i.frame.r.toFixed(2)}:${i.lane ? 1 : 0}:${i.guarded ? 1 : 0}`).join('|');
+export const portsKey = (ins: readonly PortInput[]): string => ins.map(i => `${i.id}:${i.tier}:${i.frame.angle.toFixed(3)}:${i.frame.cx.toFixed(2)},${i.frame.cz.toFixed(2)}:${i.frame.r.toFixed(2)}:${i.lane ? 1 : 0}:${i.guarded ? 1 : 0}:${i.persons.length}:${i.state}`).join('|');
 
-const ASPHALT = 0x54575b, CONCRETE = 0xb3afa3, PAINT = 0xe6e2d2, YELLOW = 0xe3b92a, STEEL = 0x8a929a, DARK = 0x2a2e33, BOOTH = 0xb9b49f;
+const POUR = 0xaeaca4, CURB = 0x8d8b84, PAINT = 0xeae7da, YELLOW = 0xe3b92a, STEEL = 0x8a929a, DARK = 0x262a2f, GLASS = 0x6fa5b8;
+const CLAD: Record<DomeTier, number> = { earthen: 0x7a6f5d, geodesic: 0x9aa3ab, glass: 0x56606a, arcology: 0x2a3037 };
+const ACCENT: Record<DomeTier, number> = { earthen: 0xffd070, geodesic: 0xffe9b0, glass: 0xdff3ff, arcology: 0x40e0ff };
 
 function paint(g: THREE.BufferGeometry, color: number): THREE.BufferGeometry {
   const ng = g.index ? g.toNonIndexed() : g; ng.deleteAttribute('uv');
@@ -30,71 +39,138 @@ function cyl(r: number, h: number, x: number, y: number, z: number, color: numbe
   const g = new THREE.CylinderGeometry(r, r, h, 8); g.translate(x, y, z); return paint(g, color);
 }
 
-/** A flat slab draped on the ground: `hl` along the axis `u` and `hw` across it, centered at (cx, cz), in cells of about 0.2 so it follows the hill. */
-function drape(cx: number, cz: number, u: [number, number], hl: number, hw: number, lift: number, ground: (x: number, z: number) => number, color: number): THREE.BufferGeometry {
-  const nl = Math.max(1, Math.ceil(hl * 2 / 0.2)), nw = Math.max(1, Math.ceil(hw * 2 / 0.2)), pos: number[] = [];
-  const P = (a: number, b: number): [number, number, number] => { const x = cx + u[0] * a + u[1] * b, z = cz + u[1] * a - u[0] * b; return [x, ground(x, z) + lift, z]; };
-  for (let i = 0; i < nl; i++) for (let j = 0; j < nw; j++) {
-    const a0 = -hl + 2 * hl * i / nl, a1 = -hl + 2 * hl * (i + 1) / nl, b0 = -hw + 2 * hw * j / nw, b1 = -hw + 2 * hw * (j + 1) / nw;
-    const A = P(a0, b0), B = P(a1, b0), C = P(a1, b1), D = P(a0, b1);
-    pos.push(...A, ...C, ...B, ...A, ...D, ...C);
-  }
-  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  const nrm = new Float32Array(pos.length); for (let i = 1; i < nrm.length; i += 3) nrm[i] = 1;   // (a slab faces up whichever way its triangles wind)
-  g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
-  return paint(g, color);
+/** Triangles from quads, flat normals computed from the winding the caller keeps facing up (and the double-sided material covers a wrong turn). */
+function tris(pos: number[], color: number): THREE.BufferGeometry {
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.computeVertexNormals(); return paint(g, color);
 }
 
-/** Lateral offset of the person airlock's axis from the port's, along the shell (units). */
-const lamOfPerson = (f: PortFrame): number => (f.person!.outer[0] - f.outer[0]) * f.u[1] - (f.person!.outer[1] - f.outer[1]) * f.u[0];
+type Fr = { cx: number; cz: number; u: [number, number] };
+const P = (f: Fr, rho: number, lam: number): [number, number] => [f.cx + f.u[0] * rho + f.u[1] * lam, f.cz + f.u[1] * rho - f.u[0] * lam];
+
+/**
+ * A straight-edged slab in the entrance's frame: `rho0..rho1` along the axis and `lam0..lam1` across it, its top a plane (`top(rho)`, linear in rho), skirted down to the ground (`floor`) on
+ * every side so no gap shows, however the land lies under it.
+ */
+function slab(f: Fr, rho0: number, rho1: number, lam0: number, lam1: number, top: (rho: number) => number, floor: (x: number, z: number) => number, color: number): THREE.BufferGeometry {
+  const pos: number[] = [], n = Math.max(1, Math.ceil((rho1 - rho0) / 0.3));
+  const V = (rho: number, lam: number, y: number): [number, number, number] => { const [x, z] = P(f, rho, lam); return [x, y, z]; };
+  const B = (rho: number, lam: number): number => { const [x, z] = P(f, rho, lam); return Math.min(floor(x, z) - 0.04, top(rho) - 0.03); };
+  const quad = (a: number[], b: number[], c: number[], d: number[]): void => { pos.push(...a, ...b, ...c, ...a, ...c, ...d); };
+  for (let i = 0; i < n; i++) {
+    const r0 = rho0 + (rho1 - rho0) * i / n, r1 = rho0 + (rho1 - rho0) * (i + 1) / n;
+    quad(V(r0, lam0, top(r0)), V(r1, lam0, top(r1)), V(r1, lam1, top(r1)), V(r0, lam1, top(r0)));                                   // the top
+    quad(V(r0, lam0, B(r0, lam0)), V(r1, lam0, B(r1, lam0)), V(r1, lam0, top(r1)), V(r0, lam0, top(r0)));                          // the sides
+    quad(V(r0, lam1, top(r0)), V(r1, lam1, top(r1)), V(r1, lam1, B(r1, lam1)), V(r0, lam1, B(r0, lam1)));
+  }
+  quad(V(rho0, lam0, B(rho0, lam0)), V(rho0, lam0, top(rho0)), V(rho0, lam1, top(rho0)), V(rho0, lam1, B(rho0, lam1)));              // the ends
+  quad(V(rho1, lam1, B(rho1, lam1)), V(rho1, lam1, top(rho1)), V(rho1, lam0, top(rho1)), V(rho1, lam0, B(rho1, lam0)));
+  return tris(pos, color);
+}
+/** Paint on a slab: a flat quad just above its top. */
+function mark(f: Fr, rho0: number, rho1: number, lam0: number, lam1: number, top: (rho: number) => number, color: number, lift = 0.004): THREE.BufferGeometry {
+  const pos: number[] = [], n = Math.max(1, Math.ceil((rho1 - rho0) / 0.3));
+  const V = (rho: number, lam: number): [number, number, number] => { const [x, z] = P(f, rho, lam); return [x, top(rho) + lift, z]; };
+  for (let i = 0; i < n; i++) {
+    const r0 = rho0 + (rho1 - rho0) * i / n, r1 = rho0 + (rho1 - rho0) * (i + 1) / n;
+    pos.push(...V(r0, lam0), ...V(r1, lam0), ...V(r1, lam1), ...V(r0, lam0), ...V(r1, lam1), ...V(r0, lam1));
+  }
+  return tris(pos, color);
+}
 
 export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, z: number) => number): PortFixtures {
   const group = new THREE.Group(); group.name = 'vehicle_ports';
-  const geos: THREE.BufferGeometry[] = [], lamps: Array<{ x: number; y: number; z: number }> = [];
-  for (const { frame: f, lane, guarded } of ins) {
-    const { u, v } = f, yaw = f.angle, at = (rho: number, lam: number): [number, number] => [f.cx + u[0] * rho + u[1] * lam, f.cz + u[1] * rho - u[0] * lam];
-    // the apron: a concrete slab from the shell out APRON_LEN, wider than the gate, with a yellow center line to the stop bar
-    const [ax, az] = f.apron.c;
-    geos.push(drape(ax, az, u, f.apron.hl + 0.1, f.apron.hw, 0.03, ground, CONCRETE));
-    geos.push(drape(...at(f.r + APRON_LEN / 2 + 0.05, 0), u, APRON_LEN / 2 - 0.05, 0.015, 0.04, ground, YELLOW));
-    geos.push(drape(...at(f.r + APRON_LEN - 0.3, 0), u, 0.02, v.dw / 2, 0.04, ground, PAINT));
-    // a flared throat where the road meets the apron: the road's own surface carries on, the slab just widens to the corners
-    // bollards: steel posts set in concrete across the mouth of the apron, a gap for the road
+  const geos: THREE.BufferGeometry[] = [];
+  const lamps: Array<{ x: number; y: number; z: number; w: number; h: number; d: number; yaw: number; color: number }> = [];
+  for (const { frame: f, lane, tier, persons, state } of ins) {
+    const { u, v } = f, yaw = f.angle, R = f.r, F: Fr = { cx: f.cx, cz: f.cz, u };
+    const clad = CLAD[tier], accent = ACCENT[tier];
+    const at = (rho: number, lam: number): [number, number] => P(F, rho, lam);
+    const lamOf = (pt: [number, number]): number => (pt[0] - f.cx) * u[1] - (pt[1] - f.cz) * u[0];
+    const offP = f.person ? lamOf(f.person.outer) : 0;
+    const pad = ground(...f.inner), yPad = pad + 0.012;
+    // ── the apron: a planar ramp from the sill (at the dome floor's level) out to the road's level, with curbs, stripes and a stop line ──
+    const lamA = -(v.dw / 2 + 0.45), lamB = Math.max(offP, 0) + (f.person ? 0.5 : v.dw / 2 + 0.45), E = at(R + APRON_LEN, 0);
+    const yE = Math.max(yPad - 0.08 * APRON_LEN, Math.min(yPad + 0.08 * APRON_LEN, ground(...E) + 0.02));
+    const topA = (rho: number): number => yPad + (yE - yPad) * Math.max(0, Math.min(1, (rho - R) / APRON_LEN));
+    geos.push(slab(F, R - 0.02, R + APRON_LEN, lamA, lamB, topA, ground, POUR));
+    for (const [l0, l1] of [[lamA, lamA + 0.035], [lamB - 0.035, lamB]] as const) geos.push(slab(F, R - 0.02, R + APRON_LEN, l0, l1, r => topA(r) + 0.022, ground, CURB));   // the straight curbs
+    geos.push(slab(F, R + APRON_LEN - 0.035, R + APRON_LEN, lamA, lamB, r => topA(r) + 0.012, ground, CURB));                                                                  // and the toe
+    geos.push(mark(F, R + 0.05, R + APRON_LEN - 0.12, -0.012, 0.012, topA, YELLOW));                                                    // the center line to the gate
+    geos.push(mark(F, R + 0.45, R + 0.5, -v.dw / 2, v.dw / 2, topA, PAINT));                                                           // the stop line before the gate
+    for (let k = 0; k < 5; k++) geos.push(mark(F, R + 0.12 + k * 0.1, R + 0.2 + k * 0.1, lamA + 0.05, lamA + 0.09, topA, YELLOW, 0.005));   // hazard chevrons along the curb
+    // ── bollards across the apron's mouth, clear of the lanes into the doors ──
     for (const [bx, bz] of f.bollards) {
-      const lam = (bx - f.cx) * u[1] - (bz - f.cz) * u[0];
-      if (Math.abs(lam) < v.dw * 0.5 + 0.05 || (f.person && Math.abs(lam - lamOfPerson(f)) < 0.42)) continue;   // (a gap for the port's door and for the person airlock's)
-      const y = ground(bx, bz);
-      geos.push(cyl(0.018, 0.12, bx, y + 0.06, bz, STEEL), cyl(0.02, 0.014, bx, y + 0.114, bz, YELLOW));
+      const lam = lamOf([bx, bz]);
+      if (Math.abs(lam) < v.dw * 0.5 + 0.05 || (f.person && Math.abs(lam - offP) < 0.42)) continue;
+      const y = topA(R + APRON_LEN - 0.12);
+      geos.push(cyl(0.02, 0.13, bx, y + 0.065, bz, STEEL), cyl(0.023, 0.03, bx, y + 0.1, bz, YELLOW));
     }
-    // the camera pole with its head angled at the gate, and the light pole opposite with a lamp
-    { const [x, z] = f.camera, y = ground(x, z); geos.push(cyl(0.01, 0.34, x, y + 0.17, z, DARK), box(0.07, 0.035, 0.05, x, y + 0.34, z, yaw, DARK), box(0.02, 0.02, 0.02, x, y + 0.34, z, yaw, STEEL)); }
-    { const [x, z] = f.light, y = ground(x, z); geos.push(cyl(0.011, 0.42, x, y + 0.21, z, STEEL), box(0.1, 0.014, 0.04, x, y + 0.425, z, yaw, DARK)); lamps.push({ x, y: y + 0.41, z }); }
-    // a guard booth beside the gate: a small glazed cabin a man can sit in (0.34 high: a door is 0.37, a sitting guard's head under the roof)
-    if (guarded) {
-      const [x, z] = f.booth, y = ground(x, z);
-      geos.push(box(0.2, 0.01, 0.2, x, y + 0.005, z, yaw, CONCRETE), box(0.17, 0.3, 0.17, x, y + 0.16, z, yaw, BOOTH), box(0.21, 0.02, 0.21, x, y + 0.325, z, yaw, DARK));
-      const [wx, wz] = [x - u[0] * 0.088 * -1, z - u[1] * 0.088 * -1]; geos.push(box(0.12, 0.1, 0.006, wx, y + 0.19, wz, yaw, 0x7fb4c4));
+    // ── the gatehouse: a steel-clad cabin with a window on the gate and a hazard sign, beside the apron ──
+    { const [gx, gz] = at(R + 0.62, lamA - 0.3), y = ground(gx, gz);
+      geos.push(box(0.3, 0.012, 0.26, gx, y + 0.006, gz, yaw, CURB), box(0.26, 0.32, 0.22, gx, y + 0.17, gz, yaw, clad), box(0.3, 0.02, 0.27, gx, y + 0.34, gz, yaw, DARK));   // slab, cabin, flat roof
+      const [wx, wz] = at(R + 0.62 - 0.115, lamA - 0.3 + 0.0); geos.push(box(0.17, 0.1, 0.012, wx, y + 0.21, wz, yaw, DARK), box(0.15, 0.08, 0.014, wx, y + 0.21, wz - u[1] * 0.0, yaw, GLASS));   // the window toward the gate
+      const [sx, sz] = at(R + 0.62 - 0.12, lamA - 0.3 + 0.1); geos.push(box(0.07, 0.07, 0.012, sx, y + 0.1, sz, yaw, YELLOW), box(0.014, 0.07, 0.014, sx, y + 0.1, sz, yaw, DARK));   // the hazard sign
+      const [dx, dz] = at(R + 0.62, lamA - 0.3 - 0.115); geos.push(box(0.012, 0.2, 0.09, dx, y + 0.12, dz, yaw, DARK));                                                                 // the door
+      geos.push(cyl(0.006, 0.12, gx + 0.05, y + 0.4, gz, DARK));                                                                                                                         // the antenna
+      lamps.push({ x: gx, y: y + 0.36, z: gz, w: 0.05, h: 0.02, d: 0.05, yaw, color: accent });
     }
-    // inside: the paved lane from the inner gate to the pad, so a truck never crosses the lawn
+    // ── the intercom and keypad post and the camera mast, at the driver's window; floodlights at the apron corners ──
+    { const [x, z] = at(R + APRON_LEN - 0.55, lamA + 0.12), y = topA(R + APRON_LEN - 0.55);
+      geos.push(cyl(0.008, 0.2, x, y + 0.1, z, STEEL), box(0.045, 0.07, 0.03, x, y + 0.205, z, yaw, DARK)); lamps.push({ x, y: y + 0.225, z, w: 0.02, h: 0.012, d: 0.012, yaw, color: 0x40ff90 }); lamps.push({ x, y: y + 0.195, z, w: 0.026, h: 0.02, d: 0.012, yaw, color: 0x9fd8ff }); }   // post, panel, status LED, screen
+    { const [x, z] = at(R + 0.4, lamA + 0.1), y = topA(R + 0.4); geos.push(cyl(0.01, 0.36, x, y + 0.18, z, DARK), box(0.075, 0.035, 0.05, x, y + 0.37, z, yaw, DARK), box(0.02, 0.02, 0.03, x, y + 0.37, z + u[1] * 0.03, yaw, STEEL)); }
+    for (const lam of [lamA + 0.04, lamB - 0.04]) { const [x, z] = at(R + APRON_LEN - 0.2, lam), y = topA(R + APRON_LEN - 0.2); geos.push(cyl(0.011, 0.48, x, y + 0.24, z, STEEL), box(0.12, 0.02, 0.05, x, y + 0.49, z, yaw, DARK)); lamps.push({ x, y: y + 0.475, z, w: 0.1, h: 0.012, d: 0.04, yaw, color: 0xfff4d8 }); }
+    // ── state lamps over the gates (outside face): the outer gate green when it stands open, red when sealed; the person door the same ──
+    const lampColor = state === 'open' ? 0x30e070 : 0xff3a2a;
+    { const [x, z] = at(R + 0.07, 0); lamps.push({ x, y: ground(x, z) + v.dh + 0.1, z, w: 0.05, h: 0.03, d: 0.02, yaw, color: lampColor }); }
+    for (const p of persons) { const a = p.angle, px = p.x + Math.sin(a) * 0.07, pz = p.z + Math.cos(a) * 0.07; lamps.push({ x: px, y: ground(px, pz) + 0.45 * (tier === 'arcology' ? 1.5 : 1) , z: pz, w: 0.05, h: 0.03, d: 0.02, yaw: a, color: lampColor }); }
+    // ── inside: the poured lane from the inner gate to the pad, level with the dome floor, curbed, striped, with a drain grate ──
     if (lane) {
-      const [ix, iz] = f.inner, [px, pz] = lane.pad, L = Math.hypot(px - ix, pz - iz), mx = (ix + px) / 2, mz = (iz + pz) / 2;
-      geos.push(drape(mx, mz, u, L / 2 + 0.05, lane.w / 2 + 0.06, 0.03, ground, ASPHALT));
-      geos.push(drape(px, pz, u, lane.half, lane.half, 0.03, ground, ASPHALT));
-      geos.push(drape(mx, mz, u, L / 2, 0.012, 0.04, ground, PAINT));
+      const rI = R - v.len, rP = R - v.len - Math.hypot(lane.pad[0] - f.inner[0], lane.pad[1] - f.inner[1]), top = (): number => yPad + 0.004;
+      geos.push(slab(F, rP - lane.half, rI + 0.02, -lane.w / 2, lane.w / 2, top, ground, POUR));
+      geos.push(slab(F, rP - lane.half, rP + lane.half, -lane.half, lane.half, top, ground, POUR));                                                                                 // the turning pad
+      for (const s of [-1, 1] as const) geos.push(slab(F, rP, rI, s * lane.w / 2 - 0.018, s * lane.w / 2 + 0.018, () => top() + 0.022, ground, CURB));                                  // the straight curbs
+      for (const s of [-1, 1] as const) geos.push(mark(F, rP, rI, s * (lane.w / 2 - 0.05) - 0.008, s * (lane.w / 2 - 0.05) + 0.008, top, YELLOW));                                       // edge lines
+      const nD = Math.max(2, Math.floor((rI - rP) / 0.16)); for (let k = 0; k < nD; k++) geos.push(mark(F, rP + 0.04 + k * (rI - rP) / nD, rP + 0.04 + k * (rI - rP) / nD + 0.07, -0.01, 0.01, top, PAINT));   // dashed center
+      geos.push(mark(F, rI - 0.2, rI - 0.16, -lane.w / 2 + 0.05, lane.w / 2 - 0.05, top, PAINT));                                                                                    // the stop line at the inner gate
+      const rg = (rI + rP) / 2; geos.push(mark(F, rg - 0.05, rg + 0.05, -lane.w / 2 + 0.05, lane.w / 2 - 0.05, top, DARK, 0.005));                                                       // the drain grate
+      for (let k = 0; k < 6; k++) geos.push(mark(F, rg - 0.045 + k * 0.018, rg - 0.038 + k * 0.018, -lane.w / 2 + 0.05, lane.w / 2 - 0.05, top, STEEL, 0.007));
+      for (const s of [-1, 1] as const) { const [x, z] = at(rI - 0.25, s * (lane.w / 2 + 0.06)); lamps.push({ x, y: yPad + 0.04, z, w: 0.03, h: 0.012, d: 0.03, yaw, color: accent }); }  // lane marker lights
     }
+    // ── a landing, canopy, sign and bollards at every person airlock (the main one is on the apron; the arcology's second stands alone) ──
+    persons.forEach((p, i) => {
+      const a = p.angle, pu: [number, number] = [Math.sin(a), Math.cos(a)], PF: Fr = { cx: f.cx, cz: f.cz, u: pu };
+      const w = tier === 'arcology' ? 0.46 : 0.3, dp = tier === 'arcology' ? 1.3 : 0.7;
+      const yl = ground(...(([f.cx + pu[0] * (R - 1), f.cz + pu[1] * (R - 1)]) as [number, number])) + 0.012;
+      if (!(i === 0 && f.person)) {   // (the main person door's landing is the apron)
+        const yEnd = Math.min(yl + 0.06, Math.max(yl - 0.06, ground(f.cx + pu[0] * (R + dp), f.cz + pu[1] * (R + dp)) + 0.02));
+        const top = (rho: number): number => yl + (yEnd - yl) * Math.max(0, Math.min(1, (rho - R) / dp));
+        geos.push(slab(PF, R - 0.02, R + dp, -w, w, top, ground, POUR));
+        for (const [l0, l1] of [[-w, -w + 0.03], [w - 0.03, w]] as const) geos.push(slab(PF, R - 0.02, R + dp, l0, l1, r => top(r) + 0.02, ground, CURB));
+        geos.push(mark(PF, R + 0.05, R + dp - 0.1, -0.01, 0.01, top, YELLOW));
+        for (const s of [-1, 1] as const) { const [bx, bz] = P(PF, R + dp - 0.1, s * (w - 0.06)); geos.push(cyl(0.018, 0.12, bx, top(R + dp - 0.1) + 0.06, bz, STEEL), cyl(0.021, 0.03, bx, top(R + dp - 0.1) + 0.095, bz, YELLOW)); }
+      }
+      // the canopy over the door: two posts and a steel roof plate with a lit sign strip, so the door reads from the road
+      const cw = (tier === 'arcology' ? 0.9 : 0.5), ch = (tier === 'arcology' ? 0.78 : 0.5), cd = 0.38 * (tier === 'arcology' ? 1.6 : 1);
+      for (const s of [-1, 1] as const) { const [qx, qz] = P(PF, R + cd - 0.03, s * (cw / 2 - 0.02)); geos.push(cyl(0.012 * (tier === 'arcology' ? 1.6 : 1), ch, qx, ground(qx, qz) + ch / 2, qz, STEEL)); }
+      const [rx, rz] = P(PF, R + cd / 2, 0); geos.push(box(cw, 0.022, cd, rx, ground(rx, rz) + ch, rz, a, clad));
+      const [sx, sz] = P(PF, R + cd - 0.005, 0); lamps.push({ x: sx, y: ground(sx, sz) + ch - 0.012, z: sz, w: cw * 0.8, h: 0.012, d: 0.012, yaw: a, color: accent });
+      const [cx2, cz2] = P(PF, R + 0.2, w - 0.02); geos.push(cyl(0.008, 0.32, cx2, ground(cx2, cz2) + 0.16, cz2, DARK), box(0.06, 0.03, 0.045, cx2, ground(cx2, cz2) + 0.33, cz2, a, DARK));   // a camera
+      const [kx, kz] = P(PF, R + 0.16, -(w - 0.02)); geos.push(cyl(0.007, 0.16, kx, ground(kx, kz) + 0.08, kz, STEEL), box(0.04, 0.05, 0.03, kx, ground(kx, kz) + 0.17, kz, a, DARK)); lamps.push({ x: kx, y: ground(kx, kz) + 0.18, z: kz, w: 0.016, h: 0.012, d: 0.012, yaw: a, color: 0x40ff90 });   // keypad
+    });
   }
   const owned: Array<{ dispose(): void }> = [];
   if (geos.length) {
     const merged = mergeGeometries(geos, false); geos.forEach(g => g.dispose());
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, metalness: 0.1, flatShading: true, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.12, flatShading: true, side: THREE.DoubleSide });
     const m = new THREE.Mesh(merged, mat); m.name = 'vehicle_port_fixtures'; m.matrixAutoUpdate = false; m.updateMatrix(); m.castShadow = true; m.receiveShadow = true;
     group.add(m); owned.push(merged, mat);
   }
   if (lamps.length) {
-    const geo = new THREE.SphereGeometry(0.024, 8, 6), heads = new THREE.InstancedMesh(geo, kitMaterial('lamp'), lamps.length), m4 = new THREE.Matrix4();
-    lamps.forEach((l, i) => heads.setMatrixAt(i, m4.makeTranslation(l.x, l.y, l.z)));
-    heads.instanceMatrix.needsUpdate = true; heads.frustumCulled = false; heads.castShadow = false;
-    group.add(heads); owned.push(geo);
+    // (indicator and flood lamps: one instanced box set, unlit so a red lamp stays red; sizes and turns ride in each instance's matrix)
+    const geo = new THREE.BoxGeometry(1, 1, 1), mat = new THREE.MeshBasicMaterial({ toneMapped: false }), heads = new THREE.InstancedMesh(geo, mat, lamps.length), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+    lamps.forEach((l, i) => { q.setFromEuler(e.set(0, l.yaw, 0)); heads.setMatrixAt(i, m4.compose(new THREE.Vector3(l.x, l.y, l.z), q, new THREE.Vector3(l.w, l.h, l.d))); heads.setColorAt(i, new THREE.Color(l.color)); });
+    heads.instanceMatrix.needsUpdate = true; if (heads.instanceColor) heads.instanceColor.needsUpdate = true; heads.frustumCulled = false; heads.castShadow = false;
+    group.add(heads); owned.push(geo, mat);
   }
   return { group, key: portsKey(ins), dispose: () => { for (const o of owned) o.dispose(); } };
 }
