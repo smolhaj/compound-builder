@@ -55,7 +55,7 @@ if (mode !== 'entry') { console.error('usage: domeEntryMovie.mjs entry|raid|keys
 
 // ───────────── Part A: entry ─────────────
 const port = Number(opt('--port', 5973)), outDir = resolve(opt('--out', '/tmp/claude-0/dome-movie/entry')), KIND = opt('--kind', 'dome_glass'), ROT = Number(opt('--rot', 1));
-const NIGHT = Number(opt('--night', 0)) === 1, SECS = Number(opt('--secs', 36)), W = Number(opt('--w', 960)), H = Number(opt('--h', 540)), PR = opt('--pr', '0.9');
+const NIGHT = Number(opt('--night', 0)) === 1, SECS = Number(opt("--secs", 40)), W = Number(opt('--w', 960)), H = Number(opt('--h', 540)), PR = opt('--pr', '0.9');
 const probe = args.includes('--probe'), stills = (opt('--stills', '') || '').split(',').filter(Boolean).map(Number);   // --stills 0.1,0.5: fractions of the film to render only
 mkdirSync(outDir, { recursive: true });
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
@@ -113,7 +113,7 @@ try {
   // the person's way: along the road's shoulder (offset from the truck's way) to the apron, round the shell outside it to the nearest personnel airlock, in
   const lock = [...geo.people].sort((a, b) => Math.abs(Math.atan2(Math.sin(a.angle - geo.v.angle), Math.cos(a.angle - geo.v.angle))) - Math.abs(Math.atan2(Math.sin(b.angle - geo.v.angle), Math.cos(b.angle - geo.v.angle))))[0];
   const walk = [];
-  const dStart = Math.max(0, gateD - 9 * S);
+  const dStart = Math.max(0, gateD - 22 * S);
   for (let d = dStart; d < gateD - 1.6 * S; d += 0.4) { const [x, z] = pathAt(d), [x2, z2] = pathAt(d + 0.4), dx = x2 - x, dz = z2 - z, l = Math.hypot(dx, dz) || 1; walk.push([x + dz / l * 0.34 * S, z - dx / l * 0.34 * S]); }
   { // an arc round the shell at R + 0.7, from the port's side to the airlock's, the short way
     const a0 = geo.v.angle, a1 = lock.angle, da = Math.atan2(Math.sin(a1 - a0), Math.cos(a1 - a0)), k = Math.max(2, Math.ceil(Math.abs(da) * (R + 0.7) / 0.4));
@@ -127,31 +127,36 @@ try {
   lap(`person path ${wl.toFixed(1)} units, ${walk.length} pts; gate at truck d=${gateD.toFixed(1)} of ${geo.L.toFixed(1)}; personnel lock at ${(lock.angle * 180 / Math.PI).toFixed(0)} deg (port ${(geo.v.angle * 180 / Math.PI).toFixed(0)})`);
 
   // ── the actors on the clock t (seconds of film): the truck waits at the outer gate while the lock cycles; the person walks all the while ──
-  const T_TRUCK0 = 2.0, TRUCK_V = (gateD - Math.max(0, gateD - 14 * S)) / 9, HOLD = 4.0, tGate = T_TRUCK0 + 9, tOn = tGate + HOLD;
-  const truckD = t => { const d0 = Math.max(0, gateD - 14 * S); if (t < T_TRUCK0) return d0; if (t < tGate) return d0 + (t - T_TRUCK0) * TRUCK_V; if (t < tOn) return gateD; return Math.min(geo.L, gateD + (t - tOn) * TRUCK_V * 0.6); };
-  const personD = t => Math.max(0, Math.min(wl, (t - 0.5) * wl / (SECS * 0.82)));
-  // the camera: a Catmull-Rom flight through waypoints [t, eye(rho, lam, h), look(rho, lam, h)], port frame coordinates; 'T' / 'P' look at the truck / person
-  const WP = [
-    // the county road end: high and wide, the person and truck both in the frame
-    [0.0, [R + 15 * S, -9 * S, 7.5 * S], ['P', 0.15]],
-    [5.0, [R + 11 * S, -6 * S, 4.2 * S], ['P', 0.12]],
-    [11.0, [R + 8 * S, 3.4 * S, 1.5 * S], ['T', 0.22]],
-    [17.0, [R + 5.5 * S, -2.4 * S, 0.8 * S], ['T', 0.22]],
-    // beside the truck as it waits at the outer gate, then the person at the personnel lock
-    [23.0, [R + 3.2 * S, 2.7 * S, 0.9 * S], ['G', 0.25]],
-    [29.0, [R * 0.95, 2.4 * S, 1.8 * S], ['T', 0.2]],
-    [SECS, [R * 0.15, 0.5 * S, 3.4 * S], ['G2', 0.2]],
+  // the clock (seconds of film): the person walks the road's shoulder from 22 units out to the personnel lock; the truck, 32 units out, overtakes, waits at the outer gate while the lock cycles, rolls in
+  const T_TRUCK0 = 2.0, T_GATE = 14.0, HOLD = 5.0, T_ON = T_GATE + HOLD, D0 = Math.max(0, gateD - 32 * S), TRUCK_V = (gateD - D0) / (T_GATE - T_TRUCK0), ROLL_V = 1.0 * S;
+  const truckD = t => t < T_TRUCK0 ? D0 : t < T_GATE ? D0 + (t - T_TRUCK0) * TRUCK_V : t < T_ON ? gateD : Math.min(geo.L, gateD + (t - T_ON) * ROLL_V);
+  const personD = t => Math.max(0, Math.min(wl, t * 0.9 * S));
+  const sm = k => { k = Math.max(0, Math.min(1, k)); return k * k * (3 - 2 * k); };
+  const stateAt = async t => ({ t, td: truckD(t), pd: personD(t) });
+  // camera rigs [time, eye rig, look rig]: a rig is [tag, a, b, c]: 'G' = the port's frame (rho out from the shell along the port axis, lam across, h above the ground), 'T' / 'P' = on the truck / person
+  // (forward along its heading, to its left, up). The eye is the smooth blend of the previous rig's position and the next rig's, both re-evaluated every frame, so the flight follows the actors.
+  const RIGS = [
+    [0.0, ['G', R + 26 * S, -10 * S, 6.5 * S], ['P', 0, 0, 0.18]],
+    [7.0, ['P', -4.5 * S, -2.6 * S, 1.0 * S], ['P', 1.5 * S, 0, 0.2]],
+    [12.0, ['G', R + 11 * S, -4.5 * S, 1.5 * S], ['T', 0, 0, 0.2]],
+    [17.0, ['T', 1.8 * S, -3.0 * S, 1.1 * S], ['T', 0, 0, 0.2]],
+    [22.0, ['G', R + 4.5 * S, 4.5 * S, 1.3 * S], ['G', R + 0.2, 0, 0.3]],
+    [28.0, ['G', R + 3.2 * S, -3.5 * S, 3.6 * S], ['G', R - 2.2 * S, 0, 0.2]],
+    [34.0, ['G', R + 4.0 * S, 3.2 * S, 1.4 * S], ['P', 0, 0, 0.18]],
+    [SECS, ['G', R - 2.4 * S, -3.0 * S, 1.1 * S], ['P', 0, 0, 0.18]],
   ];
-  const cr = (p0, p1, p2, p3, t) => 0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t * t + (-p0 + 3 * p1 - 3 * p2 + p3) * t * t * t);
-  const eyeAt = t => {
-    let i = WP.findIndex(w => w[0] > t); if (i < 0) i = WP.length - 1; if (i === 0) i = 1;
-    const a = WP[i - 1], b = WP[i], p0 = WP[Math.max(0, i - 2)], p3 = WP[Math.min(WP.length - 1, i + 1)], k = (t - a[0]) / (b[0] - a[0] || 1), kk = k * k * (3 - 2 * k) * 0.35 + k * 0.65;
-    return [0, 1, 2].map(j => cr(p0[1][j], a[1][j], b[1][j], p3[1][j], Math.max(0, Math.min(1, kk))));
+  const evalRig = async (rig, ctx) => {
+    const [tag, a, b, c] = rig;
+    if (tag === 'G') { const e = E(a, b); return [e[0], (await gd(e[0], e[1])) + c, e[1]]; }
+    const act = tag === 'T' ? ctx.truck : ctx.person, f = [Math.sin(act.h), Math.cos(act.h)], l = [f[1], -f[0]];
+    const x = act.x + f[0] * a + l[0] * b, z = act.z + f[1] * a + l[1] * b;
+    return [x, (await gd(x, z)) + (tag === 'T' || tag === 'P' ? c : 0) + (tag === 'P' && c < 0.5 ? 0 : 0), z];
   };
-  const stateAt = async t => {
-    const td = truckD(t), pd = personD(t);
-    const eyeP = eyeAt(t); const ew = E(eyeP[0], eyeP[1]);
-    return { t, td, pd, eye: [ew[0], eyeP[2], ew[1]] };
+  const rigAt = async (t, which, ctx) => {
+    let i = RIGS.findIndex(r => r[0] > t); if (i < 0) i = RIGS.length - 1; if (i === 0) i = 1;
+    const A = RIGS[i - 1], B = RIGS[i], k = sm((t - A[0]) / (B[0] - A[0] || 1));
+    const pa = await evalRig(A[which], ctx), pb = await evalRig(B[which], ctx);
+    return pa.map((v, j) => v + (pb[j] - v) * k);
   };
   // ── render: per frame set the actors and the pose, one full-quality draw ──
   await page.evaluate(async () => { const m = await import('/src/game/HomesteadWorld.ts'); const f = m.scaleFigure(0, 0, 0); f.name = '__walker'; window.__cb.ws.scene.add(f); });
@@ -162,24 +167,15 @@ try {
     const t = i / FPS, st = await stateAt(t);
     const [wx, wz] = walkAt(st.pd), [wx2, wz2] = walkAt(Math.min(wl, st.pd + 0.05)), wy = await gd(wx, wz);
     const pos = pathAt(st.td), pos2 = pathAt(Math.min(geo.L, st.td + 0.3));
-    // the look target: the truck, the person, the gate, or the lane inside
-    const lookOf = async () => {
-      const wp = WP.findLast(w => w[0] <= t) ?? WP[0], tag = wp[2][0];
-      if (tag === 'T') return [pos[0], pos[1]]; if (tag === 'P') return [wx, wz];
-      if (tag === 'G') return E(R + 0.4, 0); return E(R - 2.5 * S, 0);
-    };
-    const [lx, lz] = await lookOf();
-    // blend the look between waypoint targets (a slow turn, not a cut): previous target to this one over 2 s
-    const prev = WP.findLast(w => w[0] <= t - 2) ?? WP[0], cur = WP.findLast(w => w[0] <= t) ?? WP[0];
-    let tx = lx, tz = lz;
-    if (prev !== cur) {
-      const f = Math.min(1, (t - cur[0]) / 2), tgt = tag => tag === 'T' ? [pos[0], pos[1]] : tag === 'P' ? [wx, wz] : tag === 'G' ? E(R + 0.4, 0) : E(R - 2.5 * S, 0), a = tgt(prev[2][0]), s = f * f * (3 - 2 * f);
-      tx = a[0] + (lx - a[0]) * s; tz = a[1] + (lz - a[1]) * s;
-    }
-    const ly = (await gd(tx, tz)) + (WP.findLast(w => w[0] <= t)?.[2][1] ?? 0.2) * S;
-    let ey = (await gd(st.eye[0], st.eye[2])) + st.eye[1];
-    // the camera never goes under the ground or inside the shell skin: lift to clear the ground, and when it is within a skin's width of the shell and not at the port, nudge it out
-    ey = Math.max(ey, (await gd(st.eye[0], st.eye[2])) + 0.35);
+    const ctx = { truck: { x: pos[0], z: pos[1], h: Math.atan2(pos2[0] - pos[0], pos2[1] - pos[1]) }, person: { x: wx, z: wz, h: Math.atan2(wx2 - wx, wz2 - wz) } };
+    const eyeW = await rigAt(t, 1, ctx), lk = await rigAt(t, 2, ctx);
+    // the camera never goes under the ground, and stays out of the shell's skin (a band round R) unless it is on the port's axis, where the doorway is
+    let [ex, ey, ez] = eyeW;
+    const gE = await gd(ex, ez); ey = Math.max(ey, gE + 0.35);
+    { const dx = ex - geo.x, dz = ez - geo.z, d = Math.hypot(dx, dz), lam = Math.abs((ex - geo.x) * n[0] + (ez - geo.z) * n[1]);
+      if (Math.abs(d - R) < 0.25 && lam > geo.v.dw * 0.5 && ey < gE + R * 0.6) { const k = (R + (d >= R ? 0.25 : -0.25)) / d; ex = geo.x + dx * k; ez = geo.z + dz * k; } }
+    const tx = lk[0], ly = lk[1], tz = lk[2];
+    st.eye = [ex, ey, ez];
     await page.evaluate(([wx, wz, wy, hdg, tx, tz, tp, trot, eye, ey, look, ly, fov]) => {
       const cb = window.__cb, f = cb.ws.scene.getObjectByName('__walker');
       f.position.set(wx, wy, wz); f.rotation.y = hdg; f.position.y += Math.abs(Math.sin(wx * 40 + wz * 40)) * 0.012;

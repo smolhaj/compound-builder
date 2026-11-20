@@ -118,7 +118,7 @@ try {
     const st = await page.evaluate(async ([q0, FPS, grab, lowrender]) => {
       const cb = window.__cb, gs = cb.game.getState();
       cb.qa.skipDraw = !grab;   // (normal drawing, but a frame nobody captures is not drawn: skipping ahead and time-lapse cost almost nothing)
-      const drawn = lowrender && grab ? cb.qa.renderFull('medium') : null;
+      const drawn = lowrender && grab ? cb.qa.renderFull(q0 === 'low' || q0 === 'medium' ? 'medium' : 'high') : null;
       window.__pump(1000 / FPS);
       if (drawn) await drawn;
       const w = cb.store.getState(); if (w.quality !== q0) w.setQuality(q0); w.setPerfNotice(null);
