@@ -18,6 +18,8 @@ export interface PortInput {
   id: string; tier: DomeTier; frame: PortFrame; lane: InsideLane | null; guarded: boolean;
   /** Every person airlock of the dome: where its door stands (on the shell) and its axis angle (the main one beside the port, and the arcology's second). */
   persons: Array<{ angle: number; x: number; z: number }>;
+  /** The height of the dome's group (its pad level): the doors' sill and the state panels are measured from it. */
+  baseY: number;
   /** What the gates say: sealed (red), open (green: the outer gate stands open, the inner one shut). */
   state: 'open' | 'sealed';
 }
@@ -85,7 +87,7 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
   const group = new THREE.Group(); group.name = 'vehicle_ports';
   const geos: THREE.BufferGeometry[] = [];
   const lamps: Array<{ x: number; y: number; z: number; w: number; h: number; d: number; yaw: number; color: number }> = [];
-  for (const { frame: f, lane, tier, persons, state } of ins) {
+  for (const { frame: f, lane, tier, persons, state, baseY } of ins) {
     const { u, v } = f, yaw = f.angle, R = f.r, F: Fr = { cx: f.cx, cz: f.cz, u };
     const clad = CLAD[tier], accent = ACCENT[tier];
     const at = (rho: number, lam: number): [number, number] => P(F, rho, lam);
@@ -127,7 +129,7 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     const slot = state === 'open' ? 2 : 0, lampColor = state === 'open' ? 0x30ff80 : 0xff3a2a, bigK = tier === 'arcology' ? 1.6 : 1;
     const panelLamp = (cxp: number, czp: number, pu: [number, number], vv: { dh: number; t: number }, ang: number): void => {
       const lat: [number, number] = [pu[1], -pu[0]], rho = R + vv.t / 2 + 0.034, x = cxp + pu[0] * rho + lat[0] * (slot - 1) * 0.04 * bigK, z = czp + pu[1] * rho + lat[1] * (slot - 1) * 0.04 * bigK;
-      lamps.push({ x, y: pad + STEM[tier] + vv.dh + 0.047 * bigK, z, w: 0.026 * bigK, h: 0.026 * bigK, d: 0.012, yaw: ang, color: lampColor });
+      lamps.push({ x, y: baseY + STEM[tier] + vv.dh + 0.047 * bigK, z, w: 0.026 * bigK, h: 0.026 * bigK, d: 0.012, yaw: ang, color: lampColor });
     };
     panelLamp(f.cx, f.cz, u, v, yaw);
     for (const p of persons) panelLamp(f.cx, f.cz, [Math.sin(p.angle), Math.cos(p.angle)], vestibuleOf(tier, R), p.angle);
