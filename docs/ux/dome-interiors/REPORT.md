@@ -37,14 +37,14 @@ Scripts: `scripts/domeInteriorShots.mjs` (dome floors, day and night pairs, same
 | Bunker tier 3 | Lead-lined walls, I-beams, posts: clearly harder than tier 0. People sleeping and sheltering visible. |
 | Escape tunnel end (tier 3) | Good: arched boards, stores, a bench, extinguisher, a green door at the end. |
 
-## Not done or not shot (honest list)
-- **Plant yard span, glass dome (04):** three tries, still not a usable frame (camera ends up against a machinery wall). The arcology version works. Not delivered for glass.
-- **Geodesic dome interior:** shot with the new dressing, but the dressing was then dropped for geodesic (its perf scene has no draw-call room), so those frames were removed. Earthen dome: no standing view (arched door 0.26 high; the 20 ft dome is not enterable on foot), not shot.
-- **Dome with a walkway link end, and the link airlock door:** not shot (needs a linked second dome; not reached).
-- **Bunker control room and stairwell (standalone):** frames were pitch black in the shot harness (the control room's lamp lost the light pick to a brighter neighbor). Added a rule that the bunker room you stand in keeps its lamp; the re-shoot (`dig/`) was still waiting for the shared render lock when this was written, so those two frames are **not verified**. The same rooms are lit in the under-a-dome run.
-- **Glass porch at night (03):** still very dark; the window-light pool round houses is faint (the pool texture fades to nothing at its rim). Not fixed.
-- **Hatch shaft close-ups** (standalone and under a dome): camera ended up inside the hatch collar; dropped.
-- **Dome frames after the last code change:** the dressing now rides in the plant's own meshes (see Perf) and bench and ring lamps were added after the first glass frames, so frames 01 to 07 are from the version just before; the look is the same except the extra lamps.
+## Review round (second pass)
+- **Tier 3 galley, tier 0 control room, stairwell** were black in the harness. The cause was the light pick: it ranks by lamp strength, so the small, dim rooms lost to a bright neighbor. The room you stand in now keeps its lamp (weight 4 within 0.8 units). Verified with the render lock: tier 3 galley, tier 0 control room (operator at the desk) and the stairwell looking up to the hatch are lit. The stairwell foreground treads are dark (unlit side faces); the landing close-up (blast door) is too dim to publish and was dropped.
+- **Seated person in the tier 0 bunkroom:** lamp moved up (0.37) and dimmed (0.28); skin and clothing colors now read (cream shirt, blue-gray trousers).
+- **Glass ceiling at night (06):** reframed on a lit log house with the gridshell and stars; the gridshell is faint at night but present.
+- **Dome dressing changes after main moved:** vehicle port gets a paved lane (0.55 wide, tested) and nothing is set in its way; only person airlocks get footpaths.
+- **Not delivered (blocked):** the dome night frames for house porch, the arcology plant yard pools and the glass plant-yard span. The code for house and plant-unit light pools is in (pools lie on the lawn and in front of the units), but every dome frame shot on main after the no-snow merge (#396) renders neon green with glowing, flat-orange buildings, so those frames cannot be judged. Another agent is fixing that; re-shoot with `scripts/domeInteriorShots.mjs` once it lands. The published dome frames are from before that merge and before the one-entrance layout. The glass plant-yard span still has no usable frame (camera ends inside a machinery building).
+- **Honest note on the pools:** a deck-height pool washed the porch white and was removed; the first version of the plant pools hugged the machinery and was nearly invisible. Neither was re-checked on a healthy render.
+- Geodesic dressing was dropped (perf scene has no draw-call room); earthen dome has no standing view; link-walkway end not shot.
 
 ## Perf (`node scripts/perfBudget.mjs`, Medium and High, no budget raised)
 | Scene | Before (calls, tris, heap) | After |
@@ -52,5 +52,7 @@ Scripts: `scripts/domeInteriorShots.mjs` (dome floors, day and night pairs, same
 | mountain medium / high | 396, 753k / 1042k, 99 / 115 MB | 396, 753k / 1042k, 99 / 115 MB |
 | dome_glass medium / high | 411, 766k / 1055k, 101 / 118 MB | 411, 769k / 1058k, 102 / 119 MB |
 | dome_arcology medium / high | 412, 772k / 1063k, 102 / 119 MB | 412, 783k / 1074k, 103 / 120 MB |
-| dome_geodesic | not measured before | 408, 757k / 1046k (unchanged code path) |
+| dome_geodesic | not measured before | 411 (merged main), 757k / 1045k |
 A first version of the dressing added its own meshes (+3 draw calls on dome_glass, +4 on the arcology) and broke the budget; it now merges into the plant's machinery mesh and its lamp and pool instances, so draw calls are unchanged. Shadow triangles and casters are unchanged.
+
+Latest run on main plus this branch: dome_glass 409 calls (766k / 1052k tris, 101 / 118 MB), dome_arcology 411 (778k / 1073k, 103 / 120 MB), mountain 396; all under budget, no budget changed.
