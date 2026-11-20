@@ -33,7 +33,7 @@ const BASE: Record<DomeTier, { w: number; len: number; t: number; h: number; dh:
   earthen: { w: 0.24, len: 0.2, t: 0.03, h: 0.2, dh: 0.18, door: 0.55 },
   geodesic: { w: 0.42, len: 0.5, t: 0.03, h: 0.42, dh: 0.34, door: 0.74 },
   glass: { w: 0.55, len: 0.7, t: 0.03, h: 0.5, dh: 0.4, door: 0.68 },
-  arcology: { w: 1.1, len: 1.4, t: 0.05, h: 0.9, dh: 0.72, door: 0.6 },
+  arcology: { w: 1.7, len: 2.0, t: 0.06, h: 1.35, dh: 1.1, door: 0.72 },
 };
 
 /** The chamber of a dome of this tier whose airlocks lie on radius `r`: never longer than a third of the radius, so a small dome keeps its floor. */

@@ -39,7 +39,7 @@ const LOOK: Record<DomeTier, { strut: number; stem: number; vestW: number; vestH
   earthen: { strut: 0, stem: 0.04, vestW: 0.24, vestH: 0.2, vestL: 0.2 },
   geodesic: { strut: 0.011, stem: 0.06, vestW: 0.42, vestH: 0.4, vestL: 0.5 },
   glass: { strut: 0.014, stem: 0.08, vestW: 0.55, vestH: 0.5, vestL: 0.7 },
-  arcology: { strut: 0.03, stem: 0.14, vestW: 1.1, vestH: 0.9, vestL: 1.4 },
+  arcology: { strut: 0.03, stem: 0.14, vestW: 1.7, vestH: 1.35, vestL: 2.0 },
 };
 
 /** Airlock angles (radians from +z, the side the family arrives on): evenly spread, the first at the front. */

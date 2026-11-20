@@ -215,7 +215,7 @@ describe('one entrance: the gate complex (PROPOSED, owner: one entrance, two at 
       const d = domeFrom(st(t, 0, ang))!, p = d.airlocks.find(a => !a.role)!, v = d.airlocks.find(a => a.role === 'vehicle')!;
       const gap = angDist(p.angle, v.angle) * d.r - (p.w + v.w) / 2;
       expect(gap).toBeGreaterThanOrEqual(0.19);   // (the chambers do not touch)
-      expect(angDist(p.angle, v.angle) * d.r).toBeLessThan(2.5);   // (side by side, not on another side of the dome)
+      expect(angDist(p.angle, v.angle) * d.r).toBeLessThan(4);   // (side by side, not on another side of the dome)
       const ent = entrancesOf(d);
       expect(ent.length).toBe(t === 'arcology' ? 2 : 1);
       expect(ent.filter(e => e.complex).length).toBe(1);
