@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { BattleEvent } from '../../sim/battleTypes';
 
-type ToolKind = 'shovel' | 'rake' | 'hammer';
+type ToolKind = 'shovel' | 'rake' | 'hammer' | 'sledge' | 'saw' | 'torch';
 const MAX_TOOLS = 3;
 interface Hooks { ground: (x: number, z: number) => number; puff: (p: THREE.Vector3, r0: number, r1: number, life: number, rise: number, color: number, o0: number, glow?: boolean) => void }
 interface Grave { x: number; z: number; dig: { t0: number; secs: number } | null; fill: { t0: number; secs: number } | null; lowered: boolean; yaw: number }
@@ -50,7 +50,13 @@ export class AftermathProps {
       ? [part(new THREE.BoxGeometry(0.012, 0.21, 0.012).translate(0, 0.105, 0), WOOD), part(new THREE.BoxGeometry(0.05, 0.06, 0.008).translate(0, -0.025, 0), IRON)]
       : what === 'rake'
         ? [part(new THREE.BoxGeometry(0.012, 0.21, 0.012).translate(0, 0.105, 0), WOOD), part(new THREE.BoxGeometry(0.11, 0.012, 0.012).translate(0, -0.004, 0), IRON), part(new THREE.BoxGeometry(0.11, 0.02, 0.004).translate(0, -0.018, 0), IRON)]
-        : [part(new THREE.BoxGeometry(0.012, 0.1, 0.012).translate(0, 0.05, 0), WOOD), part(new THREE.BoxGeometry(0.045, 0.022, 0.022).translate(0, 0.105, 0), IRON)];
+        : what === 'sledge'
+          ? [part(new THREE.BoxGeometry(0.014, 0.19, 0.014).translate(0, 0.095, 0), WOOD), part(new THREE.BoxGeometry(0.07, 0.04, 0.04).translate(0, 0.2, 0), IRON)]
+          : what === 'saw'
+            ? [part(new THREE.BoxGeometry(0.012, 0.03, 0.03).translate(0, 0.015, 0), WOOD), part(new THREE.BoxGeometry(0.006, 0.02, 0.15).translate(0, 0.03, 0.09), IRON)]
+            : what === 'torch'
+              ? [part(new THREE.BoxGeometry(0.014, 0.014, 0.12).translate(0, 0.03, 0.04), 0x3a3d40), part(new THREE.BoxGeometry(0.01, 0.01, 0.03).translate(0, 0.03, 0.115), 0xffb347)]
+              : [part(new THREE.BoxGeometry(0.012, 0.1, 0.012).translate(0, 0.05, 0), WOOD), part(new THREE.BoxGeometry(0.045, 0.022, 0.022).translate(0, 0.105, 0), IRON)];
     const geo = mergeGeometries(parts)!;
     for (const p of parts) p.dispose();
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
@@ -120,12 +126,13 @@ export class AftermathProps {
       const u = at(h.unit); if (!u || u.dead || u.gone) continue;
       const mesh = this._mesh(h.what), n = per.get(h.what) ?? 0; if (n >= MAX_TOOLS) continue;
       per.set(h.what, n + 1);
-      const age = this._t - h.t0, k = h.what === 'hammer' ? 7 : 4.2, swing = Math.sin(age * k) * 0.5 + 0.5;
+      const age = this._t - h.t0, k = h.what === 'hammer' ? 7 : h.what === 'sledge' ? 3 : h.what === 'saw' ? 9 : h.what === 'torch' ? 1.5 : 4.2, swing = Math.sin(age * k) * 0.5 + 0.5;
       // in the hand ahead of the body, the head down by the ground at the bottom of the stroke
       const fx = Math.sin(u.rot), fz = Math.cos(u.rot);
       const reach = 0.085 + swing * 0.03;
-      this._p.set(u.x + fx * reach + fz * 0.03, this._h.ground(u.x, u.z) + u.y + (h.what === 'hammer' ? 0.12 : 0.1) + (1 - swing) * 0.03, u.z + fz * reach - fx * 0.03);
-      this._e.set(h.what === 'hammer' ? -0.9 + swing * 1.5 : 0.35 + swing * 0.55, u.rot, 0, 'YXZ');
+      const raised = h.what === 'hammer' || h.what === 'sledge', level = h.what === 'saw' || h.what === 'torch';
+      this._p.set(u.x + fx * reach + fz * 0.03, this._h.ground(u.x, u.z) + u.y + (raised ? 0.12 : level ? 0.13 : 0.1) + (level ? 0 : (1 - swing) * 0.03), u.z + fz * reach - fx * 0.03);
+      this._e.set(h.what === 'sledge' ? -1.3 + swing * 1.9 : raised ? -0.9 + swing * 1.5 : level ? 0.1 : 0.35 + swing * 0.55, u.rot, 0, 'YXZ');
       this._q.setFromEuler(this._e);
       this._m.compose(this._p, this._q, this._s);
       mesh.setMatrixAt(n, this._m); mesh.count = n + 1; mesh.instanceMatrix.needsUpdate = true;

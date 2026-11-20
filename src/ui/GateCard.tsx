@@ -25,6 +25,7 @@ import { pluralize } from '../sim/words';
 import { defaultStance } from '../sim/raidDefault';
 import { isTalk, talkOffer } from '../sim/negotiation';
 import { ORDERS, ORDER_HINT, ORDER_NAME } from '../sim/raidOrders';
+import { homeUnderSealedDome } from '../sim/dome/sealed';
 import { SCOUT_HINT, SCOUT_NAME, SCOUT_PLANS } from '../sim/scoutPlans';
 
 
@@ -258,9 +259,11 @@ export function GateCard() {
 
 /** Orders for the fight (sim/raidOrders.ts): what the family does when the line is pressed. One tap each; hold is the default. */
 export function RaidOrders() {
+  const sealed = useGameStore(s => homeUnderSealedDome(s.game));
   const cut = useGameStore(s => s.cutscene);
   const set = useGameStore(s => s.setRaidOrder);
   const now = cut?.orders?.[0]?.order ?? 'hold';
+  if (sealed) return null;   // (a dome nothing can breach: nothing to decide)
   return <div style={{ marginTop: 10 }} data-testid="raid-orders">
     <div style={{ fontSize: 11, letterSpacing: 1.6, textTransform: 'uppercase', opacity: 0.6, marginBottom: 4 }}>Orders for the fight</div>
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

@@ -31,6 +31,9 @@ import { breakInScene, commitDays, finishPlan, gateScene, planSiege, probeBattle
 import { step } from './engine';
 import { hourOf, type GameState } from './state';
 import { pluralize } from './words';
+import { domesOf } from './dome/standing';
+import { domeBeats } from './dome/domeBeats';
+import { addScars } from './dome/scars';
 
 export interface StagedRaid {
   /** The game with the stance resolved but the clock still at the arrival. */
@@ -154,15 +157,27 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?:
   if (e.kind !== 'break_in') {
     const dir = new LineDirector(seed);
     battles = voiceCutscene(battles, { dir, seed, temper: e.temper ?? 'desperate', scenes, from: voiceFrom });
+    // a dome over the home: the crew's time at the shell is staged (probes, frustration, the family watching; sim/dome/domeBeats.ts), and the marks stay on the shell
+    if (battle) {
+      const f0 = g.structures.filter(isFinished), h0 = f0.find(st => isHome(st.kind)) ?? f0[0] ?? { x: 0, z: 0 };
+      const dome = domesOf(g).find(dm => Math.hypot(h0.x - dm.x, h0.z - dm.z) < dm.r);
+      if (dome) {
+        const li = battles.length - 1;
+        battles[li] = domeBeats(battles[li], { dome, seed, temper: e.temper ?? 'desperate', dir, skirtCrew: e.kind === 'tunnelers' });
+        addScars(g, dome, battles[li]);
+      }
+    }
     // the death and the quiet after it (presentation only)
     const fin = g.structures.filter(isFinished), home = fin.find(st => isHome(st.kind)) ?? fin[0] ?? { x: 0, z: 0 };
     // how the last fight ends on screen agrees with the sim's result: the crew beaten (down or hands up, never a standing cluster) or the family held (sim/raidEnding.ts)
     const last = battles.length - 1, temper = e.temper ?? 'desperate';
-    battles = battles.map((b, i) => (i === last ? dragTheWounded(b, { x: home.x, z: home.z }) : b));
-    const ep = endPoses({ battle: battles[last], temper, style: scenes[last].style, dir, seed, house: { x: home.x, z: home.z } });
+    // (a fight at a dome nothing can breach is shown as raiders turned back outside and a household watching: no wounded to drag, no one down or giving up, no death scene)
+    const sealed = !!battles[last].sealed;
+    if (!sealed) battles = battles.map((b, i) => (i === last ? dragTheWounded(b, { x: home.x, z: home.z }) : b));
+    const ep = sealed ? { battle: battles[last], ending: null, wake: 0 } as ReturnType<typeof endPoses> : endPoses({ battle: battles[last], temper, style: scenes[last].style, dir, seed, house: { x: home.x, z: home.z } });
     battles = battles.map((b, i) => (i === last ? ep.battle : b));
     const crewWon = ep.ending === 'breached' || ep.ending === 'overrun';
-    const d = dramatize({ before: game, after: g, battles, house: { x: home.x, z: home.z }, raidersWounded: g.gate.aftermath?.wounded ?? 0, temper, style: fresh.style ?? undefined, dir, seed, skipWake: crewWon });
+    const d = sealed ? { battles, info: null } as ReturnType<typeof dramatize> : dramatize({ before: game, after: g, battles, house: { x: home.x, z: home.z }, raidersWounded: g.gate.aftermath?.wounded ?? 0, temper, style: fresh.style ?? undefined, dir, seed, skipWake: crewWon });
     battles = d.battles; drama = d.info;
     scenes = scenes.map((sc, i) => (i === last && ep.ending ? { ...sc, ending: ep.ending, ...(ep.wake > 0 ? { wake: ep.wake } : {}) } : sc));
     if (drama) scenes = scenes.map((sc, i) => (i === drama!.scene ? { ...sc, wake: drama!.wake } : sc));
