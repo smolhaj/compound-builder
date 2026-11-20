@@ -38,7 +38,7 @@ Staged by the dome raid beats (probes at the shell, family voices, frustration, 
 | b-geodesic-night-01-family-behind-glass | Good. Night, family behind the struts. |
 | b-geodesic-night-02-leader-count-vehicles | Good. Raiders in the field, dome and name tags. |
 | b-arcology-day-01-scout-on-foot | Fair. One scout, red ring. |
-| b-arcology-day-02-elena-at-the-shell | Good. Muzzle flashes outside. |
+| b-arcology-day-02-elena-at-the-shell | Good. Red flashes outside the shell. |
 | b-arcology-day-03-swap-out-next-pair | Good. Raider line, family reaction. |
 | b-arcology-day-04-leader-were-leaving | Good. Crew turning back. |
 | b-arcology-day-05-quiet-then-someone-cries | Good. |
