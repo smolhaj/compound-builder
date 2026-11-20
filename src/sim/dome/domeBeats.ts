@@ -13,6 +13,7 @@ import { mulberry32 } from '../rng';
 import { phasesOf, profileOfUnit } from '../raidDialogue';
 import type { Dome } from './standing';
 import { isShellKind } from './siege';
+import { entrancesOf } from './standing';
 
 export interface DomeBeatInput {
   dome: Pick<Dome, 'id' | 'tier' | 'x' | 'z' | 'r' | 'airlocks'>;
@@ -76,7 +77,12 @@ export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
   const a0 = Math.atan2(mx - d.x, mz - d.z);
   const angDiff = (a: number, c: number) => Math.atan2(Math.sin(a - c), Math.cos(a - c));
   const person = d.airlocks.filter(l => l.role !== 'link');
-  const lock = [...person].sort((p, q) => Math.abs(angDiff(p.angle, a0)) - Math.abs(angDiff(q.angle, a0)))[0] ?? null;
+  const doors = entrancesOf(d as Parameters<typeof entrancesOf>[0]).sort((p, q) => Math.abs(angDiff(p.angle, a0)) - Math.abs(angDiff(q.angle, a0)));
+  // the entrance the crew works: the gate complex (a person airlock and the vehicle sally port side by side) counts as ONE, so its two leaves are worked together
+  const gate = doors[0] ?? null;
+  const personLock = person.filter(l => l.role !== 'vehicle').sort((p, q) => Math.abs(angDiff(p.angle, gate?.angle ?? a0)) - Math.abs(angDiff(q.angle, gate?.angle ?? a0)))[0] ?? null;
+  const portLock = gate?.complex ? person.find(l => l.role === 'vehicle') ?? null : null;
+  const lock = personLock ?? portLock;
   const onShell = (a: number, off = 0): { x: number; z: number } => ({ x: d.x + Math.sin(a) * (d.r + off), z: d.z + Math.cos(a) * (d.r + off) });
   const leader = raiders.find(u => u.leader) ?? raiders[0];
   const crewOrder = raiders.filter(u => u.id !== leader.id && !u.job);
@@ -164,7 +170,8 @@ export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
   // 4. the airlock
   if (lock) {
     const lt = at(0.6), pair = [pickWorker(8), pickWorker(9)].filter((u, i, all) => u && all.indexOf(u) === i);
-    pair.forEach((u, i) => { stand(u, lt - 2.5, lock.angle + (i ? 1 : -1) * 0.05, 0.22); for (let k = 0; k < 3; k++) probe(lt + k * 1.3 + i * 0.4, u, 'pry', lock.angle, true); });
+    // (the first man on the person airlock's door, the second on the sally port's gates when the complex has one: both hold)
+    pair.forEach((u, i) => { const door = i === 1 && portLock ? portLock : lock; stand(u, lt - 2.5, door.angle + (i ? 1 : -1) * 0.05, 0.22); for (let k = 0; k < 3; k++) probe(lt + k * 1.3 + i * 0.4, u, 'pry', door.angle, true); });
     say(lt + 3.5, pair[0], 'dome_airlock');
     say(lt + 5, pair[1] ?? leader, 'dome_airlock');
   }
@@ -196,7 +203,7 @@ export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
   const SIGNS = ['wave', 'point', 'fist'] as const;
   const tauntBase = at(0.44), muted = new Map<string, [number, number]>();
   taunters.slice(0, 3).forEach((u, i) => {
-    const tt = tauntBase + i * 1.9, a = a0 + 0.25 * (i - 1);
+    const tt = tauntBase + i * 1.9, a = (gate?.angle ?? a0) + 0.12 * (i - 1);   // (behind the gate complex when there is one)
     goTo(u, tt, a, -0.55);
     muted.set(u.id, [tt - 4, tt + 5]);
     const face = onShell(a, 4);
