@@ -173,8 +173,12 @@ import { isGradedTier } from '../sim/dome/grading';
 import { makeDomePlant, plantKey, type DomePlantFx, type PlantLook } from './fx/DomePlant';
 import { interiorPlan, type Obstacle } from './fx/domeInteriorPlan';
 import { plantLayout } from '../sim/dome/plant';
+import { makeVehiclePorts, type PortFixtures, type PortInput } from './fx/VehiclePorts';
+import { planToPort, portFrameOf } from '../sim/dome/portRoad';
+import { insideLane, portCycleSeconds, vehicleTail } from '../sim/dome/vehiclePort';
+import { guardCount } from '../sim/guards';
 import { makeLinkFixtures, linksKey, type LinkFixtureInput, type LinkFixtures } from './fx/DomeLinks';
-import { domesOf as standingDomes } from '../sim/dome/standing';
+import { domeFrom, domesOf as standingDomes } from '../sim/dome/standing';
 import { linkState, linksOf } from '../sim/dome/linkGraph';
 import { stateOf as domeStateOf } from '../sim/dome/live';
 import { fxOf as plantFxOf, unitsOf as plantUnitsOf } from '../sim/dome/plantLive';
@@ -383,6 +387,7 @@ export class HomesteadWorld {
     this.county = countyRoad(site.region, seed);
     this.countyGaps = this._findCountyGaps();
     this.plan = roadPlanFor(site, seed, this.parcel);
+    this._baseRef = this.plan;
     this.access = accessFromPlan(this.plan);
     this.terrain = new TerrainRenderer(ws.scene);
     this.ridges = new DistantRidges(ws.scene);
@@ -458,6 +463,52 @@ export class HomesteadWorld {
     this.lived.update(game, performance.now(), { night: f.night, lightsOut: this._blackout });
     this._domeAir(game);
     this._syncLinks(game);
+    this._syncPorts(game);
+  }
+
+
+  // ── the vehicle sally ports (sim/dome/vehiclePort.ts): the road ends at each dome's port, the apron, bollards and lane are drawn, the truck cycles the lock ──
+  /** The road as the county plans it, before any dome has taken the end of it to its port. */
+  private _baseRef!: RoadPlan;
+  private _portKey = '';
+  private _ports: PortFixtures | null = null;
+  private _portTail: Array<[number, number]> = [];
+  private _syncPorts(game: GameState): void {
+    const domes = standingDomes(game).filter(d => portFrameOf(d));
+    const guarded = guardCount(game) > 0;
+    const key = domes.map(d => `${d.id}:${d.x},${d.z}:${portFrameOf(d)!.angle.toFixed(3)}`).join('|') + `|${this._baseRef.signature}|${this._drive ? 1 : 0}|${guarded ? 1 : 0}`;
+    if (key === this._portKey) return;
+    this._portKey = key;
+    const pr = planToPort(this._baseRef, domes, (x, z) => this.parcel.height(x, z));
+    const ins: PortInput[] = domes.map(d => {
+      const f = portFrameOf(d)!;
+      return { id: d.id, frame: f, lane: insideLane(f), guarded };
+    });
+    if (this._ports) { this._root.remove(this._ports.group); this._ports.dispose(); this._ports = null; }
+    if (ins.length) { const f = makeVehiclePorts(ins, (x, z) => this.groundAt(x, z)); this._root.add(f.group); this._ports = f; }
+    this._applyPlan(pr ? pr.plan : this._baseRef);
+    this._portTail = pr ? vehicleTail(pr.frame).slice(1) : [];
+    this.truck.setLock(pr && pr.dome.tier !== 'earthen' ? { x: pr.frame.outer[0], z: pr.frame.outer[1], s: portCycleSeconds(pr.dome.tier) } : null);
+    this._tailKey = '';
+  }
+  /** Make `plan` the road in use: redraw the land along it, the road and the truck's way. */
+  private _applyPlan(plan: RoadPlan): void {
+    if (plan === this.plan) return;
+    const was = roadBedOf(this.plan).bbox;
+    this.plan = plan;
+    this.access = accessFromPlan(plan);
+    const bed = this._drive ? roadBedOf(plan) : null, nb = roadBedOf(plan).bbox;
+    this.parcel.setRoadBed(bed);
+    if (this._quality) {
+      this.terrain.refresh(this._terrainSource, Math.min(was[0], nb[0]), Math.min(was[1], nb[1]), Math.max(was[2], nb[2]), Math.max(was[3], nb[3]));
+      this._plant(this._quality);
+    }
+    this._buildRoads();
+    this.truck.dispose();
+    this.truck = new DeliveryTruck(this._ws.scene, this._truckRoute(), (x, z) => (Math.abs(x - this.county.x(z)) < ROAD_W ? this.countyY(x, z) : this.groundAt(x, z)), this.county.x, (x, z) => this._driveY(x, z));
+    this.plow.setRoute(this.access.drive);
+    this._stockKey = '';
+    this._ws.invalidateShadows();
   }
 
   /** The main dome's inner haze and closed-ecology plants (sim/dome/live.ts domeLook), kept on its own group. */
@@ -557,8 +608,8 @@ export class HomesteadWorld {
       { const odd = ((st.rot % 2) + 2) % 2 === 1, hx = (odd ? def.cellsZ : def.cellsX) * CELL / 2, hz = (odd ? def.cellsX : def.cellsZ) * CELL / 2; obs.push({ x: lx, z: lz, hx, hz, home: def.sleeps > 0, y: def.floorY }); }
       sig.push(`${st.id}@${Math.round(lx * 20)},${Math.round(lz * 20)}`);
     }
-    const angles = (standingDomes(game).find(d => d.id === ref.st.id)?.airlocks ?? []).map(a => a.angle);
-    sig.push(angles.map(a => a.toFixed(2)).join('/'), filtering);
+    const locks = standingDomes(game).find(d => d.id === ref.st.id)?.airlocks ?? [], angles = locks.filter(a => a.role !== 'vehicle').map(a => a.angle), vehicles = locks.filter(a => a.role === 'vehicle').map(a => a.angle);
+    sig.push(angles.map(a => a.toFixed(2)).join('/'), 'v' + vehicles.map(a => a.toFixed(2)).join('/'), filtering);
     const key = sig.join('|'), hit = this._interiorCache.get(b.placed.id);
     if (hit && hit.key === key) return hit;
     for (const q of plantLayout(ref.tier, ref.r, filtering, { rot: b.placed.rot }).parts) {
@@ -566,7 +617,7 @@ export class HomesteadWorld {
       const rr = q.shape === 'box' ? Math.hypot(q.w, q.d) / 2 : q.r;
       if (rr > 0.06) obs.push({ x: q.x, z: q.z, hx: rr, hz: rr });
     }
-    const plan = interiorPlan(ref.tier, ref.r, angles, obs, b.placed.rot + 1);
+    const plan = interiorPlan(ref.tier, ref.r, angles, obs, b.placed.rot + 1, vehicles);
     // the plant's equipment is lit at night: a pool of light round every unit (the yard and gallery read as a working place, not a dark plane)
     { const big = plantLayout(ref.tier, ref.r, filtering, { rot: b.placed.rot }).parts.filter(q => !q.onShell && !q.high && q.shape === 'box' && q.h > 0.12 && Math.max(q.w, q.d) > 0.3 && Math.hypot(q.x, q.z) < ref.r * 1.8).sort((p, q) => Math.max(q.w, q.d) - Math.max(p.w, p.d)).slice(0, 14);
       // (the pool lies on the aisle side of each unit, in front of its doors, where the ground shows)
@@ -609,7 +660,9 @@ export class HomesteadWorld {
   /** The family chose another entrance (before the drive): plan the road from it, redraw it and send the truck the new way. */
   replan(site: LandSite): void {
     const plan = roadPlanFor(site, this._seed, this.parcel);
-    if (plan === this.plan) return;
+    if (plan === this._baseRef) return;
+    this._baseRef = plan;
+    this._portKey = '';
     this.plan = plan;
     this.access = accessFromPlan(plan);
     this.parcel.setRoadBed(this._drive ? roadBedOf(plan) : null);
@@ -1517,9 +1570,9 @@ export class HomesteadWorld {
   /** The delivery truck drives on through a tunnel when the yard lies beyond one (re-found when the layout changes, between deliveries). */
   private _syncTruckTail(): void {
     const drive = this._truckRoute(), end = drive[drive.length - 1], y = this.access.yard;
-    const key = `${this.corridors.corridors.map(c => c.id + (c.collapsed ? 'x' : '')).join()}|${[...this._built.keys()].length}|${end}|${y.x},${y.z}|${this._drive}`;
+    const key = `${this.corridors.corridors.map(c => c.id + (c.collapsed ? 'x' : '')).join()}|${[...this._built.keys()].length}|${end}|${y.x},${y.z}|${this._drive}|${this._portTail.length}`;
     if (key === this._tailKey || !end) return;
-    const tail = this.corridors.corridors.length ? this.vehicleRoute(end, [y.x, y.z]) ?? [] : [];
+    const tail = this._portTail.length ? this._portTail : this.corridors.corridors.length ? this.vehicleRoute(end, [y.x, y.z]) ?? [] : [];
     if (this.truck.setTail(tail)) this._tailKey = key;
   }
 
@@ -1797,6 +1850,8 @@ export class HomesteadWorld {
     if (climb) opts.rise = climb.rise;
     // a dome meets the hill: its stem wall and berm are draped on the natural ground (no pad), sampled from the group's own frame
     if (def.level === 'cover') { const gx = p.x, gz = p.z, base = gradedDome ? this.parcel.height : this._naturalH; opts.ground = (lx, lz) => base(gx + lx, gz + lz) - y; }
+    // a dome's vehicle sally port is cut at its stamped angle on the shell (turned into the group's own frame; sim/dome/vehiclePort.ts)
+    if (def.level === 'cover') { const vp = domeFrom(p as unknown as Structure)?.airlocks.find(a => a.role === 'vehicle'); if (vp) opts.port = vp.angle - p.rot * Math.PI / 2; }
     if (p.kind === 'vehicle_yard') {
       const half = def.cellsX * CELL / 2;
       opts.spur = yardSpur(this.access.drive, p.x, p.z, p.rot, half, DRIVE_W);
@@ -2390,7 +2445,7 @@ export class HomesteadWorld {
     for (const p of list) {
       const pb = this._built.get(p.id);
       if (!pb?.under || !p.kind.startsWith('bunker_')) continue;
-      const d = domeAt(dome.kind, dome.x, dome.z, dome.rot);
+      const d = domeAt(dome.kind, dome.x, dome.z, dome.rot, (dome as { portAngle?: number }).portAngle);
       if (!d || Math.hypot(p.x - dome.x, p.z - dome.z) >= usableR(d) + 0.25) continue;
       const bp = blueprintOf(p), fin = p.stage >= bp.stages.length, hrs = bp.stages[Math.min(p.stage, bp.stages.length - 1)].hours, r = footprint(KIT[p.kind], p.x, p.z, p.rot, false);
       out.push({ id: p.id, x0: r.x0 - dome.x, z0: r.z0 - dome.z, x1: r.x1 - dome.x, z1: r.z1 - dome.z, floorY: pb.under.datum - y0, roofY: pb.under.datum + ROOF_TOP - y0, stage: fin ? 5 : p.stage, f: fin ? 1 : Math.round(20 * (p.supplied ? p.done / hrs : 0)) / 20, entry: isEntry(KIT[p.kind]), plinth: !p.underDome?.with });
@@ -2434,7 +2489,7 @@ export class HomesteadWorld {
   }
   /** The bunker rooms under a dome that the section plane cuts, in the face's frame. */
   private _sectionRooms(dome: Structure, rot: number, y0: number, list: readonly Structure[]): SectionRoom[] {
-    const d = domeAt(dome.kind, dome.x, dome.z, dome.rot), out: SectionRoom[] = [], c = Math.cos(rot), s = Math.sin(rot);
+    const d = domeAt(dome.kind, dome.x, dome.z, dome.rot, (dome as { portAngle?: number }).portAngle), out: SectionRoom[] = [], c = Math.cos(rot), s = Math.sin(rot);
     if (!d) return out;
     for (const p of list) {
       const pb = this._built.get(p.id);

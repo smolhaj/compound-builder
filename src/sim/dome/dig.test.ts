@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { DOME_TIERS, TIER, DOME_KIND, cellsOfKind } from './tiers';
+import { DOME_TIERS, TIER, FRAME_SPANS, DOME_KIND, cellsOfKind } from './tiers';
 import { BLUEPRINTS } from '../blueprints';
 import { DIG_PHASES, STAGE_SPLIT, STRATA, digState, digVolumes, hasUtilities, pitDepthFt, pitProfile, pitShape, skirtParams, strataAt, strataBreaks, utilityRuns, digLabel } from './dig';
 import { domeCost } from './cost';
@@ -12,7 +12,7 @@ describe('dome dig stages', () => {
   it('the stage shares sum to one and the blueprints keep the same total hours', () => {
     for (const t of DOME_TIERS) {
       expect(STAGE_SPLIT[t].reduce((a, b) => a + b, 0)).toBeCloseTo(1, 9);
-      const bp = BLUEPRINTS[DOME_KIND[t]], total = bp.stages.reduce((a, s) => a + s.hours, 0), want = domeCost(t).hours;
+      const bp = BLUEPRINTS[DOME_KIND[t]], total = bp.stages.reduce((a, s) => a + s.hours, 0), want = domeCost(t, undefined, { vehiclePort: true }).hours;
       expect(Math.abs(total - want)).toBeLessThanOrEqual(5);
     }
   });
@@ -115,12 +115,12 @@ describe('skirt and utilities', () => {
       expect(k.rIn).toBeGreaterThan(0);
     }
   });
-  it('one sleeve per airlock, runs reach through the skirt, the plant lines lie on the pit floor', () => {
+  it('one sleeve per span of the reference frame, runs reach through the skirt, the plant lines lie on the pit floor', () => {
     for (const t of DOME_TIERS) {
       const runs = utilityRuns(t, cells(t));
       if (t === 'earthen') { expect(runs).toHaveLength(0); continue; }
       const s = pitShape(t, cells(t));
-      expect(runs.filter(r => r.kind === 'sleeve')).toHaveLength(TIER[t].airlocks);
+      expect(runs.filter(r => r.kind === 'sleeve')).toHaveLength(FRAME_SPANS[t]);
       for (const r of runs) { expect(r.r1).toBeGreaterThan(r.r0); expect(r.y).toBeGreaterThan(0); if (r.kind === 'sleeve') { expect(r.r0).toBeLessThan(s.R); expect(r.r1).toBeGreaterThan(s.rSkirt); } else expect(r.r1).toBeLessThan(s.rTop); }
       for (const k of ['power', 'water', 'sewer', 'data'] as const) expect(runs.some(r => r.kind === k)).toBe(true);
     }

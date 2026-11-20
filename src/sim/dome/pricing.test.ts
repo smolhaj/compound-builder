@@ -16,7 +16,8 @@ describe('dome pricing (docs/design/dome_pricing.md)', () => {
     for (const t of DOME_TIERS) for (const c of sizesOf(t).filter((_, i, a) => i === 0 || i === a.length - 1 || a[i] === TIER[t].cells)) {
       const s = domeCostSummary(t, c);
       expect(s.lines.reduce((a, l) => a + l.usd, 0)).toBe(domeCost(t, c).totalUsd);
-      expect(s.grandUsd).toBe(s.totalUsd);
+      expect(s.grandUsd).toBe(s.totalUsd + s.extras.reduce((a, l) => a + l.usd, 0));   // (the only extra is the vehicle port, itemized)
+      expect(s.extras.every(l => l.id === 'vehicle_port')).toBe(true);
     }
   });
   it('a bigger dome of a tier never costs less, and a higher tier costs more at the same footprint', () => {

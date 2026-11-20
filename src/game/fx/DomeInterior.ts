@@ -4,7 +4,7 @@
  * costs no draw call of its own (the dome scenes in scripts/perfBudget.json have no room for one). SCALE v2.
  */
 import * as THREE from 'three';
-import { BENCH, CRATE, PATH_W, type InteriorPlan } from './domeInteriorPlan';
+import { BENCH, CRATE, LANE_W, PATH_W, type InteriorPlan } from './domeInteriorPlan';
 
 
 const col = (g: THREE.BufferGeometry, hex: number, jitter = 0, seed = 0): THREE.BufferGeometry => {
@@ -24,8 +24,9 @@ export function interiorPieces(plan: InteriorPlan, ground: (lx: number, lz: numb
   const pieces: THREE.BufferGeometry[] = [], gy = (x: number, z: number): number => ground(x, z);
   plan.segs.forEach((s, i) => {
     const y = gy(s.x, s.z) + 0.002;
-    pieces.push(box(PATH_W, 0.02, s.len, s.x, y, s.z, s.rot, 0x8f846f, 0, 0, 0, 0.16, i));
-    for (const k of [-1, 1]) pieces.push(box(0.022, 0.028, s.len, s.x, y, s.z, s.rot, 0x5f5a50, k * (PATH_W / 2 + 0.006), 0, 0, 0.1, i + 7));
+    const w = s.w ?? PATH_W, lane = w >= LANE_W;
+    pieces.push(box(w, 0.02, s.len, s.x, y, s.z, s.rot, lane ? 0x6f6c68 : 0x8f846f, 0, 0, 0, 0.16, i));
+    for (const k of [-1, 1]) pieces.push(box(0.022, 0.028, s.len, s.x, y, s.z, s.rot, 0x5f5a50, k * (w / 2 + 0.006), 0, 0, 0.1, i + 7));
   });
   if (plan.plaza) {
     const g = new THREE.CylinderGeometry(plan.plaza.r, plan.plaza.r, 0.02, 28); g.translate(plan.plaza.x, gy(plan.plaza.x, plan.plaza.z) + 0.012, plan.plaza.z); pieces.push(col(g, 0x9a8f7a));

@@ -80,7 +80,7 @@ if ( uWx.x + uWx.y > 0.002 ) {
   float wxNz = wxNoise( wxP.xz * 0.32 ) * 0.62 + wxNoise( wxP.xz * 1.9 + 17.3 ) * 0.38;
 
   // ── Wet surfaces ─────────────────────────────────────────────────────────
-  float wxW = uWx.x * wxPorous;
+  float wxW = uWx.x * wxPorous * ( 1.0 - seaDomeM );   // (rain and its puddles stay off the ground under a sealed dome)
   if ( wxW > 0.001 ) {
     float wxFace = 0.45 + 0.55 * wxUp;              // walls get less wet than roofs / ground
     // Wet grass and leaves: darker and a touch more saturated, with at most a
@@ -121,7 +121,8 @@ if ( uWx.x + uWx.y > 0.002 ) {
 
   // ── Lying snow ───────────────────────────────────────────────────────────
   // seaSnowK (season patch): plowed roads / paths, bare crowns, snowbanks
-  float wxS = uWx.y * wxPorous * smoothstep( 0.42, 0.8, wxUp ) * seaSnowK;
+  // seaDomeM (season patch): a climate-controlled dome interior keeps lying snow and ash off its ground, roofs, paths and crowns
+  float wxS = uWx.y * wxPorous * smoothstep( 0.42, 0.8, wxUp ) * seaSnowK * ( 1.0 - seaDomeM );
   // Plowed roads: dark, unsaturated surfaces only keep slushy patches
   float wxLum = dot( diffuseColor.rgb, vec3( 0.3, 0.55, 0.15 ) );
   float wxSat = max( diffuseColor.r, max( diffuseColor.g, diffuseColor.b ) ) - min( diffuseColor.r, min( diffuseColor.g, diffuseColor.b ) );

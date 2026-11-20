@@ -6,7 +6,7 @@
  */
 /** An axis-aligned box in the dome's local frame: center and half sizes (a round thing is a square of its radius). */
 export interface Obstacle { x: number; z: number; hx: number; hz: number; /** A lived-in house: its lit windows throw a pool of light round it at night. */ home?: boolean; /** The height of its floor above the ground (the porch deck): its light pool lies there. */ y?: number }
-export interface PathSeg { x: number; z: number; rot: number; len: number }
+export interface PathSeg { x: number; z: number; rot: number; len: number; /** Width: a footpath is PATH_W, the vehicle lane LANE_W. */ w?: number }
 export interface Prop { x: number; z: number; rot: number }
 export interface InteriorPlan {
   segs: PathSeg[]; benches: Prop[]; crates: Prop[]; planters: Prop[]; signs: Prop[]; lamps: Array<{ x: number; z: number }>;
@@ -14,15 +14,16 @@ export interface InteriorPlan {
   /** Pools of window light round the houses (center, radius). */
   glows: Array<{ x: number; z: number; r: number; y?: number }>;
 }
-export const PATH_W = 0.3, BENCH = { len: 0.17, dep: 0.06, seat: 0.075, back: 0.15 }, CRATE = 0.07;
+export const PATH_W = 0.3, LANE_W = 0.55, BENCH = { len: 0.17, dep: 0.06, seat: 0.075, back: 0.15 }, CRATE = 0.07;
 const STEP = 0.3;
 
 const hash = (n: number): number => { let h = (n | 0) * 374761393 + 668265263; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 
-export function interiorPlan(tier: string, r: number, angles: readonly number[], obstacles: readonly Obstacle[], seed = 1): InteriorPlan {
+export function interiorPlan(tier: string, r: number, angles: readonly number[], obstacles: readonly Obstacle[], seed = 1, vehicles: readonly number[] = []): InteriorPlan {
   const out: InteriorPlan = { segs: [], benches: [], crates: [], planters: [], signs: [], lamps: [], plaza: null, glows: [] };
   if (tier !== 'glass' && tier !== 'arcology' && tier !== 'geodesic') return out;
-  const free = (x: number, z: number, pad: number, inner = 0.9): boolean => Math.hypot(x, z) < r * inner && !obstacles.some(o => Math.abs(x - o.x) < o.hx + pad && Math.abs(z - o.z) < o.hz + pad);
+  const nearLane = (x: number, z: number): boolean => vehicles.some(a => { const al = x * Math.sin(a) + z * Math.cos(a), ac = Math.abs(x * Math.cos(a) - z * Math.sin(a)); return al > r * 0.4 && ac < LANE_W / 2 + 0.45; });
+  const free = (x: number, z: number, pad: number, inner = 0.9): boolean => Math.hypot(x, z) < r * inner && !nearLane(x, z) && !obstacles.some(o => Math.abs(x - o.x) < o.hx + pad && Math.abs(z - o.z) < o.hz + pad);
   // a lit house throws its light on the lawn round it: the pool is centered a little toward the middle of the dome, so the lit part lies where the ground shows
   // (centered on the house it hides under the floor; lying at porch height it washes the deck to white)
   for (const o of obstacles) if (o.home) { const m = Math.max(o.hx, o.hz), d = Math.hypot(o.x, o.z) || 1, off = Math.min(d, m + 0.4); out.glows.push({ x: o.x - o.x / d * off, z: o.z - o.z / d * off, r: m * 2.8 + 0.6 }); }
@@ -75,6 +76,15 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
     for (let i = 0; i < 8; i++) {
       const a = (i + 0.5) * Math.PI / 4 + 0.2, off = rr + PATH_W / 2 + BENCH.dep / 2 + 0.06, x = Math.sin(a) * off, z = Math.cos(a) * off;
       if (out.segs.some(s => Math.hypot(s.x - Math.sin(a) * rr, s.z - Math.cos(a) * rr) < STEP * 0.6) && free(x, z, BENCH.len / 2 + 0.04) && !angles.some(an => Math.abs(Math.atan2(Math.sin(a - an), Math.cos(a - an))) < 0.2)) { out.benches.push({ x, z, rot: Math.atan2(-Math.sin(a), -Math.cos(a)) }); if (i % 2 === 0 && out.lamps.length < 14) out.lamps.push({ x: x + Math.cos(a) * 0.16, z: z - Math.sin(a) * 0.16 }); }
+    }
+  }
+  // the vehicle sally port: a paved lane from its inner door in to a parking pad (trucks stop on pavement, never on the lawn); nothing is set in its way
+  for (const a of vehicles) {
+    const sx = Math.sin(a), sz = Math.cos(a), r1 = r * 0.5;
+    for (let rho = r * 0.86; rho > r1; rho -= STEP) {
+      const x = sx * (rho - STEP / 2), z = sz * (rho - STEP / 2);
+      if (Math.hypot(x, z) >= r * 0.92 || obstacles.some(o => Math.abs(x - o.x) < o.hx + LANE_W / 2 + 0.03 && Math.abs(z - o.z) < o.hz + LANE_W / 2 + 0.03)) break;
+      out.segs.push({ x, z, rot: Math.atan2(sx, sz), len: STEP + 0.01, w: LANE_W });
     }
   }
   if (out.plaza) {

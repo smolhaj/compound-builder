@@ -24,7 +24,25 @@ export class DeliveryTruck {
   private readonly _scene: THREE.Scene;
   private _load: THREE.Group | null = null;
   private readonly _queue: OrderLine[][] = [];
-  private _cur: { lines: OrderLine[]; phase: Phase; d: number; t: number } | null = null;
+  private _cur: { lines: OrderLine[]; phase: Phase; d: number; t: number; wait?: number; waited?: boolean } | null = null;
+  /** A dome's vehicle port on the way: the truck waits `s` seconds at its outer gate while the lock cycles (sim/dome/vehiclePort `portCycleSeconds`), each way. */
+  private _lock: { x: number; z: number; s: number } | null = null;
+  private _lockIn = Infinity;
+  private _lockOut = Infinity;
+  setLock(l: { x: number; z: number; s: number } | null): void {
+    if (this._cur || this._held) return;
+    this._lock = l; this._lay();
+  }
+  private _lockAt(path: readonly Wp[]): number {
+    if (!this._lock) return Infinity;
+    let best = Infinity, at = Infinity, d = 0;
+    for (let i = 0; i < path.length; i++) {
+      if (i > 0) d += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
+      const e = Math.hypot(path[i][0] - this._lock.x, path[i][1] - this._lock.z);
+      if (e < best) { best = e; at = d; }
+    }
+    return best < 0.6 ? at : Infinity;
+  }
   private _in: Wp[] = [];
   private _out: Wp[] = [];
   private _south: Pt[] = [];
@@ -80,6 +98,8 @@ export class DeliveryTruck {
     this._out = [...onYard.reverse(), ...this._north];
     this._inLen = lineLength(this._in as unknown as Pt[]);
     this._outLen = lineLength(this._out as unknown as Pt[]);
+    this._lockIn = this._lockAt(this._in);
+    this._lockOut = this._lockAt(this._out);
   }
 
   /** The yard lies beyond a tunnel: the truck drives on through it (only between deliveries). Returns whether the way changed. */
@@ -147,6 +167,10 @@ export class DeliveryTruck {
         const here = sampleRoute(path, Math.min(c.d, len));
         if (Math.abs(here.x - this._roadX(here.z)) < 0.7) for (const a of this._crossers) yieldK = Math.min(yieldK, yieldSpeed(a.z - here.z - 0.4, 1));
       }
+      // the vehicle port: the outer gate opens, the truck rolls into the chamber, the gate shuts behind it and the inner one opens (the lock cycle)
+      const gate = c.phase === 'in' ? this._lockIn : this._lockOut;
+      if (c.wait !== undefined && c.wait > 0) { c.wait -= dt * k; return; }
+      if (this._lock && gate !== Infinity && !c.waited && c.d >= gate - 0.05 && c.d <= gate + 1.5) { c.wait = this._lock.s; c.waited = true; return; }
       c.d += dt * k * (inside ? 1.2 : onDrive ? 1.4 : 5) * yieldK;
       const p = sampleRoute(path, Math.min(c.d, len));
       this._truck.position.set(p.x, p.y ?? this._ground(p.x, p.z), p.z);
@@ -160,7 +184,7 @@ export class DeliveryTruck {
     } else {
       c.t += dt * k;
       if (c.t > 2.5 && this._load) this._setLoad(null);
-      if (c.t > 4) { c.phase = 'out'; c.d = 0; }
+      if (c.t > 4) { c.phase = 'out'; c.d = 0; c.waited = false; c.wait = undefined; }
     }
   }
 
