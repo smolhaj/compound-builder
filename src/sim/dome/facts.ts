@@ -18,7 +18,7 @@ export function domeFacts(tier: DomeTier, cells: number = TIER[tier].cells): str
   const out = [
     `${n(g.diameterFt)} ft across, ${n(g.heightFt)} ft at the crown, covers ${(g.footprintSf / 43560).toFixed(g.footprintSf < 43560 ? 2 : 1)} acre${g.footprintSf >= 43560 * 1.5 ? 's' : ''}`,
     `Buried skirt ${n(t.skirtFt)} ft deep: tunnelers cannot dig under it; tunnels cross by an airlock`,
-    t.airlocks ? `${t.airlocks} airlocks, each a two-door chamber` : 'One low door, no airlock',
+    t.airlocks ? `One main entrance on the road side: a two-door person airlock beside a vehicle sally port${t.airlocks > 1 ? ', and a second person airlock opposite' : ''}` : 'One low door, no airlock',
   ];
   out.push(`Holds out wind to ${n(s.wind)} mph, hail to ${s.hail >= 20 ? 'any size' : `${s.hail} in`}, snow to ${n(s.snow)} lb per sq ft`);
   out.push(impervious(tier) ? 'Rifle fire, rockets and shrapnel do not get through the panels' : tier === 'earthen' ? 'Thick earth turns most bullets' : 'Does not stop a rifle: it is a glazed wall');

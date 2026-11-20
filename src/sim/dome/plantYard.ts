@@ -10,7 +10,7 @@
  * Local frame: the dome's center at the origin; angles from +z toward +x; `rot` quarter turns like the airlocks. Pure (tested in plantUnits.test.ts).
  */
 import type { DomeTier } from './tiers';
-import { TIER } from './tiers';
+import { TIER, FRAME_SPANS } from './tiers';
 import type { MaterialId } from '../materials';
 
 /** Airlock angles (the same rule as standing.ts, kept here so the cost table does not import the world state). */
@@ -60,7 +60,7 @@ export function yardPoint(g: Pick<YardGeom, 'phi' | 'r' | 'er' | 'et'>, u: numbe
 /** The yard of a dome of this tier and shell radius `r`, or null (no yard on a geodesic or earthen dome: the plant is packaged inside). */
 export function yardGeometry(tier: DomeTier, r: number, rot = 0): YardGeom | null {
   if (!hasYard(tier)) return null;
-  const n = Math.max(1, TIER[tier].airlocks), angles = airlockAngles(n), s = plantSize(r);
+  const n = FRAME_SPANS[tier], angles = airlockAngles(n), s = plantSize(r);
   const phi = (n > 1 ? (angles[0] + angles[1]) / 2 : Math.PI) + rot * Math.PI / 2;
   const span = n > 1 ? (angles[1] - angles[0]) * r : 2 * Math.PI * r;
   const W = Math.max(1.6, Math.min(5.4 * s, span - 2.8)), D = Math.max(1.2, 2.0 * s);

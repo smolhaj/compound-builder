@@ -22,7 +22,7 @@ import { PERIMETER, type PerimeterKind, type PerimeterRun } from '../perimeter';
 import { repairLeadDays } from '../structureDamage';
 import { TIER, type DomeTier } from './tiers';
 import { STOPS, type Weapon } from './protection';
-import { domesOf, PANELS, type Dome } from './standing';
+import { domesOf, entrancesOf, PANELS, type Dome } from './standing';
 import { MATERIALS, type MaterialId, type Stock } from '../materials';
 import type { GameState } from '../state';
 
@@ -83,7 +83,8 @@ export function shellRun(d: Dome, openAngles: readonly number[] = []): Perimeter
   let total = 0;
   for (let i = 1; i < pts.length; i++) total += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
   const at = (a: number) => { const u = ((a / (2 * Math.PI)) % 1 + 1) % 1; return u * total; };
-  const gates = d.airlocks.map(l => ({ at: at(l.angle), w: l.w }));
+  // one gate per public entrance: the gate complex (the person airlock and the vehicle port side by side) is ONE, a second person airlock another; link airlocks and the plant's service airlock are not doors a crew can work (PROPOSED, owner: one entrance, two at most)
+  const gates = entrancesOf(d).map(e => ({ at: at(e.angle), w: e.w }));
   for (const a of openAngles) gates.push({ at: at(a), w: 0.6, breach: true } as { at: number; w: number; breach?: boolean });
   return { id: `dome:${d.id}`, kind: SHELL_KIND[d.tier], pts, gates, done: 0, hours: 0, supplied: true, finishedAt: 0 };
 }
@@ -149,7 +150,8 @@ export function shellWord(tier: DomeTier, health: number): string | null {
   return `${down} panel${down === 1 ? '' : 's'} down: the shell is open there until the glazier has replaced ${down === 1 ? 'it' : 'them'}`;
 }
 export const TIER_PANELS = (t: DomeTier): number => PANELS[t];
-export const AIRLOCKS = (t: DomeTier): number => TIER[t].airlocks;
+/** Public entrances a raid can work: the gate complex is one, the arcology's second airlock another. */
+export const AIRLOCKS = (t: DomeTier): number => Math.max(1, TIER[t].airlocks);
 
 /** What the shell is worth as a barrier on the posture's 0-100 scale (a closed ring of the tier, less the panels down). Never falls as the tier rises (property test); the arcology is the top of the chain. */
 export const SHELL_BARRIER: Record<DomeTier, number> = { earthen: 50, geodesic: 35, glass: 62, arcology: 100 };
@@ -178,7 +180,10 @@ export function panelSpot(d: Pick<Dome, 'x' | 'z' | 'r' | 'airlocks'>, k = 0): {
     gaps.push({ mid: (a + b) / 2, span: b - a });
   }
   gaps.sort((p, q) => q.span - p.span || p.mid - q.mid);
-  const angle = gaps[k % gaps.length].mid, [x, z] = onShell(d, angle);
+  // a wide vehicle port leaves some mid-gaps too close: those that clear every airlock come first (the rest only when none does)
+  const room = (a: number): number => d.airlocks.reduce((m, l) => Math.min(m, Math.abs(angDiff(a, l.angle)) * d.r - (l.role === 'vehicle' ? l.w / 2 : 0)), Infinity);
+  const clear = gaps.filter(g => room(g.mid) >= PANEL_CLEARANCE * Math.min(1, d.r / 2));
+  const pool = clear.length ? clear : gaps, angle = pool[k % pool.length].mid, [x, z] = onShell(d, angle);
   return { x, z, angle };
 }
 
@@ -188,8 +193,8 @@ export function awayFromAirlocks(d: Pick<Dome, 'x' | 'z' | 'r' | 'airlocks'>, x:
   const need = clear / d.r;
   for (let pass = 0; pass < 3; pass++) {
     for (const l of d.airlocks) {
-      const off = angDiff(a, l.angle);
-      if (Math.abs(off) < need) { a = l.angle + (off >= 0 ? 1 : -1) * need; moved = true; }
+      const off = angDiff(a, l.angle), nd = l.role === 'vehicle' ? need + l.w / 2 / d.r : need;   // (a vehicle port is wide: its chamber and gates)
+      if (Math.abs(off) < nd) { a = l.angle + (off >= 0 ? 1 : -1) * nd; moved = true; }
     }
   }
   const [nx, nz] = onShell(d, a);

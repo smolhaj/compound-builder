@@ -18,6 +18,13 @@ import { CELL_FT, TIER, tierOfKind, type DomeTier } from '../../sim/dome/tiers';
 import { airlockAngles } from '../../sim/dome/standing';
 import { digState } from '../../sim/dome/dig';
 import type { BuildLayer } from './shell';
+import { DEFAULT_BEARING, choosePortAngle, personAngles, portVestibule } from '../../sim/dome/vehiclePort';
+
+/** The public entrances of a dome in its own frame (turn 0): the person airlock(s) of the gate complex and the vehicle port beside them (sim/dome/vehiclePort.ts). */
+const entrancesFor = (tier: DomeTier, R: number, port: number | undefined): { port: number; persons: number[] } => {
+  const p = port ?? choosePortAngle({ tier, r: R, rot: 0 }, DEFAULT_BEARING).angle;
+  return { port: p, persons: personAngles(tier, R, p) };
+};
 import { SHELL_INSET, SURROUND_PAD, axisOf, chamberColliders, chamberRho, ringSkipped, vestibuleOf, type Vestibule } from '../../sim/dome/vestibule';
 
 /** World units of berm banked round a dome's shell inside its footprint (the footprint is shell plus berm). */
@@ -151,12 +158,15 @@ const strut = (a: Pt3, b: Pt3, r: number, seg: number): THREE.BufferGeometry => 
  * door. The struts along the removed edges go too. One `Doorways` per dome.
  */
 class Doorways {
-  readonly holes: Array<{ a: number; v: Vestibule; lam0: number; lam1: number; y1: number }> = [];
+  readonly holes: Array<{ a: number; v: Vestibule; lam0: number; lam1: number; y1: number; vehicle?: boolean }> = [];
   private readonly R: number;
   private readonly y0: number;
-  constructor(angles: number[], tier: DomeTier, R: number, y0: number) {
+  constructor(angles: number[], tier: DomeTier, R: number, y0: number, port: number | null = null) {
     this.R = R; this.y0 = y0;
     for (const a of angles) { const v = vestibuleOf(tier, R); this.holes.push({ a, v, lam0: -(v.cw / 2 + v.t), lam1: v.cw / 2 + v.t, y1: y0 + v.dh }); }
+    // the vehicle sally port (sim/dome/vehiclePort.ts): a longer, wider chamber at its own angle on the shell
+    const pv = port === null ? null : portVestibule(tier, R);
+    if (pv && port !== null) this.holes.push({ a: port, v: pv, lam0: -(pv.cw / 2 + pv.t), lam1: pv.cw / 2 + pv.t, y1: y0 + pv.dh, vehicle: true });
   }
   private at(h: Doorways['holes'][number], x: number, z: number): [number, number] { const k = axisOf(h.a); return [x * k.ux + z * k.uz, x * k.vx + z * k.vz]; }
   /** Does this panel (its corners) sit in a doorway window? Grows the hole to cover it when it does. */
@@ -216,7 +226,14 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
     const g = box(len, v.dh * 0.97, 0.012, -sh * len / 2, 0, 0).rotateY(phi).translate(sh * v.dw / 2, y0, rho);
     p.add('door', place(g));
   };
-  swing(outer, -1); swing(inner, 1);
+  // a vehicle port's gates slide: each leaf rides back along the wall on the chamber side of its door line, half open; an interlock lamp over each (red: shut behind, green: clear)
+  const slide = (rho: number, side: 1 | -1) => {
+    const len = v.dw * 0.56, g = box(len, v.dh * 0.96, 0.016, side * (v.dw / 2 - len / 2 + 0.02), 0, 0).translate(0, y0, rho + (rho === outer ? -0.03 : 0.03));
+    p.add('door', place(g));
+    p.add('trim', place(box(v.dw + 0.1, 0.02, 0.03, 0, y0 + v.dh + 0.004, rho + (rho === outer ? -0.03 : 0.03))));   // the gate's track
+    p.add('lamp', place(box(0.05, 0.03, 0.02, -side * (v.dw / 2 + 0.06), y0 + v.dh - 0.04, rho + (rho === outer ? 0.03 : -0.03))));
+  };
+  if (hole.vehicle) { slide(outer, 1); slide(inner, -1); } else { swing(outer, -1); swing(inner, 1); }
   p.add('lamp', place(box(v.cw * 0.5, 0.012, 0.04, 0, y0 + v.h - 0.014, mid)));                                                // a lamp down the middle of the ceiling
   p.add('lamp', place(box(v.dw * 0.4, 0.012, 0.012, 0, y0 + v.dh + 0.02, outer + 0.022)));                                      // and one over the outer door
   p.layer = 'interior';
@@ -282,7 +299,7 @@ function earthen(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
 }
 
 /** The shared build of a triangulated dome (geodesic and arcology). */
-function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number, opts: BuildOpts, N: number, airlocks: number, panelMat: 'dome_polycarb' | 'arcology', frameMat: 'aluminum' | 'steel'): THREE.Group {
+function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number, opts: BuildOpts, N: number, panelMat: 'dome_polycarb' | 'arcology', frameMat: 'aluminum' | 'steel'): THREE.Group {
   const p = new Parts(seed, opts), L = LOOK[tier], R = def.cellsX * CELL / 2 - 0.03 - bermU(tier), y0 = L.stem, g = opts.ground ?? (() => 0);
   const rim = (a: number) => g(R * Math.sin(a), R * Math.cos(a));
   const nWall = Math.max(36, Math.min(120, Math.round(R * 14)));
@@ -301,7 +318,7 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
   const band = tier === 'arcology' ? 0.8 : 0;
   p.layer = 'frame';
   const seen = new Set<string>(), seg = tier === 'arcology' ? 3 : 5;
-  const doors = new Doorways(airlockAngles(airlocks), tier, R, y0);
+  const ent = entrancesFor(tier, R, opts.port), doors = new Doorways(ent.persons, tier, R, y0, ent.port);
   // the panels that sit in a doorway window are left out first (the holes grow to cover them), then the struts that run along the hole
   const kept = tris.filter(([A, B, C]) => !doors.takes([V(...A), V(...B), V(...C)]));
   const edge = (A: [number, number], B: [number, number]) => {
@@ -335,14 +352,14 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
   return out;
 }
 
-function geodesic(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group { return triShell(def, 'geodesic', seed, opts, 5, 2, 'dome_polycarb', 'aluminum'); }
+function geodesic(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group { return triShell(def, 'geodesic', seed, opts, 5, 'dome_polycarb', 'aluminum'); }
 /**
  * The arcology lattice's frequency by detail tier: 12 on High (a strut every ~30 ft at the default size), 8 on Medium and Low. The struts are the arcology's
  * biggest shadow caster (about 1,300 of them), and Medium's shadow-triangle budget (scripts/perfBudget.json, never raised) has room for the coarser lattice only.
  */
 export const arcologyFrequency = (t: DetailTier): number => (t === 'high' ? 12 : 8);
 
-function arcology(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group { return triShell(def, 'arcology', seed, opts, arcologyFrequency(detailTier()), 6, 'arcology', 'steel'); }
+function arcology(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group { return triShell(def, 'arcology', seed, opts, arcologyFrequency(detailTier()), 'arcology', 'steel'); }
 
 function glass(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   const p = new Parts(seed, opts), L = LOOK.glass, R = def.cellsX * CELL / 2 - 0.03, y0 = L.stem, g = opts.ground ?? (() => 0);
@@ -356,7 +373,7 @@ function glass(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   { const emb = embankment(R + 0.06, g, y0 - 0.005, 96); if (emb) p.add('earth', emb); }
   const th = (i: number) => i / P * Math.PI / 2 * 0.985;             // parallels from the crown (i = 0 is the oculus ring) down to the foot
   const V = (i: number, m: number): Pt3 => dir(R - 0.03, i === P ? Math.PI / 2 : th(i), m * TAU / M, y0);
-  const doors = new Doorways(airlockAngles(3), 'glass', R, y0);
+  const ent = entrancesFor('glass', R, opts.port), doors = new Doorways(ent.persons, 'glass', R, y0, ent.port);
   // panes in a doorway window first (the hole grows to cover them), then the members along it
   const cell = (i: number, m: number): Pt3[] => [V(i, m), V(i, m + 1), V(i + 1, m + 1), V(i + 1, m)];
   const keptCells: Array<[number, number]> = [];

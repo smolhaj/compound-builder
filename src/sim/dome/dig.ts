@@ -12,7 +12,7 @@
  * so what is drawn is what the Projects panel says. Hours and prices are unchanged: only how a dome's hours are split over its five stages moved
  * (`STAGE_SPLIT`, docs/DECISIONS.md). Lengths in world units (SCALE v2: 1 unit = 20 ft, a person 0.28) unless named `Ft`. Pure; tested in dig.test.ts.
  */
-import { CELL_FT, TIER, shellFt, type DomeTier } from './tiers';
+import { CELL_FT, TIER, shellFt, type DomeTier, FRAME_SPANS } from './tiers';
 import { vestibuleOf } from './vestibule';
 
 const TAU = Math.PI * 2;
@@ -227,7 +227,7 @@ export interface UtilRun {
 /** The runs laid on the pit floor before the skirt: to the plant between the first two airlocks (power, water, sewer, data) and a sleeve through the skirt at every airlock. */
 export function utilityRuns(tier: DomeTier, cells: number): UtilRun[] {
   if (!hasUtilities(tier)) return [];
-  const s = pitShape(tier, cells), t = TIER[tier], v = vestibuleOf(tier, s.R), angles = airlockAngles(Math.max(1, t.airlocks));
+  const s = pitShape(tier, cells), v = vestibuleOf(tier, s.R), angles = airlockAngles(FRAME_SPANS[tier]);
   const phi = angles.length > 1 ? (angles[0] + angles[1]) / 2 : Math.PI;
   const scale = Math.max(0.6, Math.min(1.5, s.R / 6));
   const inner = s.R * 0.38, outer = s.rWork + 0.5 * s.run + 0.2;

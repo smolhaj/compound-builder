@@ -23,7 +23,7 @@
  */
 import type { Filtering } from './air';
 import type { DomeTier } from './tiers';
-import { TIER } from './tiers';
+import { FRAME_SPANS } from './tiers';
 import type { WaterLoop } from './waterLoop';
 import type { PlantKind, PlantPlace } from './plantUnits';
 import { CHAMBER_LEN, PORTAL_H, PORTAL_W, plantSize, yardGeometry, yardPoint, YARD_GAP, YARD_H, YARD_T, type YardGeom } from './plantYard';
@@ -95,7 +95,7 @@ const loc = (f: Fr, dx: number, dz: number): [number, number] => [f.x + dx * Mat
 export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: PlantOpts = {}): Plant {
   const level = LEVEL[filtering], s = plantSize(r), parts: PlantPart[] = [], lines: PlantLine[] = [];
   const loop = o.loop ?? 'none', spares = o.spares ?? [], rot = o.rot ?? 0;
-  const n = Math.max(1, TIER[tier].airlocks), tau = Math.PI * 2, step = tau / n;
+  const n = FRAME_SPANS[tier], tau = Math.PI * 2, step = tau / n;
   const angles = tier === 'earthen' ? [0] : Array.from({ length: n }, (_, i) => i * step + rot * Math.PI / 2);
   const spanMid = (i: number): number => angles[i % n] + step / 2;
   const spans = n > 1 ? [spanMid(0), spanMid(1)] : [Math.PI + rot * Math.PI / 2];
