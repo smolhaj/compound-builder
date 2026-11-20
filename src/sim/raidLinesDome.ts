@@ -129,7 +129,7 @@ export const DOME_LINES: Record<'raider' | 'defender', Partial<Record<DomeCtx, V
     dome_spectate: {
       any: ['Still at it.', 'They are not getting anywhere.', 'Look at him. Same spot again.', 'How long are they going to do this?', 'He is going to hurt his hands.', 'Nothing is happening. Good.'],
       kid: ['Are they still there?', 'He hit it again!', 'Can I see?', 'They look so small.'],
-      civ: ['Pour me another. Long night.', 'Seven now. No, eight.', 'Does not even scratch it.', 'Look at that one. Giving up already.', 'Told you it would hold.'],
+      civ: ['Pour me another. Long night.', 'Seven now. No, eight.', 'Does not even scratch it.', 'Look at that one. Sat down already.', 'Told you it would hold.'],
       vet: ['Keep an eye on the east side.', 'They are tired. Look how they stand.'],
       elder: ['Poor fools. All that work.', 'Let them wear themselves out.'],
     },
