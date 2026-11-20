@@ -86,7 +86,7 @@ interface U {
   /** Drawn size this frame (the figure grows with the camera's distance). */
   gs?: number;
   /** Carries a rifle (every defender on the line, a raider who has fired), and until when the muzzle is up at the target. */
-  armed?: boolean; aimUntil?: number;
+  armed?: boolean; aimUntil?: number; /** A spectator at a sealed dome: never raises a rifle, points with a raised hand. */ relaxed?: boolean;
   /** Where it stood last frame (the stride follows the ground covered). */
   px?: number; pz?: number;
 }
@@ -334,7 +334,7 @@ export class BattleRenderer {
         if (p) { wear.shirt = p.shirt; if (p.body === 'f' && wear.hairStyle === 0) wear.longHair = true; }
         if (def.civilian) scale = p ? (p.kid ? ((p.age ?? 9) < 8 ? 0.62 : 0.78) : 1) : 0.66;
         wear.pants = 0x3b4a66;
-        armed = !def.civilian && !def.machine;
+        armed = !def.civilian && !def.machine && !b.sealed;   // (a household at a dome nothing can breach has put its rifles down: it watches)
       } else {
         const rl = def.look?.role;
         const role: Role = rl === 'scout' || rl === 'leader' ? (rl === 'leader' ? 'militia' : 'tactical') : rl === 'soldier' ? 'militia' : rl === 'kid' ? 'child' : rl === 'parent' ? 'neighbor' : !def.look ? (hashStr(def.id) % 3 === 0 ? 'militia' : 'scavenger') : 'scavenger';
@@ -356,7 +356,7 @@ export class BattleRenderer {
       const y = def.y ?? 0;
       const start = def.side === 'raider' && !def.machine ? this._clearOfCover(def.x, def.z) : { x: def.x, z: def.z };
       this._units.set(def.id, { scale, def, x: start.x, y, z: start.z, tx: start.x, ty: y, tz: start.z, rot: def.side === 'raider' ? Math.atan2(this._center.x - def.x, this._center.z - def.z) : 0,
-        phase: r() * 6, speed: RUN, wear, armed, wound: 0, dead: false, crouch: false, gone: false });
+        phase: r() * 6, speed: RUN, wear, armed, relaxed: !!b.sealed && def.side === 'home' && !def.machine, wound: 0, dead: false, crouch: false, gone: false });
     }
     if (b.vehicle) {
       // (the opportunists' pickup: one small group of merged parts, only while this scene plays)
@@ -600,13 +600,13 @@ export class BattleRenderer {
         u.rot = Math.atan2(e.x - u.x, e.z - u.z); u.armed = true; u.aimUntil = this.time + 0.9; u.tx = u.x; u.tz = u.z;
         this.shellFx.onDomeShot(e, p0, chest);
         // the round that comes back rocks him: down on a knee for a moment, then up (no wound: nothing in the fight changes)
-        if (e.bounce === 'back') { u.proneUntil = this.time + (e.down ?? 2); this.shake = Math.max(this.shake, 0.06); }
+        if (e.bounce === 'back') { u.proneUntil = this.time + (e.down ?? 2); u.limp = true; this.shake = Math.max(this.shake, 0.06); }
         break;
       }
       case 'gesture': {
         const u = U_(e.unit); if (!u || u.dead) break;
         u.rot = Math.atan2(e.x - u.x, e.z - u.z); u.tx = u.x; u.tz = u.z; u.crouch = false;
-        if (e.what === 'point') { u.armed = true; u.aimUntil = this.time + e.secs; }
+        if (e.what === 'point' && !u.relaxed) { u.armed = true; u.aimUntil = this.time + e.secs; }
         else { u.hands = true; u.frozenUntil = this.time + e.secs; }   // (arms up: a wave-off, a raised fist)
         break;
       }

@@ -18,6 +18,8 @@ export interface Shot { /** A beat holds the shot until this time (the death sce
 
 const MIN_HOLD = 3.2;
 const ORDER: ShotKind[] = ['wall', 'raiders', 'house', 'wide', 'gate', 'raiders'];
+/** A fight at a dome nothing can breach: the picture is the crew at the shell, never the family's yard or the house. */
+export const SEALED_ORDER: ShotKind[] = ['raiders', 'wide', 'gate', 'raiders'];
 /** The lead-in is only 3-9 s of playback: a wide pose, the crew from the side, a low shot out through the gate from the defenders' side (the caption is about the raiders, so never a defender's close-up), each held a few seconds and never twice running. */
 const LEAD_ORDER: ShotKind[] = ['wide', 'raiders', 'gate'];
 /** The shortest a scheduled shot is held in the lead-in (s). */
@@ -369,6 +371,8 @@ export class Director {
   private _lastCheck = -99;
   /** The latest crew member seen at work on a dome's shell (sim/dome/domeBeats.ts probes): the next cut is to him while the work is on. */
   private _probe: { unit: string; t: number } | null = null;
+  /** The fight is at a sealed dome (Battle.sealed): no house or wall shots of the family's side. */
+  sealed = false;
   private _t = 0;
   private _g: Ground = () => 0;
   private _byId: ReadonlyMap<string, Actor> = new Map();
@@ -458,7 +462,7 @@ export class Director {
       else if (e.kind === 'breach' || e.kind === 'fallback' || e.kind === 'explosion' || e.kind === 'mine') want = { kind: 'wide', hold: 4.2 };
       else if (e.kind === 'gesture' || (e.kind === 'dome_shot' && (e.bounce === 'back' || this._r() < 0.4))) { this._probe = { unit: e.unit, t: time }; want = { kind: 'close', subject: e.unit, hold: 3.6 }; }
       else if (e.kind === 'probe') { this._probe = { unit: e.unit, t: time }; if (e.what !== 'rifle' && this._r() < 0.85) want = { kind: 'close', subject: e.unit, hold: 3.8 }; }
-      else if (e.kind === 'alarm' && !this.shot) want = { kind: 'house', hold: 5 };
+      else if (e.kind === 'alarm' && !this.shot && !this.sealed) want = { kind: 'house', hold: 5 };
       else if (e.kind === 'say' && e.who && !want) {
         const u = byId.get(e.who); const lastSaid = this._last.get(e.who) ?? -99;
         if (u && !u.dead && !u.gone && time - lastSaid > 9 && (this.shot?.subject !== e.who)) { want = { kind: 'close', subject: e.who, hold: 3.4 }; this._last.set(e.who, time); }
@@ -501,7 +505,7 @@ export class Director {
     }
     if (due) {
       // next in the rotation that has something to show
-      const order = this.leadIn && raiders.length ? LEAD_ORDER : ORDER;
+      const order = this.sealed && raiders.length ? SEALED_ORDER : this.leadIn && raiders.length ? LEAD_ORDER : ORDER;
       for (let k = 0; k < order.length; k++) {
         const kind = order[(this._cycle + k) % order.length];
         if (kind === cur?.kind) continue;

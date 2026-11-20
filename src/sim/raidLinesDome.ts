@@ -89,12 +89,12 @@ export const DOME_LINES: Record<'raider' | 'defender', Partial<Record<DomeCtx, V
       large: ['We know the layout now.'],
     },
     dome_angry: {
-      any: ['Open fire. All of it!', 'Reloading!', 'It has to break. Keep firing!'],
+      any: ['Keep firing. It has to break!', 'Reloading!', 'It has to break. Keep firing!'],
       hard: ['Concentrate. One spot.'],
       desperate: ['Break. Please, just break.'],
     },
     dome_bounce: {
-      any: ['Who fired that?', 'It bounced right back!', 'It came back! Get down!', 'Cease fire, you idiot!', 'My arm. That nearly took my arm.'],
+      any: ['Who fired that?', 'It bounced right back!', 'It came back! Get down!', 'Cease fire, you idiot!', 'That nearly took my head off. My own round.'],
       savage: ['Who fired? Who the hell fired?'],
       desperate: ['I am okay. I am okay. Stay down.'],
     },

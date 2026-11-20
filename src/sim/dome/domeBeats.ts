@@ -225,10 +225,10 @@ export function domeBeats(b0: Battle, o: DomeBeatInput): Battle {
       out.push({ t: r2(bt + k * 0.34), kind: 'dome_shot', unit: u.id, x: r2(sp.x), z: r2(sp.z), ox: r2(Math.sin(a)), oz: r2(Math.cos(a)), tier, bounce: back ? 'back' : 'glance', ...(back ? { down: 2.2 } : {}) });
     }
     say(bt - 0.6, u, 'dome_angry');
-    if (kickback && i === kickIdx) { say(bt + burst * 0.34 + 0.7, u, 'dome_bounce'); say(bt + burst * 0.34 + 2.4, homeAt(5, bt + 4), 'dome_react_bounce'); say(bt + burst * 0.34 + 4.6, homeAt(6, bt + 6), 'dome_react_limp'); }
+    if (kickback && i === kickIdx) { say(bt + burst * 0.34 + 0.7, u, 'dome_bounce'); say(bt + burst * 0.34 + 2.4, homeAt(5, bt + 4), 'dome_react_bounce'); }
   }
   // 9. the household comes to the inside of the shell and taunts the crew through it (a kid, a parent, a guard: each in his own voice), with a sign
-  const people = home.concat(b.units.filter(u => u.side === 'home' && u.civilian && !u.bystander && !u.machine));
+  const people = home.concat(b.units.filter(u => u.side === 'home' && u.civilian && (sealed || !u.bystander) && !u.machine));   // (at a sealed dome even the children in the yard come to the glass)
   const byProf = (p: string) => people.find(h => profileOfUnit(h) === p || (p === 'elder' && h.traits?.history.includes('elder')));
   const taunters = ['kid', 'civ', 'vet'].map(byProf).filter((u, i, all): u is BattleUnit => !!u && all.indexOf(u) === i);
   for (const u of people) if (taunters.length < (sealed ? 8 : 3) && !taunters.includes(u)) taunters.push(u);
@@ -269,6 +269,8 @@ export function domeBeats(b0: Battle, o: DomeBeatInput): Battle {
     say(at(0.93), leader, 'dome_order');
     say(Math.min(b.duration - 1, tEnd + 1.2), pickWorker(13) ?? leader, 'dome_vow');
     say(Math.min(b.duration - 0.6, tEnd + 2.6), homeAt(4, tEnd + 2.6), 'dome_gone');
+    // (only when the man who took his own round back is limping off with the rest)
+    if (kickback && nMad > 0) say(Math.min(b.duration - 0.9, tEnd + 3.8), homeAt(8, tEnd + 3.8), 'dome_react_limp');
   }
   // the rest of the crew mills about near the shell, in sight of it (nobody stands out in the dark where the sim left him)
   [...crewOrder, leader].filter(u => !worked.has(u.id) && !drivers.has(u.id)).forEach((u, i) => goTo(u, 2 + i * 0.7, a0 + (i % 2 ? 1 : -1) * (0.55 + i * 0.12), 1.6 + (i % 3) * 0.5));

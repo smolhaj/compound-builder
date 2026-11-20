@@ -479,7 +479,7 @@ export function GameCanvas() {
       if (!navSolidCache || navSolidCache.sig !== sig || now - navSolidCache.at > 60000) navSolidCache = { sig, at: now, fn: (x: number, z: number) => world.walkBlocked(x, z, 0.04) };
       return navSolidCache.fn;
     };
-    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70), ...(qa.noCover ? [] : coverBoxes(world.lowCover, homeSpot(), 70))] ,
+    const player = new CutscenePlayer({ battle, ground: world.groundAt, house: homeSpot, commit: () => useGameStore.getState().commitCutscene(), seed: useGameStore.getState().game.seed, domes: () => domesOf(useGameStore.getState().game).map(d => ({ x: d.x, z: d.z, r: d.r, tier: d.tier })), obstacles: () => [...obstaclesOf(useGameStore.getState().game), ...treeBoxes(world.treeSpecs, homeSpot(), 70), ...(qa.noCover ? [] : coverBoxes(world.lowCover, homeSpot(), 70))] ,
       // the invasion look (sim/breach.ts, sim/houseAssault.ts): how the wall comes down, and the fight inside the house; cinematic, the sim's result is kept
       prepare: b0 => {
         // 1. the invasion look (cinematic; the sim's result is kept); 2. the movement rule: every leg goes through a real opening (sim/cutNav.ts).

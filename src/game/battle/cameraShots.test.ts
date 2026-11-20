@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { Director, MAX_SURFACE_COVER, MAX_WALL_COVER, wallCover, STANDOFF, auditPose, bestEye, surfaceCover, brushCover, MAX_BRUSH_COVER, figurePx, lensProblem, poseAt, shotProblems, type Actor, type Box, type Shot } from './director';
-import { obstaclesOf, treeBoxes } from './cameraObstacles';
+import { SEALED_ORDER, Director, MAX_SURFACE_COVER, MAX_WALL_COVER, wallCover, STANDOFF, auditPose, bestEye, surfaceCover, brushCover, MAX_BRUSH_COVER, figurePx, lensProblem, poseAt, shotProblems, type Actor, type Box, type Shot } from './director';
+import { obstaclesOf, treeBoxes, domeShotGround } from './cameraObstacles';
 import { place } from '../../sim/raidTestKit';
 import { domesOf } from '../../sim/dome/standing';
 import { lightLabel } from './lightLabel';
@@ -188,6 +188,19 @@ describe('every raid-cutscene shot frames its subject and stays out of the geome
     expect(shotProblems({ ...base, eye: { x: 0, y: 0.5, z: -3 }, look: { x: 0, y: 0.2, z: 3 } }, ctx).join()).toMatch(/subjects in frame/);
     expect(shotProblems({ ...base, eye: { x: 0, y: 0.5, z: 3.8 }, look: { x: 0, y: 0.2, z: 3 } }, ctx).join()).toMatch(/too close/);
     expect(shotProblems({ ...base, eye: { x: 2.5, y: 0.5, z: 6 }, look: { x: 0, y: 0.2, z: 3 } }, ctx)).toEqual([]);
+  });
+});
+
+describe('the embankment under a dome is ground to the shot camera', () => {
+  it('raises the ground round the foot of a dome, out to the embankment\'s reach, and nowhere else', () => {
+    const flat = () => 0, g = domeShotGround(flat, [{ x: 0, z: 0, r: 5, tier: 'arcology' }]);
+    expect(g(5.2, 0)).toBeGreaterThan(0.05);       // just outside the shell: up to the stem wall's top
+    expect(g(5.2, 0)).toBeGreaterThan(g(9, 0));      // and sloping away
+    expect(g(14, 0)).toBe(0); expect(g(1, 1)).toBe(0); // beyond its reach and inside the shell: untouched
+    expect(domeShotGround(flat, [])).toBe(flat);
+  });
+  it('a sealed fight never cuts to the house or the wall of the family', () => {
+    expect(SEALED_ORDER).not.toContain('house'); expect(SEALED_ORDER).not.toContain('wall'); expect(SEALED_ORDER).toContain('raiders');
   });
 });
 
