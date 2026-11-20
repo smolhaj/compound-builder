@@ -81,6 +81,13 @@ try {
   if (want('chamber-person')) { await pr(EP(R + 0.8 * S, 0.0, 0.3 * S), EP(R - 0.2, 0, 0.22 * S), 55); await shot('chamber-person-eye'); }
   if (want('chamber-port')) { await pr(E(R + 1.5 * S, 0.1, 0.32 * S), E(R - 0.6, 0, 0.25 * S), 58); await shot('chamber-port-eye'); }
   const lightsOn = () => page.evaluate(() => window.__cb.game.setState(st => { const g = structuredClone(st.game); g.utilities.lit = ['x']; return { game: g }; }));
+  if (want('diag')) {
+    await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62);
+    await page.evaluate(() => { let n = 0; window.__cb.ws.scene.traverse(o => { const m = o.material; if (o.isMesh && m && m.side === 1 && m.transparent && m.depthWrite === false && m.type === 'MeshBasicMaterial') { o.visible = false; n++; } }); window.__hazeHidden = n; });
+    lap('haze meshes hidden ' + await page.evaluate(() => window.__hazeHidden)); await shot('diag-nohaze');
+    await set(`cb.store.getState().setSeasonMode?.('winter')`); await shot('diag-winter');
+    await set(`cb.store.getState().setTimeOfDay(12)`); await shot('diag-noon');
+  }
   if (want('inside-night')) { await lightsOn(); await set(`cb.store.getState().setTimeOfDay(21.5)`); await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await shot('inside-looking-out-night'); }
   if (want('night')) {
     await lightsOn(); await set(`cb.store.getState().setTimeOfDay(21.5)`);
