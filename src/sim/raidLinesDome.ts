@@ -5,11 +5,11 @@
  */
 type Variants = Partial<Record<string, readonly string[]>>;
 export type DomeCtx = 'dome_scout' | 'dome_shots' | 'dome_tool' | 'dome_cut' | 'dome_airlock' | 'dome_ram' | 'dome_blast' | 'dome_skirt' | 'dome_argue' | 'dome_order' | 'dome_panic' | 'dome_vow'
-  | 'dome_watch' | 'dome_fire' | 'dome_holds' | 'dome_gone' | 'dome_angry' | 'dome_bounce' | 'dome_taunt' | 'dome_react_swing' | 'dome_react_bounce' | 'dome_react_limp' | 'dome_cross';
+  | 'dome_watch' | 'dome_fire' | 'dome_holds' | 'dome_gone' | 'dome_angry' | 'dome_bounce' | 'dome_taunt' | 'dome_react_swing' | 'dome_react_bounce' | 'dome_react_limp' | 'dome_cross' | 'dome_spectate';
 
 /** Every key of every pool, so a test can hold the planner to using each one. */
 export const DOME_RAIDER_CTX: readonly DomeCtx[] = ['dome_scout', 'dome_shots', 'dome_tool', 'dome_cut', 'dome_airlock', 'dome_ram', 'dome_blast', 'dome_skirt', 'dome_argue', 'dome_order', 'dome_panic', 'dome_vow', 'dome_angry', 'dome_bounce', 'dome_cross'];
-export const DOME_DEFENDER_CTX: readonly DomeCtx[] = ['dome_watch', 'dome_fire', 'dome_holds', 'dome_gone', 'dome_taunt', 'dome_react_swing', 'dome_react_bounce', 'dome_react_limp'];
+export const DOME_DEFENDER_CTX: readonly DomeCtx[] = ['dome_watch', 'dome_fire', 'dome_holds', 'dome_gone', 'dome_taunt', 'dome_react_swing', 'dome_react_bounce', 'dome_react_limp', 'dome_spectate'];
 export const DOME_VARIANT_KEYS: readonly string[] = ['any', 'desperate', 'hard', 'savage', 'small', 'large', 'leader', 'kid', 'civ', 'vet', 'elder'];
 
 export const DOME_LINES: Record<'raider' | 'defender', Partial<Record<DomeCtx, Variants>>> = {
@@ -94,7 +94,7 @@ export const DOME_LINES: Record<'raider' | 'defender', Partial<Record<DomeCtx, V
       desperate: ['Break. Please, just break.'],
     },
     dome_bounce: {
-      any: ['Who is shooting? Who is hit?', 'Something hit me. I am hit!', 'It came back! Get down!', 'Shit, contact! Where did that come from?', 'My arm. I think it is my arm.'],
+      any: ['Who fired that?', 'It bounced right back!', 'It came back! Get down!', 'Cease fire, you idiot!', 'My arm. That nearly took my arm.'],
       savage: ['Who fired? Who the hell fired?'],
       desperate: ['I am okay. I am okay. Stay down.'],
     },
@@ -125,6 +125,13 @@ export const DOME_LINES: Record<'raider' | 'defender', Partial<Record<DomeCtx, V
       kid: ['Did it bounce?', 'Why did he fall down?'],
       civ: ['Serves him right. Damn fool.', 'Oh God. Is he... okay. He is up.'],
       vet: ['Ricochet. Stay back from the wall.'],
+    },
+    dome_spectate: {
+      any: ['Still at it.', 'They are not getting anywhere.', 'Look at him. Same spot again.', 'How long are they going to do this?', 'He is going to hurt his hands.', 'Nothing is happening. Good.'],
+      kid: ['Are they still there?', 'He hit it again!', 'Can I see?', 'They look so small.'],
+      civ: ['Pour me another. Long night.', 'Seven now. No, eight.', 'Does not even scratch it.', 'Look at that one. Giving up already.', 'Told you it would hold.'],
+      vet: ['Keep an eye on the east side.', 'They are tired. Look how they stand.'],
+      elder: ['Poor fools. All that work.', 'Let them wear themselves out.'],
     },
     dome_react_limp: {
       any: ['He is leaving. Is he leaving? He is limping.', 'That one is hurt. Look at him.', 'They are... are they going?', 'Is that one... is he all right?'],

@@ -288,6 +288,8 @@ export interface Battle {
   aftermath?: Aftermath;
   /** The live raid facts (save v87). */
   raid?: RaidFacts;
+  /** A fight at a dome that holds against everything a crew can bring (the arcology): nobody on the home side fires, is hit or takes cover, and there is nothing for the player to order. Set by sim/dome/domeBeats.ts. */
+  sealed?: boolean;
   invasion?: InvasionMeta;
   /** Night or day (lights matter at night). */
   night: boolean;
