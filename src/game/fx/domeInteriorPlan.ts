@@ -26,7 +26,7 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
   const free = (x: number, z: number, pad: number, inner = 0.9): boolean => Math.hypot(x, z) < r * inner && !nearLane(x, z) && !obstacles.some(o => Math.abs(x - o.x) < o.hx + pad && Math.abs(z - o.z) < o.hz + pad);
   // a lit house throws its light on the lawn round it: the pool is centered a little toward the middle of the dome, so the lit part lies where the ground shows
   // (centered on the house it hides under the floor; lying at porch height it washes the deck to white)
-  for (const o of obstacles) if (o.home) { const m = Math.max(o.hx, o.hz), d = Math.hypot(o.x, o.z) || 1, off = Math.min(d, m + 0.4); out.glows.push({ x: o.x - o.x / d * off, z: o.z - o.z / d * off, r: m * 2.8 + 0.6 }); }
+  for (const o of obstacles) if (o.home) { const m = Math.max(o.hx, o.hz), d = Math.hypot(o.x, o.z) || 1, off = Math.min(d, m + 0.4); out.glows.push({ x: o.x - o.x / d * off, z: o.z - o.z / d * off, r: m * 1.5 + 0.35 }); }
   const plazaR = Math.min(0.9, r * 0.11);
   const plazaOk = free(0, 0, plazaR + 0.25, 1);
   if (plazaOk) out.plaza = { x: 0, z: 0, r: plazaR };
