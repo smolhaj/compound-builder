@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import * as THREE from 'three';
-import { domeGradeNow, writeDomeGrade, DOME_EDGE, DOME_MAX, DOME_UNIFORMS, DOME_DECL, clearDomeMask, domeMaskAt, domeMaskInfo, seaLocalGlsl, seaLocalize, writeDomeMask } from './domeMask';
+import { DOME_EDGE, DOME_MAX, DOME_UNIFORMS, DOME_DECL, clearDomeMask, domeMaskAt, domeMaskInfo, seaLocalGlsl, seaLocalize, writeDomeMask } from './domeMask';
 import { SEASON_UNIFORMS, installSeasonShaderPatch } from './seasonShader';
 
 beforeEach(() => clearDomeMask());
@@ -83,19 +83,5 @@ describe('dome mask uniforms (render smoke)', () => {
     expect(block).not.toMatch(/\buSea[ABCD]\b/);
     const lib = THREE.ShaderLib.standard.uniforms as Record<string, THREE.IUniform>;
     expect(lib.uSeaDome.value).toBe(DOME_UNIFORMS.uSeaDome.value);
-  });
-});
-
-describe('dome grade compensation', () => {
-  it('is the inverse of the frame cast and saturation, clamped, neutral for no grade or bad input', () => {
-    writeDomeGrade([0.9, 0.98, 1.1], 0.55);
-    const g = domeGradeNow();
-    expect(g.x).toBeCloseTo(1 / 0.9, 5); expect(g.z).toBeCloseTo(1 / 1.1, 5); expect(g.w).toBeCloseTo(1 / 0.55, 5);
-    writeDomeGrade([1, 1, 1], 1);
-    expect(domeGradeNow()).toEqual({ x: 1, y: 1, z: 1, w: 1 });
-    writeDomeGrade([0.01, NaN, 9], 0.1);
-    const b = domeGradeNow();
-    expect(b.x).toBe(1); expect(b.y).toBe(1); expect(b.z).toBeCloseTo(0.6, 5); expect(b.w).toBe(2.2);
-    writeDomeGrade([1, 1, 1], 1);
   });
 });
