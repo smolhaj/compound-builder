@@ -83,13 +83,13 @@ export const DOME_LINES: Record<'raider' | 'defender', Partial<Record<DomeCtx, V
     dome_vow: {
       any: ['We come back with real equipment.', 'Remember where this is.', 'More men next time.', 'Give it a month. We find a way.', 'They have to come out sometime.'],
       leader: ['We are not finished with this place.'],
-      savage: ['You hear me in there? We are coming back.'],
+      savage: ['We are coming back. You hear me?'],
       desperate: ['Maybe they open up when they run low. We wait.'],
       small: ['Next time we bring a dozen.'],
       large: ['We know the layout now.'],
     },
     dome_angry: {
-      any: ['Open fire. All of it!', 'Come out and face us!', 'Reloading!', 'It has to break. Keep firing!'],
+      any: ['Open fire. All of it!', 'Reloading!', 'It has to break. Keep firing!'],
       hard: ['Concentrate. One spot.'],
       desperate: ['Break. Please, just break.'],
     },
