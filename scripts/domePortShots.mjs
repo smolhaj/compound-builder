@@ -9,7 +9,7 @@ let chromium; try { ({ chromium } = require('playwright')); } catch { ({ chromiu
 const out = process.argv[2], port = Number(process.argv[3] || 5994);
 // SCENES='glass:dome_glass:1:aerial,closeup,eye,inside,night;arc:dome_arcology:1:aerial,eye,inside;...' (name:kind:rot:shots), or KIND/ROT for one
 const TAG = process.env.TAG || '';
-const SCENES = (process.env.SCENES || `${process.env.KIND || 'dome_glass'}:${process.env.KIND || 'dome_glass'}:${process.env.ROT ?? 1}:${process.argv[4] || 'aerial,closeup,eye,inside,night'}`).split(';').map(x => { const [name, kind, rot, shots] = x.split(':'); return { name, kind, rot: Number(rot), shots: shots.split(',') }; });
+const SCENES = (process.env.SCENES || `${process.env.KIND || 'dome_glass'}:${process.env.KIND || 'dome_glass'}:${process.env.ROT ?? 1}:${process.argv[4] || 'aerial,closeup,eye,inside,night'}`).split(';').map(x => { const [name, kind, rot, shots, doors] = x.split(':'); return { name, kind, rot: Number(rot), shots: shots.split(','), doors }; });
 const W = Number(process.env.W || 1600), H = Number(process.env.H || 900), PR = process.env.PR || '0.9';
 mkdirSync(out, { recursive: true });
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
@@ -28,11 +28,12 @@ try {
   const frames = async (n = 1) => { for (let i = 0; i < n; i++) await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(250); };
   const shot = async name => { await frames(2); await page.evaluate(() => window.__cb.qa.renderFull('high')); await page.screenshot({ path: `${out}/${PFX}${name}.png` }); lap(name); };
   const set = js => page.evaluate(js => new Function('cb', js)(window.__cb), js);
-  const info = await page.evaluate(async ([KIND, ROT]) => {
+  const info = await page.evaluate(async ([KIND, ROT, DOORS]) => {
     const cb = window.__cb, G = cb.game, w = cb.world; G.getState().setSpeed(0);
     G.setState(s => ({ game: { ...s.game, money: 900_000_000 } }));
     const y = w.access.yard, drive = w.access.drive, end = drive[drive.length - 1];
     // the dome stands over the end of the drive, as in the owner's scene: its centre a little way back from the yard toward the house
+    (await import('/src/game/buildkit/domeBuildings.ts')).setDoorLook(DOORS);
     const sp = cb.tool.findSpot(KIND, y.x - 2.5, y.z - 1.5, ROT, 14);
     if (!sp) return null;
     G.getState().plan(KIND, sp[0], sp[1], ROT);
@@ -40,11 +41,11 @@ try {
     G.setState(s => { const g = structuredClone(s.game); for (const q of g.structures) { q.stage = 99; q.done = 0; q.finishedAt = 0; q.supplied = true; } g.utilities.lit = ['x']; return { game: g }; });
     cb.store.getState().setHudHidden?.(true);
     return { id: st.id, x: st.x, z: st.z, rot: ROT, port: st.portAngle ?? null, yard: [y.x, y.z], end };
-  }, [KIND, ROT]);
+  }, [KIND, ROT, SC.doors || 'open']);
   if (!info) { console.error('no spot for ' + KIND); await page.close(); continue; }
   lap(JSON.stringify(info));
   await frames(4);
-  const dm = await page.evaluate(async id => { const s = await import('/src/sim/dome/standing.ts'); const d = s.domesOf(window.__cb.game.getState().game).find(x => x.id === id); const a = d.airlocks.find(l => l.role === 'vehicle'); return { r: d.r, x: d.x, z: d.z, a: a ? { angle: a.angle, x: a.x, z: a.z, inX: a.inX, inZ: a.inZ } : null, tier: d.tier }; }, info.id);
+  const dm = await page.evaluate(async id => { const s = await import('/src/sim/dome/standing.ts'); const d = s.domesOf(window.__cb.game.getState().game).find(x => x.id === id); const a = d.airlocks.find(l => l.role === 'vehicle'); return { r: d.r, x: d.x, z: d.z, a: a ? { angle: a.angle, x: a.x, z: a.z, inX: a.inX, inZ: a.inZ } : null, persons: d.airlocks.filter(l => !l.role).map(l => ({ angle: l.angle, x: l.x, z: l.z })), tier: d.tier }; }, info.id);
   lap(JSON.stringify(dm));
   const gd = (x, z) => page.evaluate(([x, z]) => window.__cb.world.groundAt(x, z), [x, z]);
   const poseRaw = (e, l, fov = 60) => page.evaluate(([e, l, fov]) => { window.__cb.qa.pose = { x: e[0], y: e[1], z: e[2], lx: l[0], ly: l[1], lz: l[2], fov }; }, [e, l, fov]);
@@ -69,9 +70,14 @@ try {
     await pr(E(R + 5.2 * S, -1.9 * S, 0.5), [gate[0], 0.3 * S, gate[2]], 58); await shot('eye-at-port-truck-person');
   }
   if (want('inside')) {
-    await person(...[E(R - len - 1.6, 0.5, 0)].map(p => [p[0], p[2]])[0]);
+    await person(...[E(R - len - 1.4, 0.9 * S, 0)].map(p => [p[0], p[2]])[0]);
     await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await shot('inside-looking-out');
   }
+  const pa = dm.persons[0], pu = pa ? [Math.sin(pa.angle), Math.cos(pa.angle)] : u, pn = [pu[1], -pu[0]];
+  const EP = (rho, lam, h) => [dm.x + pu[0] * rho + pn[0] * lam, h, dm.z + pu[1] * rho + pn[1] * lam];   // a point on the person airlock's frame
+  if (want('chamber-person')) { await pr(EP(R + 0.9 * S, 0.12 * S, 0.3 * S), EP(R - 0.2, 0, 0.22 * S), 55); await shot('chamber-person-eye'); }
+  if (want('chamber-port')) { await pr(E(R + 1.5 * S, 0.1, 0.32 * S), E(R - 0.6, 0, 0.25 * S), 58); await shot('chamber-port-eye'); }
+  if (want('inside-night')) { await set(`cb.store.getState().setTimeOfDay(21.5)`); await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await shot('inside-looking-out-night'); }
   if (want('night')) {
     await set(`cb.store.getState().setTimeOfDay(21.5)`);
     await pr(E(R + 6.5, -3.5, 2.2), gate, 55); await shot('night-port');
