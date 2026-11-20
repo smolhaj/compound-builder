@@ -21,7 +21,7 @@ export interface FxHooks {
 
 const MAX_DEBRIS = 72, G = 2.4;
 interface Chunk { pos: THREE.Vector3; vel: THREE.Vector3; rot: THREE.Euler; spin: THREE.Vector3; size: THREE.Vector3; color: number; settled: boolean }
-interface Run { group: THREE.Group; from: THREE.Vector3; to: THREE.Vector3; secs: number; age: number; yaw: number; done: boolean; hitAt: number; lamps: THREE.SpotLight[] }
+interface Run { fail: boolean; group: THREE.Group; from: THREE.Vector3; to: THREE.Vector3; secs: number; age: number; yaw: number; done: boolean; hitAt: number; lamps: THREE.SpotLight[] }
 
 export class InvasionFx {
   private readonly _group: THREE.Group;
@@ -78,6 +78,9 @@ export class InvasionFx {
     else if (e.kind === 'gap') this._gap(e);
   }
 
+  /** The charge went off and the wall held: the bag is gone, the wall wears a black scorch. */
+  spent(x: number, z: number): void { if (this._satchel && Math.hypot(this._satchel.mesh.position.x - x, this._satchel.mesh.position.z - z) < 1.2) { this._group.remove(this._satchel.mesh); this._satchel = null; } }
+
   // ── the truck ─────────────────────────────────────────────────────────
   private _startRam(e: Extract<BattleEvent, { kind: 'ram' }>): void {
     const h = this._h;
@@ -87,7 +90,7 @@ export class InvasionFx {
     const bar = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.07, 0.03), new THREE.MeshStandardMaterial({ color: 0x1d1f20, roughness: 0.8, metalness: 0.4 }));
     bar.position.set(0, 0.09, 0.47);
     truck.add(bar);
-    const from = new THREE.Vector3(e.fromX, 0, e.fromZ), to = new THREE.Vector3(e.x, 0, e.z);
+    const fail = e.ok === false, from = new THREE.Vector3(e.fromX, 0, e.fromZ), to = fail && e.stopX !== undefined && e.stopZ !== undefined ? new THREE.Vector3(e.stopX, 0, e.stopZ) : new THREE.Vector3(e.x, 0, e.z);   // (a ram that did not get through stops where it stopped: never through the wall)
     const yaw = Math.atan2(to.x - from.x, to.z - from.z);
     truck.rotation.y = yaw;
     from.y = h.ground(from.x, from.z); to.y = h.ground(to.x, to.z);
@@ -104,7 +107,7 @@ export class InvasionFx {
       this._beams.push(beam);
       void l;
     });
-    this._run = { group: truck, from, to, secs: e.secs, age: 0, yaw, done: false, hitAt: -1, lamps: this._lamps };
+    this._run = { fail, group: truck, from, to, secs: e.secs, age: 0, yaw, done: false, hitAt: -1, lamps: this._lamps };
   }
 
   private _placeLamps(r: Run, intensity: number): void {
@@ -213,14 +216,22 @@ export class InvasionFx {
         // dust kicked up behind the tires
         if (Math.floor(r.age * 9) !== Math.floor((r.age - dt) * 9) && u < 1) h.puff(r.group.position.clone().add(new THREE.Vector3(-Math.sin(r.yaw) * 0.4, 0.04, -Math.cos(r.yaw) * 0.4)), 0.05, 0.28, 1.4, 0.05, 0x8a7d66, 0.35);
         this._placeLamps(r, 70);
-        if (u >= 1) { r.done = true; r.hitAt = r.age; }
+        if (u >= 1) {
+          r.done = true; r.hitAt = r.age;
+          if (r.fail) {   // it hit and the wall held: sparks off the steel, a crack of metal, the shake
+            const hp = r.group.position.clone(); hp.y += 0.12;
+            h.flash(hp, 6, 0xffd9a0); h.shake(0.3);
+            for (let i = 0; i < 9; i++) h.puff(hp.clone().add(new THREE.Vector3((i % 3 - 1) * 0.1, (i % 2) * 0.06, ((i >> 1) % 3 - 1) * 0.08)), 0.02, 0.05, 0.4, 0.1, 0xffb050, 1, true);
+          }
+        }
       } else {
         // through the opening and stopping, nose up, a little crumpled
         const s = Math.min(1, (r.age - r.hitAt) / 1.0), ease = 1 - (1 - s) * (1 - s);
         const f = new THREE.Vector3(Math.sin(r.yaw), 0, Math.cos(r.yaw));
-        r.group.position.copy(r.to).addScaledVector(f, 0.55 * ease);
+        // (a truck through the wall rolls on; one that was stopped rocks back off it)
+        r.group.position.copy(r.to).addScaledVector(f, r.fail ? -0.07 * ease : 0.55 * ease);
         r.group.position.y = h.ground(r.group.position.x, r.group.position.z);
-        r.group.rotation.x = -0.05 * ease; r.group.rotation.z = 0.035 * ease;
+        r.group.rotation.x = (r.fail ? -0.09 : -0.05) * ease; r.group.rotation.z = (r.fail ? 0.06 : 0.035) * ease;
         this._placeLamps(r, 70);
         if (s < 1 && Math.floor(r.age * 14) !== Math.floor((r.age - dt) * 14)) h.puff(r.group.position.clone().add(new THREE.Vector3(0, 0.1, 0)), 0.05, 0.22, 1.2, 0.08, 0x8a7d66, 0.3);
         // steam off the hood

@@ -31,6 +31,9 @@ import { breakInScene, commitDays, finishPlan, gateScene, planSiege, probeBattle
 import { step } from './engine';
 import { hourOf, type GameState } from './state';
 import { pluralize } from './words';
+import { domesOf } from './dome/standing';
+import { domeBeats } from './dome/domeBeats';
+import { addScars } from './dome/scars';
 
 export interface StagedRaid {
   /** The game with the stance resolved but the clock still at the arrival. */
@@ -154,6 +157,16 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?:
   if (e.kind !== 'break_in') {
     const dir = new LineDirector(seed);
     battles = voiceCutscene(battles, { dir, seed, temper: e.temper ?? 'desperate', scenes, from: voiceFrom });
+    // a dome over the home: the crew's time at the shell is staged (probes, frustration, the family watching; sim/dome/domeBeats.ts), and the marks stay on the shell
+    if (battle) {
+      const f0 = g.structures.filter(isFinished), h0 = f0.find(st => isHome(st.kind)) ?? f0[0] ?? { x: 0, z: 0 };
+      const dome = domesOf(g).find(dm => Math.hypot(h0.x - dm.x, h0.z - dm.z) < dm.r);
+      if (dome) {
+        const li = battles.length - 1;
+        battles[li] = domeBeats(battles[li], { dome, seed, temper: e.temper ?? 'desperate', dir, skirtCrew: e.kind === 'tunnelers' });
+        addScars(g, dome, battles[li]);
+      }
+    }
     // the death and the quiet after it (presentation only)
     const fin = g.structures.filter(isFinished), home = fin.find(st => isHome(st.kind)) ?? fin[0] ?? { x: 0, z: 0 };
     // how the last fight ends on screen agrees with the sim's result: the crew beaten (down or hands up, never a standing cluster) or the family held (sim/raidEnding.ts)

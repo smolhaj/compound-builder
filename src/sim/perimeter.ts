@@ -260,9 +260,9 @@ export const WALL_HP: Partial<Record<PerimeterKind, number>> = {
   bar_fence: 90, wrought_iron: 90, covered_walkway: 90, iron_barbed: 105, container_wall: 140, container_stack: 190, stone_wall: 200,
   steel_wall: 210, electric_steel: 220, concrete_wall: 250,
   // a dome's shell: twin-wall polycarbonate is cut with snips, laminated glass takes a crew with axes and a long while, the arcology's panels are not a wall a crew can work
-  shell_earthen: 150, shell_geodesic: 45, shell_glass: 120, shell_arcology: 1000,
+  shell_earthen: 190, shell_geodesic: 175, shell_glass: 190, shell_arcology: 1000,
   // a dome link's walkway wears its tier's shell (the same hit points)
-  link_walk_earthen: 150, link_walk_geodesic: 45, link_walk_glass: 120, link_walk_arcology: 1000,
+  link_walk_earthen: 190, link_walk_geodesic: 175, link_walk_glass: 190, link_walk_arcology: 1000,
 };
 /** The toughest wall in the table (concrete): the top of the scale. */
 export const WALL_HP_TOP = 250;
@@ -282,7 +282,9 @@ export const needsMeans = (kind: PerimeterKind): boolean => wallHp(kind) >= 190;
  * Multiplier on how fast a crew at the line gets over a wall kind (1 = the old flat rate; the sim's climb chance per second is 0.02 per raider at the line
  * times this). Tougher walls hold much longer; a wall that needs means is almost never climbed. `growth` is a hedge's grown share.
  */
-export const climbRateK = (kind: PerimeterKind, growth = 1): number => (PERIMETER[kind].impervious ? 0 : needsMeans(kind) ? 0.12 : Math.max(0.35, Math.min(1.6, 60 / Math.max(10, wallHp(kind) * Math.max(0.2, growth)))));
+/** How fast a crew with ladders and hand tools gets through a dome's shell (PROPOSED, docs/design/dome_raids.md): the older hit-point rule let a 16-man crew cut laminated glass in a minute. */
+export const SHELL_CLIMB_K: Partial<Record<PerimeterKind, number>> = { shell_earthen: 0.5, shell_geodesic: 0.25, shell_glass: 0.05, link_walk_earthen: 0.5, link_walk_geodesic: 0.25, link_walk_glass: 0.05 };
+export const climbRateK = (kind: PerimeterKind, growth = 1): number => (SHELL_CLIMB_K[kind] !== undefined && !PERIMETER[kind].impervious ? SHELL_CLIMB_K[kind]! : PERIMETER[kind].impervious ? 0 : needsMeans(kind) ? 0.12 : Math.max(0.35, Math.min(1.6, 60 / Math.max(10, wallHp(kind) * Math.max(0.2, growth)))));
 /** Extra seconds a crew spends at a wall before the first can be across (ladders, cutters): longer for a tougher wall. */
 export const climbHoldS = (kind: PerimeterKind, growth = 1): number => Math.min(8, wallHp(kind) * growth / 30);
 

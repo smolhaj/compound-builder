@@ -20,6 +20,7 @@ import { chooseCover, dropsProne, type Round } from './coverChoice';
 import { getViolence, poolRadius, spatter, stain, woundSpot } from './bloodFx';
 import { buildVehicle } from '../props/vehicleGeometry';
 import { InvasionFx } from './InvasionFx';
+import { ShellFx } from './ShellFx';
 import { SceneProps } from './SceneProps';
 
 const RUN = 1.1;          // world units / s (≈ 6.5 m/s)
@@ -128,6 +129,7 @@ export class BattleRenderer {
   onGap: ((runId: string, at: number, w: number) => void) | null = null;
   /** The invasion look: the ramming truck, the charge, the debris (game/battle/InvasionFx.ts). */
   readonly invasion: InvasionFx;
+  readonly shellFx: ShellFx;
   /** The door leaf, the loot packs and the set fires (game/battle/SceneProps.ts). */
   readonly props: SceneProps;
   battle: Battle | null = null;
@@ -234,6 +236,7 @@ export class BattleRenderer {
       ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c),
       boom: (x, y, z, r, dust) => this._boom(x, y, z, r, dust), shake: v => { this.shake = Math.max(this.shake, v); }, gap: (id, at, w) => this.onGap?.(id, at, w),
     });
+    this.shellFx = new ShellFx(this._group, { ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c), shake: v => { this.shake = Math.max(this.shake, v); }, tracer: (a, b) => this._tracer(a, b) });
     this.props = new SceneProps(this._group, { ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c), glow: (i, p, k, c) => { const l = this._glows[i]; if (l) { l.position.copy(p); l.color.setHex(c); l.intensity = k; l.distance = 3 + k * 0.5; } }, shake: v => { this.shake = Math.max(this.shake, v); } });
     this.props.centerOf = () => ({ x: this._center.x, z: this._center.z });
     this._trGeo.setAttribute('position', new THREE.BufferAttribute(this._trPos, 3).setUsage(THREE.DynamicDrawUsage));
@@ -362,7 +365,7 @@ export class BattleRenderer {
       v.position.set(c.x, this._ground(c.x, c.z), c.z); v.rotation.y = b.vehicle.rot;
       this._group.add(v); this._vehicle = v;
     }
-    this.invasion.begin(b);
+    this.invasion.begin(b); this.shellFx.begin();
     this.props.end();
     this._floodsOutAt = -1; this._floodBase = []; this._lightsSparked = false;
     this._alarm = new THREE.PointLight(0xff2020, 0, 14, 1.6);
@@ -386,7 +389,7 @@ export class BattleRenderer {
   private _vehicle: THREE.Group | null = null;
 
   stop(): void {
-    this.invasion.end();
+    this.invasion.end(); this.shellFx.end();
     this.props.end();
     if (this._vehicle) { this._group.remove(this._vehicle); this._vehicle.traverse(o => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).geometry.dispose(); }); this._vehicle = null; }
     for (const m of this._marks) { this._group.remove(m.sprite); m.sprite.material.dispose(); }
@@ -587,10 +590,27 @@ export class BattleRenderer {
       case 'explosion': {
         const y = this._ground(e.x, e.z) + (e.y ?? 0);
         this._boom(e.x, y, e.z, Math.max(0.3, e.radius), !!e.wrecks);
-        if (e.wrecks) this._decal(e.x, e.z, e.radius * 0.8);
+        if (e.wrecks) this._decal(e.x, e.z, e.radius * 0.8); else this.invasion.spent(e.x, e.z);
         break;
       }
       case 'ram': case 'charge': case 'gap': this.invasion.onEvent(e); break;
+      case 'dome_shot': {
+        const u = U_(e.unit); if (!u || u.dead) break;
+        const p0 = this._muzzle(u, new THREE.Vector3()), chest = this._torso(u, new THREE.Vector3());
+        u.rot = Math.atan2(e.x - u.x, e.z - u.z); u.armed = true; u.aimUntil = this.time + 0.9; u.tx = u.x; u.tz = u.z;
+        this.shellFx.onDomeShot(e, p0, chest);
+        // the round that comes back rocks him: down on a knee for a moment, then up (no wound: nothing in the fight changes)
+        if (e.bounce === 'back') { u.proneUntil = this.time + (e.down ?? 2); this.shake = Math.max(this.shake, 0.06); }
+        break;
+      }
+      case 'gesture': {
+        const u = U_(e.unit); if (!u || u.dead) break;
+        u.rot = Math.atan2(e.x - u.x, e.z - u.z); u.tx = u.x; u.tz = u.z; u.crouch = false;
+        if (e.what === 'point') { u.armed = true; u.aimUntil = this.time + e.secs; }
+        else { u.hands = true; u.frozenUntil = this.time + e.secs; }   // (arms up: a wave-off, a raised fist)
+        break;
+      }
+      case 'probe': { const u = U_(e.unit); if (u && !u.dead) u.rot = Math.atan2(-e.ox, -e.oz); this.shellFx.onEvent(e); break; }   // (he faces the shell while he works at it)
       case 'house_door': case 'loot': case 'fire': case 'ladder': case 'flare': case 'flag': case 'tool': case 'repair': this.props.onEvent(e); break;
       case 'grave': {
         this.props.onEvent(e);
