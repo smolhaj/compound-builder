@@ -61,6 +61,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   103: s => ({ ...s, version: 104 }),
   // 104 → 105: a rich start (`richStart`, optional), `Lineage.unscored` (optional) and the dome's upkeep owed (`DomeState.upkeepOwed`, optional): absent means an ordinary start and nothing owed; nothing to back-fill
   104: s => ({ ...s, version: 105 }),
+  // 105 → 106: optional GameState.shellScars (scorch, chip and dent marks a raid leaves on a dome's shell, sim/dome/scars.ts); nothing to back-fill
+  105: s => ({ ...s, version: 106 }),
   97: s => ({ ...s, version: 98 }),
   // 95 → 96: hiding in the bunker (sim/bunkerHide.ts): `Outcome.bunker` on the gate card, optional; no old-save work
   95: s => ({ ...s, version: 96 }),

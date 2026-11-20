@@ -147,7 +147,7 @@ export type BattleEvent =
   /** A man carries a white flag (a cloth on a stick) from now on: the envoy of a parley. */
   | { t: number; kind: 'flag'; unit: string }
   /** After the fight (sim/raidDrama.ts): `unit` works with a tool in hand for `secs` (a shovel at the grave, a rake over the stain, a hammer at the wall). */
-  | { t: number; kind: 'tool'; unit: string; what: 'shovel' | 'rake' | 'hammer'; secs: number }
+  | { t: number; kind: 'tool'; unit: string; what: 'shovel' | 'rake' | 'hammer' | 'sledge' | 'saw' | 'torch'; secs: number }
   /** The grave at (x, z): `dig` opens the pit over `secs`; `lower` the fallen lies in it; `fill` heaps the mound over `secs` and `unit` (the fallen) is under it. */
   | { t: number; kind: 'grave'; x: number; z: number; stage: 'dig' | 'lower' | 'fill'; secs: number; unit?: string }
   /** Sand raked over the blood within a hand's breadth of (x, z) for `secs`. */
@@ -156,6 +156,15 @@ export type BattleEvent =
   | { t: number; kind: 'repair'; x: number; z: number; w: number; heading: number; secs: number }
   /** A flare goes up and lights the yard for `secs`. */
   | { t: number; kind: 'flare'; x: number; z: number; by: string; secs: number }
+  /**
+   * Presentation only (sim/dome/domeBeats.ts): a raider works at a dome's shell at (x, z) with `what`. `holds`: the shell shrugs it off (sparks, a scuff, a chip);
+   * false: it is really giving (a saw through polycarbonate). Never changes an outcome.
+   */
+  | { t: number; kind: 'probe'; unit: string; what: 'rifle' | 'sledge' | 'saw' | 'torch' | 'pry'; x: number; z: number; /** Unit vector pointing out of the dome at the spot. */ ox: number; oz: number; tier: 'earthen' | 'geodesic' | 'glass' | 'arcology'; holds: boolean; secs?: number }
+  /** A raider fires at the shell (presentation only, no wound, no hit on anyone: sim/dome/domeBeats.ts). `bounce`: the round glances off, or comes back at the shooter, who is rocked for `down` seconds (never a wound). (x, z) is the point on the shell; (ox, oz) the outward unit vector. */
+  | { t: number; kind: 'dome_shot'; unit: string; x: number; z: number; ox: number; oz: number; tier: 'earthen' | 'geodesic' | 'glass' | 'arcology'; bounce: 'glance' | 'back'; down?: number }
+  /** Someone at the shell makes a sign at the crew (presentation only): a wave-off, a pointing at the gate, a raised fist, facing (x, z). */
+  | { t: number; kind: 'gesture'; unit: string; what: 'wave' | 'point' | 'fist'; x: number; z: number; secs: number }
   | { t: number; kind: 'end'; result: 'repelled' | 'fled' | 'breached' | 'overrun' };
 
 export type RaidOrderKind = 'hold' | 'fallback' | 'counter';
@@ -279,6 +288,8 @@ export interface Battle {
   aftermath?: Aftermath;
   /** The live raid facts (save v87). */
   raid?: RaidFacts;
+  /** A fight at a dome that holds against everything a crew can bring (the arcology): nobody on the home side fires, is hit or takes cover, and there is nothing for the player to order. Set by sim/dome/domeBeats.ts. */
+  sealed?: boolean;
   invasion?: InvasionMeta;
   /** Night or day (lights matter at night). */
   night: boolean;
