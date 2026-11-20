@@ -569,7 +569,8 @@ export class HomesteadWorld {
     const plan = interiorPlan(ref.tier, ref.r, angles, obs, b.placed.rot + 1);
     // the plant's equipment is lit at night: a pool of light round every unit (the yard and gallery read as a working place, not a dark plane)
     { const big = plantLayout(ref.tier, ref.r, filtering, { rot: b.placed.rot }).parts.filter(q => !q.onShell && !q.high && q.shape === 'box' && q.h > 0.12 && Math.max(q.w, q.d) > 0.3 && Math.hypot(q.x, q.z) < ref.r * 1.8).sort((p, q) => Math.max(q.w, q.d) - Math.max(p.w, p.d)).slice(0, 14);
-      for (const q of big) plan.glows.push({ x: q.x, z: q.z, r: Math.max(q.w, q.d) * 1.1 + 0.5 }); }
+      // (the pool lies on the aisle side of each unit, in front of its doors, where the ground shows)
+      for (const q of big) { const d = Math.hypot(q.x, q.z) || 1, m = Math.max(q.w, q.d), off = m / 2 + 0.5; plan.glows.push({ x: q.x - q.x / d * off, z: q.z - q.z / d * off, r: m * 1.2 + 1.0 }); } }
     const made = { plan, key };
     this._interiorCache.set(b.placed.id, made);
     return made;
