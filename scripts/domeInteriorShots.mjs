@@ -108,11 +108,11 @@ try {
     const along2 = (a, rho, off = 0, hh = h) => L(Math.sin(a) * rho + Math.cos(a) * off, Math.cos(a) * rho - Math.sin(a) * off, hh);
     if (lane.length) {
       const inner = lane.reduce((m, t) => (Math.hypot(t.x, t.z) < Math.hypot(m.x, m.z) ? t : m), lane[0]);
-      await pair('08-vehicle-lane', L(inner.x / R * 0.88, inner.z / R * 0.88, h), [veh[0], ground + 0.3, veh[1]], 70, [frac(L(inner.x / R, inner.z / R, 0)).map((v, i) => v + (i ? Math.cos(va) : Math.sin(va)) * 0.1)]);
+      await pair('08-vehicle-lane', L(inner.x / R * 0.86 + Math.cos(va) * 0.05, inner.z / R * 0.86 - Math.sin(va) * 0.05, h), [veh[0], ground + 0.3, veh[1]], 70, [frac(L(inner.x / R, inner.z / R, 0)).map((v, i) => v + (i ? Math.cos(va) : Math.sin(va)) * 0.1)]);
     }
     const pa = airlocks[0], mid = (pa + va) / 2;
     await pair('09-entrance-complex', along2(mid, 0.5, 0), along2(mid, 1.05, 0, 0.3), 80, [frac(along2(pa, 0.78, 0.03, 0))]);
-    await pair('10-vehicle-port-door', along2(va, 0.62, 0.0), [veh[0], ground + 0.3, veh[1]], 62, []);
+    await pair('10-vehicle-port-door', along2(va, 0.56, 0.055), [veh[0], ground + 0.3, veh[1]], 62, []);
   }
   await page.close();
 } finally { await browser.close(); vite.kill(); setTimeout(() => process.exit(0), 200); }
