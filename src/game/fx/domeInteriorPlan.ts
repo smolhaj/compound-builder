@@ -5,14 +5,14 @@
  * SCALE v2: a person is 0.28 tall, a path 0.3 wide (2 m), a bench seat 0.075 high.
  */
 /** An axis-aligned box in the dome's local frame: center and half sizes (a round thing is a square of its radius). */
-export interface Obstacle { x: number; z: number; hx: number; hz: number; /** A lived-in house: its lit windows throw a pool of light round it at night. */ home?: boolean }
+export interface Obstacle { x: number; z: number; hx: number; hz: number; /** A lived-in house: its lit windows throw a pool of light round it at night. */ home?: boolean; /** The height of its floor above the ground (the porch deck): its light pool lies there. */ y?: number }
 export interface PathSeg { x: number; z: number; rot: number; len: number }
 export interface Prop { x: number; z: number; rot: number }
 export interface InteriorPlan {
   segs: PathSeg[]; benches: Prop[]; crates: Prop[]; planters: Prop[]; signs: Prop[]; lamps: Array<{ x: number; z: number }>;
   plaza: { x: number; z: number; r: number } | null;
   /** Pools of window light round the houses (center, radius). */
-  glows: Array<{ x: number; z: number; r: number }>;
+  glows: Array<{ x: number; z: number; r: number; y?: number }>;
 }
 export const PATH_W = 0.3, BENCH = { len: 0.17, dep: 0.06, seat: 0.075, back: 0.15 }, CRATE = 0.07;
 const STEP = 0.3;
@@ -23,7 +23,7 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
   const out: InteriorPlan = { segs: [], benches: [], crates: [], planters: [], signs: [], lamps: [], plaza: null, glows: [] };
   if (tier !== 'glass' && tier !== 'arcology' && tier !== 'geodesic') return out;
   const free = (x: number, z: number, pad: number, inner = 0.9): boolean => Math.hypot(x, z) < r * inner && !obstacles.some(o => Math.abs(x - o.x) < o.hx + pad && Math.abs(z - o.z) < o.hz + pad);
-  for (const o of obstacles) if (o.home) out.glows.push({ x: o.x, z: o.z, r: Math.max(o.hx, o.hz) * 4.5 });
+  for (const o of obstacles) if (o.home) out.glows.push({ x: o.x, z: o.z, r: Math.max(o.hx, o.hz) * 4.5, y: o.y });
   const plazaR = Math.min(0.9, r * 0.11);
   const plazaOk = free(0, 0, plazaR + 0.25, 1);
   if (plazaOk) out.plaza = { x: 0, z: 0, r: plazaR };

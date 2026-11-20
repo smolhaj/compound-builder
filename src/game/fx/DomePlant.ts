@@ -98,7 +98,7 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
       heads.setMatrixAt(i, m4.makeTranslation(l.x, gy + l.y + 0.03, l.z));
       pools.setMatrixAt(i, m4.compose(pos.set(l.x, gy + 0.012, l.z), q0, sc.set(l.k, 1, l.k)));
     });
-    glows.forEach((o, i) => pools.setMatrixAt(n + i, m4.compose(pos.set(o.x, ground(o.x, o.z) + 0.02, o.z), q0, sc.set(o.r / 0.55, 1, o.r / 0.55))));
+    glows.forEach((o, i) => pools.setMatrixAt(n + i, m4.compose(pos.set(o.x, ground(o.x, o.z) + (o.y ?? 0) + 0.02, o.z), q0, sc.set(o.r / 0.55, 1, o.r / 0.55))));
     for (const m of [heads, pools]) { m.instanceMatrix.needsUpdate = true; m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; group.add(m); }
     pools.renderOrder = 2;
     owned.push(headGeo, poolGeo);
