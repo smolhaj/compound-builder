@@ -250,26 +250,26 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
   for (const s of [-1, 1]) X('iron', 0.022, capY - y0, 0.04, s === -1 ? lam0 : lam1, y0, doors.shellRho(s === -1 ? lam0 : lam1) + 0.017);    // sealed bulkhead rims at the skin
   // ── the doors ──
   p.layer = 'openings';
-  const ds = Math.max(0.01, 0.02 * big);
+  const ds = Math.max(0.01, 0.02 * big), yb = Math.min(y0, foot + 0.03), dhb = v.dh + (y0 - yb);   // (the doors stand on the chamber floor, not on the stem wall's sill)
   /** The door frame: a recessed steel frame round the opening with a black gasket just inside it and bolt heads on its face. */
   const frame = (rho: number, face: 1 | -1): void => {
     const z = rho + face * (v.t / 2 + 0.004);
-    X('iron', 0.026, v.dh + 0.02, 0.02, -(v.dw / 2 + 0.013), y0, z); X('iron', 0.026, v.dh + 0.02, 0.02, v.dw / 2 + 0.013, y0, z); X('iron', v.dw + 0.052, 0.026, 0.02, 0, y0 + v.dh - 0.006, z);
+    X('iron', 0.026, dhb + 0.02, 0.02, -(v.dw / 2 + 0.013), yb, z); X('iron', 0.026, dhb + 0.02, 0.02, v.dw / 2 + 0.013, yb, z); X('iron', v.dw + 0.052, 0.026, 0.02, 0, yb + dhb - 0.006, z);
     const gz = rho + face * 0.002;
-    X('iron', 0.012, v.dh - 0.01, 0.014, -(v.dw / 2 - 0.004), y0, gz); X('iron', 0.012, v.dh - 0.01, 0.014, v.dw / 2 - 0.004, y0, gz); X('iron', v.dw - 0.01, 0.012, 0.014, 0, y0 + v.dh - 0.016, gz);   // the gasket
-    for (let k = 0; k < 5; k++) { const yy = y0 + 0.03 + k * (v.dh - 0.07) / 4; X('aluminum', 0.012, 0.012, 0.012, -(v.dw / 2 + 0.013), yy, z + face * 0.01); X('aluminum', 0.012, 0.012, 0.012, v.dw / 2 + 0.013, yy, z + face * 0.01); }
+    X('iron', 0.012, dhb - 0.01, 0.014, -(v.dw / 2 - 0.004), yb, gz); X('iron', 0.012, dhb - 0.01, 0.014, v.dw / 2 - 0.004, yb, gz); X('iron', v.dw - 0.01, 0.012, 0.014, 0, yb + dhb - 0.016, gz);   // the gasket
+    for (let k = 0; k < 5; k++) { const yy = yb + 0.03 + k * (dhb - 0.07) / 4; X('aluminum', 0.012, 0.012, 0.012, -(v.dw / 2 + 0.013), yy, z + face * 0.01); X('aluminum', 0.012, 0.012, 0.012, v.dw / 2 + 0.013, yy, z + face * 0.01); }
   };
-  /** The state panel over a door: a dark plate with three lamps (red sealed, amber cycling, green open) and the interlock light; `lit` is the one on. */
-  const panel = (rho: number, face: 1 | -1, lit: 0 | 1 | 2): void => {
+  /** The state panel over a door: a dark plate with three lamp windows (red sealed, amber cycling, green open); the world lights the one that is on (game/fx/VehiclePorts). */
+  const panel = (rho: number, face: 1 | -1): void => {
     const z = rho + face * (v.t / 2 + 0.018), yy = y0 + v.dh + 0.035;
     X('iron', 0.14 * big, 0.05 * big, 0.012, 0, yy, z);
-    ([['paint_red', -0.04], ['paint_yellow', 0], ['paint_green', 0.04]] as const).forEach(([m, dx], i) => X(i === lit ? 'lamp' : m, 0.026 * big, 0.026 * big, 0.008, dx * big, yy + 0.012 * big, z + face * 0.008));
+    ([['paint_red', -0.04], ['paint_yellow', 0], ['paint_green', 0.04]] as const).forEach(([m, dx]) => X(m, 0.026 * big, 0.026 * big, 0.008, dx * big, yy + 0.012 * big, z + face * 0.008));
     X('aluminum', 0.14 * big, 0.008, 0.012, 0, yy - 0.012, z);   // the readout strip: pressure and air quality
   };
   /** A hatch-style leaf: a thick steel slab with a gasketed edge, a viewport, a latch wheel, locking bars and a hazard border. */
   const leaf = (g0: { w: number; lam: number; shut: boolean; rho: number; phi: number; pivot: number }): void => {
     const geoms: Array<[KitMaterialId, THREE.BufferGeometry]> = [];
-    const w = g0.w, h = v.dh * 0.97, put = (m: KitMaterialId, bw: number, bh: number, bd: number, x: number, y: number, z: number): void => { geoms.push([m, box(bw, bh, bd, x, y, z)]); };
+    const w = g0.w, h = dhb * 0.97, put = (m: KitMaterialId, bw: number, bh: number, bd: number, x: number, y: number, z: number): void => { geoms.push([m, box(bw, bh, bd, x, y, z)]); };
     put('steel', w, h, ds * 1.6, 0, 0, 0);                                                                // the leaf
     put('iron', w * 0.9, 0.012, ds * 2.1, 0, h - 0.02, 0); put('iron', w * 0.9, 0.012, ds * 2.1, 0, 0.02, 0);    // top and bottom rails
     put('paint_yellow', 0.014, h * 0.9, ds * 2.2, -w / 2 + 0.01, h * 0.05, 0); put('paint_yellow', 0.014, h * 0.9, ds * 2.2, w / 2 - 0.01, h * 0.05, 0);   // hazard edge bands
@@ -278,7 +278,7 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
     for (let k = 0; k < 3; k++) { put('iron', 0.05, 0.012, ds * 2.2, -w / 2 + 0.03, h * (0.22 + 0.25 * k), 0); put('iron', 0.05, 0.012, ds * 2.2, w / 2 - 0.03, h * (0.22 + 0.25 * k), 0); }   // locking bars
     const wheel = new THREE.TorusGeometry(0.045 * big, 0.007, 5, 14).translate(-w * 0.18, h * 0.46, ds * 1.6); geoms.push(['aluminum', wheel]);   // the latch wheel
     put('aluminum', 0.09 * big, 0.008, 0.008, -w * 0.18, h * 0.46, ds * 1.8); put('aluminum', 0.008, 0.09 * big, 0.008, -w * 0.18, h * 0.46, ds * 1.8);
-    for (const [m, g] of geoms) p.add(m, place((g0.phi ? g.translate(-w / 2, 0, 0) : g).rotateY(g0.phi).translate(g0.pivot + (g0.phi ? 0 : g0.lam), y0, g0.rho)));
+    for (const [m, g] of geoms) p.add(m, place((g0.phi ? g.translate(-w / 2, 0, 0) : g).rotateY(g0.phi).translate(g0.pivot + (g0.phi ? 0 : g0.lam), yb, g0.rho)));
   };
   /** A blast gate: two heavy plates that meet in the middle (or slide apart), a gasket seam, hazard bands on the leading edges, a track and a bottom guide. */
   const gate = (rho: number, face: 1 | -1, shut: boolean): void => {
@@ -286,15 +286,15 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
     for (const s of [-1, 1]) {
       const cx = s * (w / 2 + open) , geoms: Array<[KitMaterialId, THREE.BufferGeometry]> = [];
       const put = (m: KitMaterialId, bw: number, bh: number, bd: number, x: number, y: number, zz: number): void => { geoms.push([m, box(bw, bh, bd, x, y, zz)]); };
-      put('steel', w, v.dh * 0.97, 0.022, 0, 0, 0);
-      for (let k = 1; k < 5; k++) put('iron', w * 0.94, 0.012, 0.028, 0, v.dh * 0.97 * k / 5, 0);                    // horizontal stiffeners
-      put('paint_yellow', 0.02, v.dh * 0.97 - 0.01, 0.03, -s * (w / 2 - 0.012), 0.005, 0);                                     // hazard band on the leading edge
-      put('iron', 0.012, v.dh * 0.97 - 0.02, 0.034, -s * (w / 2), 0.01, 0);                                                    // the gasket seam
-      for (let k = 0; k < 4; k++) put('aluminum', 0.012, 0.012, 0.03, s * w * 0.3, v.dh * (0.2 + 0.2 * k), 0);        // lock bolts
-      for (const [m, g] of geoms) p.add(m, place(g.translate(cx, y0, z)));
+      put('steel', w, dhb * 0.97, 0.022, 0, 0, 0);
+      for (let k = 1; k < 5; k++) put('iron', w * 0.94, 0.012, 0.028, 0, dhb * 0.97 * k / 5, 0);                    // horizontal stiffeners
+      put('paint_yellow', 0.02, dhb * 0.97 - 0.01, 0.03, -s * (w / 2 - 0.012), 0.005, 0);                                     // hazard band on the leading edge
+      put('iron', 0.012, dhb * 0.97 - 0.02, 0.034, -s * (w / 2), 0.01, 0);                                                    // the gasket seam
+      for (let k = 0; k < 4; k++) put('aluminum', 0.012, 0.012, 0.03, s * w * 0.3, dhb * (0.2 + 0.2 * k), 0);        // lock bolts
+      for (const [m, g] of geoms) p.add(m, place(g.translate(cx, yb, z)));
     }
     X('iron', v.dw * (shut ? 1 : 1.9) + 0.1, 0.022, 0.04, 0, y0 + v.dh, z);                                          // the track
-    X('iron', v.dw + 0.2, 0.01, 0.03, 0, y0, z);                                                                    // the bottom guide
+    X('iron', v.dw + 0.2, 0.01, 0.03, 0, yb, z);                                                                    // the bottom guide
   };
   const outerShut = doorLook === 'sealed', innerShut = true;
   const personSwing = (rho: number, shut: boolean, into: 1 | -1): void => {
@@ -304,7 +304,7 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
   };
   if (veh) { frame(outer, 1); frame(inner, -1); gate(outer, -1, outerShut); gate(inner, 1, innerShut); }
   else { frame(outer, 1); frame(inner, -1); personSwing(outer, outerShut, -1); personSwing(inner, innerShut, 1); }
-  panel(outer, 1, outerShut ? 0 : 2); panel(inner, -1, 0);
+  panel(outer, 1); panel(inner, -1);
   // the outer face: a hazard-chevron sign plate and the interlock lamp
   X('paint_yellow', 0.22 * big, 0.04 * big, 0.01, 0, y0 + v.dh + 0.09 * big, outer + v.t / 2 + 0.02);
   for (let k = 0; k < 5; k++) X('iron', 0.018 * big, 0.04 * big, 0.012, (-0.08 + 0.04 * k) * big, y0 + v.dh + 0.09 * big, outer + v.t / 2 + 0.022);
