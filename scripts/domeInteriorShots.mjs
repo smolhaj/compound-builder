@@ -88,7 +88,7 @@ try {
   const centerOk = plan.plaza != null;
   await pair('01-lawn-homes', centerOk ? L(0, 0, h) : segAt(best.a, 0.3), [house.x, ground + 0.2, house.z], 70, [[0.14, 0.1], [-0.06, 0.45]]);
   await pair('02-path-between', segAt(best.a, 0.4), along(best.a, 0.95, 0, 0.25), 62, [frac(segAt(best.a, 0.62, 0))]);
-  { const e = await door(house.cz + 0.9, h), l = await door(house.cz - 0.1, 0.22);
+  { const e = await door(house.cz + 2.3, h), l = await door(house.cz - 0.1, 0.22);
     await pair('03-house-door', e, l, 62, [[(e[0] - D.x) / R + 0.05, (e[2] - D.z) / R - 0.03]]); }
   await pair('05-airlock-person-out', segAt(best.a, 0.68), along(best.a, 1.15, 0, 0.25), 64, [frac(segAt(best.a, 0.8, 0))]);
   await pair('06-glass-ceiling', segAt(best.a, 0.3, 0.3), [house.x, ground + 1.7, house.z], 80, [frac(segAt(best.a, 0.42, 0))]);
