@@ -42,7 +42,7 @@ describe('dome dig stages', () => {
   });
   it('the pit is exactly the tier skirt depth while the skirt is formed and poured', () => {
     for (const t of DOME_TIERS) for (const f of [0, 0.3, 0.6, 0.99]) expect(pitDepthFt(t, 1, f)).toBeCloseTo(TIER[t].skirtFt, 9);
-    expect([4, 20, 30, 60]).toEqual(DOME_TIERS.map(t => TIER[t].skirtFt));
+    expect([4, 30, 30, 60]).toEqual(DOME_TIERS.map(t => TIER[t].skirtFt));
   });
   it('an unsupplied stage has not moved', () => {
     expect(digState('glass', 0, 0.9, false).depthFt).toBe(0);

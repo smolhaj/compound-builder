@@ -1,6 +1,7 @@
 import { moatStates } from '../sim/waterWorks';
 import { domesOf } from '../sim/dome/standing';
 import { shelterUnderDome } from '../sim/dome/shelter';
+import { DomeScars } from './props/DomeScars';
 import { DomePortals } from './props/DomePortals';
 import { shellPointAt } from '../sim/dome/siege';
 import { fireMarks, fireOverlayNote } from '../sim/fireRisk';
@@ -439,6 +440,11 @@ export function GameCanvas() {
     const portals = new DomePortals(ws.scene, world.groundAt);
     const syncPortals = () => { const g = useGameStore.getState().game; portals.sync(domesOf(g), g.perimeter); };
     syncPortals();
+    // the marks a raid left on a dome's shell, fading with the days (sim/dome/scars.ts)
+    const scars = new DomeScars(ws.scene, world.groundAt);
+    const syncScars = () => { const g = useGameStore.getState().game; scars.sync(domesOf(g), g); };
+    syncScars();
+    const unsubScars = useGameStore.subscribe(s => `${(s.game.shellScars ?? []).length}|${Math.floor(s.game.clock.t)}|${s.game.structures.filter(st => st.kind.startsWith('dome_')).length}`, syncScars);
     const unsubPortals = useGameStore.subscribe(s => `${s.game.perimeter.length}|${s.game.perimeter.filter(r => r.finishedAt !== null).length}|${s.game.structures.filter(st => st.kind.startsWith('dome_')).map(st => `${st.id}${st.finishedAt}`).join()}`, syncPortals);
     const unsubDamage = useGameStore.subscribe(s => `${(s.game.raidDamage ?? []).filter(d => d.done < d.hours).map(d => d.id).join()}|${s.game.structures.filter(st => st.fixes?.some(f => f.part === 'glass' && f.done < f.hours)).map(st => st.id).join()}`, syncDamage);
     const battle = new BattleRenderer(ws.scene, world.groundAt, () => useGameStore.getState().game.people);
@@ -896,7 +902,7 @@ export function GameCanvas() {
       window.removeEventListener('keyup', onShift);
       player.stop();
       unCamReq();
-      nameLayer.dispose(); battle.dispose(); unsubDamage(); damageView.dispose(); unsubPortals(); portals.dispose();
+      nameLayer.dispose(); battle.dispose(); unsubDamage(); damageView.dispose(); unsubPortals(); portals.dispose(); unsubScars(); scars.dispose();
       tour.dispose();
       tool.dispose();
       marker.dispose();

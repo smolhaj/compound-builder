@@ -46,7 +46,7 @@ import { moatFx } from './waterWorks';
 import { lureOf, raidYardLosses } from './vehicleYard';
 import { doorTierOf, planBreach, type DoorPlan } from './doorBreach';
 import { sapperBreach } from './corridors';
-import { SALLY_HOLD, isShellKind, tierOfShell, withDomeShell } from './dome/siege';
+import { HEAVY_BLAST, SHELL_ODDS, SALLY_HOLD, isShellKind, tierOfShell, withDomeShell } from './dome/siege';
 import { roadStart } from './roadFx';
 import { WALK_CLIMB_FACTOR, WALK_POST, deckSpots, walkLength, walkRuns } from './walkway';
 import { TURRET_JAM, battleTowerPosts, highBonus, litTowerIds, isTower, mountReady, towerPosture, towerPosts, towerReach, turretsReady } from './towers';
@@ -438,7 +438,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
   const tWall = noWall ? null : wallTarget(s.perimeter, C, dir, { width: 0.7, preferGate: false });
   const tGate = noWall ? null : wallTarget(s.perimeter, C, dir, { width: 0.7, preferGate: true });
   const ramAt = (t: BreachWhere | null) => (t ? ramOdds({ wallKind: t.kind, gate: t.gate, difficulty, ...countersOf(s, t, C, t.runId) }) * (opts.scoutPlan === 'prepare' && t.gate ? PREPARED_GATE : 1) : 0);   // (a gate shut and chained on the scouts' warning)
-  const blastAt = (t: BreachWhere | null) => (t ? blastOdds({ wallKind: t.kind, gate: t.gate, difficulty, gateBarrier: countersOf(s, t, C, t.runId).gateBarrier }) * (opts.scoutPlan === 'prepare' && t.gate ? PREPARED_GATE : 1) : 0);
+  const blastAt = (t: BreachWhere | null) => (t ? blastOdds({ wallKind: t.kind, gate: t.gate, difficulty, heavy: means.satchels >= HEAVY_BLAST.satchels && late >= HEAVY_BLAST.late, gateBarrier: countersOf(s, t, C, t.runId).gateBarrier }) * (opts.scoutPlan === 'prepare' && t.gate ? PREPARED_GATE : 1) : 0);
   const ramBest = tGate && tGate.gate && ramAt(tGate) > ramAt(tWall) ? tGate : tWall;
   const how: BreachHow = noWall || !tWall ? 'climb' : chooseHow(means, ramAt(ramBest), blastAt(tWall));
   const target: BreachWhere | null = how === 'ram' ? ramBest : tWall;
@@ -785,7 +785,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
       hurt(u, (60 + r() * 50) * (1 - d / radius * 0.6) * (u.side === 'home' && u.shelter ? 0.35 : 1) * (u.post === wreck ? 1 : Math.max(0.4, u.cover)) * (u.armor.plate || u.armor.soft ? 0.7 : 1) * (u.armor.helmet ? 0.85 : 1), t);   // armor takes some of the fragments
     }
     let wrecks: 'post' | 'wall' | undefined;
-    if (wreck && wreck.kind !== 'open') { wreck.wrecked = true; smokeFrom = Math.min(smokeFrom, t); wrecks = wreck.kind === 'wall' ? 'wall' : 'post'; if (wreck.kind === 'wall' && !(wallKind in PERIMETER && PERIMETER[wallKind as PerimeterKind].impervious)) wallDown = true; }   // (an arcology's panels are not a wall a rocket brings down)
+    if (wreck && wreck.kind !== 'open') { wreck.wrecked = true; smokeFrom = Math.min(smokeFrom, t); wrecks = wreck.kind === 'wall' ? 'wall' : 'post'; if (wreck.kind === 'wall' && !(wallKind in PERIMETER && PERIMETER[wallKind as PerimeterKind].impervious) && (!isShellKind(wallKind) || r() < SHELL_ODDS[tierOfShell(wallKind)!].blast)) wallDown = true; }   // (an arcology's panels are not a wall a rocket brings down)
     ev.push({ t: r2(t), kind: 'explosion', x: r2(x), z: r2(z), radius, hits, ...(wrecks ? { wrecks } : {}) });
   };
   // how organized they are: later in the collapse, armored, more of them carry rifles
@@ -1498,7 +1498,7 @@ export function planBattle(state: GameState, raiders: number, seed: number, opts
     // (round 4) clubs against rifles need far more of them to rush the line; going over a wall, every rifle at a post on it slows them
     const outnumber = armedR ? 2 : 4;
     const onWall = H.filter(f => !f.out && !f.shelter && f.arm !== FISTS && t >= f.readyAt && f.post?.kind !== 'open' && atLine.some(x => sight(f, x) !== 'blocked')).length;   // (every rifle that bears on the climbers)
-    if (!breached && !peace && atLine.length && ((wallDown && !gapOnly) || hNow === 0 || rUp.length > hNow * outnumber) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (hNow === 0 || t - lineSince >= (synth ? STAGE_HOLD[stage] : ringK === 0 ? ringHold : ringStay)) && (!climbing || (t - lineSince >= 10 + wallClimbHold + (moat && ringK === 0 ? moat.holdS : 0) && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) * wallTop.climb * climbWeak * wallClimbK / (1 + onWall)))) {
+    if (!breached && !peace && atLine.length && ((wallDown && !gapOnly) || (hNow === 0 && (wallDown || !isShellKind(wallKind))) || (rUp.length > hNow * outnumber && (wallDown || !isShellKind(wallKind)))) && (opts.ambush === undefined || hNow === 0 || t - lineSince >= 12 + opts.ambush) && (hNow === 0 || t - lineSince >= (synth ? STAGE_HOLD[stage] : ringK === 0 ? ringHold : ringStay)) && (!climbing || (t - lineSince >= 10 + wallClimbHold + (moat && ringK === 0 ? moat.holdS : 0) && r() < 0.02 * atLine.length * (deck ? WALK_CLIMB_FACTOR : 1) * wallTop.climb * climbWeak * wallClimbK / (1 + onWall)))) {
       if (ringK < ringRs.length) fallBack(t);
       else openLine(t, pendingHow, rUp);
     }
