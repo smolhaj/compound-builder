@@ -90,7 +90,7 @@ const angDiff = (a: number, b: number): number => { let d = (a - b) % (Math.PI *
 
 /** The angles the dome's shell is already spoken for (person airlocks, the plant's service airlock with its yard, other links) and how far clear of each a link airlock must stand (radians). */
 export function takenAngles(d: Dome): Array<{ angle: number; gap: number }> {
-  const out: Array<{ angle: number; gap: number }> = d.airlocks.map(a => ({ angle: a.angle, gap: LINK.MIN_AIRLOCK_GAP }));
+  const out: Array<{ angle: number; gap: number }> = d.airlocks.map(a => ({ angle: a.angle, gap: a.role === 'vehicle' ? LINK.MIN_AIRLOCK_GAP + a.w / 2 / d.r : LINK.MIN_AIRLOCK_GAP }));
   if (hasYard(d.tier)) { const y = yardGeometry(d.tier, d.r, d.structure.rot); if (y) out.push({ angle: y.phi, gap: y.W / 2 / d.r + 0.18 }); }
   return out;
 }

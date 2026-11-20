@@ -5,7 +5,8 @@
  * The lines add up to `domeCost(...).totalUsd` (shell + skirt and earthwork + airlocks + plant + yard + finish + permit + the crew's wages), so what the
  * card shows is what the bill charges. Plant spares, filtering and the closed ecology are optional upgrades and are listed apart (`options`).
  */
-import { billUsd, domeCost } from './cost';
+import { CREW_RATE, billUsd, domeCost } from './cost';
+import { portBill, portVestibule, vehicleFits } from './vehiclePort';
 import { TIER, shellFt, type DomeTier } from './tiers';
 import { domeGeometry } from './geometry';
 import { yardBill, hasYard } from './plantYard';
@@ -49,7 +50,7 @@ export function domeCostSummary(tier: DomeTier, cells: number = TIER[tier].cells
     { id: 'shell', label: 'Shell, frame and glazing, erected', usd: shell },
     { id: 'skirt', label: `Buried skirt, ${TIER[tier].skirtFt} ft deep: concrete and steel`, usd: skirt },
     { id: 'earthwork', label: 'Earthwork: crater, rock, shoring, dewatering, skirt forms', usd: earthUsd },
-    { id: 'airlocks', label: `${TIER[tier].airlocks || 'No'} airlocks`, usd: airlocks },
+    { id: 'airlocks', label: TIER[tier].airlocks ? `${TIER[tier].airlocks} person airlock${TIER[tier].airlocks > 1 ? 's' : ''} (the main entrance${TIER[tier].airlocks > 1 ? ' and a second' : ''})` : 'No airlocks', usd: airlocks },
     { id: 'plant', label: 'Air and climate plant (chillers, air handlers, controls)', usd: plant },
     { id: 'yard', label: 'Hardened plant yard, service airlock and passage', usd: yard },
     { id: 'finish', label: 'Finish: paths, drainage, beds, lighting', usd: fit },
@@ -59,6 +60,10 @@ export function domeCostSummary(tier: DomeTier, cells: number = TIER[tier].cells
   // anything the lines did not catch (the earthen dome's hardware, rounding) goes to the shell line so the lines always add to the bill
   const gap = c.totalUsd - lines.reduce((a, l) => a + l.usd, 0);
   lines[0].usd += gap;
+  // the vehicle sally port (PROPOSED, docs/DECISIONS.md 2026-11-19): its kits, bollards, camera, paving and crew, itemized and counted in the grand total (the blueprint charges the same goods)
+  const pb = portBill(tier, g.radiusFt / 20), pv = portVestibule(tier, g.radiusFt / 20);
+  const portExtras: CostLine[] = pv ? [{ id: 'vehicle_port', label: `Vehicle sally port (two interlocked gates, ${Math.round(pv.len * 20)} ft lock chamber${vehicleFits(pv) ? '' : ', handcart size'}), bollards, camera, apron${vehicleFits(pv) ? ' and inside lane' : ''}`, usd: billUsd(pb.bill) + Math.round(pb.hours * CREW_RATE / 100) * 100 }] : [];
+  extras = [...portExtras, ...extras];
   const opts: CostLine[] = [];
   if (tier !== 'earthen') {
     opts.push({ id: 'spare_chiller', label: 'Second chiller plant (N+1)', usd: spareUsd(tier, cells, 'chiller', 'none') ?? 0 });

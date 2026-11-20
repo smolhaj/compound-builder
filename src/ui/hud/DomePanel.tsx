@@ -17,6 +17,7 @@ import { domeRunning } from '../../sim/dome/runningLine';
 import { DomeClimateSection } from './DomeClimateSection';
 import { DomeLinksSection } from './DomeLinksSection';
 import { DomeBunkerSection } from './DomeBunkerSection';
+import { portCycleSeconds, portWords } from '../../sim/dome/vehiclePort';
 
 const NAME: Record<Filtering, string> = { none: 'None (shell leakage only)', scrubber: 'CO2 scrubbers', advanced: 'Advanced air bank', closed: 'Closed ecology' };
 const BUY: Record<Filtering, string> = { none: '', scrubber: 'Fit CO2 scrubbers', advanced: 'Fit the advanced air bank', closed: 'Build the closed ecology' };
@@ -145,6 +146,12 @@ export function DomePanel() {
     </Section>
     <DomeBunkerSection v={v} />
     <DomeClimateSection v={v} />
+    <Section title="Vehicle port">
+      <div data-testid="dome-vehicle-port">
+        <Note>{portWords(d.tier, d.r)}.</Note>
+        {d.tier !== 'earthen' && <Note>{`A truck waits about ${portCycleSeconds(d.tier)} seconds in the lock: the outer gate shuts before the inner one opens, the same rule as a person airlock with a longer hold. The road ends at the apron outside the port.`}</Note>}
+      </div>
+    </Section>
     <DomePlantSection v={v} />
     <DomeLinksSection v={v} />
     <div style={{ fontSize: 11, color: DIM }}>The {TIER_NAME(v).toLowerCase()} sits over the bunker, which keeps its own fallout protection. It keeps weather, ash and fallout dust off the ground under it, and it can be seen for miles.</div>

@@ -37,7 +37,7 @@ const finish = (g: GameState): void => { for (const l of linksOf(g)) { const r =
 describe('the link airlock', () => {
   it('is a dedicated airlock on the shell, separate from the person airlocks and the plant service airlock', () => {
     const g = two('glass', 'glass'); orderLink(g, 'dA', 'dB', 'walkway');
-    const d = domesOf(g).find(x => x.id === 'dA')!, links = d.airlocks.filter(a => a.role === 'link'), person = d.airlocks.filter(a => a.role !== 'link');
+    const d = domesOf(g).find(x => x.id === 'dA')!, links = d.airlocks.filter(a => a.role === 'link'), person = d.airlocks.filter(a => !a.role);
     expect(links.length).toBe(1);
     expect(person.length).toBe(TIER.glass.airlocks);
     const ang = (a: number, b: number) => { let x = Math.abs(a - b) % (Math.PI * 2); if (x > Math.PI) x = Math.PI * 2 - x; return x; };
@@ -116,7 +116,7 @@ describe('quote, cost and rules', () => {
     expect(quoteLink(g, 'dA', 'dB', 'tunnel').problem).toBeNull();
   });
   it('a line through a third dome is refused', () => {
-    const g = two('geodesic', 'geodesic', 20); dome(g, 'dC', 'glass', 33, 33);
+    const g = two('geodesic', 'geodesic', 20); dome(g, 'dC', 'glass', 33, 31);
     expect(quoteLink(g, 'dA', 'dB', 'walkway').problem).toMatch(/through another dome|Too far|off your land/);
     void domeRouteProblem;
   });
