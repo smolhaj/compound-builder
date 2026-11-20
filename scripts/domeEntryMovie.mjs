@@ -136,8 +136,8 @@ try {
   // camera rigs [time, eye rig, look rig]: a rig is [tag, a, b, c]: 'G' = the port's frame (rho out from the shell along the port axis, lam across, h above the ground), 'T' / 'P' = on the truck / person
   // (forward along its heading, to its left, up). The eye is the smooth blend of the previous rig's position and the next rig's, both re-evaluated every frame, so the flight follows the actors.
   const RIGS = [
-    [0.0, ['G', R + 26 * S, -10 * S, 6.5 * S], ['P', 0, 0, 0.18]],
-    [7.0, ['P', -4.5 * S, -2.6 * S, 1.0 * S], ['P', 1.5 * S, 0, 0.2]],
+    [0.0, ['G', R + 21 * S, -13 * S, 5.5 * S], ['G', R + 7 * S, 0, 0.5]],
+    [7.0, ['P', -1.5 * S, 4.6 * S, 1.0 * S], ['P', 1.5 * S, 0, 0.2]],
     [12.0, ['G', R + 11 * S, -4.5 * S, 1.5 * S], ['T', 0, 0, 0.2]],
     [17.0, ['T', 1.8 * S, -3.0 * S, 1.1 * S], ['T', 0, 0, 0.2]],
     [22.0, ['G', R + 4.5 * S, 4.5 * S, 1.3 * S], ['G', R + 0.2, 0, 0.3]],
@@ -174,6 +174,8 @@ try {
     const gE = await gd(ex, ez); ey = Math.max(ey, gE + 0.35);
     { const dx = ex - geo.x, dz = ez - geo.z, d = Math.hypot(dx, dz), lam = Math.abs((ex - geo.x) * n[0] + (ez - geo.z) * n[1]);
       if (Math.abs(d - R) < 0.25 && lam > geo.v.dw * 0.5 && ey < gE + R * 0.6) { const k = (R + (d >= R ? 0.25 : -0.25)) / d; ex = geo.x + dx * k; ez = geo.z + dz * k; } }
+    // and out of the people and the truck: within 1.1 units of either, at their height, it is pushed out along the line from them
+    for (const a of [ctx.truck, ctx.person]) { const dx = ex - a.x, dz = ez - a.z, d = Math.hypot(dx, dz); if (d < 1.1 && ey < gE + 0.8) { const k = 1.1 / (d || 1); ex = a.x + (d ? dx : 1) * k; ez = a.z + (d ? dz : 0) * k; } }
     const tx = lk[0], ly = lk[1], tz = lk[2];
     st.eye = [ex, ey, ez];
     await page.evaluate(([wx, wz, wy, hdg, tx, tz, tp, trot, eye, ey, look, ly, fov]) => {
