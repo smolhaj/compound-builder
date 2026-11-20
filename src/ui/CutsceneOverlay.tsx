@@ -200,8 +200,11 @@ function FireButton() {
 
 /** Orders on the live playhead: three small buttons while the last fight plays. The fight is replanned from this second on (same seeded stream, so nothing already shown changes). */
 function LiveOrders() {
+  // (a fight at a dome nothing can breach has nothing to order: the household watches)
+  const sealed = useBattleStore(s => !!s.battle?.sealed);
   const give = useGameStore(s => s.giveRaidOrderNow);
   const now = useGameStore(s => s.cutscene?.orders?.slice(-1)[0]?.order ?? 'hold');
+  if (sealed) return null;
   return <div data-testid="live-orders" style={{ position: 'fixed', left: 'clamp(12px, 3vw, 40px)', bottom: `calc(${BAR} + 12px)`, zIndex: 39, display: 'flex', gap: 6, alignItems: 'center', background: 'rgba(16,14,11,0.82)', padding: '6px 8px', borderRadius: 6, pointerEvents: 'auto' }}>
     <span style={{ ...label, marginRight: 4 }}>Orders</span>
     {ORDERS.map(o => <button key={o} data-testid={`live-order-${o}`} title={ORDER_HINT[o]} onClick={() => give(o)} style={{ ...btn, background: o === now ? '#d8c9a0' : 'rgba(30,26,22,0.9)', color: o === now ? '#1c1d18' : '#efe6d4' }}>{ORDER_NAME[o]}</button>)}

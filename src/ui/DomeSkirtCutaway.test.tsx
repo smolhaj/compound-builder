@@ -16,9 +16,9 @@ describe('skirt cutaway', () => {
     expect(SKIRT_NUMBERS.coverPlain).toBe(17);
     expect(SKIRT_NUMBERS.coverLearned).toBe(29);
   });
-  it('tells the story the rules tell: 20 ft beats a plain crew only, 30 ft and 60 ft beat both', () => {
+  it('tells the story the rules tell: the 4 ft earthen skirt stops nobody, 30 ft (geodesic, glass) and 60 ft (arcology) beat both a plain and a learned crew', () => {
     expect(skirtFacts('geodesic').plain).toBeGreaterThanOrEqual(0.99);
-    expect(skirtFacts('geodesic').learned).toBe(0);
+    expect(skirtFacts('geodesic').learned).toBeGreaterThanOrEqual(0.99);
     expect(skirtFacts('glass').learned).toBeGreaterThanOrEqual(0.99);
     expect(skirtFacts('arcology').learned).toBeGreaterThanOrEqual(0.99);
     expect(skirtFacts('earthen').plain).toBe(0);

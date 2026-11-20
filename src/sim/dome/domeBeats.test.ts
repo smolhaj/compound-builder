@@ -4,7 +4,7 @@ import { place, opts } from '../raidTestKit';
 import { planBattle } from '../battle';
 import { LineDirector, resetRaidMemory, LINES } from '../raidDialogue';
 import { DOME_LINES, DOME_RAIDER_CTX, DOME_DEFENDER_CTX, DOME_VARIANT_KEYS } from '../raidLinesDome';
-import { domeBeats, BEAT_CTX_USED, shellWording, mildWording } from './domeBeats';
+import { domeBeats, BEAT_CTX_USED, shellWording, mildWording, sealedFight } from './domeBeats';
 import { domesOf, PANELS } from './standing';
 import { addScars, visibleScars, SCAR_LIFE } from './scars';
 import { blastOdds, ramOdds } from '../breachMeans';
@@ -31,7 +31,7 @@ describe('raids on a dome are staged (presentation only)', () => {
         resetRaidMemory();
         const { b, dome } = fight(tier, seed);
         const out = domeBeats(b, { dome, seed, temper: 'hard', dir: new LineDirector(seed) });
-        expect(out.events.filter(e => e.kind !== 'say' && e.kind !== 'move' && e.kind !== 'cover' && e.kind !== 'probe' && e.kind !== 'tool' && e.kind !== 'dome_shot' && e.kind !== 'gesture')).toEqual(b.events.filter(e => e.kind !== 'say' && e.kind !== 'move' && e.kind !== 'cover'));
+        expect(out.events.filter(e => e.kind !== 'say' && e.kind !== 'move' && e.kind !== 'cover' && e.kind !== 'probe' && e.kind !== 'tool' && e.kind !== 'dome_shot' && e.kind !== 'gesture')).toEqual((tier === 'arcology' ? sealedFight(b) : b).events.filter(e => e.kind !== 'say' && e.kind !== 'move' && e.kind !== 'cover'));
         for (let i = 1; i < out.events.length; i++) expect(out.events[i].t).toBeGreaterThanOrEqual(out.events[i - 1].t);
         for (const e of out.events) if (e.kind === 'probe') {
           probes++; kinds.add(e.what);
@@ -161,7 +161,7 @@ describe('anger, ricochets and the household at the shell (presentation only)', 
         for (const e of back) { expect(sh.filter(x => x.unit === e.unit).pop()).toBe(e); expect(e.down).toBeGreaterThan(0); }
         // his voice follows within a few seconds, and nobody is wounded or killed by it
         for (const e of back) expect(out.events.some(s => s.kind === 'say' && s.ctx === 'dome_bounce' && s.who === e.unit && s.t > e.t && s.t < e.t + 3)).toBe(true);
-        expect(out.events.filter(e => e.kind === 'wound' || e.kind === 'death').length).toBe(run(tier, seed).b.events.filter(e => e.kind === 'wound' || e.kind === 'death').length);
+        if (tier !== 'arcology') expect(out.events.filter(e => e.kind === 'wound' || e.kind === 'death').length).toBe(run(tier, seed).b.events.filter(e => e.kind === 'wound' || e.kind === 'death').length);
         expect(JSON.stringify(run(tier, seed).out)).toBe(JSON.stringify(out));
       }
       expect(shots, tier).toBeGreaterThan(10);
@@ -184,5 +184,39 @@ describe('anger, ricochets and the household at the shell (presentation only)', 
   it('taunts name no stronger word than "damn", and never give a child or an elder a curse', () => {
     for (const t of Object.values(DOME_LINES.defender.dome_taunt ?? {}).flat() as string[]) expect(t).not.toMatch(/nigg|cunt|jesus/i);
     for (const t of [...(DOME_LINES.defender.dome_taunt?.kid ?? []), ...(DOME_LINES.defender.dome_taunt?.elder ?? [])]) expect(t).not.toMatch(/damn|hell/i);
+  });
+});
+
+describe('a sealed dome (the arcology) is a household watching, not a firefight', () => {
+  const homeUnits = (b: { units: Array<{ id: string; side: string }> }) => new Set(b.units.filter(u => u.side === 'home').map(u => u.id));
+  it('emits no defender shots, hits, reloads, flares, cover, wounds or generic lines, and flags the fight sealed (no orders bar)', () => {
+    for (let seed = 300; seed < 312; seed++) {
+      resetRaidMemory();
+      const { b, dome } = fight('arcology', seed, 10);
+      const out = domeBeats(b, { dome, seed, temper: 'hard', dir: new LineDirector(seed) });
+      const home = homeUnits(out);
+      expect(out.sealed).toBe(true);
+      for (const e of out.events) {
+        expect(['shot', 'wound', 'death', 'aid', 'carry', 'flare', 'reload', 'jam', 'fallback', 'panic', 'heroic', 'surrender']).not.toContain(e.kind);
+        if (e.kind === 'cover') expect(home.has(e.unit)).toBe(false);
+        if (e.kind === 'say') expect(e.ctx ?? '', e.text).toMatch(/^dome_/);
+        if (e.kind === 'say' && e.who && home.has(e.who)) expect(e.ctx).not.toBe('dome_fire');
+      }
+      // the household is out at the glass, many of it, and it speaks as spectators
+      expect(out.events.filter(e => e.kind === 'say' && e.ctx === 'dome_spectate').length).toBeGreaterThan(1);
+    }
+  });
+  it('a lower tier whose home side never fires has no gunfire talk from the home side; a tier that can fail is not sealed', () => {
+    for (const tier of ['geodesic', 'glass'] as const) for (let seed = 300; seed < 312; seed++) {
+      resetRaidMemory();
+      const { b, dome } = fight(tier, seed, 10);
+      const out = domeBeats(b, { dome, seed, temper: 'hard', dir: new LineDirector(seed) });
+      expect(out.sealed).toBeUndefined();
+      const home = homeUnits(out), fires = out.events.some(e => e.kind === 'shot' && home.has(e.from));
+      if (!fires) for (const e of out.events) if (e.kind === 'say' && e.who && home.has(e.who)) expect(['first_shots', 'fight', 'defender_hit', 'mate_down', 'fire']).not.toContain(e.ctx);
+    }
+  });
+  it('the raiders\' bounce lines are about their own round, never a hit by the defenders', () => {
+    for (const t of Object.values(DOME_LINES.raider.dome_bounce ?? {}).flat() as string[]) expect(t).not.toMatch(/\bhit\b|shot at|they shot/i);
   });
 });
