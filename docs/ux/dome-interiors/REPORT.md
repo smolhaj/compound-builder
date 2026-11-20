@@ -56,3 +56,21 @@ Scripts: `scripts/domeInteriorShots.mjs` (dome floors, day and night pairs, same
 A first version of the dressing added its own meshes (+3 draw calls on dome_glass, +4 on the arcology) and broke the budget; it now merges into the plant's machinery mesh and its lamp and pool instances, so draw calls are unchanged. Shadow triangles and casters are unchanged.
 
 Latest run on main plus this branch: dome_glass 409 calls (766k / 1052k tris, 101 / 118 MB), dome_arcology 411 (778k / 1073k, 103 / 120 MB), mountain 396; all under budget, no budget changed.
+
+
+## Round 3: dome re-shoot on current main (night fix #403, camera grade #405, vehicle port #401)
+All 36 dome frames were re-shot (stale pre-merge `dome-*` frames removed). Glass and arcology, day and night pairs; the 08 to 10 frames show the new one-entrance layout from inside.
+
+| Frame | Verdict |
+|---|---|
+| 00 aerial inside (glass, arcology) | Good. Night no longer glows green; lamps, lit windows, plant block readable. |
+| 01 lawn and homes, glass night | Good: greenhouse, house, bench lamp pool. Lawn is a little green-black. |
+| 02 path between buildings | Good. Day clear; night has two lamp posts at the door and warm pools. |
+| 03 house door, glass | Fixed. Shot from the lawn: lit gable and windows, a lamp post, a bench; before, the porch was a black deck. |
+| 04 plant yard, glass | Usable now: the camera stands in an aisle (the shot script keeps that sector clear of houses), plant buildings and lamp posts with pools at night. |
+| 04 plant yard, arcology night | Better: lamp posts and a lit apron in front of the garage-style units. The middle of the floor is still dark lawn. |
+| 05 person airlock, 06 ceiling | Good; arcology 05 night shows the lit door lamp, bench and crates. |
+| 08 vehicle lane, 09 entrance complex, 10 vehicle port door (glass, arcology) | New. The truck lane is paved and marked; the person airlock sits beside the vehicle port; lamps flank both doors. Glass night shows lit door lamps. Arcology night lane frames are dark: asphalt albedo is low and the lane has no lamp of its own. |
+
+Changes: lamp posts beside every lived-in house and flanking each person airlock; plant-unit lamp posts with larger pools; shot script keeps the plant sector free, adds the lane and entrance shots.
+Not done: the arcology 08 and 10 night frames are still dark (lane lamps would fix them). Interior pools are still soft, not rim-bright.
