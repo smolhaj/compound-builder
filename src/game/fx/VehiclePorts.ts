@@ -21,7 +21,7 @@ export interface PortFixtures { group: THREE.Group; key: string; dispose(): void
 
 export const portsKey = (ins: readonly PortInput[]): string => ins.map(i => `${i.id}:${i.tier}:${i.frame.angle.toFixed(3)}:${i.frame.cx.toFixed(2)},${i.frame.cz.toFixed(2)}:${i.frame.r.toFixed(2)}:${i.lane ? 1 : 0}:${i.guarded ? 1 : 0}:${i.persons.length}:${i.state}`).join('|');
 
-const POUR = 0xaeaca4, CURB = 0x8d8b84, PAINT = 0xeae7da, YELLOW = 0xe3b92a, STEEL = 0x8a929a, DARK = 0x262a2f, GLASS = 0x6fa5b8;
+const POUR = 0x8f8d86, CURB = 0x6f6d68, PAINT = 0xeae7da, YELLOW = 0xe3b92a, STEEL = 0x8a929a, DARK = 0x262a2f, GLASS = 0x6fa5b8;
 const CLAD: Record<DomeTier, number> = { earthen: 0x7a6f5d, geodesic: 0x9aa3ab, glass: 0x56606a, arcology: 0x2a3037 };
 const ACCENT: Record<DomeTier, number> = { earthen: 0xffd070, geodesic: 0xffe9b0, glass: 0xdff3ff, arcology: 0x40e0ff };
 

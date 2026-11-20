@@ -38,7 +38,7 @@ try {
     if (!sp) return null;
     G.getState().plan(KIND, sp[0], sp[1], ROT);
     const st = G.getState().game.structures.at(-1);
-    G.setState(s => { const g = structuredClone(s.game); for (const q of g.structures) { q.stage = 99; q.done = 0; q.finishedAt = 0; q.supplied = true; } g.utilities.lit = ['x']; return { game: g }; });
+    G.setState(s => { const g = structuredClone(s.game); for (const q of g.structures) { q.stage = 99; q.done = 0; q.finishedAt = 0; q.supplied = true; } return { game: g }; });   // (no lit lamps by day: their warm point lights tinted every frame; the night shots switch them on)
     cb.store.getState().setHudHidden?.(true);
     return { id: st.id, x: st.x, z: st.z, rot: ROT, port: st.portAngle ?? null, yard: [y.x, y.z], end };
   }, [KIND, ROT, SC.doors || 'open']);
@@ -64,10 +64,11 @@ try {
   if (want('second')) { await pr(E(-(R + 9 * S), 3 * S, 3), E(-R, 0.5 * S, 0), 58); await shot('second-entrance-opposite'); }
   if (want('eye')) {
     // (the delivery truck stops short on this lot's county road whatever a dome does, so the shot stands a truck on the apron by hand)
-    await page.evaluate(async ([x, z, heading]) => { const m = await import('/src/game/props/truckGeometry.ts'); const t = m.buildTruck(); t.position.set(x, window.__cb.world.groundAt(x, z), z); t.rotation.y = heading; window.__cb.ws.scene.add(t); }, [E(R + 1.1 * S, 0.25 * S, 0)[0], E(R + 1.1 * S, 0.25 * S, 0)[2], (a ? a.angle : 0) + Math.PI]);
+    await page.evaluate(async ([x, z, heading]) => { const m = await import('/src/game/props/truckGeometry.ts'); const t = m.buildTruck(); t.position.set(x, window.__cb.world.groundAt(x, z), z); t.rotation.y = heading; window.__cb.ws.scene.add(t); window.__truckProp = t; }, [E(R + 1.1 * S, 0.25 * S, 0)[0], E(R + 1.1 * S, 0.25 * S, 0)[2], (a ? a.angle : 0) + Math.PI]);
     await person(...[E(R + 2.6 * S, 0.9 * S, 0)].map(p => [p[0], p[2]])[0]);
     await frames(2);
     await pr(E(R + 5.2 * S, -1.9 * S, 0.5), [gate[0], 0.3 * S, gate[2]], 58); await shot('eye-at-port-truck-person');
+    await page.evaluate(() => { window.__truckProp?.removeFromParent(); });
   }
   if (want('inside')) {
     await person(...[E(R - len - 1.4, 0.9 * S, 0)].map(p => [p[0], p[2]])[0]);
@@ -75,11 +76,12 @@ try {
   }
   const pa = dm.persons[0], pu = pa ? [Math.sin(pa.angle), Math.cos(pa.angle)] : u, pn = [pu[1], -pu[0]];
   const EP = (rho, lam, h) => [dm.x + pu[0] * rho + pn[0] * lam, h, dm.z + pu[1] * rho + pn[1] * lam];   // a point on the person airlock's frame
-  if (want('chamber-person')) { await pr(EP(R + 0.9 * S, 0.12 * S, 0.3 * S), EP(R - 0.2, 0, 0.22 * S), 55); await shot('chamber-person-eye'); }
+  if (want('chamber-person')) { await pr(EP(R + 0.8 * S, 0.0, 0.3 * S), EP(R - 0.2, 0, 0.22 * S), 55); await shot('chamber-person-eye'); }
   if (want('chamber-port')) { await pr(E(R + 1.5 * S, 0.1, 0.32 * S), E(R - 0.6, 0, 0.25 * S), 58); await shot('chamber-port-eye'); }
-  if (want('inside-night')) { await set(`cb.store.getState().setTimeOfDay(21.5)`); await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await shot('inside-looking-out-night'); }
+  const lightsOn = () => page.evaluate(() => window.__cb.game.setState(st => { const g = structuredClone(st.game); g.utilities.lit = ['x']; return { game: g }; }));
+  if (want('inside-night')) { await lightsOn(); await set(`cb.store.getState().setTimeOfDay(21.5)`); await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await shot('inside-looking-out-night'); }
   if (want('night')) {
-    await set(`cb.store.getState().setTimeOfDay(21.5)`);
+    await lightsOn(); await set(`cb.store.getState().setTimeOfDay(21.5)`);
     await pr(E(R + 6.5, -3.5, 2.2), gate, 55); await shot('night-port');
   }
   await page.close();
