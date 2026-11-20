@@ -111,14 +111,15 @@ describe('the skirt against a dig', () => {
 
 describe('a tunnel crosses a dome only through an airlock', () => {
   const dome = (tier: DomeTier = 'glass') => domeFrom({ id: 'dm', kind: KIND[tier], x: 10, z: -4, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 })!;
-  it('the airlocks are evenly spread and sit on the shell', () => {
-    for (const t of BUILT) { const d = dome(t); expect(d.airlocks.length).toBe(TIER[t].airlocks); for (const a of d.airlocks) expect(Math.hypot(a.x - d.x, a.z - d.z)).toBeCloseTo(d.r, 5); }
-    const a = airlocksOf('arcology', 0, 0, 9, 1); expect(a[0].angle).toBeCloseTo(Math.PI / 2, 9);
+  it('the entrances sit on the shell: one person airlock beside the port (two on the arcology, the second opposite)', () => {
+    for (const t of BUILT) { const d = dome(t); expect(d.airlocks.filter(a => !a.role).length).toBe(TIER[t].airlocks); for (const a of d.airlocks) expect(Math.hypot(a.x - d.x, a.z - d.z)).toBeCloseTo(d.r, 5); }
+    const a = airlocksOf('arcology', 0, 0, 9, 1, 0.5);
+    expect(a.length).toBe(2); expect(a[1].angle).toBeCloseTo(0.5 + Math.PI, 9); expect(a[0].angle).toBeGreaterThan(0.5);   // (the main one stands beside the port at 0.5)
   });
   it('a line that never meets the shell is untouched; one that meets it away from an airlock is refused with the nearest airlock named', () => {
     const d = dome();
     expect(crossingProblem(d, 'escape_tunnel', [[0, 20], [4, 20]])).toBeNull();
-    const a = d.airlocks[0], mid = (d.airlocks[0].angle + d.airlocks[1].angle) / 2;
+    const a = d.airlocks[0], mid = a.angle + Math.PI;   // (opposite the one person airlock)
     const away: [number, number] = [d.x + Math.sin(mid) * (d.r + 3), d.z + Math.cos(mid) * (d.r + 3)], inside: [number, number] = [d.x, d.z];
     expect(crossingProblem(d, 'underground_passage', [away, inside])).toMatch(/only through an airlock.*ft from the nearest airlock/);
     expect(crossingProblem(d, 'underground_passage', [[a.outX + Math.sin(a.angle) * 3, a.outZ + Math.cos(a.angle) * 3], inside])).toBeNull();
@@ -126,17 +127,17 @@ describe('a tunnel crosses a dome only through an airlock', () => {
     expect(CROSSING_KINDS).toContain('escape_tunnel');
   });
   it('the line is laid through the airlock: outer door, then the chamber, then the inner door', () => {
-    const d = dome(), a = d.airlocks[1];
+    const d = dome(), a = d.airlocks[0];
     const from: [number, number] = [a.x + Math.sin(a.angle) * 6, a.z + Math.cos(a.angle) * 6];
     const { pts, airlock } = throughAirlock(d, [from, [d.x, d.z]]);
-    expect(airlock?.index).toBe(1);
+    expect(airlock?.index).toBe(0);
     expect(pts.map(p => p.map(n => +n.toFixed(2)))).toContainEqual([+a.x.toFixed(2), +a.z.toFixed(2)]);
     expect(pts.length).toBe(5);
     expect(crossesAt(d, pts)).not.toBeNull();
   });
   it('on the place: refused off an airlock, accepted and snapped on one; a staked dome counts', () => {
     const g = withDome(place(2, 'standard', 'bare'), 'geodesic', [20, 0]);
-    const d = domesOf(g)[0], a = d.airlocks[0], mid = (a.angle + d.airlocks[1].angle) / 2;
+    const d = domesOf(g)[0], a = d.airlocks[0], mid = a.angle + Math.PI;
     const bad: [number, number][] = [[d.x + Math.sin(mid) * (d.r + 4), d.z + Math.cos(mid) * (d.r + 4)], [d.x, d.z]];
     expect(domeRouteProblem(g, 'escape_tunnel', bad)).not.toBeNull();
     const good: [number, number][] = [[a.outX + Math.sin(a.angle) * 2, a.outZ + Math.cos(a.angle) * 2], [d.x, d.z]];
@@ -152,11 +153,11 @@ describe('the shell in a raid', () => {
     const g = withDome(place(3, 'standard', 'armed'), 'glass');
     const w = withDomeShell(g, { x: 0, z: 0 });
     const run = w.perimeter.find(r => r.id === 'dome:dm')!;
-    expect(run.kind).toBe('shell_glass'); expect(run.gates.length).toBe(3); expect(isShellKind(run.kind)).toBe(true);
+    expect(run.kind).toBe('shell_glass'); expect(run.gates.length).toBe(1); expect(isShellKind(run.kind)).toBe(true);   // (the person airlock and the vehicle port are ONE gate complex: one entrance)
     expect(withDomeShell(g, { x: 500, z: 500 })).toBe(g);
     expect(shellRun(domesOf(g)[0], [1]).gates.filter(x => (x as { breach?: boolean }).breach).length).toBe(1);
     const p = shellPointAt(domesOf(g)[0], run.gates[0].at);
-    expect(Math.hypot(p.x - domesOf(g)[0].airlocks[0].x, p.z - domesOf(g)[0].airlocks[0].z)).toBeLessThan(0.15);
+    expect(Math.hypot(p.x - domesOf(g)[0].airlocks[0].x, p.z - domesOf(g)[0].airlocks[0].z)).toBeLessThan(run.gates[0].w);   // (the complex's gate spans the person airlock and the port)
   });
   it('the arcology holds against every crew, with a truck and charges, on every seed; the glass and geodesic domes are breached by some', () => {
     const tally: Record<string, { n: number; breached: number; gap: number }> = {};

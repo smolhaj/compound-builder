@@ -17,6 +17,7 @@ import { payUpkeep, toolHold, wearTools, workSpeed } from './tools';
 import type { GameState, Structure } from './state';
 import { bunkerBlueprint, footedBlueprint, holdDome, holdFor, type Piece } from './dome/bunker';
 import { tierOfKind } from './dome/tiers';
+import { stampPort } from './dome/portSite';
 import { lengthText } from './units';
 
 export function blueprintOf(st: Structure) {
@@ -54,6 +55,7 @@ export function planStructure(s: GameState, kind: string, x: number, z: number, 
   const st: Structure = { id: `s${s.nextId++}`, kind, x, z, rot, stage: 0, done: 0, supplied: false, finishedAt: null };
   stampGrade(s, st);
   stampStyle(s, st);
+  stampPort(s, st);
   s.structures.push(st);
   log(s, `Staked out a ${kind.replace('_', ' ')}.`);
   return st;

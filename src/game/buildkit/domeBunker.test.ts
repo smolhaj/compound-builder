@@ -16,8 +16,8 @@ describe('a bunker under a dome', () => {
   for (const tier of ['geodesic', 'glass', 'arcology'] as const) {
     it(`${tier}: a hatch inside the ring is allowed whether the dome is staked first or the bunker is`, () => {
       const { kind, dome } = at(tier);
-      expect(siteProblem(KIT.bunker_hatch, 9.75, 9.75, 0, flat, [dome])).toBeNull();
-      expect(siteProblem(KIT[kind], 10, 10, 0, flat, [P('s1', 'bunker_hatch', 9.75, 9.75)])).toBeNull();
+      expect(siteProblem(KIT.bunker_hatch, 9.4, 10, 0, flat, [dome])).toBeNull();
+      expect(siteProblem(KIT[kind], 10, 10, 0, flat, [P('s1', 'bunker_hatch', 9.4, 10)])).toBeNull();
     });
   }
   it('a bunkroom joins the hatch under a big dome, wall to wall, and a dome staked later accepts it', () => {
@@ -35,9 +35,10 @@ describe('a bunker under a dome', () => {
   });
   it('the way in to an airlock stays clear', () => {
     const { kind, dome } = at('arcology'), d = domeAt(kind, 10, 10)!;
-    // the first airlock is on the +z side
-    expect(siteProblem(KIT.bunker_hatch, 10.25, 10 + usableR(d) - 0.3, 0, flat, [dome])).toBe('airlock_lane');
-    expect(siteProblem(KIT.bunker_hatch, 10 + usableR(d) - 0.3, 10.25, 0, flat, [dome])).toBeNull();
+    // the gate complex is on the +z side (stamped): the way in to it is kept clear, the east side is free
+    const stamped = { ...dome, portAngle: 0 } as Placed;
+    expect(siteProblem(KIT.bunker_hatch, 10.25, 10 + usableR(d) - 0.3, 0, flat, [stamped])).toBe('airlock_lane');
+    expect(siteProblem(KIT.bunker_hatch, 10 + usableR(d) - 0.3, 10.25, 0, flat, [stamped])).toBeNull();
   });
   it('the earthen dome is a hut: a bunker under it is refused with its own message, one beside it is fine', () => {
     const { dome } = at('earthen', 4);

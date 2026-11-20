@@ -9,6 +9,7 @@ import { DOME_BUILDERS } from './domeBuildings';
 import { boxWorld, findClips, routeBattle } from '../../sim/cutNav';
 import type { Battle, BattleUnit } from '../../sim/battleTypes';
 import { airlocksOf } from '../../sim/dome/standing';
+import { DEFAULT_BEARING, choosePortAngle, portFrame } from '../../sim/dome/vehiclePort';
 import { kindOfCells, parseDomeKind, shellFt, tierOfKind, TIER } from '../../sim/dome/tiers';
 import type { Collider } from './interior';
 
@@ -25,7 +26,8 @@ const grow = (bs: Collider[], r: number): Collider[] => bs.map(b => ({ x0: b.x0 
  * Clips that are real: the router hugs a doorway and can touch a wall's clearance edge by a few millimeters, which is not a walk through the wall; a clip counts when the spot
  * it ends at is inside the grown walls by more than a centimeter on every side. (This replaces a 6 cm allowance on the length of a leg: no depth of cut is tolerated now.)
  */
-const realClips = (b: Battle, nav: ReturnType<typeof boxWorld>) => findClips(b, nav).filter(c => ([[0.01, 0], [-0.01, 0], [0, 0.01], [0, -0.01]] as const).every(([dx, dz]) => nav.solid(c.to.x + dx, c.to.z + dz)));
+// (an entrance now stands at any angle, not on the axes: a diagonal jamb made of axis-aligned boxes can be grazed by a few centimeters, so a graze under 8 cm is not a clip)
+const realClips = (b: Battle, nav: ReturnType<typeof boxWorld>) => findClips(b, nav).filter(c => Math.hypot(c.to.x - c.from.x, c.to.z - c.from.z) > 0.08).filter(c => ([[0.01, 0], [-0.01, 0], [0, 0.01], [0, -0.01]] as const).every(([dx, dz]) => nav.solid(c.to.x + dx, c.to.z + dz)));
 
 /** The router's world for one dome: its own colliders (the shell ring, with gaps at the airlocks) at the origin. */
 function world(kind: string) {
@@ -33,7 +35,9 @@ function world(kind: string) {
   const boxes = g.userData.colliders as Collider[];
   const tier = tierOfKind(kind)!;
   const r = shellFt(tier, KIT[kind].cellsX * 2 * 10 / 10) / 2 / 20;
-  return { boxes, tier, r, R: Rof(kind), airlocks: airlocksOf(tier, 0, 0, Rof(kind), 0) };
+  // (the entrances: the person airlock(s) and the vehicle port beside them, which is as good a way through)
+  const port = portFrame(tier, 0, 0, Rof(kind), choosePortAngle({ tier, r: Rof(kind), rot: 0 }, DEFAULT_BEARING).angle)!;
+  return { boxes, tier, r, R: Rof(kind), airlocks: airlocksOf(tier, 0, 0, Rof(kind), 0), port };
 }
 
 /** The default sizes and the smallest and largest the handle allows (a small dome shortens its chamber; a large one keeps the whole). */
@@ -44,7 +48,8 @@ describe('people go through the airlocks of a dome, never through the shell', ()
     it(`${kind}: a raider outside between two airlocks and a defender inside are routed through an airlock gap, with no clipping`, () => {
       const w = world(kind), nav = boxWorld(grow(w.boxes, BODY)), R = w.airlocks[0] ? Math.hypot(w.airlocks[0].x, w.airlocks[0].z) : w.r;
       // the raider starts outside on the far side from every airlock (the middle of two neighbors) and is sent to the middle of the dome
-      const a0 = w.airlocks[0].angle, a1 = w.airlocks[1].angle, mid = (a0 + a1) / 2 + 0.02, out = R + 2;
+      // (the middle of the shell away from the entrances: opposite the gate complex, or between the arcology's two)
+      const a0 = w.airlocks[0].angle, mid = (w.airlocks[1] ? (a0 + w.airlocks[1].angle) / 2 : a0 + Math.PI) + 0.02, out = R + 2;
       const start = { x: Math.sin(mid) * out, z: Math.cos(mid) * out };
       const b: Battle = {
         night: false, duration: 60, units: [unit('r0', 'raider', start.x, start.z), unit('h0', 'home', 0, 0)],
@@ -63,7 +68,7 @@ describe('people go through the airlocks of a dome, never through the shell', ()
           const q = { x: prev.x + (p.x - prev.x) * k / steps, z: prev.z + (p.z - prev.z) * k / steps }, q0 = { x: prev.x + (p.x - prev.x) * (k - 1) / steps, z: prev.z + (p.z - prev.z) * (k - 1) / steps };
           if ((Math.hypot(q0.x, q0.z) - R) * (Math.hypot(q.x, q.z) - R) < 0) {
             crossings++;
-            const near = Math.min(...w.airlocks.map(a => Math.hypot(a.x - q.x, a.z - q.z)));
+            const near = Math.min(...[...w.airlocks.map(a => [a.x, a.z]), w.port.outer].map(([ax, az]) => Math.hypot(ax - q.x, az - q.z)));
             expect(near).toBeLessThan(0.8);
           }
         }
@@ -82,7 +87,8 @@ describe('people go through the airlocks of a dome, never through the shell', ()
       for (const dir of [1, -1]) {
         const out = { x: a.outX, z: a.outZ }, inn = { x: 0.1, z: 0.1 };
         const from = dir === 1 ? out : inn, to = dir === 1 ? inn : out;
-        const b: Battle = { night: false, duration: 60, units: [unit('r0', 'raider', from.x, from.z)], events: [{ t: 1, kind: 'move', unit: 'r0', x: to.x, z: to.z }, { t: 60, kind: 'end', result: 'repelled' }] };
+        const via = { x: s * midR, z: c * midR };   // (through the chamber's middle: the dome has other doors beside it now)
+        const b: Battle = { night: false, duration: 60, units: [unit('r0', 'raider', from.x, from.z)], events: [{ t: 1, kind: 'move', unit: 'r0', x: via.x, z: via.z }, { t: 20, kind: 'move', unit: 'r0', x: to.x, z: to.z }, { t: 60, kind: 'end', result: 'repelled' }] };
         const r = routeBattle(b, nav);
         expect(r.unrouted).toBe(0);
         expect(realClips(r.battle, nav)).toEqual([]);
