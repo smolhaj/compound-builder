@@ -28,6 +28,7 @@ import { collapseLook, withWeather } from '../sim/collapseLook';
 import { shellBleachOf, shellFrostOf, shimmerOf, waterLockOf } from '../sim/climateLook';
 import { domeOf, stateOf } from '../sim/dome/live';
 import { setShellClimate } from './fx/DomeShell';
+import { easeInside, warmInside } from './fx/DomeCameraGrade';
 import { DomeInteriorLook } from './fx/DomeInteriorLook';
 import { breachOf } from '../sim/dome/interiorClimate';
 import { clearDomeMask, writeDomeDaylight } from '../engine/world/season/domeMask';
@@ -318,6 +319,7 @@ export function GameCanvas() {
     let feltAcc = 9, hitOff = 0, hitBase = 0, hitHeld = false;
     const climOverlay: ClimateOverlay = { scorch: 0, snow: 0, freeze: 0 };
     let shellAcc = 6;
+    let camInside = 0;   // (how much the camera stands under a protected dome: the frame's cold grade eases to a warm neutral by it; fx/DomeCameraGrade)
     const domeInterior = new DomeInteriorLook();   // (the ground under a climate-held dome keeps its normal season: fx/DomeInteriorLook)
     const terrainOv = new TerrainOverlay(ws.scene, world.groundAt);
     const showTerrain = () => {
@@ -683,7 +685,9 @@ export function GameCanvas() {
         wx.haze = Math.max(wx.haze ?? 0.4, look.haze);
         wx.snow = Math.max(wx.snow, 0.5 * look.ash);
       }
-      ws.setCollapseLook({ dim: look.dim, tint: look.skyTint, amt: look.skyAmt, night: look.skyNight, cast: look.cast, sat: look.sat, contrast: look.contrast, sunScale: look.sunScale, sunLower: look.sunLower, wash: look.scorch, townGlow: look.townGlow, flicker: look.flicker, fireGlow: look.fireGlow, smoke: look.smoke, nightLift: look.nightLift, nightGlow: look.nightGlow,
+      camInside = easeInside(camInside, shelterUnderDome(domesOf(gs).map(d => ({ x: d.x, z: d.z, r: d.r, k: domeInterior.protectionOf(d.id) })), ws.camera.position, world.groundAt(ws.camera.position.x, ws.camera.position.z)), dt);
+      const inLook = warmInside({ cast: look.cast, sat: look.sat, contrast: look.contrast, dim: look.dim, amt: look.skyAmt }, camInside);
+      ws.setCollapseLook({ dim: inLook.dim, tint: look.skyTint, amt: inLook.amt, night: look.skyNight, cast: inLook.cast, sat: inLook.sat, contrast: inLook.contrast, sunScale: look.sunScale, sunLower: look.sunLower, wash: look.scorch, townGlow: look.townGlow, flicker: look.flicker, fireGlow: look.fireGlow, smoke: look.smoke, nightLift: look.nightLift, nightGlow: look.nightGlow,
         fog: look.fog, haze: look.haze, townLights: look.townLights, traffic: look.traffic, convoy: look.convoy, flashes: look.flashes, aurora: look.aurora, comet: look.comet, az: look.az });
       ws.cutsceneLift = player.active ? 1 : 0;
       ws.setWeather(wx, Math.max(weather.flash, look.flash, 0.6 * (getHitLive()?.flash ?? 0)), weather.skyLightning);
