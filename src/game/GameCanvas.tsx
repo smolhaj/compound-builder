@@ -30,7 +30,7 @@ import { setShellClimate } from './fx/DomeShell';
 import { easeInside, warmInside } from './fx/DomeCameraGrade';
 import { DomeInteriorLook } from './fx/DomeInteriorLook';
 import { breachOf } from '../sim/dome/interiorClimate';
-import { clearDomeMask } from '../engine/world/season/domeMask';
+import { clearDomeMask, writeDomeDaylight } from '../engine/world/season/domeMask';
 import type { ClimateOverlay } from '../engine/world/season/seasonState';
 import { OasisState } from './atmosphere/OasisState';
 import { applyDust, dustStorm } from '../engine/world/weather/dustStorm';
@@ -609,6 +609,7 @@ export function GameCanvas() {
       const { timeOfDay: t, dayOfYear, totalDays, seasonMode, weatherMode } = useWorldStore.getState();
       const lookRaw = collapseLook(game);   // (once a frame: the night sky, the ground's climate bend and the weather-adjusted look below all read it)
       ws.setNightSky(moonPhase(dayOfYear + t / 24), (d0 => d0 + (1 - d0) * lookRaw.blackout)(skyDarkness(world.climate, false)));
+      writeDomeDaylight(1 - ws.nightFactor);   // (the dome's warm self-light and lawn glow are daylight only)
       Object.assign(world.air, { hour: t, wind: weather.outputs.wind, daylight: 1 - ws.nightFactor * 0.85, viewportH: canvas.clientHeight || 800 });
       // the slow climate kinds bend the ground (scorched lawns, a lying snow pack, frozen still water) and the dome glass (frost, bleach)
       climOverlay.scorch = lookRaw.scorch; climOverlay.snow = lookRaw.snowCover; climOverlay.freeze = lookRaw.freeze;
