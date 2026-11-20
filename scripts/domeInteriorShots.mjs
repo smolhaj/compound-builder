@@ -42,7 +42,10 @@ try {
       ['garden', -0.28, -0.20], ['garden', -0.10, -0.32], ['greenhouse', -0.46, 0.0], ['orchard', 0.05, -0.55], ['field', 0.38, 0.42], ['pond', -0.35, 0.50],
       ['well_drilled', -0.02, 0.26], ['cistern', 0.04, 0.38], ['solar_array', -0.55, 0.22], ['battery_shed', -0.22, 0.38], ['root_cellar', -0.40, -0.40], ['wood_oven', -0.18, 0.02], ['metal_garage', 0.34, 0.12],
     ] : tier === 'geodesic' ? [['timber_cabin', -0.2, 0.1], ['garden', 0.2, -0.3], ['chicken_coop', 0.3, 0.2], ['well_drilled', 0.0, 0.4]] : [];
-    for (const [k, fx, fz] of list) inside(k, fx, fz);
+    // keep the sector in front of the plant's service airlock clear, so the camera has an aisle to stand in (a house there put the lens inside a building)
+    const yardPhi = big ? (await import('/src/sim/dome/plantYard.ts')).yardGeometry(tier, R)?.phi : null;
+    const inSector = (fx, fz) => yardPhi != null && Math.hypot(fx, fz) > 0.25 && Math.abs(Math.atan2(Math.sin(Math.atan2(fx, fz) - yardPhi), Math.cos(Math.atan2(fx, fz) - yardPhi))) < 0.8;
+    for (const [k, fx, fz] of list) if (!inSector(fx, fz)) inside(k, fx, fz);
     G.setState(s => { const g = structuredClone(s.game); for (const st of g.structures) { st.stage = 99; st.done = 0; st.finishedAt = 0; st.supplied = true; } g.utilities.lit = ['x']; return { game: g }; });
     { const live = await import('/src/sim/dome/live.ts'); G.setState(s => { const g = structuredClone(s.game); const d = live.domeOf(g); if (d) g.domes = { ...(g.domes ?? {}), [d.st.id]: { ...live.stateOf(g, d), filtering: 'closed' } }; return { game: g }; }); }
     G.setState({ tool: null, bunkerSite: null, hover: null, selected: null });   // (no placement ghost left over from planning)
@@ -97,6 +100,19 @@ try {
     lap('plant ' + JSON.stringify(near));
     const rho = Math.max(0.3 * R, near.rMin - 3.6), eye = [D.x + Math.sin(ph - 0.18) * rho, ground + h, D.z + Math.cos(ph - 0.18) * rho];
     await pair('04-plant-yard-airlock', eye, [D.x + yx, ground + 0.4, D.z + yz], 78, [[(eye[0] - D.x) / R + Math.sin(ph) * 0.05 + 0.02, (eye[2] - D.z) / R + Math.cos(ph) * 0.05]]);
+  }
+  // the one-entrance layout: the vehicle sally port's paved lane and the person airlock beside it, from inside
+  const veh = info.airlocks.find(a => a[3] === 'vehicle');
+  if (veh) {
+    const va = veh[2], lane = plan.segs.filter(t => (t.w ?? 0) >= 0.5);
+    const along2 = (a, rho, off = 0, hh = h) => L(Math.sin(a) * rho + Math.cos(a) * off, Math.cos(a) * rho - Math.sin(a) * off, hh);
+    if (lane.length) {
+      const inner = lane.reduce((m, t) => (Math.hypot(t.x, t.z) < Math.hypot(m.x, m.z) ? t : m), lane[0]);
+      await pair('08-vehicle-lane', L(inner.x / R * 0.88, inner.z / R * 0.88, h), [veh[0], ground + 0.3, veh[1]], 70, [frac(L(inner.x / R, inner.z / R, 0)).map((v, i) => v + (i ? Math.cos(va) : Math.sin(va)) * 0.1)]);
+    }
+    const pa = airlocks[0], mid = (pa + va) / 2;
+    await pair('09-entrance-complex', along2(mid, 0.5, 0), along2(mid, 1.05, 0, 0.3), 80, [frac(along2(pa, 0.78, 0.03, 0))]);
+    await pair('10-vehicle-port-door', along2(va, 0.62, 0.0), [veh[0], ground + 0.3, veh[1]], 62, []);
   }
   await page.close();
 } finally { await browser.close(); vite.kill(); setTimeout(() => process.exit(0), 200); }
