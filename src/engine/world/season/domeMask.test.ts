@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest';
 import * as THREE from 'three';
-import { DOME_EDGE, DOME_MAX, DOME_UNIFORMS, DOME_DECL, clearDomeMask, domeMaskAt, domeMaskInfo, seaLocalGlsl, seaLocalize, writeDomeMask } from './domeMask';
+import { domeDaylightNow, writeDomeDaylight, DOME_EDGE, DOME_MAX, DOME_UNIFORMS, DOME_DECL, clearDomeMask, domeMaskAt, domeMaskInfo, seaLocalGlsl, seaLocalize, writeDomeMask } from './domeMask';
 import { SEASON_UNIFORMS, installSeasonShaderPatch } from './seasonShader';
 
 beforeEach(() => clearDomeMask());
@@ -83,5 +83,16 @@ describe('dome mask uniforms (render smoke)', () => {
     expect(block).not.toMatch(/\buSea[ABCD]\b/);
     const lib = THREE.ShaderLib.standard.uniforms as Record<string, THREE.IUniform>;
     expect(lib.uSeaDome.value).toBe(DOME_UNIFORMS.uSeaDome.value);
+  });
+});
+
+describe('dome daylight', () => {
+  it('is clamped, neutral for bad input, and read by the surface patch', () => {
+    writeDomeDaylight(0.3); expect(domeDaylightNow()).toBeCloseTo(0.3, 6);
+    writeDomeDaylight(-4); expect(domeDaylightNow()).toBe(0);
+    writeDomeDaylight(NaN); expect(domeDaylightNow()).toBe(1);
+    installSeasonShaderPatch();
+    const SC = THREE.ShaderChunk as unknown as Record<string, string>;
+    expect(SC.season_surface.match(/seaDomeM \* uSeaDomeI\.w/g)?.length).toBe(2);
   });
 });
