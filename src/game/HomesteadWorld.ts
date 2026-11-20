@@ -482,7 +482,7 @@ export class HomesteadWorld {
     const pr = planToPort(this._baseRef, domes, (x, z) => this.parcel.height(x, z));
     const ins: PortInput[] = domes.map(d => {
       const f = portFrameOf(d)!;
-      return { id: d.id, frame: f, lane: insideLane(f), guarded };
+      return { id: d.id, tier: d.tier, frame: f, lane: insideLane(f), guarded, persons: d.airlocks.filter(a => !a.role).map(a => ({ angle: a.angle, x: a.x, z: a.z })), state: 'open' as const, baseY: this._built.get(d.id)?.group.position.y ?? this.groundAt(d.x, d.z) };
     });
     if (this._ports) { this._root.remove(this._ports.group); this._ports.dispose(); this._ports = null; }
     if (ins.length) { const f = makeVehiclePorts(ins, (x, z) => this.groundAt(x, z)); this._root.add(f.group); this._ports = f; }

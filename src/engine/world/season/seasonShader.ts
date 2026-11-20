@@ -375,8 +375,8 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD
   // a lit greenhouse: while the dome runs (seaDomeM follows its protection) everything under the shell keeps a warm light that the cold blue outside lacks,
   // day and night: a warm albedo cast plus a small warm self-light (no new light, pass or uniform)
   if ( seaDomeM > 0.002 ) {
-    diffuseColor.rgb *= mix( vec3( 1.0 ), vec3( 1.18, 0.98, 0.7 ), seaDomeM );
-    totalEmissiveRadiance += ( diffuseColor.rgb * vec3( 1.0, 0.5, 0.14 ) * 1.0 + vec3( 0.12, 0.06, 0.015 ) ) * seaDomeM * uSeaDomeI.w;   // (the warm self-light follows daylight: at night the inside is lit only by its lamps and windows)
+    diffuseColor.rgb *= mix( vec3( 1.0 ), vec3( 1.05, 0.99, 0.89 ), seaDomeM );   // (subtle: the stronger cast blew wood, canvas and steel out flat orange in daylight)
+    totalEmissiveRadiance += ( diffuseColor.rgb * vec3( 1.0, 0.5, 0.14 ) * 0.14 + vec3( 0.03, 0.015, 0.004 ) ) * seaDomeM * uSeaDomeI.w;   // (the warm self-light follows daylight: at night the inside is lit only by its lamps and windows)
   }
 #endif
 `;

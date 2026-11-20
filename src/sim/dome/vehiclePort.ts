@@ -26,7 +26,7 @@ import { MATERIALS } from '../materials';
 export type Pt = [number, number];
 const TAU = Math.PI * 2;
 /** Person airlock chamber widths (the same table as standing.ts, kept here so this module stays below it in the import order). */
-const VESTIBULE: Record<DomeTier, { w: number }> = { earthen: { w: 0.24 }, geodesic: { w: 0.42 }, glass: { w: 0.55 }, arcology: { w: 1.1 } };
+const VESTIBULE: Record<DomeTier, { w: number }> = { earthen: { w: 0.24 }, geodesic: { w: 0.42 }, glass: { w: 0.55 }, arcology: { w: 1.7 } };
 
 /** The vehicles the port is sized for (world units, SCALE v2: 20 ft a unit). A pickup is 0.92 long (`game/perimeter/gateKitLayout`), a box truck about 1.2, the motorhome 0.44 wide. */
 export const TRUCK = { LEN: 1.2, WIDTH: 0.43, PICKUP: 0.95 } as const;
@@ -45,7 +45,7 @@ export const ATTACH = 8;
 const BASE: Record<Exclude<DomeTier, 'earthen'>, { w: number; len: number; t: number; h: number; dh: number; door: number; holdK: number; bollards: number }> = {
   geodesic: { w: 0.78, len: 1.0, t: 0.03, h: 0.46, dh: 0.38, door: 0.9, holdK: 1.5, bollards: 4 },
   glass: { w: 1.0, len: 1.4, t: 0.03, h: 0.55, dh: 0.46, door: 0.88, holdK: 1.5, bollards: 6 },
-  arcology: { w: 1.8, len: 2.4, t: 0.05, h: 1.0, dh: 0.84, door: 0.85, holdK: 1.5, bollards: 10 },
+  arcology: { w: 2.7, len: 3.0, t: 0.06, h: 1.5, dh: 1.3, door: 0.85, holdK: 1.5, bollards: 12 },
 };
 
 /** Does a dome of this tier carry a vehicle port? Earthen: no (a low door and a gravel apron). */

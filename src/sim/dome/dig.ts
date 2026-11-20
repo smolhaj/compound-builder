@@ -239,7 +239,7 @@ export function utilityRuns(tier: DomeTier, cells: number): UtilRun[] {
     { kind: 'data', a: phi, r0: inner, r1: outer, y: p * 1.2, pipe: p * 0.8, n: 2, gap: p * 2, off: 0.34 * scale },
   ];
   // each airlock's sleeve: a big steel sleeve through the skirt line, wide enough for the chamber's tunnel crossing (sim/dome/crossing.ts)
-  const sleeve = Math.max(0.05, v.dw * 0.28);
+  const sleeve = Math.max(0.05, Math.min(0.15, v.dw * 0.28));   // (capped: the arcology's wide door does not make the sleeve reach below the skirt)
   for (const a of angles) runs.push({ kind: 'sleeve', a, r0: s.R - 0.7 * scale, r1: s.rSkirt + 0.45, y: sleeve + 0.03, pipe: sleeve, n: 1, gap: 0, off: 0 });
   return runs;
 }
