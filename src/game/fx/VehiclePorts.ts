@@ -95,9 +95,12 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     const offP = f.person ? lamOf(f.person.outer) : 0;
     const pad = ground(...f.inner), yPad = pad + 0.012;
     // ── the apron: a planar ramp from the sill (at the dome floor's level) out to the road's level, with curbs, stripes and a stop line ──
-    const lamA = -(v.dw / 2 + 0.45), lamB = Math.max(offP, 0) + (f.person ? 0.5 : v.dw / 2 + 0.45), E = at(R + APRON_LEN, 0);
-    const yE = Math.max(yPad - 0.08 * APRON_LEN, Math.min(yPad + 0.08 * APRON_LEN, ground(...E) + 0.02));
-    const topA = (rho: number): number => yPad + (yE - yPad) * Math.max(0, Math.min(1, (rho - R) / APRON_LEN));
+    const lamA = -(v.dw / 2 + 0.45), lamB = Math.max(offP, 0) + (f.person ? 0.5 : v.dw / 2 + 0.45);
+    // the top follows the highest ground under each cross-section (never buried, never stretched over a dip), eased so the ramp stays gentle; the skirts close the sides
+    const nS = 8, hs: number[] = [];
+    for (let k = 0; k <= nS; k++) { const r = R + APRON_LEN * k / nS; let m = -Infinity; for (const l of [lamA, 0, lamB]) m = Math.max(m, ground(...at(r, l))); hs.push(Math.max(m + 0.012, k === 0 ? yPad : -Infinity)); }
+    for (let k = 1; k <= nS; k++) hs[k] = Math.max(hs[k - 1] - 0.05 * APRON_LEN / nS, Math.min(hs[k - 1] + 0.05 * APRON_LEN / nS, hs[k]));   // (at most 5 percent a step)
+    const topA = (rho: number): number => { const t = Math.max(0, Math.min(1, (rho - R) / APRON_LEN)) * nS, k = Math.min(nS - 1, Math.floor(t)); return hs[k] + (hs[k + 1] - hs[k]) * (t - k); };
     geos.push(slab(F, R - 0.02, R + APRON_LEN, lamA, lamB, topA, ground, POUR));
     for (const [l0, l1] of [[lamA, lamA + 0.035], [lamB - 0.035, lamB]] as const) geos.push(slab(F, R - 0.02, R + APRON_LEN, l0, l1, r => topA(r) + 0.022, ground, CURB));   // the straight curbs
     geos.push(slab(F, R + APRON_LEN - 0.035, R + APRON_LEN, lamA, lamB, r => topA(r) + 0.012, ground, CURB));                                                                  // and the toe

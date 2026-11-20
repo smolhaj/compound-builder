@@ -66,7 +66,7 @@ try {
   if (want('second')) { await pr(E(-(R + 9 * S), 3 * S, 3), E(-R, 0.5 * S, 0), 58); await shot('second-entrance-opposite'); }
   if (want('eye')) {
     // (the delivery truck stops short on this lot's county road whatever a dome does, so the shot stands a truck on the apron by hand)
-    await page.evaluate(async ([x, z, heading]) => { const m = await import('/src/game/props/truckGeometry.ts'); const t = m.buildTruck(); t.position.set(x, window.__cb.world.groundAt(x, z), z); t.rotation.y = heading; window.__cb.ws.scene.add(t); window.__truckProp = t; }, [E(R + 1.1 * S, 0.25 * S, 0)[0], E(R + 1.1 * S, 0.25 * S, 0)[2], (a ? a.angle : 0) + Math.PI]);
+    await page.evaluate(async ([x, z, heading]) => { const m = await import('/src/game/props/truckGeometry.ts'); const t = m.buildTruck(); t.position.set(x, window.__cb.world.groundAt(x, z) + 0.04, z); t.rotation.y = heading; window.__cb.ws.scene.add(t); window.__truckProp = t; }, [E(R + 1.1 * S, 0.25 * S, 0)[0], E(R + 1.1 * S, 0.25 * S, 0)[2], (a ? a.angle : 0) + Math.PI]);
     await person(...[E(R + 2.6 * S, 0.9 * S, 0)].map(p => [p[0], p[2]])[0]);
     await frames(2);
     await pr(E(R + 5.2 * S, -1.9 * S, 0.5), [gate[0], 0.3 * S, gate[2]], 58); await shot('eye-at-port-truck-person');
