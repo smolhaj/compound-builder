@@ -27,7 +27,7 @@ const r2 = (n: number): number => Math.round(n * 100) / 100;
 /** How close the crew starts to the shell (world units, 1 = 6 m), and how fast it walks to it. */
 const APPROACH = 5, WALK_SPEED = 1.0;
 /** Every dialogue key the planner can use (a test holds raidLinesDome.ts to it). */
-export const BEAT_CTX_USED: readonly string[] = ['dome_scout', 'dome_shots', 'dome_tool', 'dome_cut', 'dome_airlock', 'dome_ram', 'dome_blast', 'dome_skirt', 'dome_argue', 'dome_order', 'dome_panic', 'dome_vow', 'dome_watch', 'dome_fire', 'dome_holds', 'dome_gone', 'dome_angry', 'dome_bounce', 'dome_taunt'];
+export const BEAT_CTX_USED: readonly string[] = ['dome_scout', 'dome_shots', 'dome_tool', 'dome_cut', 'dome_airlock', 'dome_ram', 'dome_blast', 'dome_skirt', 'dome_argue', 'dome_order', 'dome_panic', 'dome_vow', 'dome_watch', 'dome_fire', 'dome_holds', 'dome_gone', 'dome_angry', 'dome_bounce', 'dome_taunt', 'dome_react_swing', 'dome_react_bounce', 'dome_react_limp', 'dome_cross'];
 
 /** Does this fight's own timeline break the shell (a gap or a breach on a shell run)? Then the crew's tool work before it is real. */
 export const shellBroken = (b: Battle): boolean => b.events.some(e => (e.kind === 'breach' && !!e.where && isShellKind(e.where.kind)) || (e.kind === 'gap' && e.runId.startsWith('dome:')));
@@ -45,7 +45,7 @@ export function shellWording(text: string, tier: string): string {
   if (!m || tier === 'glass') return text;
   return text.replace(/Glass breaks\. Glass always breaks\./, `${m.Glass} cracks. ${m.Glass} always cracks.`).replace(/pane of glass/g, m.panes).replace(/\bGlass\b/g, m.Glass).replace(/\bglass\b/g, m.glass);
 }
-/** The strongest a dome caption may be is "damn": a line the generic pools wrote with stronger language is softened (pure). */
+/** (Unused since the owner loosened the language rules: kept for a quiet-mode caption setting.) A softened caption: nothing stronger than "damn" (pure). */
 export function mildWording(text: string): string {
   return text
     .replace(/\bgoddamn(ed|it)?\b/gi, m => (m[0] === 'G' ? 'Damn' : 'damn'))
@@ -160,6 +160,7 @@ export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
     say(at(0.5) + 5, u, 'dome_tool');
   }
   say(toolT + 6, homeAt(1, toolT + 6), 'dome_fire');
+  say(toolT + 1.6, homeAt(7, toolT + 1.6), 'dome_react_swing');
   // 4. the airlock
   if (lock) {
     const lt = at(0.6), pair = [pickWorker(8), pickWorker(9)].filter((u, i, all) => u && all.indexOf(u) === i);
@@ -185,7 +186,7 @@ export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
       out.push({ t: r2(bt + k * 0.34), kind: 'dome_shot', unit: u.id, x: r2(sp.x), z: r2(sp.z), ox: r2(Math.sin(a)), oz: r2(Math.cos(a)), tier, bounce: back ? 'back' : 'glance', ...(back ? { down: 2.2 } : {}) });
     }
     say(bt - 0.6, u, 'dome_angry');
-    if (kickback && i === kickIdx) { say(bt + burst * 0.34 + 0.7, u, 'dome_bounce'); say(bt + burst * 0.34 + 2.8, homeAt(5, bt + 4), 'dome_holds'); }
+    if (kickback && i === kickIdx) { say(bt + burst * 0.34 + 0.7, u, 'dome_bounce'); say(bt + burst * 0.34 + 2.4, homeAt(5, bt + 4), 'dome_react_bounce'); say(bt + burst * 0.34 + 4.6, homeAt(6, bt + 6), 'dome_react_limp'); }
   }
   // 9. the household comes to the inside of the shell and taunts the crew through it (a kid, a parent, a guard: each in his own voice), with a sign
   const people = home.concat(b.units.filter(u => u.side === 'home' && u.civilian && !u.bystander && !u.machine));
@@ -219,6 +220,7 @@ export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
   const pan = pickWorker(11);
   say(at(0.72), pan, 'dome_panic');
   say(at(0.8), pickWorker(12), 'dome_argue');
+  say(at(0.8) + 1.1, pickWorker(14), 'dome_cross'); say(at(0.84), pickWorker(15), 'dome_cross');
   say(at(0.86), leader, 'dome_argue');
   if (!broke) {
     say(at(0.93), leader, 'dome_order');
@@ -237,6 +239,5 @@ export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
   };
   const keep = b.events.map(e => moved.get(e) ?? e).filter(e => !dropped(e));
   const units = b.units.map(u => (start.has(u.id) && pull > 0 && !u.job ? { ...u, ...start.get(u.id)! } : u));
-  const soft = keep.map(e => (e.kind === 'say' && mildWording(e.text) !== e.text ? { ...e, text: mildWording(e.text) } : e));
-  return { ...b, units, events: [...soft, ...out].sort((p, q) => p.t - q.t) };
+  return { ...b, units, events: [...keep, ...out].sort((p, q) => p.t - q.t) };
 }
