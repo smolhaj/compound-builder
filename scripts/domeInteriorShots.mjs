@@ -45,6 +45,7 @@ try {
     for (const [k, fx, fz] of list) inside(k, fx, fz);
     G.setState(s => { const g = structuredClone(s.game); for (const st of g.structures) { st.stage = 99; st.done = 0; st.finishedAt = 0; st.supplied = true; } g.utilities.lit = ['x']; return { game: g }; });
     { const live = await import('/src/sim/dome/live.ts'); G.setState(s => { const g = structuredClone(s.game); const d = live.domeOf(g); if (d) g.domes = { ...(g.domes ?? {}), [d.st.id]: { ...live.stateOf(g, d), filtering: 'closed' } }; return { game: g }; }); }
+    G.setState({ tool: null, bunkerSite: null, hover: null, selected: null });   // (no placement ghost left over from planning)
     cb.store.getState().setHudHidden?.(true);
     const a = (await import('/src/sim/dome/standing.ts')).domesOf(G.getState().game, true).find(x => x.id === dome.id);
     const Y = big ? (await import('/src/sim/dome/plantYard.ts')).yardGeometry(tier, R) : null;
