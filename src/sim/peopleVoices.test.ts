@@ -61,7 +61,7 @@ describe('swearing fits the person', () => {
   it('a child never swears, an old devout person prays instead', () => {
     for (const c of DEF_CTX) for (const t of lines(kid, c)) expect(t).not.toMatch(CURSE);
     const old = DEF_CTX.flatMap(c => lines(elder, c));
-    expect(old.some(t => CURSE.test(t))).toBe(false);
+    expect(old.filter(t => CURSE.test(t)).length / old.length).toBeLessThan(0.15);   // (an elder may swear, rarely and bluntly)
     expect(old.some(t => /Lord|God help|Our Father|Hail Mary|Dear God/.test(t))).toBe(true);
   });
   it('a veteran stays calm: a curse only when hit', () => {
@@ -107,11 +107,14 @@ describe('lines are spoken, not written', () => {
     const own = (k: 'civ' | 'kid' | 'elder' | 'vet') => Object.values(LINES.defender).flatMap(p => p?.[k] ?? []);
     expect(own('civ').filter(t => CURSE.test(t)).length).toBeGreaterThan(12);
     expect(own('kid').filter(t => CURSE.test(t))).toEqual([]);
-    expect(own('elder').filter(t => CURSE.test(t))).toEqual([]);
+    const ow = own('elder'), ows = ow.filter(t => CURSE.test(t)).length;
+    expect(ows).toBeGreaterThan(0); expect(ows / ow.length).toBeLessThanOrEqual(0.3);   // (elders: rare, blunt, mixed with prayer)
     expect(own('elder').some(t => /Lord|God/.test(t))).toBe(true);
     expect(own('vet').filter(t => CURSE.test(t)).length).toBeLessThanOrEqual(3);   // (only when hit)
     const raiders = Object.values(LINES.raider).flatMap(p => [...(p?.crowd ?? []), ...(p?.opportunists ?? [])]);
     expect(raiders.filter(t => CURSE.test(t)).length).toBeGreaterThan(8);
-    expect((Object.values(LINES.raider).flatMap(p => p?.crew ?? []) as string[]).filter(t => CURSE.test(t))).toEqual([]);   // (an organized crew stays terse)
+    const crew = Object.values(LINES.raider).flatMap(p => p?.crew ?? []) as string[], cs = crew.filter(t => CURSE.test(t)).length;
+    expect(cs).toBeGreaterThan(5); expect(cs / crew.length).toBeLessThanOrEqual(0.3);   // (an organized crew stays terse and cold; swearing is a minority, on stress or contempt)
+    expect(crew.filter(t => /\b(f\W{0,3}(?:u\W?c\W?k|\*+)|f off|sh\*+t|s\*\*+)/i.test(t) && !CURSE.test(t))).toEqual([]);   // (words are written in full, never masked)
   });
 });
