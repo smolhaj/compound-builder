@@ -12,126 +12,129 @@ export type InteriorCtx =
 export const INTERIOR_LINES: Record<'raider' | 'defender', Partial<Record<InteriorCtx, Variants>>> = {
   raider: {
     kick_door: {
-      any: ['Kick it. Kick it in!', 'Again. Harder, by the lock.', 'It is barred. Put your shoulder in it!', 'One more and it goes.', 'Stand clear, I am breaking it.', 'Get that door open!', 'They wedged something behind it. Push!', 'Hit it by the latch, not the middle.', 'It is giving. Once more!', 'Break it down. They are right behind it.'],
-      disciplined: ['Breacher up. On my count.', 'Hold the stack. Door first, then we go.'],
-      rush: ['Just bust it! Bust it!', 'Everybody push! Now!'],
+      any: ['Did it move? It moved.', 'Again? It\'s not going.', 'Hold on. Somebody\'s behind it.', 'Kick it.', 'Again. By the lock.', 'It\'s barred. Shoulder.', 'One more.', 'Stand back. Breaking it.', 'Get it open.', 'They wedged something. Push.', 'Latch. Not the middle.', 'It\'s giving.', 'Again. They\'re right behind it.'],
+      disciplined: ['Breacher up. On three.', 'Hold the stack. Door, then us.'],
+      crew: ['Fuck. It\'s barred. Again.', 'Latch. Hit the latch.', 'One more. Together.', 'Wedged. Back off, I\'ll shoot the lock.'],
+      rush: ['Just bust it!', 'Everybody push!'],
     },
     stack_door: {
-      any: ['Door! Stack on the door!', 'Get on the wall by the door. Stay off the front of it.', 'Two on the hinge side, I take the other. On three.', 'Nobody stands in front of that door. Stack up!', 'Wait for it. Wait. Now!', 'Tight on the wall. Shoulder to shoulder.', 'Point man, you go first. I have your back.', 'Stay out of the doorway until I say.', 'Number two, take the left corner. Number three, the right.', 'Quiet. Listen at the frame.'],
+      any: ['Which door? This one?', 'Is it locked? Try it. Easy.', 'I said wait. Wait for the count.', 'Door. Stack up.', 'On the wall by the door. Not in front of it.', 'Two on the hinge side. I\'ve got the other. On three.', 'Nobody in front of that door.', 'Wait. Wait. Now.', 'Tight on the wall. Shoulder to shoulder.', 'Point, you go first. I\'m behind you.', 'Stay out of the doorway till I say.', 'Two, take the left corner. Three, the hall.', 'Quiet. Listen at the door.'],
     },
     pie_corner: {
-      any: ['Corner! Corner on the right!', 'I have the left side. Nothing yet.', 'Slice it slow. Slow. Do not rush the angle.', 'Movement behind the couch!', 'Clear on the left. Check the right.', 'Table by the window. Two of them behind it.', 'See a muzzle in the back corner.', 'Show me the next corner. Tell me what you see.', 'Hold there. I am working the angle.', 'Door on the far wall. Closed.'],
-      disciplined: ['Eyes on the corners first, then the middle.', 'Cut the pie. Do not step into the open.'],
+      any: ['Corner. Right corner.', 'I\'ve got the left. Nothing yet.', 'Slow. Slow. Don\'t rush the angle.', 'Movement behind the couch.', 'Left clear. Check right.', 'Table by the window. Two behind it.', 'Muzzle. Back corner.', 'Tell me what you see.', 'Hold there. Working the angle.', 'Far wall. Door. Closed.'],
+      disciplined: ['Corners first. Then the middle.', 'Cut it slow. Don\'t step out.'],
+      crew: ['Shit. Movement left.', 'Table. Two behind it.', 'Left clear. Hold.', 'Eyes on the far corner.'],
     },
     funnel: {
-      any: ['Do not bunch in the door! It is a funnel!', 'They have the doorway covered! Back out of the line!', 'Get out of the doorway, get out!', 'Do not stand there, move through!', 'Everybody through at once, do not stop in the door!', 'Keep going, do not stop at the frame!'],
-      rush: ['Go, go, go, push them back!', 'Through the door! Through the door!', 'Do not stop, they cannot hit us all!'],
-      disciplined: ['Nobody crosses that line until we flash it.', 'Off the door. We do this a different way.'],
+      any: ['Don\'t bunch in the door!', 'They\'ve got the doorway. Off the line!', 'Get out of the doorway!', 'Don\'t stand there. Move through.', 'Everybody through. Don\'t stop in the door.', 'Keep going. Don\'t stop at the frame.'],
+      rush: ['Go, go, push!', 'Through the door!', 'Don\'t stop. They can\'t hit us all.'],
+      disciplined: ['Nobody crosses till we flash it.', 'Off the door. We do it different.'],
     },
     room_clear: {
-      any: ['Room clear!', 'Clear. Nothing in here.', 'Kitchen is clear. Moving on.', 'Clear left. Clear right. Move up.', 'That room is ours. Next door.', 'Bedroom is empty. Check the closet.', 'Clear! Hold here while I look behind the bed.', 'All clear. Stack on the next door.', 'No one in here. Keep moving.', 'This one is done. Who has the hall?'],
+      any: ['Room clear.', 'Clear. Nothing in here.', 'Kitchen clear. Moving.', 'Left clear. Right clear. Move up.', 'That room\'s done. Next door.', 'Bedroom empty. Check the closet.', 'Clear. Hold. Checking behind the bed.', 'All clear. Stack on the next door.', 'Nobody in here. Keep moving.', 'This one\'s done. Who has the hall?'],
     },
     rally: {
-      any: ['Stay with me! We are almost through!', 'Do not stop! Push!', 'Keep going, almost there!', 'On me! On me, all of you!', 'Hold together. We take it room by room.', 'Nobody leaves until we have the house!', 'We are closing in, keep it tight!', 'One more room and it is ours!', 'Do not let up now!', 'Stay together, stay loud!'],
+      any: ['Stay with me. Almost through.', 'Keep pushing.', 'Keep going. Almost.', 'On me. On me!', 'Room by room. Together.', 'Nobody leaves till we have the house.', 'Close it up. Keep it tight.', 'One more room.', 'Don\'t let up.', 'Stay together. Stay loud.'],
     },
     cover_fire: {
-      any: ['Suppress that corner!', 'Keep their heads down while we move!', 'Fire at the table! Put rounds on it!', 'Lay it on the doorway!', 'I have the window. Go!', 'Covering! Go, go!', 'Shoot the couch. They are behind it!', 'Pour it on them, I am moving!', 'Put rounds on that window!', 'Keep the pressure on the left side!'],
+      any: ['Suppress that corner.', 'Keep their heads down. I\'m moving.', 'Table. Put rounds on it.', 'Doorway. Keep it covered.', 'I\'ve got the window. Go.', 'Covering. Go, go.', 'Couch. They\'re behind it.', 'Keep shooting. I\'m moving.', 'Window. Put rounds on it.', 'Keep the pressure on the left.'],
     },
     found: {
-      any: ['Got one! In the closet!', 'Someone is behind the door. Come out!', 'I hear breathing. Back of the room.', 'Found them. Bedroom closet.', 'Under the bed! Under the bed!', 'Hands! Show me your hands!', 'Cellar hatch is warm. Someone is down there.', 'There. Behind the curtain.', 'They are hiding in the pantry.', 'Open it. Open it slowly.'],
-      hostile: ['Dig them out.', 'Drag them out of there.', 'Nobody hides from us.'],
+      any: ['Got one. Closet.', 'Somebody\'s behind the door. Come out.', 'I hear breathing. Back of the room.', 'Found them. Bedroom closet.', 'Under the bed. Under the bed.', 'Hands. Show me your hands.', 'Cellar hatch is warm. Someone\'s down there.', 'There. Behind the curtain.', 'Pantry. They\'re in the pantry.', 'Open it. Slow.'],
+      hostile: ['Get them out.', 'Drag them out of there.', 'Come on. Out.'],
     },
     order_out: {
-      any: ['Come out slowly. Nobody is going to hurt you.', 'Everyone out of the closet. Hands where I can see them.', 'We do not shoot people who come out. Come on.', 'Walk out, keep your hands up. That is all.', 'Kids first. Come on out, it is okay.', 'Nobody has to get hurt. Step out now.', 'Come out with your hands up, and you will be fine.', 'We just want the food. Come on out.', 'Easy. Come out where I can see you.', 'Stay calm. Walk to the kitchen.'],
-      merciful: ['Not the children. Nobody touches the children.', 'Anyone unarmed, sit by the wall. You will be left alone.'],
+      any: ['Come out. Slow.', 'Everyone out of the closet. Hands up.', 'Nobody shoots if you come out.', 'Walk out. Hands where I can see.', 'Kids first. Come on.', 'Step out. Nobody has to get hurt.', 'Hands up. Come out.', 'We just want the food. Come out.', 'Easy. Come out one at a time.', 'Out. Now. Slow.'],
+      merciful: ['Not the kids. Don\'t touch the kids.', 'Unarmed, sit by the wall. You\'ll be left alone.'],
     },
     spare: {
-      merciful: ['Go sit with the others. Stay out of the way.', 'You are not our problem. Stay down and stay quiet.', 'Take the kids to the back room. Go.', 'Leave them. They are kids.', 'Put your hands down. Sit there and do not move.', 'Get the little ones out of here. Now.', 'We are not here for you. Stay put.', 'Nobody shoots an unarmed man. Over there.', 'You did right to come out. Sit.', 'Go on. Get out of my sight.'],
-      any: ['Leave that one. No threat to us.', 'Sit down over there.'],
+      merciful: ['Go sit with the others. Stay out of the way.', 'You\'re not the problem. Stay down. Stay quiet.', 'Take the kids to the back room.', 'Leave them. They\'re kids.', 'Hands down. Sit there.', 'Get the little ones out of here.', 'Not here for you. Stay put.', 'He\'s unarmed. Over there.', 'You did right. Sit.', 'Go on. Over there with the others.'],
+      any: ['Leave that one. No threat.', 'Sit down over there.'],
     },
     kill: {
-      hostile: ['No witnesses.', 'Finish it.', 'Do not leave anybody behind us.', 'They saw our faces. Do it.', 'Nobody walks out of this house.', 'Put them down and move on.', 'Make it quick. We are not done here.', 'They would have done it to us.', 'Not one of them.', 'Shut that noise up.'],
-      any: ['Do it. We do not have all night.'],
+      hostile: ['Just do it.', 'Finish it.', 'Don\'t leave anybody behind.', 'He saw my face.', 'Get it done.', 'Quick. We\'re not done here.', 'Don\'t let him talk.', 'Not one.', 'Shut him up.', 'Do it outside.'],
+      any: ['Do it. We don\'t have all night.'],
     },
     captive: {
-      hostile: ['You, with me. Move!', 'Take that one. We might need him.', 'Tie his hands. He is coming with us.', 'Drag her out. She walks or she gets dragged.', 'The young one comes. The rest stay.', 'Keep walking. Do not look back.', 'Grab him. He is worth something.', 'Get her to the truck. Quiet!', 'Hands behind you. Move.', 'No one follows us, or this one pays for it.'],
+      hostile: ['You. With me.', 'Take that one. We might need him.', 'Tie his hands. He comes.', 'Get her up. She walks or gets dragged.', 'The young one comes. The rest stay.', 'Keep walking. Don\'t look back.', 'Grab him. He\'s worth something.', 'Get her to the truck. Quiet.', 'Hands behind you. Move.', 'Nobody follows us. Or this one pays.'],
       any: ['You come with us. Walk.'],
     },
     loot_item: {
-      any: ['Grab the {item}. All of it.', 'Take the {item}, leave the rest.', 'Got the {item}. Let us move.', 'That {item} is ours now.', 'Load the {item} on the truck.', 'Help me carry the {item}!', 'Do not drop the {item}.', 'Check for more {item} in the back.', 'This is what we came for. The {item}.', 'Bag the {item}. Quickly.'],
-      crowd: ['It is ours! Take everything!', 'Mine! I saw it first!'],
+      any: ['Is that all the {item}? Check again.', 'Where\'d the rest of the {item} go?', 'Leave it. Too heavy. Take the {item}.', 'Grab the {item}. All of it.', 'Take the {item}. Leave the rest.', 'Got the {item}. Let\'s go.', 'That {item}\'s ours now.', 'Load the {item} on the truck.', 'Help me carry the {item}.', 'Don\'t drop the {item}.', 'More {item} in the back?', 'That\'s what we came for. The {item}.', 'Bag the {item}. Fast.'],
+      crowd: ['It\'s ours! Take the {item}, take everything!', 'Mine! I saw the {item} first!'],
+      crew: ['Fuck, that {item} is heavy. Two on it.', 'Not that {item}. The next one.', 'Take the {item}. Mark the rest.', 'Count the {item}. Then go.'],
     },
     arson: {
-      hostile: ['Burn it. Burn all of it.', 'Light the barn. Let them watch.', 'Pour it on the porch. Fire!', 'Toss the rag in. Back up!', 'Let it burn. They can have the ashes.', 'Set the house. We are leaving.', 'Good. Watch it go up.', 'Get the fuel can. Soak the door.', 'Nothing left for the next ones.', 'Light it!'],
+      hostile: ['Burn it.', 'Light the barn.', 'Pour it on the porch.', 'Throw the rag in. Back up.', 'Let it burn.', 'Set the house. We\'re leaving.', 'Watch it go.', 'Get the fuel can. Soak the door.', 'Leave nothing for the next ones.', 'Light it.'],
     },
     tribute: {
-      any: ['That is enough. We take that and go.', 'Hand it over and nobody else gets hurt.', 'Put the {item} on the ground and step back.', 'This settles it. Do not follow us.', 'We have a deal. Remember it.', 'Count it out. All of it.', 'Fair enough. Walk away from this.', 'You keep the house. We keep the {item}.', 'Okay. That is what we asked for. No more.', 'We will not come back if this is the last of it.'],
+      any: ['That\'s all of it? Count it again.', 'Is that everything? Don\'t lie to me.', 'Okay. That\'s fine. That\'s... fine.', 'That\'s enough. We take that and go.', 'Hand it over and nobody else gets hurt.', 'Put the {item} on the ground. Step back.', 'That settles it. Don\'t follow us.', 'We have a deal. Remember it.', 'Count it out. All of it.', 'Fair enough. Walk away from this.', 'You keep the house. We keep the {item}.', 'That\'s what we asked for. No more.', 'We won\'t be back if this is all of it.'],
     },
     passage: {
-      any: ['We only want to pass. Open the gate and we go on.', 'Let us through to the road. That is all.', 'Open the gate and we are out of your lives.', 'We walk out the way we came. Agreed?', 'Clear a way and we leave. No trouble.', 'Put the guns down and let us leave.', 'Safe passage to the county road. Then we are gone.', 'We take our wounded and go. Do not shoot.', 'Fair. Back off the gate and we move.', 'Let us carry our dead out of here.'],
+      any: ['You\'ll let us through? Just like that?', 'Is it a trick? Watch the wall.', 'Open it slow. Slow.', 'We only want to pass. Open the gate.', 'Let us through to the road.', 'Open the gate. We\'re gone.', 'We walk out the way we came. Agreed?', 'Clear a way and we leave.', 'Put the guns down. Let us leave.', 'Safe passage to the county road.', 'We take our wounded and go. Don\'t shoot.', 'Back off the gate. We\'ll go slow.', 'Hold your fire. We\'re leaving.'],
     },
     wounded_fallback: {
-      any: ['Get him out of here! Cover them!', 'Take him back to the gap!', 'Help me drag him, pick up his feet!', 'I have him. Go, go!', 'Stay with me, stay awake!', 'Somebody help me with him!', 'Leave the rifle, grab his arm!', 'Pull him behind the truck.', 'Hold on, I am taking you out.', 'Do not leave him in the house!'],
+      any: ['Get him out of here. Cover them.', 'Take him back to the gap.', 'Help me. Grab his feet.', 'I\'ve got him. Go.', 'Stay with me. Stay awake.', 'Somebody help me with him.', 'Leave the rifle. Get his arm.', 'Behind the truck.', 'Hold on. I\'m taking you out.', 'Don\'t leave him in the house.'],
     },
   },
   defender: {
     pie_corner: {
-      any: ['Watch the doorway. Do not move.', 'Wait for the first one. Wait.', 'Let them come into the room.', 'Do not fire until he steps in.', 'I see a shadow under the door.', 'Steady. Steady. Not yet.', 'They are at the door. Quiet now.', 'Aim at the frame. First one through is yours.', 'Stay behind the table and breathe.', 'They are slow. They are being careful.'],
+      any: ['Watch the doorway. Don\'t move.', 'Wait for the first one.', 'Let them come into the room.', 'Don\'t fire till he steps in.', 'Shadow under the door.', 'Steady. Not yet.', 'They\'re at the door. Quiet.', 'Aim at the frame. First one through.', 'Behind the table. Breathe.', 'They\'re slow. Careful.'],
     },
     funnel: {
-      any: ['They are bunching in the door! Fire!', 'Shoot the doorway! They cannot spread!', 'Hit the door, hit the door!', 'One at a time, they have to come through that frame!', 'Keep it on the door!', 'That is the choke. Keep shooting there.', 'They cannot get past the door!', 'Fire into the doorway!', 'Hold the line of the door!', 'They are stacked up in the hall!'],
+      any: ['They\'re bunching in the door!', 'Doorway! Shoot the doorway!', 'Hit the door!', 'One at a time through that frame.', 'Keep it on the door!', 'That\'s the choke. Keep shooting there.', 'They can\'t get past the door!', 'Into the doorway!', 'Hold the door!', 'They\'re stacked up in the hall!'],
     },
     fallback_stage: {
-      any: ['Back to the next room! I will cover!', 'Fall back to the kitchen, go!', 'Next room! Move, move!', 'We cannot hold this one. Back!', 'Go, I have the door!', 'Everyone fall back to the hall!', 'Into the bedroom, keep low!', 'Stairs next! Up the stairs!', 'Back to the cellar door, now!', 'Get to the back room, I am right behind you!'],
+      any: ['Back to the next room. I\'ll cover.', 'Kitchen. Go!', 'Next room. Move!', 'We can\'t hold this one. Back!', 'Go. I\'ve got the door.', 'Everyone to the hall!', 'Bedroom. Stay low.', 'Stairs. Up the stairs!', 'Cellar door. Now.', 'Back room. I\'m right behind you.'],
     },
     wounded_fallback: {
-      any: ['I have {n}. Cover us!', 'Lean on me, {n}. We are moving.', '{n}, hold your {w} and walk!', 'Come on, {n}, back to the next room.', 'Somebody help me with {n}!', 'Get {n} out of the line of the door!', 'Keep pressure on that {w}, {n}!', 'I am not leaving you, {n}.', 'On three we lift {n}. One, two, three.', 'Drag {n} behind the couch!'],
+      any: ['I\'ve got {n}. Cover us!', 'Lean on me, {n}. We\'re moving.', '{n}, hold your {w} and walk.', 'Come on, {n}. Next room.', 'Somebody help me with {n}!', 'Get {n} out of the doorway!', 'Keep pressure on that {w}, {n}.', 'I\'m not leaving you, {n}.', 'On three we lift {n}. One, two, three.', 'Drag {n} behind the couch!'],
     },
     cover_fire: {
-      any: ['Covering fire, go!', 'I have the door, move!', 'Keep their heads down while we move!', 'Shoot over the table, keep shooting!', 'Go on, I am right behind you!', 'Empty it at the doorway!', 'Fire at the hall!', 'Hold them here until the others are clear.', 'Two of you shoot, two of you move!', 'Make them keep their heads down!'],
+      any: ['Covering. Go!', 'I\'ve got the door. Move.', 'Keep their heads down while we move.', 'Over the table. Keep shooting.', 'Go. I\'m right behind you.', 'Empty it at the doorway.', 'Hall! Shoot the hall!', 'Hold them till the others are clear.', 'Two shoot, two move.', 'Keep their heads down!'],
     },
     last_stand: {
-      any: ['This is the last room. Nobody gets past.', 'No more room to fall back to.', 'We hold here, whatever happens.', 'The kids are behind that door. Nobody goes through.', 'Everything we have is in this house.', 'We stand here.', 'Keep firing until they stop coming.', 'This is our home. Hold!', 'Whatever happens, nobody goes past this door.', 'Stay low and make every shot count.', 'The kids are right behind us. Hold.'],
+      any: ['Last room. Nobody gets past.', 'Nowhere left to go.', 'We hold here.', 'The kids are behind that door.', 'Everything we have is in this house.', 'We stay here.', 'Keep shooting till they stop.', 'This is our home.', 'Nobody goes past this door.', 'Low. Make every shot count.', 'The kids are in there. Nobody.'],
     },
     hide: {
-      any: ['Shh. Quiet. Do not make a sound.', 'Stay in the closet. Do not come out for anything.', 'Get down. Stay down.', 'Under the bed, quickly!', 'Down the cellar, pull the hatch shut.', 'Hold your breath. They are close.', 'Do not cry, please do not cry.', 'Stay with me. Do not move.', 'Behind the clothes. Go, go.', 'Close your eyes and count. I am right here.'],
+      any: ['Shh. Not a sound.', 'Stay in the closet. Don\'t come out for anything.', 'Down. Stay down.', 'Under the bed. Quick.', 'Down the cellar. Pull the hatch shut.', 'Hold your breath. They\'re close.', 'Don\'t cry. Please don\'t cry.', 'Stay with me. Don\'t move.', 'Behind the clothes. Go.', 'Eyes shut. Count. I\'m right here.'],
     },
     freeze: {
-      any: ['I cannot move. I cannot move.', '...', 'Please. Please. Please.', 'Oh God, they are inside.', 'I cannot breathe.', 'My legs will not work.', 'Somebody help me.', 'No, no, no.', 'I want to go home.', 'Make it stop.'],
+      any: ['I can\'t move. I can\'t move.', '...', 'Please. Please. Please.', 'Oh God. They\'re inside.', 'I can\'t breathe.', 'My legs won\'t work.', 'Somebody help me.', 'No, no, no.', 'I want to go home.', 'Make it stop.'],
     },
     shield: {
-      any: ['Get behind me. Stay behind me.', 'Cover your head, {n}, I have you.', 'I have got you, {n}. Do not look.', 'Stay under me. Do not move.', 'Not her. Take me.', 'Duck down, {n}, I am right on top of you.', 'Hold on to me. Hold on.', 'Stay close. Do not let go.', 'Close your eyes, sweetheart.', 'I will not let them. I will not.'],
+      any: ['Behind me. Stay behind me.', 'Head down, {n}. I\'ve got you.', 'I\'ve got you, {n}. Don\'t look.', 'Stay under me. Don\'t move.', 'Not her. Take me.', 'Down, {n}. I\'m right on top of you.', 'Hold on to me.', 'Stay close. Don\'t let go.', 'Eyes shut, sweetheart.', 'No. No. Not them.'],
     },
     plead: {
-      any: ['Please, there are children here.', 'Do not shoot. Please do not shoot.', 'We have nothing. Take it and go.', 'Please, he is only ten.', 'I am not armed. Look, I am not armed.', 'Take the food. Just let the kids be.', 'We give up. We give up.', 'I have a family. Please.', 'I will do whatever you say.', 'Not the baby. Please, not the baby.'],
-      kid: ['Mommy?', 'I want my dad.', 'Please do not hurt us.', 'I am scared.', 'Is it over?', 'I did not do anything.'],
+      any: ['Please. There are children here.', 'Don\'t shoot. Please.', 'We have nothing. Take it and go.', 'He\'s ten. Please.', 'I\'m not armed. Look.', 'Take the food. Leave the kids.', 'We give up. We give up.', 'I have a family. Please.', 'I\'ll do what you say.', 'Not the baby. Please.'],
+      kid: ['Mommy?', 'I want my dad.', 'Don\'t hurt us.', 'I\'m scared.', 'Is it over?', 'I didn\'t do anything.'],
     },
     come_out: {
-      any: ['Okay. We are coming out. Do not shoot.', 'Hands up. See? Hands up.', 'We are coming out. There are kids with me.', 'Do not shoot, we are coming out slow.', 'Okay, okay, I am standing up.', 'Take your hands off the door, we are coming.', 'Here. Look. Nothing in our hands.', 'We surrender. Nobody is armed.', 'Easy. Coming out. Coming out.', 'Do not hurt them. Please.'],
+      any: ['Okay. Coming out. Don\'t shoot.', 'Hands up. See? Hands up.', 'Coming out. Kids with me.', 'Don\'t shoot. Coming out slow.', 'Okay, okay. Standing up.', 'Hands off the door. We\'re coming.', 'Look. Nothing in our hands.', 'We give up. Nobody\'s armed.', 'Easy. Coming out.', 'Don\'t hurt them. Please.'],
     },
     spare: {
-      any: ['Thank you. Thank you.', 'God bless you. Thank you.', 'Come on, kids, over here. Quietly.', 'Stay close to me. Do not look at them.', 'Is it over? Are they leaving?', 'Thank you for not...', 'Stay down. Wait until they leave.', 'Breathe. We are all right.', 'I thought we were dead.', 'Keep your hands where they can see them.'],
+      any: ['Thank you. Thank you.', 'God bless you.', 'Come on, kids. Over here. Quiet.', 'Stay close. Don\'t look at them.', 'Is it over? Are they leaving?', 'Thank you for not...', 'Stay down. Wait till they go.', 'Breathe. We\'re all right.', 'I thought we were dead.', 'Keep your hands where they can see.'],
     },
     kill: {
-      any: ['No! No, please!', 'Oh God, no!', 'Not him!', 'Stop! Stop it!', 'She is just a child!', 'You monsters!', 'No, no, no!', 'Please, no!', 'Do not! Do not!', 'Somebody help!'],
+      any: ['No! No, please!', 'Oh God, no!', 'Not him!', 'Stop! Stop it!', 'She\'s a child!', 'No, no, no!', 'Please, no!', 'Don\'t! Don\'t!', 'Somebody help!', 'Leave him alone!'],
     },
     captive: {
-      any: ['Let go of me!', 'Where are you taking him?', 'Take me instead!', 'Do not take her! Please!', 'I will come, I will come. Leave the kids.', 'Let him go! He is just a boy!', 'Bring him back!', 'Do not hurt him!', 'Please. Please.', 'We will pay. Name it, we will pay.'],
+      any: ['Let go of me!', 'Where are you taking him?', 'Take me instead!', 'Not her! Please!', 'I\'ll come. Leave the kids.', 'Let him go. He\'s a boy!', 'Bring him back!', 'Don\'t hurt him!', 'Please. Please.', 'We\'ll pay. Name it.'],
     },
     arson: {
-      any: ['They are burning the house!', 'Fire! They set the barn on fire!', 'Get the buckets, the barn is burning!', 'The porch is on fire, get out!', 'They lit the roof!', 'Put it out! Put it out!', 'Everything is going up!', 'Smoke! Everybody out!', 'Our home... they burned our home.', 'We have to get the animals out!'],
+      any: ['They\'re burning the house!', 'Fire! The barn!', 'Buckets! The barn\'s burning!', 'The porch! Get out!', 'The roof\'s on fire!', 'Put it out!', 'It\'s all going up!', 'Smoke! Everybody out!', 'Our home. They burned our home.', 'The animals. Get the animals out!'],
     },
     loot_item: {
-      any: ['That is our {item}. That is all we have.', 'Not the {item}, we need it.', 'They are taking the {item}.', 'Let them have the {item}. Just let them go.', 'That {item} was for the winter.', 'They have the {item}. Let them leave.', 'Our whole {item}... gone.', 'Let it go. It is only {item}.', 'They took the {item} out the back.', 'Count what they took. The {item} first.'],
+      any: ['Not that. Please, not the... take the {item}.', 'Hon, let it go. It\'s only {item}.', 'That\'s... that was the last of the {item}.', 'That\'s our {item}. That\'s all we have.', 'Not the {item}. We need it.', 'They\'re taking the {item}.', 'Let them have the {item}. Just let them go.', 'That {item} was for winter.', 'They have the {item}. Let them leave.', 'All our {item}. Gone.', 'Let it go. It\'s only {item}.', 'They took the {item} out the back.', 'Count what they took. The {item} first.'],
     },
     tribute: {
-      any: ['Here. Take it. That is all we have.', 'This is the {item}. Now go.', 'That is the deal. You leave and we do not follow.', 'Take the {item} and go. We never saw you.', 'We agreed to this. Honor it.', 'This is what you wanted. Now leave us alone.', 'Fair. Take it and go.', 'That is it. We have nothing else.', 'Let the kids go inside first. Then we hand it over.', 'We will not come after you. Go.'],
+      any: ['That\'s all of it. I swear that\'s all.', 'Is that enough? Is it enough?', 'Take it. Take... what are you waiting for?', 'Here. Take it. That\'s all we have.', 'That\'s the {item}. Now go.', 'That\'s the deal. You leave, we don\'t follow.', 'Take the {item} and go.', 'We agreed. Keep to it.', 'That\'s what you wanted. Leave us alone.', 'Fine. Take it.', 'That\'s it. Nothing else.', 'Kids go inside first. Then we hand it over.', 'We won\'t come after you. Go.'],
     },
     passage: {
-      any: ['Open the gate. Let them through.', 'Let them go. Nobody shoots.', 'They are leaving. Do not stop them.', 'Let them carry their wounded out.', 'Hold your fire. They are going.', 'Walk them to the road, nobody fires.', 'Let them pass. It is over.', 'Gate is open. Go on.', 'They keep their word, so do we.', 'Stand down. They are going.'],
+      any: ['You sure? Are you sure about this?', 'Open it. Open it slow.', 'Watch them. Watch their hands.', 'Open the gate. Let them through.', 'Let them go. Nobody shoots.', 'They\'re leaving. Don\'t stop them.', 'Let them carry their wounded out.', 'Hold your fire. They\'re going.', 'Walk them to the road. Nobody fires.', 'Let them pass.', 'Gate\'s open. Go on.', 'They kept their word. So do we.', 'Stand down. They\'re going.'],
     },
     rally: {
-      any: ['Hold on! They are tiring!', 'We can do this. Hold the line!', 'Keep fighting, keep fighting!', 'Do not give them an inch of this house!', 'For the kids. Hold!', 'This is our home, hold it!'],
+      any: ['Hold on. They\'re tiring.', 'We can do this. Hold.', 'Keep shooting.', 'Not an inch of this house.', 'For the kids. Hold.', 'This is our home. Hold it.'],
     },
   },
 };

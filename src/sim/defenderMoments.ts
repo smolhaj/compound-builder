@@ -39,10 +39,10 @@ export function decorateDefenders(b: Battle, g: GameState, stance: Stance | null
 
   // the watch
   const watch = homes.find(u => u.post === 'tower' || u.post === 'building' || u.post === 'wall') ?? homes[0];
-  if (watch) say(1.5, (scene === 0 ? ['Somebody on the drive. Wake everyone.', 'Headlights at the mailbox.', 'Movement at the gate, more than one.'] : ['Still out there. Keep your heads down.', 'Nobody has left. I can still see them.', 'Same count as before. Stay on your post.'])[(seed >>> 0) % 3], watch.id);
+  if (watch) say(1.5, (scene === 0 ? ['Somebody on the drive. Wake everyone.', 'Headlights at the mailbox.', 'Movement at the gate. More than one.'] : ['Still out there. Heads down.', 'Nobody\'s left. Same count.', 'Same as before. Stay on your post.'])[(seed >>> 0) % 3], watch.id);
   // the dogs, by name
   const dogs = (g.dogs ?? []).filter(d => d.health > 20);
-  if (dogs.length && scene === 0) say(0.6, dogs.length === 1 ? `${dogs[0].name} will not stop barking at the gate.` : `${dogs[0].name} and ${dogs[1].name} are at the fence, barking at the dark.`);
+  if (dogs.length && scene === 0) say(0.6, dogs.length === 1 ? `${dogs[0].name} won't stop barking at the gate.` : `${dogs[0].name} and ${dogs[1].name} are at the fence. Barking at the dark.`);
   // the children are pulled indoors
   const kids = scene > 0 ? [] : alive.filter(p => p.kid || p.age < KID_AGE).filter(p => !used.has(p.id)).slice(0, 4);
   const parent = homes.find(u => u.personId && g.people.find(p => p.id === u.personId && !p.kid));
@@ -53,7 +53,7 @@ export function decorateDefenders(b: Battle, g: GameState, stance: Stance | null
     const door = at(-2.4, (i - 1.5) * 0.2);
     ev.push({ t: r2(2.5 + i * 0.7), kind: 'move', unit: id, x: door.x, z: door.z });
   });
-  if (kids.length) say(3, `${kids.length > 1 ? 'Kids, inside, now!' : `${kids[0].first}, inside. Now!`}`, parent?.id);
+  if (kids.length) say(3, `${kids.length > 1 ? 'Kids, inside. Now.' : `${kids[0].first}, inside. Now.`}`, parent?.id);
   // guards on shift at the gate post
   let gi = 0;
   for (const guard of onDuty(g).slice(0, 2)) {
@@ -63,18 +63,18 @@ export function decorateDefenders(b: Battle, g: GameState, stance: Stance | null
     const p = at(4.2, 1.4 + gi * 1.2);
     units.push({ id, side: 'home', personId: guard.person.id, x: r2(p.x - ax * 3), z: r2(p.z - az * 3), post: 'open', bystander: true });
     ev.push({ t: 1 + gi, kind: 'move', unit: id, x: p.x, z: p.z });
-    if (gi === 0) say(5, `${guard.name} is at the gate post, rifle ready.`);
+    if (gi === 0) say(5, `${guard.name}'s on the gate. Rifle up.`);
     gi++;
   }
   // a warning shot over their heads
   if (stance === 'warn' && watch && raiders[0]) {
     ev.push({ t: 14, kind: 'shot', from: watch.id, to: raiders[0].id, hit: false });
-    say(14.5, 'That one was over your heads. Turn around.', watch.id);
+    say(14.5, 'That was over your heads. Turn around.', watch.id);
   }
   // wounded carried in: name both
   for (const e of b.events) if (e.kind === 'carry' && e.by) {
     const w = b.units.find(u => u.id === e.unit), c = b.units.find(u => u.id === e.by);
-    say(e.t + 0.3, `${nameOf(c)} is carrying ${nameOf(w)} inside.`);
+    say(e.t + 0.3, `${nameOf(c)}, you've got ${nameOf(w)}? Go. Inside.`);
   }
   ev.sort((a, c) => a.t - c.t);
   void nameOf;

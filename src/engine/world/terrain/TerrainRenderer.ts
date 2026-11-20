@@ -449,6 +449,7 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
         float sThr = mix(0.36, 0.62, smoothstep(500.0, 1300.0, camDc));
         float snow = smoothstep(sl - 30.0, sl + 30.0, alt) * (1.0 - smoothstep(sThr, sThr + 0.14, slope));
         snow = max(snow, uSnowCover * (1.0 - smoothstep(0.25, 0.55, slope)) * (1.0 - 0.8 * fo) * (1.0 - 0.45 * smoothstep(0.22, 0.55, vForest)));
+        if ( uSeaDomeI.x > 0.5 ) snow *= 1.0 - seaDomeK( vRPos );   // a climate-controlled dome's ground is never snow-covered (season/domeMask.ts)
         col = mix(col, uSnow * (0.9 + 0.1 * nb), snow);
         // Damp shore and wet mud just above the water line
         float shore = 1.0 - smoothstep(0.0, 0.25, alt - uWaterY);
