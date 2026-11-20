@@ -18,7 +18,7 @@ import type { BreachWhere } from './battleTypes';
 import type { CrewKind } from './surrender';
 import type { GameState } from './state';
 import { GATE_SEC, hasGateMotor, hasSallyGate } from './gateSecurity';
-import { SHELL_ODDS, airlockDoor } from './dome/siege';
+import { HEAVY_BLAST, SHELL_ODDS, airlockDoor } from './dome/siege';
 
 export type BreachHow = 'climb' | 'ram' | 'charge';
 
@@ -124,11 +124,12 @@ export function ramOdds(a: { wallKind: string; gate: boolean; difficulty: Diffic
 }
 
 /** The chance one satchel opens the target (a bollard does nothing against a charge; a reinforced gate helps a little). */
-export function blastOdds(a: { wallKind: string; gate: boolean; difficulty: Difficulty } & Pick<MeansCounters, 'gateBarrier'>): number {
+export function blastOdds(a: { wallKind: string; gate: boolean; difficulty: Difficulty; /** false: not a heavy crew (see `HEAVY_BLAST`): a glass dome's satchel odds are a tenth. */ heavy?: boolean } & Pick<MeansCounters, 'gateBarrier'>): number {
   const d = MEANS_DIFF[a.difficulty] ?? MEANS_DIFF.standard;
   const door = a.gate ? airlockDoor(a.wallKind) : null;
   const p = door ? Math.max(Math.min(0.35, door.blast), door.blast - 0.03 * a.gateBarrier) : a.gate ? Math.max(0.35, GATE_BASE.blast - 0.03 * a.gateBarrier) : resistOf(a.wallKind).blast;
-  return Math.max(0, Math.min(0.95, p * d.odds));
+  const soft = a.heavy === false && a.wallKind === 'shell_glass' ? HEAVY_BLAST.otherwise : 1;
+  return Math.max(0, Math.min(0.95, p * d.odds * soft));
 }
 
 /** The reason an attempt failed, for the card and the scene. */
@@ -185,7 +186,7 @@ export function wallTarget(runs: readonly PerimeterRun[], home: { x: number; z: 
       const den = dir.x * ez - dir.z * ex;
       if (len > 1e-9 && Math.abs(den) > 1e-9) {
         const t = ((ax - home.x) * ez - (az - home.z) * ex) / den, u = ((ax - home.x) * dir.z - (az - home.z) * dir.x) / den;
-        if (t > 1 && t <= maxD && u >= 0 && u <= 1 && (!best || t > best.d)) best = { run, d: t, at: acc + u * len, px: ax + ex * u, pz: az + ez * u, hx: ex / len, hz: ez / len };
+        if (t > (run.kind.startsWith('shell_') ? 0.3 : 1) && t <= maxD && u >= 0 && u <= 1 && (!best || t > best.d)) best = { run, d: t, at: acc + u * len, px: ax + ex * u, pz: az + ez * u, hx: ex / len, hz: ez / len };
       }
       acc += len;
     }

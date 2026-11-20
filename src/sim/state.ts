@@ -48,7 +48,7 @@ import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
 import { richFunds } from './richStart';
-export const SAVE_VERSION = 105;
+export const SAVE_VERSION = 106;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
@@ -286,6 +286,8 @@ export interface GameState {
   dome?: import('./dome/live').DomeState;
   /** Every finished dome's own state by structure id (each runs its own air, climate and water loop; save v100). `dome` mirrors the biggest one's. */
   domes?: Record<string, import('./dome/live').DomeState>;
+  /** Marks a raid left on a dome's shell (sim/dome/scars.ts): scorch, chips, dents. They wear off with the days. Optional (save v105). */
+  shellScars?: import('./dome/scars').ShellScar[];
   /** A rented place to sleep while the house goes up: motel, extended stay, RV or modular unit (sim/shelterBridge.ts; absent until rented; save v101). */
   rental?: import('./shelterBridge').Rental;
   /** How old the stores are, rotation, traps. */
