@@ -27,6 +27,9 @@ import { collapseLook, withWeather } from '../sim/collapseLook';
 import { shellBleachOf, shellFrostOf, shimmerOf, waterLockOf } from '../sim/climateLook';
 import { domeOf, stateOf } from '../sim/dome/live';
 import { setShellClimate } from './fx/DomeShell';
+import { DomeInteriorLook } from './fx/DomeInteriorLook';
+import { breachOf } from '../sim/dome/interiorClimate';
+import { clearDomeMask } from '../engine/world/season/domeMask';
 import type { ClimateOverlay } from '../engine/world/season/seasonState';
 import { OasisState } from './atmosphere/OasisState';
 import { applyDust, dustStorm } from '../engine/world/weather/dustStorm';
@@ -314,6 +317,7 @@ export function GameCanvas() {
     let feltAcc = 9, hitOff = 0, hitBase = 0, hitHeld = false;
     const climOverlay: ClimateOverlay = { scorch: 0, snow: 0, freeze: 0 };
     let shellAcc = 6;
+    const domeInterior = new DomeInteriorLook();   // (the ground under a climate-held dome keeps its normal season: fx/DomeInteriorLook)
     const terrainOv = new TerrainOverlay(ws.scene, world.groundAt);
     const showTerrain = () => {
       const g = useGameStore.getState().game, m = useWorldStore.getState().terrainMode, t = terrainOf(g);
@@ -612,6 +616,7 @@ export function GameCanvas() {
         shellAcc = 0;
         const d0 = domeOf(game), st0 = d0 ? stateOf(game, d0) : null;
         setShellClimate(st0 ? shellFrostOf(st0.outF, st0.indoorF) : 0, st0 ? shellBleachOf(lookRaw.scorch, st0.outF) : 0);
+        domeInterior.update(game, world.groundAt);
       }
       const sp = world.seasons.params;
       // Season grade, particles and damp ground follow the drawn (eased) visual season
@@ -650,7 +655,7 @@ export function GameCanvas() {
       const wx = weather.update({
         dt, speed: speed === 0 ? 1 : 60 / SECONDS_PER_DAY[speed], season: wxSeason, hour: t,
         mode: weatherMode, eventWetness: ws.eventWetness, night: ws.nightFactor,
-        camera: ws.camera, focus: cam.target, sheltered: shelterUnderDome(domesOf(gs), ws.camera.position, world.groundAt(ws.camera.position.x, ws.camera.position.z)),
+        camera: ws.camera, focus: cam.target, sheltered: shelterUnderDome(domesOf(gs).map(d => ({ x: d.x, z: d.z, r: d.r, k: 1 - breachOf(d.health) })), ws.camera.position, world.groundAt(ws.camera.position.x, ws.camera.position.z)),
         snowBase: sp.snow, snowAllow: seasonState.weatherSnow, region: seasonState.climate.id,
         valleyBank: vc.bankDensity > 1e-4 ? { y: vc.bankTopY, amount: Math.min(1, vc.bankDensity * 2.5) } : null,
         mist: valley.nearMist(ws.camera.position.y),
@@ -807,7 +812,7 @@ export function GameCanvas() {
     if (!showcaseNext) requestAnimationFrame(() => requestAnimationFrame(() => { if (!cancelled) useWorldStore.getState().setBoot(null); }));
 
     // QA hook (screenshot harness, console poking).
-    (window as unknown as Record<string, unknown>).__cb = { oasis, census: () => sceneCensus(ws.scene), terrainOv, blueprintOv, player, ws, world, weather, valley, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
+    (window as unknown as Record<string, unknown>).__cb = { oasis, domeInterior, census: () => sceneCensus(ws.scene), terrainOv, blueprintOv, player, ws, world, weather, valley, cam, tour, tool, marker, fence, sight, game: useGameStore, store: useWorldStore, THREE, qa, battle,
       feltWorld: felt, feltSync,
       demoBattle: () => {
         const g = useGameStore.getState().game;
@@ -918,7 +923,7 @@ export function GameCanvas() {
       ws.dispose();
     };
     })();
-    return () => { cancelled = true; stop(); setPhotoCapturer(null); useWorldStore.getState().setBoot(null); };
+    return () => { cancelled = true; stop(); clearDomeMask(); setPhotoCapturer(null); useWorldStore.getState().setBoot(null); };
   }, []);
 
   return <canvas ref={ref} style={{ width: '100%', height: '100%' }} />;

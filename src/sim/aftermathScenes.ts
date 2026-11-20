@@ -28,10 +28,10 @@ export interface BurialInput { name: string; age: number; kid: boolean; elder: b
 
 // What people say at a grave: broken, plain, spoken (contractions, fragments, a name; grief and anger can swear in an adult; a child says a few words and never
 // curses; an old, devout person prays).
-const WORDS_KIN = ['"God. You were just here this morning."', '"{n}. I\'ll keep the place. I told you I would."', '"I should have been out there."', '"Fuck. Fuck, {n}. Why you?"', '"I\'m sorry. I\'m sorry, {n}."', '"Goddamn it, {n}. Goddamn it."'];
+const WORDS_KIN = ['"God. You were just here this morning."', '"{n}. I\'ll keep the place. I told you I would."', '"I should have been out there."', '"I keep... he was just here this morning. He was just..."', '"Say something. Somebody say something."', '"I told him stay down. I told him."', '"Fuck. Fuck, {n}. Why you?"', '"I\'m sorry. I\'m sorry, {n}."', '"Goddamn it, {n}. Goddamn it."'];
 const WORDS_KID = ['"Is {n} cold down there?"', '"Can I put this on top? It was {n}\'s."', '"I\'ll be quiet now. Come back."', '"I want {n} back."'];
-const WORDS_ANY = ['"{n} stayed on the wall. That\'s all I\'ve got."', '"{n} didn\'t run. Remember that."', '"Shit. Shit, {n}."', '"Jesus. I still can\'t believe it."', '"{n} would have done it for any of us."'];
-const WORDS_ELDER = ['"Lord, take {n} home."', '"Dear God, keep {n}. It\'s all we can give."', '"Eternal rest grant unto {n}, O Lord..."'];
+const WORDS_ANY = ['"{n} stayed on the wall. That\'s... that\'s all I\'ve got."', '"Anybody else? No? Okay. Okay."', '"I didn\'t know {n} well. But he stayed."', '"{n} didn\'t run. Remember that."', '"Shit. Shit, {n}."', '"Jesus. I still can\'t believe it."', '"{n} would have done it for any of us."'];
+const WORDS_ELDER = ['"Lord, take {n} home."', '"Dear God, keep {n}. It\'s all we can give."', '"Eternal rest grant unto {n}, O Lord..."', '"Goddamn it, {n}. Lord, take {n} home."'];
 
 export function burialWords(inp: BurialInput): SceneLine[] {
   const r = mulberry32(inp.seed * 31 + 7), used = new Set<string>(), v = { n: inp.name };
