@@ -23,11 +23,12 @@ const encode = (listFile, mp4, inputFps) => new Promise((ok, fail) => spawn('ffm
 
 if (mode === 'join') {
   const root = resolve(opt('--root', '/tmp/claude-0/dome-movie')), mp4 = resolve(opt('--mp4', 'dome-movie.mp4'));
-  const dirs = readdirSync(root, { withFileTypes: true }).filter(d => d.isDirectory() && existsSync(`${root}/${d.name}/frames.txt`)).map(d => d.name).sort();
+  const dirs = readdirSync(root, { withFileTypes: true }).filter(d => d.isDirectory() && existsSync(`${root}/${d.name}/frames.txt`) && /^[ab]\d-/.test(d.name)).map(d => d.name).sort();
   const parts = [];
   for (const d of dirs) {
     // each part's list refers to its own frames: prefix with the directory so one concat list holds them all
-    const lines = readFileSync(`${root}/${d}/frames.txt`, 'utf8').split('\n').filter(Boolean).map(l => l.startsWith('file ') ? `file '${root}/${d}/${l.slice(6, -1)}'` : l);
+    const hold = Number(opt('--hold', 0.6));   // a time-lapse frame stands for up to 2 s of the fight: show each for at most --hold seconds
+    const lines = readFileSync(`${root}/${d}/frames.txt`, 'utf8').split('\n').filter(Boolean).map(l => l.startsWith('file ') ? `file '${root}/${d}/${l.slice(6, -1)}'` : l.startsWith('duration ') ? `duration ${Math.min(Number(l.slice(9)), d.startsWith('a') ? 9 : hold).toFixed(4)}` : l);
     parts.push(...lines);
   }
   const list = `${root}/all.txt`; writeFileSync(list, parts.join('\n') + '\n');
