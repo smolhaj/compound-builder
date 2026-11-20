@@ -87,23 +87,16 @@ try {
   await frames(4);
   // the road re-plans to the port and the truck's tail (through the gate to the lane) is laid on the world's next idle ticks: wait for it (a held truck would ignore it)
   for (let k = 0; k < 60; k++) { if (await page.evaluate(() => window.__cb.world.truck.tail.length > 0)) break; await frames(2); }
-  // the far end of the county road lies outside the terrain streamed in around the camera: fly down the road once so its ground is real, then lay the truck's way again (a winter toggle re-lays it)
-  await page.evaluate(async () => {
-    const cb = window.__cb, w = cb.world, gz = w.access.drive[0][1];
-    for (let z = gz - 160; z <= gz + 5; z += 20) { const x = w.county.x(z); cb.qa.pose = { x, y: w.groundAt(x, z) + 1.2, z, lx: x, ly: w.groundAt(x, z + 5), lz: z + 5, fov: 60 }; await cb.qa.renderNow(); }
-    cb.qa.pose = null;
-    w.truck.setWinter(true); w.truck.setWinter(false);
-  });
-  lap('truck way after streaming: ' + await page.evaluate(() => window.__cb.world.truck.inLength.toFixed(1)));
   lap('truck tail points: ' + await page.evaluate(() => window.__cb.world.truck.tail.length));
   // the scene's geometry: the dome, its vehicle port and personnel airlocks, the truck's way in sampled by distance (the truck is held at each distance in turn)
   const geo = await page.evaluate(async id => {
     const cb = window.__cb, w = cb.world, s = await import('/src/sim/dome/standing.ts');
     const d = s.domesOf(cb.game.getState().game).find(x => x.id === id);
     const v = d.airlocks.find(l => l.role === 'vehicle'), people = d.airlocks.filter(l => l.role !== 'link' && l.role !== 'vehicle');
-    const L = w.truck.inLength, pts = [], n = Math.ceil(L / 0.25);
-    w.truck.qaHold([{ material: 'lumber', qty: 6 }], 0);
-    for (let i = 0; i <= n; i++) { w.truck.qaHold([{ material: 'lumber', qty: 6 }], Math.min(L, i * L / n)); const a = w.truck.at; if (a) pts.push([i * L / n, a[0], a[1]]); }
+    // the truck's whole way (county road, drive, the tail through the port to the lane), laid by us: the world's own drivable prefix is cut short where the terrain streams
+    const t = w.truck, full = [...t._south, ...t._driveWay, ...t._tail], pts = []; let L = 0;
+    for (let k = 1; k < full.length; k++) { const a = full[k - 1], b = full[k], l = Math.hypot(b[0] - a[0], b[1] - a[1]), m = Math.max(1, Math.ceil(l / 0.25)); for (let q = 0; q < m; q++) pts.push([L + l * q / m, a[0] + (b[0] - a[0]) * q / m, a[1] + (b[1] - a[1]) * q / m]); L += l; }
+    pts.push([L, full.at(-1)[0], full.at(-1)[1]]);
     return { r: d.r, x: d.x, z: d.z, tier: d.tier, v: v ? { angle: v.angle, x: v.x, z: v.z, inX: v.inX, inZ: v.inZ, dw: v.dw, len: v.len ?? 0.3 } : null, people: people.map(p => ({ angle: p.angle, x: p.x, z: p.z, outX: p.outX, outZ: p.outZ, inX: p.inX, inZ: p.inZ })), L, pts };
   }, info.id);
   lap(`dome r=${geo.r.toFixed(2)} tier=${geo.tier} port=${geo.v ? 'yes' : 'NONE'} people locks=${geo.people.length} truck way=${geo.L.toFixed(1)} units, ${geo.pts.length} pts`);
@@ -162,7 +155,6 @@ try {
   };
   // ── render: per frame set the actors and the pose, one full-quality draw ──
   await page.evaluate(async () => { const m = await import('/src/game/HomesteadWorld.ts'); const f = m.scaleFigure(0, 0, 0); f.name = '__walker'; window.__cb.ws.scene.add(f); });
-  await page.evaluate(() => window.__cb.world.truck.qaHold([{ material: 'lumber', qty: 6 }], 0));
   const log = [], nF = Math.round(SECS * FPS), caps = [];
   const only = stills.length ? new Set(stills.map(f => Math.round(f * (nF - 1)))) : null;
   for (let i = 0; i < nF; i++) {
@@ -191,9 +183,9 @@ try {
     await page.evaluate(([wx, wz, wy, hdg, tx, tz, tp, trot, eye, ey, look, ly, fov]) => {
       const cb = window.__cb, f = cb.ws.scene.getObjectByName('__walker');
       f.position.set(wx, wy, wz); f.rotation.y = hdg; f.position.y += Math.abs(Math.sin(wx * 40 + wz * 40)) * 0.012;
-      cb.world.truck.qaHold([{ material: 'lumber', qty: 6 }], tp);
+      { const tr = cb.world.truck, g = tr._truck, h = { call: (_, x, z) => tr._ground(x, z) }; tr._held = true; g.visible = true; g.position.set(tx, h.call(0, tx, tz), tz); g.rotation.order = 'YXZ'; g.rotation.set(-Math.atan2(h.call(cb.world, tx + Math.sin(trot) * 0.4, tz + Math.cos(trot) * 0.4) - h.call(cb.world, tx - Math.sin(trot) * 0.4, tz - Math.cos(trot) * 0.4), 0.8), trot, 0); }
       cb.qa.pose = { x: eye[0], y: ey, z: eye[1], lx: look[0], ly, lz: look[1], fov };
-    }, [wx, wz, wy, Math.atan2(wx2 - wx, wz2 - wz), pos[0], pos[1], st.td, 0, [st.eye[0], st.eye[2]], ey, [tx, tz], ly, 58]);
+    }, [wx, wz, wy, Math.atan2(wx2 - wx, wz2 - wz), pos[0], pos[1], st.td, Math.atan2(pos2[0] - pos[0], pos2[1] - pos[1]), [st.eye[0], st.eye[2]], ey, [tx, tz], ly, 58]);
     await frames(1);
     await page.evaluate(() => window.__cb.qa.renderFull('high'));
     const file = `f${String(i).padStart(5, '0')}.jpg`;
