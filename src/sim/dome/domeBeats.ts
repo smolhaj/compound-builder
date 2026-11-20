@@ -13,6 +13,8 @@ import { mulberry32 } from '../rng';
 import { phasesOf, profileOfUnit } from '../raidDialogue';
 import type { Dome } from './standing';
 import { isShellKind } from './siege';
+import { entrancesOf } from './standing';
+import { isSealedTier } from './sealed';
 
 export interface DomeBeatInput {
   dome: Pick<Dome, 'id' | 'tier' | 'x' | 'z' | 'r' | 'airlocks'>;
@@ -27,7 +29,7 @@ const r2 = (n: number): number => Math.round(n * 100) / 100;
 /** How close the crew starts to the shell (world units, 1 = 6 m), and how fast it walks to it. */
 const APPROACH = 5, WALK_SPEED = 1.0;
 /** Every dialogue key the planner can use (a test holds raidLinesDome.ts to it). */
-export const BEAT_CTX_USED: readonly string[] = ['dome_scout', 'dome_shots', 'dome_tool', 'dome_cut', 'dome_airlock', 'dome_ram', 'dome_blast', 'dome_skirt', 'dome_argue', 'dome_order', 'dome_panic', 'dome_vow', 'dome_watch', 'dome_fire', 'dome_holds', 'dome_gone', 'dome_angry', 'dome_bounce', 'dome_taunt', 'dome_react_swing', 'dome_react_bounce', 'dome_react_limp', 'dome_cross'];
+export const BEAT_CTX_USED: readonly string[] = ['dome_scout', 'dome_shots', 'dome_tool', 'dome_cut', 'dome_airlock', 'dome_ram', 'dome_blast', 'dome_skirt', 'dome_argue', 'dome_order', 'dome_panic', 'dome_vow', 'dome_watch', 'dome_fire', 'dome_holds', 'dome_gone', 'dome_angry', 'dome_bounce', 'dome_taunt', 'dome_react_swing', 'dome_react_bounce', 'dome_react_limp', 'dome_cross', 'dome_spectate'];
 
 /** Does this fight's own timeline break the shell (a gap or a breach on a shell run)? Then the crew's tool work before it is real. */
 export const shellBroken = (b: Battle): boolean => b.events.some(e => (e.kind === 'breach' && !!e.where && isShellKind(e.where.kind)) || (e.kind === 'gap' && e.runId.startsWith('dome:')));
@@ -57,7 +59,38 @@ export function mildWording(text: string): string {
     .replace(/\bshit\w*/gi, m => (/^S/.test(m) ? 'Damn' : 'damn'));
 }
 
-export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
+/** Kinds that mean the home side is fighting: dropped from a fight at a dome nobody can breach. */
+const FIREFIGHT = new Set<BattleEvent['kind']>(['shot', 'wound', 'death', 'aid', 'carry', 'flare', 'fallback', 'taken', 'reload', 'jam', 'heroic', 'panic', 'shield', 'throw', 'rocket', 'hide', 'surrender']);
+/** The generic fire-fight pools: not said in a scene where nobody on the home side fires. */
+const GUN_CTX = new Set(['first_shots', 'fight', 'defender_hit', 'mate_down', 'raider_down', 'fire', 'jam', 'cover_fire']);
+
+/**
+ * A sealed dome (the arcology): the picture is raiders stuck outside and a household watching. Everything that reads as a firefight goes (shots, wounds,
+ * cover, flares, reloads, orders), every generic line goes (only the dome's own pools speak), and the home side's cover orders go (they stand and watch).
+ */
+export function sealedFight(b: Battle): Battle {
+  const home = new Set(b.units.filter(u => u.side === 'home').map(u => u.id));
+  const events = b.events.filter(e => {
+    if (FIREFIGHT.has(e.kind)) return false;
+    if (e.kind === 'say') return (e.ctx ?? '').startsWith('dome_');
+    if (e.kind === 'beat') return e.role === 'vigil';
+    if (e.kind === 'cover') return !home.has(e.unit);
+    return true;
+  });
+  return { ...b, events, sealed: true };
+}
+/** A fight at a dome where nobody on the home side fires: no gunfire lines from the home side (the generic pools talk about shots and wounds). */
+export function withoutGunTalk(b: Battle): Battle {
+  const home = new Set(b.units.filter(u => u.side === 'home').map(u => u.id));
+  return { ...b, events: b.events.filter(e => !(e.kind === 'say' && e.who && home.has(e.who) && GUN_CTX.has(e.ctx ?? ''))) };
+}
+
+export function domeBeats(b0: Battle, o: DomeBeatInput): Battle {
+  let b = b0;
+  const sealed = isSealedTier(o.dome.tier);
+  const homeIds = new Set(b.units.filter(u => u.side === 'home').map(u => u.id));
+  const defendersFire = !sealed && b.events.some(e => e.kind === 'shot' && homeIds.has(e.from));
+  b = sealed ? sealedFight(b) : defendersFire ? b : withoutGunTalk(b);
   const d = o.dome, tier = d.tier, rnd = mulberry32(o.seed * 4909 + 17);
   const dead = new Map<string, number>();
   for (const e of b.events) if (e.kind === 'death') dead.set(e.unit, e.t);
@@ -76,7 +109,12 @@ export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
   const a0 = Math.atan2(mx - d.x, mz - d.z);
   const angDiff = (a: number, c: number) => Math.atan2(Math.sin(a - c), Math.cos(a - c));
   const person = d.airlocks.filter(l => l.role !== 'link');
-  const lock = [...person].sort((p, q) => Math.abs(angDiff(p.angle, a0)) - Math.abs(angDiff(q.angle, a0)))[0] ?? null;
+  const doors = entrancesOf(d as Parameters<typeof entrancesOf>[0]).sort((p, q) => Math.abs(angDiff(p.angle, a0)) - Math.abs(angDiff(q.angle, a0)));
+  // the entrance the crew works: the gate complex (a person airlock and the vehicle sally port side by side) counts as ONE, so its two leaves are worked together
+  const gate = doors[0] ?? null;
+  const personLock = person.filter(l => l.role !== 'vehicle').sort((p, q) => Math.abs(angDiff(p.angle, gate?.angle ?? a0)) - Math.abs(angDiff(q.angle, gate?.angle ?? a0)))[0] ?? null;
+  const portLock = gate?.complex ? person.find(l => l.role === 'vehicle') ?? null : null;
+  const lock = personLock ?? portLock;
   const onShell = (a: number, off = 0): { x: number; z: number } => ({ x: d.x + Math.sin(a) * (d.r + off), z: d.z + Math.cos(a) * (d.r + off) });
   const leader = raiders.find(u => u.leader) ?? raiders[0];
   const crewOrder = raiders.filter(u => u.id !== leader.id && !u.job);
@@ -159,12 +197,13 @@ export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
     for (let k = 0; k < 3; k++) probe(at(0.5) + k * 1.6, u, 'torch', a, true, 1.4);
     say(at(0.5) + 5, u, 'dome_tool');
   }
-  say(toolT + 6, homeAt(1, toolT + 6), 'dome_fire');
+  if (defendersFire) say(toolT + 6, homeAt(1, toolT + 6), 'dome_fire');
   say(toolT + 1.6, homeAt(7, toolT + 1.6), 'dome_react_swing');
   // 4. the airlock
   if (lock) {
     const lt = at(0.6), pair = [pickWorker(8), pickWorker(9)].filter((u, i, all) => u && all.indexOf(u) === i);
-    pair.forEach((u, i) => { stand(u, lt - 2.5, lock.angle + (i ? 1 : -1) * 0.05, 0.22); for (let k = 0; k < 3; k++) probe(lt + k * 1.3 + i * 0.4, u, 'pry', lock.angle, true); });
+    // (the first man on the person airlock's door, the second on the sally port's gates when the complex has one: both hold)
+    pair.forEach((u, i) => { const door = i === 1 && portLock ? portLock : lock; stand(u, lt - 2.5, door.angle + (i ? 1 : -1) * 0.05, 0.22); for (let k = 0; k < 3; k++) probe(lt + k * 1.3 + i * 0.4, u, 'pry', door.angle, true); });
     say(lt + 3.5, pair[0], 'dome_airlock');
     say(lt + 5, pair[1] ?? leader, 'dome_airlock');
   }
@@ -192,16 +231,20 @@ export function domeBeats(b: Battle, o: DomeBeatInput): Battle {
   const people = home.concat(b.units.filter(u => u.side === 'home' && u.civilian && !u.bystander && !u.machine));
   const byProf = (p: string) => people.find(h => profileOfUnit(h) === p || (p === 'elder' && h.traits?.history.includes('elder')));
   const taunters = ['kid', 'civ', 'vet'].map(byProf).filter((u, i, all): u is BattleUnit => !!u && all.indexOf(u) === i);
-  for (const u of people) if (taunters.length < 3 && !taunters.includes(u)) taunters.push(u);
+  for (const u of people) if (taunters.length < (sealed ? 8 : 3) && !taunters.includes(u)) taunters.push(u);
   const SIGNS = ['wave', 'point', 'fist'] as const;
-  const tauntBase = at(0.44), muted = new Map<string, [number, number]>();
-  taunters.slice(0, 3).forEach((u, i) => {
-    const tt = tauntBase + i * 1.9, a = a0 + 0.25 * (i - 1);
-    goTo(u, tt, a, -0.55);
-    muted.set(u.id, [tt - 4, tt + 5]);
+  const tauntBase = at(sealed ? 0.12 : 0.44), muted = new Map<string, [number, number]>();
+  const front = gate?.angle ?? a0;
+  taunters.slice(0, sealed ? 8 : 3).forEach((u, i, all) => {
+    // a household that cannot be reached comes to the glass and watches: strung along the shell behind the crew, the child right at it, in no hurry
+    const kid = profileOfUnit(u) === 'kid';
+    const tt = tauntBase + i * (sealed ? 1.3 : 1.9), a = front + (sealed ? 0.1 * (i - (all.length - 1) / 2) : 0.12 * (i - 1));
+    goTo(u, tt, a, kid ? -0.25 : -0.55 - (sealed ? (i % 3) * 0.2 : 0));
+    muted.set(u.id, [tt - 4, sealed ? tEnd + 1 : tt + 5]);
     const face = onShell(a, 4);
-    out.push({ t: r2(tt + 0.2), kind: 'gesture', unit: u.id, what: SIGNS[(i + Math.floor(o.seed)) % 3], x: r2(face.x), z: r2(face.z), secs: 1.8 });
+    if (!sealed || i % 2 === 0 || kid) out.push({ t: r2(tt + 0.2), kind: 'gesture', unit: u.id, what: kid ? 'wave' : SIGNS[(i + Math.floor(o.seed)) % 3], x: r2(face.x), z: r2(face.z), secs: 1.8 });
     say(tt + 0.5, u, 'dome_taunt');
+    if (sealed) { say(tt + 5.5 + i * 0.9, u, 'dome_spectate'); say(tt + 12 + i * 1.3, u, 'dome_spectate'); }
   });
   // 6. what the truck and the satchel did, from the fight's own failed attempts
   for (const e of b.events) {

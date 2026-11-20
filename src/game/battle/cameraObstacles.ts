@@ -31,8 +31,9 @@ export function obstaclesOf(g: GameState): Box[] {
     if (def.frontCells > 0) out.push({ ...footprint(def, st.x, st.z, st.rot, true), h: PORCH_HEIGHT, kind: 'building' });
   }
   for (const d of domesOf(g)) for (const l of d.airlocks) {
+    const hw = Math.max(AIRLOCK_HALF, (l.w ?? 0) / 2 + 0.1);
     const cx = d.x + Math.sin(l.angle) * d.r, cz = d.z + Math.cos(l.angle) * d.r;
-    out.push({ x0: cx - AIRLOCK_HALF, x1: cx + AIRLOCK_HALF, z0: cz - AIRLOCK_HALF, z1: cz + AIRLOCK_HALF, h: AIRLOCK_H, kind: 'building', id: 'dome_airlock' });
+    out.push({ x0: cx - hw, x1: cx + hw, z0: cz - hw, z1: cz + hw, h: AIRLOCK_H, kind: 'building', id: 'dome_airlock' });
   }
   for (const run of g.perimeter) {
     const def = PERIMETER[run.kind];
