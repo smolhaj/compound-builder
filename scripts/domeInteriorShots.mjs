@@ -48,7 +48,7 @@ try {
     cb.store.getState().setHudHidden?.(true);
     const a = (await import('/src/sim/dome/standing.ts')).domesOf(G.getState().game, true).find(x => x.id === dome.id);
     const Y = big ? (await import('/src/sim/dome/plantYard.ts')).yardGeometry(tier, R) : null;
-    return { dome, R, camp: [c.x, c.z], placed, airlocks: a?.airlocks?.map(l => [+l.x.toFixed(2), +l.z.toFixed(2), +l.angle.toFixed(2)]), yard: Y && { phi: Y.phi, chamber: Y.portal.chamber, from: Y.portal.from, to: Y.portal.to, center: Y.center } };
+    return { dome, R, camp: [c.x, c.z], placed, airlocks: a?.airlocks?.map(l => [+l.x.toFixed(2), +l.z.toFixed(2), +l.angle.toFixed(2), l.role ?? '']), yard: Y && { phi: Y.phi, chamber: Y.portal.chamber, from: Y.portal.from, to: Y.portal.to, center: Y.center } };
   }, [tier, cells]);
   lap(JSON.stringify(info));
   if (info.err) throw new Error(info.err);
@@ -71,7 +71,7 @@ try {
   await pair('00-aerial-inside', L(0.0, -1.35, 3.2), L(0, 0.15, 0), 60, [[0.02, 0.5]]);
   // the standing views: the camera stands on the plan's free paths (QA reads the plan the world drew), so it is never inside a building
   const plan = await page.evaluate(() => { const f = [...window.__cb.world._interiorCache.values()][0]; return f ? { segs: f.plan.segs, benches: f.plan.benches, plaza: f.plan.plaza, crates: f.plan.crates, signs: f.plan.signs } : null; });
-  const airlocks = info.airlocks.map(a => a[2]);
+  const airlocks = info.airlocks.filter(a => !a[3]).map(a => a[2]);   // (footpaths only: the vehicle port has its own lane)
   const along = (a, rho, off = 0, h = 0) => L(Math.sin(a) * rho + Math.cos(a) * off, Math.cos(a) * rho - Math.sin(a) * off, h);   // rho in fractions of R, off across the path (fractions of R)
   const segsOf = a => plan.segs.filter(s => Math.abs(Math.atan2(Math.sin(Math.atan2(s.x, s.z) - a), Math.cos(Math.atan2(s.x, s.z) - a))) < 0.08);
   const best = airlocks.map(a => ({ a, n: segsOf(a).length })).sort((p, q) => q.n - p.n)[0];
