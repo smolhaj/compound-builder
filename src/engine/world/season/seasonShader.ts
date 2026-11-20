@@ -298,7 +298,7 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD
     diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.12, 0.30, 0.05 ) * ( 0.85 + 0.3 * seN1 ) * ( 1.0 - 0.6 * seLB.y ), seGreen * seaDomeM * 0.9 );
 #if defined( SEA_MUD ) && !defined( SEA_MUD_UV )
     // (the regional ground itself, whatever its season-time albedo: a maintained lawn inside the dome)
-    diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.03, 0.30, 0.012 ) * ( 0.85 + 0.3 * seN1 ) * ( 1.0 - 0.6 * seLB.y ), seUp * seaDomeM * 0.95 );
+    diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.08, 0.30, 0.008 ) * ( 0.85 + 0.3 * seN1 ) * ( 1.0 - 0.6 * seLB.y ), seUp * seaDomeM * 0.95 );
     totalEmissiveRadiance += vec3( 0.008, 0.05, 0.004 ) * ( 0.8 + 0.4 * seN1 ) * ( 1.0 - 0.6 * seLB.y ) * seUp * seaDomeM;   // (keeps the grass green under the cold grade)
 #endif
   }
@@ -378,7 +378,7 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD
     // undo the frame's cold grade on what is lit inside (uSeaDomeC = 1 / cast, 1 / saturation), then a warm albedo cast and a warm self-light
     float seDl = dot( diffuseColor.rgb, vec3( 0.2126, 0.7152, 0.0722 ) );
     diffuseColor.rgb = mix( vec3( seDl ), diffuseColor.rgb, mix( 1.0, uSeaDomeC.w, seaDomeM ) );
-    diffuseColor.rgb *= mix( vec3( 1.0 ), uSeaDomeC.rgb * vec3( 1.22, 0.98, 0.62 ), seaDomeM );
+    diffuseColor.rgb *= mix( vec3( 1.0 ), uSeaDomeC.rgb * vec3( 1.15, 1.02, 0.5 ), seaDomeM );
     totalEmissiveRadiance += ( diffuseColor.rgb * vec3( 1.0, 0.5, 0.14 ) * 1.0 + vec3( 0.12, 0.06, 0.015 ) ) * uSeaDomeC.rgb * seaDomeM;
   }
 #endif
