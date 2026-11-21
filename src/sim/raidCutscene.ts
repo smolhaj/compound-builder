@@ -173,6 +173,7 @@ export function stageRaid(game: GameState, stance: Stance, keep?: Keep, orders?:
     const last = battles.length - 1, temper = e.temper ?? 'desperate';
     // (a fight at a dome nothing can breach is shown as raiders turned back outside and a household watching: no wounded to drag, no one down or giving up, no death scene)
     const sealed = !!battles[last].sealed;
+    if (sealed) g.gate.aftermath = null;   // (nobody lies hurt on the drive, none is held at the gate: the crew is frustrated and unhurt)
     if (!sealed) battles = battles.map((b, i) => (i === last ? dragTheWounded(b, { x: home.x, z: home.z }) : b));
     const ep = sealed ? { battle: battles[last], ending: null, wake: 0 } as ReturnType<typeof endPoses> : endPoses({ battle: battles[last], temper, style: scenes[last].style, dir, seed, house: { x: home.x, z: home.z } });
     battles = battles.map((b, i) => (i === last ? ep.battle : b));

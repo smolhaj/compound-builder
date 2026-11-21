@@ -109,3 +109,27 @@ export function coverPusher(cover: readonly CoverLike[]): (x: number, z: number)
     return { x: px, z: pz };
   };
 }
+
+/** Height of a dome's stem wall above its floor, by tier (the same numbers the shell is built with: game/buildkit/domeBuildings.ts `LOOK`). */
+export const DOME_STEM: Record<string, number> = { earthen: 0.04, geodesic: 0.06, glass: 0.08, arcology: 0.14 };
+/** How far out the embankment under a dome's foot can reach (units), and how many units out it goes per unit of drop. */
+export const EMBANK_REACH = 8, EMBANK_RUN = 2.4;
+export interface DomeFloor { x: number; z: number; r: number; tier: string }
+
+/**
+ * The ground a shot's camera must stay above: the terrain, raised near a dome by the earth embankment banked under its foot (it slopes from the stem wall's
+ * top out to the natural ground; a camera on the terrain there is inside it, which renders black). Pure; the terrain function is not touched elsewhere.
+ */
+export function domeShotGround(ground: (x: number, z: number) => number, domes: readonly DomeFloor[]): (x: number, z: number) => number {
+  if (!domes.length) return ground;
+  const tops = domes.map(d => ground(d.x, d.z) + (DOME_STEM[d.tier] ?? 0.1));
+  return (x, z) => {
+    let g = ground(x, z);
+    domes.forEach((d, i) => {
+      const dist = Math.hypot(x - d.x, z - d.z);
+      if (dist < d.r || dist > d.r + EMBANK_REACH) return;
+      g = Math.max(g, tops[i] - (dist - d.r) / EMBANK_RUN);
+    });
+    return g;
+  };
+}

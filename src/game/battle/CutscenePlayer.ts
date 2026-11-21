@@ -5,6 +5,7 @@
  * the sim: when the timeline is done it asks the store to commit (the clock
  * advances once, by the plan's length).
  */
+import { domeShotGround, type DomeFloor } from './cameraObstacles';
 import { useGameStore } from '../../store/gameStore';
 import { useBattleStore } from '../../store/battleStore';
 import { useCutsceneView } from '../../store/cutsceneStore';
@@ -28,6 +29,8 @@ export interface PlayerDeps {
   seed: number;
   /** Buildings and walls the camera must keep out of (read once per cutscene; the game stands still). */
   obstacles?: () => Box[];
+  /** Domes on the place: the shot camera stays above the embankment under their feet. */
+  domes?: () => DomeFloor[];
   /** Last-minute cinematic work on a scene's battle before it plays (the invasion's break and house fight: sim/breach.ts, sim/houseAssault.ts); cached per battle. */
   prepare?: (b: Battle) => Battle;
   /** The roofs off (the cutaway view) while the fight is inside the house, and back after. */
@@ -118,7 +121,8 @@ export class CutscenePlayer {
       return poseAt(this._dir.shot!, this._time);
     }
     this._time += dt;
-    const { battle, ground } = this.d;
+    const { battle } = this.d;
+    const ground = domeShotGround(this.d.ground, this.d.domes?.() ?? []);
     let loc = locate(plan, this._real);
     const seg = loc.segment;
     // the lead-in shows the cast in place, frozen at the first frame (so the shots have someone to show), then the fight runs from there
@@ -180,7 +184,7 @@ export class CutscenePlayer {
       const rx = raiders.reduce((a, u) => a + u.x, 0) / raiders.length - house.x, rz = raiders.reduce((a, u) => a + u.z, 0) / raiders.length - house.z, l = Math.hypot(rx, rz) || 1;
       this._road = { x: rx / l, z: rz / l };
     }
-    this._dir.night = lightLabel(hourAfter(plan, loc.game)) === 'Night'; this._dir.variant = loc.segment.scene;
+    this._dir.night = lightLabel(hourAfter(plan, loc.game)) === 'Night'; this._dir.variant = loc.segment.scene; this._dir.sealed = !!b.sealed;
     let shot;
     if (battle.playing !== this._wasPlaying) { this._wasPlaying = battle.playing; this._dir.shot = null; this._lastKind = ''; }
     const inner = battle.playing ? (interiorShot(battle.battle?.invasion, battle.time, ground, this._boxes, this._focusOf(battle), this._doorBeats(battle), this._crewOf(battle)) ?? breachShot(battle.battle?.invasion, battle.time, ground, this._boxes)) : null;
