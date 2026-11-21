@@ -17,7 +17,7 @@ const TAU = Math.PI * 2;
 export function airlockAngles(n: number): number[] { return Array.from({ length: n }, (_, i) => i * TAU / Math.max(1, n)); }
 
 /** The airlock vestibule: width of the door (world units) and how far the chamber runs in from the shell, by tier (the room itself is in vestibule.ts). */
-export const VESTIBULE: Record<DomeTier, { w: number; len: number }> = { earthen: { w: 0.24, len: 0.2 }, geodesic: { w: 0.42, len: 0.5 }, glass: { w: 0.55, len: 0.7 }, arcology: { w: 1.1, len: 1.4 } };
+export const VESTIBULE: Record<DomeTier, { w: number; len: number }> = { earthen: { w: 0.24, len: 0.2 }, geodesic: { w: 0.42, len: 0.5 }, glass: { w: 0.55, len: 0.7 }, arcology: { w: 1.7, len: 2.0 } };
 
 export interface Airlock {
   index: number;

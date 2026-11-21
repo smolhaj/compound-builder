@@ -29,9 +29,9 @@ export interface DomeFootprint {
   edge?: number;
 }
 
-/** The shared uniforms: footprints (x, z, r, k) then (x2, z2, y, edge); and (count, dormant look, 0, 0). */
+/** The shared uniforms: footprints (x, z, r, k) then (x2, z2, y, edge); and (count, dormant look, 0, daylight). */
 const BLOCK = new Float32Array(DOME_MAX * 8);
-const INFO = { x: 0, y: 0, z: 0, w: 0 };
+const INFO = { x: 0, y: 0, z: 0, w: 1 };
 export const DOME_UNIFORMS = { uSeaDome: { value: BLOCK }, uSeaDomeI: { value: INFO } } as const;
 
 const fin = (x: number | undefined, d: number): number => (typeof x === 'number' && Number.isFinite(x) ? x : d);
@@ -55,6 +55,10 @@ export function writeDomeMask(list: readonly DomeFootprint[], dormant = 0): numb
   INFO.x = n; INFO.y = clamp01(fin(dormant, 0));
   return n;
 }
+
+/** Daylight 0 (night) to 1 (day): scales the dome's warm self-light and lawn glow, so a night interior is lit by its lamps and windows only. */
+export function writeDomeDaylight(day: number): void { INFO.w = Number.isFinite(day) ? Math.max(0, Math.min(1, day)) : 1; }
+export function domeDaylightNow(): number { return INFO.w; }
 
 /** The count and dormant look last written (tests and QA). */
 export function domeMaskInfo(): { count: number; dormant: number } { return { count: INFO.x, dormant: INFO.y }; }
