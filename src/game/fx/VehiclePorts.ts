@@ -23,7 +23,9 @@ export interface PortInput {
   /** What the gates say: sealed (red), open (green: the outer gate stands open, the inner one shut). */
   state: 'open' | 'sealed';
 }
-export interface PortFixtures { group: THREE.Group; key: string; dispose(): void }
+export type PortState = 'open' | 'cycling' | 'sealed';
+export interface PortFixtures { group: THREE.Group; key: string; /** Recolor the state lamps: green open, amber cycling, red sealed (cheap: instance colors only). */ setState(s: PortState): void; dispose(): void }
+const STATE_COLOR: Record<PortState, number> = { open: 0x30ff80, cycling: 0xffb020, sealed: 0xff3a2a };
 
 export const portsKey = (ins: readonly PortInput[]): string => ins.map(i => `${i.id}:${i.tier}:${i.frame.angle.toFixed(3)}:${i.frame.cx.toFixed(2)},${i.frame.cz.toFixed(2)}:${i.frame.r.toFixed(2)}:${i.lane ? 1 : 0}:${i.guarded ? 1 : 0}:${i.persons.length}:${i.state}`).join('|');
 
@@ -60,16 +62,18 @@ const P = (f: Fr, rho: number, lam: number): [number, number] => [f.cx + f.u[0] 
 function slab(f: Fr, rho0: number, rho1: number, lam0: number, lam1: number, top: (rho: number) => number, floor: (x: number, z: number) => number, color: number): THREE.BufferGeometry {
   const pos: number[] = [], n = Math.max(1, Math.ceil((rho1 - rho0) / 0.3));
   const V = (rho: number, lam: number, y: number): [number, number, number] => { const [x, z] = P(f, rho, lam); return [x, y, z]; };
-  const B = (rho: number, lam: number): number => { const [x, z] = P(f, rho, lam); return Math.min(floor(x, z) - 0.04, top(rho) - 0.03); };
+  const B = (rho: number, lam: number): number => { const [x, z] = P(f, rho, lam); return Math.min(floor(x, z) - 0.01, top(rho) - 0.03); };
   const quad = (a: number[], b: number[], c: number[], d: number[]): void => { pos.push(...a, ...b, ...c, ...a, ...c, ...d); };
+  // the sides and the toe slope away (about 1 in 1.2) instead of dropping straight down: a low camera sees a banked edge, not a cliff
+  const K = 0.6, dr = (rho: number, lam: number): number => Math.max(0, top(rho) - B(rho, lam)) * K;
+  const VB = (rho: number, lam: number, side: -1 | 1 | 0, end: 0 | 1 | -1 = 0): [number, number, number] => { const d = dr(rho, lam); const [x, z] = P(f, rho + end * d, lam + side * d); return [x, B(rho, lam), z]; };
   for (let i = 0; i < n; i++) {
     const r0 = rho0 + (rho1 - rho0) * i / n, r1 = rho0 + (rho1 - rho0) * (i + 1) / n;
     quad(V(r0, lam0, top(r0)), V(r1, lam0, top(r1)), V(r1, lam1, top(r1)), V(r0, lam1, top(r0)));                                   // the top
-    quad(V(r0, lam0, B(r0, lam0)), V(r1, lam0, B(r1, lam0)), V(r1, lam0, top(r1)), V(r0, lam0, top(r0)));                          // the sides
-    quad(V(r0, lam1, top(r0)), V(r1, lam1, top(r1)), V(r1, lam1, B(r1, lam1)), V(r0, lam1, B(r0, lam1)));
+    quad(VB(r0, lam0, -1), VB(r1, lam0, -1), V(r1, lam0, top(r1)), V(r0, lam0, top(r0)));                                           // the banked sides
+    quad(V(r0, lam1, top(r0)), V(r1, lam1, top(r1)), VB(r1, lam1, 1), VB(r0, lam1, 1));
   }
-  quad(V(rho0, lam0, B(rho0, lam0)), V(rho0, lam0, top(rho0)), V(rho0, lam1, top(rho0)), V(rho0, lam1, B(rho0, lam1)));              // the ends
-  quad(V(rho1, lam1, B(rho1, lam1)), V(rho1, lam1, top(rho1)), V(rho1, lam0, top(rho1)), V(rho1, lam0, B(rho1, lam0)));
+  quad(V(rho1, lam1, top(rho1)), V(rho1, lam0, top(rho1)), VB(rho1, lam0, -1, 1), VB(rho1, lam1, 1, 1));                              // the toe
   return tris(pos, color);
 }
 /** Paint on a slab: a flat quad just above its top. */
@@ -86,7 +90,7 @@ function mark(f: Fr, rho0: number, rho1: number, lam0: number, lam1: number, top
 export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, z: number) => number): PortFixtures {
   const group = new THREE.Group(); group.name = 'vehicle_ports';
   const geos: THREE.BufferGeometry[] = [];
-  const lamps: Array<{ x: number; y: number; z: number; w: number; h: number; d: number; yaw: number; color: number }> = [];
+  const lamps: Array<{ x: number; y: number; z: number; w: number; h: number; d: number; yaw: number; color: number; state?: boolean }> = [];
   for (const { frame: f, lane, tier, persons, state, baseY } of ins) {
     const { u, v } = f, yaw = f.angle, R = f.r, F: Fr = { cx: f.cx, cz: f.cz, u };
     const clad = CLAD[tier], accent = ACCENT[tier];
@@ -106,7 +110,7 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     geos.push(slab(F, R + APRON_LEN - 0.035, R + APRON_LEN, lamA, lamB, r => topA(r) + 0.012, ground, CURB));                                                                  // and the toe
     geos.push(mark(F, R + 0.05, R + APRON_LEN - 0.12, -0.012, 0.012, topA, YELLOW));                                                    // the center line to the gate
     geos.push(mark(F, R + 0.45, R + 0.5, -v.dw / 2, v.dw / 2, topA, PAINT));                                                           // the stop line before the gate
-    for (let k = 0; k < 5; k++) geos.push(mark(F, R + 0.12 + k * 0.1, R + 0.2 + k * 0.1, lamA + 0.05, lamA + 0.09, topA, YELLOW, 0.005));   // hazard chevrons along the curb
+    for (let k = 0; k < 3; k++) geos.push(mark(F, R + 0.12 + k * 0.1, R + 0.2 + k * 0.1, lamA + 0.05, lamA + 0.09, topA, YELLOW, 0.005));   // hazard chevrons along the curb
     // ── bollards across the apron's mouth, clear of the lanes into the doors ──
     for (const [bx, bz] of f.bollards) {
       const lam = lamOf([bx, bz]);
@@ -132,7 +136,7 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     const slot = state === 'open' ? 2 : 0, lampColor = state === 'open' ? 0x30ff80 : 0xff3a2a, bigK = tier === 'arcology' ? 1.6 : 1;
     const panelLamp = (cxp: number, czp: number, pu: [number, number], vv: { dh: number; t: number }, ang: number): void => {
       const lat: [number, number] = [pu[1], -pu[0]], rho = R + vv.t / 2 + 0.034, x = cxp + pu[0] * rho + lat[0] * (slot - 1) * 0.04 * bigK, z = czp + pu[1] * rho + lat[1] * (slot - 1) * 0.04 * bigK;
-      lamps.push({ x, y: baseY + STEM[tier] + vv.dh + 0.047 * bigK, z, w: 0.026 * bigK, h: 0.026 * bigK, d: 0.012, yaw: ang, color: lampColor });
+      lamps.push({ x, y: baseY + STEM[tier] + vv.dh + 0.047 * bigK, z, w: 0.026 * bigK, h: 0.026 * bigK, d: 0.012, yaw: ang, color: lampColor, state: true });
     };
     panelLamp(f.cx, f.cz, u, v, yaw);
     for (const p of persons) panelLamp(f.cx, f.cz, [Math.sin(p.angle), Math.cos(p.angle)], vestibuleOf(tier, R), p.angle);
@@ -146,13 +150,13 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
       const nD = Math.max(2, Math.floor((rI - rP) / 0.16)); for (let k = 0; k < nD; k++) geos.push(mark(F, rP + 0.04 + k * (rI - rP) / nD, rP + 0.04 + k * (rI - rP) / nD + 0.07, -0.01, 0.01, top, PAINT));   // dashed center
       geos.push(mark(F, rI - 0.2, rI - 0.16, -lane.w / 2 + 0.05, lane.w / 2 - 0.05, top, PAINT));                                                                                    // the stop line at the inner gate
       const rg = (rI + rP) / 2; geos.push(mark(F, rg - 0.05, rg + 0.05, -lane.w / 2 + 0.05, lane.w / 2 - 0.05, top, DARK, 0.005));                                                       // the drain grate
-      for (let k = 0; k < 6; k++) geos.push(mark(F, rg - 0.045 + k * 0.018, rg - 0.038 + k * 0.018, -lane.w / 2 + 0.05, lane.w / 2 - 0.05, top, STEEL, 0.007));
+      for (let k = 0; k < 3; k++) geos.push(mark(F, rg - 0.045 + k * 0.036, rg - 0.038 + k * 0.018, -lane.w / 2 + 0.05, lane.w / 2 - 0.05, top, STEEL, 0.007));
       for (const s of [-1, 1] as const) { const [x, z] = at(rI - 0.25, s * (lane.w / 2 + 0.06)); lamps.push({ x, y: yPad + 0.04, z, w: 0.03, h: 0.012, d: 0.03, yaw, color: accent }); }  // lane marker lights
     }
     // ── a landing, canopy, sign and bollards at every person airlock (the main one is on the apron; the arcology's second stands alone) ──
     persons.forEach((p, i) => {
       const a = p.angle, pu: [number, number] = [Math.sin(a), Math.cos(a)], PF: Fr = { cx: f.cx, cz: f.cz, u: pu };
-      const w = tier === 'arcology' ? 0.46 : 0.3, dp = tier === 'arcology' ? 1.3 : 0.7;
+      const w = tier === 'arcology' ? 1.3 : 0.3, dp = tier === 'arcology' ? 2.6 : 0.7;
       const yl = ground(...(([f.cx + pu[0] * (R - 1), f.cz + pu[1] * (R - 1)]) as [number, number])) + 0.012;
       if (!(i === 0 && f.person)) {   // (the main person door's landing is the apron)
         const yEnd = Math.min(yl + 0.06, Math.max(yl - 0.06, ground(f.cx + pu[0] * (R + dp), f.cz + pu[1] * (R + dp)) + 0.02));
@@ -163,27 +167,30 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
         for (const s of [-1, 1] as const) { const [bx, bz] = P(PF, R + dp - 0.1, s * (w - 0.06)); geos.push(cyl(0.018, 0.12, bx, top(R + dp - 0.1) + 0.06, bz, STEEL), cyl(0.021, 0.03, bx, top(R + dp - 0.1) + 0.095, bz, YELLOW)); }
       }
       // the canopy over the door: two posts and a steel roof plate with a lit sign strip, so the door reads from the road
-      const cw = (tier === 'arcology' ? 0.9 : 0.5), ch = (tier === 'arcology' ? 0.78 : 0.5), cd = 0.38 * (tier === 'arcology' ? 1.6 : 1);
+      const cw = (tier === 'arcology' ? 2.6 : 0.5), ch = (tier === 'arcology' ? 1.5 : 0.5), cd = 0.38 * (tier === 'arcology' ? 3.2 : 1);
       for (const s of [-1, 1] as const) { const [qx, qz] = P(PF, R + cd - 0.03, s * (cw / 2 - 0.02)); geos.push(cyl(0.012 * (tier === 'arcology' ? 1.6 : 1), ch, qx, ground(qx, qz) + ch / 2, qz, STEEL)); }
       const [rx, rz] = P(PF, R + cd / 2, 0); geos.push(box(cw, 0.022, cd, rx, ground(rx, rz) + ch, rz, a, clad));
       const [sx, sz] = P(PF, R + cd - 0.005, 0); lamps.push({ x: sx, y: ground(sx, sz) + ch - 0.012, z: sz, w: cw * 0.8, h: 0.012, d: 0.012, yaw: a, color: accent });
+      if (tier === 'arcology') for (const sg of [-1, 1] as const) { const [mx, mz] = P(PF, R + dp - 0.2, sg * (w - 0.05)); geos.push(cyl(0.02, 1.9, mx, ground(mx, mz) + 0.95, mz, STEEL), box(0.3, 0.05, 0.12, mx, ground(mx, mz) + 1.92, mz, a, DARK)); lamps.push({ x: mx, y: ground(mx, mz) + 1.88, z: mz, w: 0.26, h: 0.02, d: 0.08, yaw: a, color: 0xfff4d8 }); }   // tall floodlight masts
       const [cx2, cz2] = P(PF, R + 0.2, w - 0.02); geos.push(cyl(0.008, 0.32, cx2, ground(cx2, cz2) + 0.16, cz2, DARK), box(0.06, 0.03, 0.045, cx2, ground(cx2, cz2) + 0.33, cz2, a, DARK));   // a camera
       const [kx, kz] = P(PF, R + 0.16, -(w - 0.02)); geos.push(cyl(0.007, 0.16, kx, ground(kx, kz) + 0.08, kz, STEEL), box(0.04, 0.05, 0.03, kx, ground(kx, kz) + 0.17, kz, a, DARK)); lamps.push({ x: kx, y: ground(kx, kz) + 0.18, z: kz, w: 0.016, h: 0.012, d: 0.012, yaw: a, color: 0x40ff90 });   // keypad
     });
   }
   const owned: Array<{ dispose(): void }> = [];
+  let heads: THREE.InstancedMesh | null = null;
   if (geos.length) {
     const merged = mergeGeometries(geos, false); geos.forEach(g => g.dispose());
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.12, flatShading: true, side: THREE.DoubleSide });
-    const m = new THREE.Mesh(merged, mat); m.name = 'vehicle_port_fixtures'; m.matrixAutoUpdate = false; m.updateMatrix(); m.castShadow = true; m.receiveShadow = true;
+    const m = new THREE.Mesh(merged, mat); m.name = 'vehicle_port_fixtures'; m.matrixAutoUpdate = false; m.updateMatrix(); m.castShadow = false; m.receiveShadow = true;
     group.add(m); owned.push(merged, mat);
   }
   if (lamps.length) {
     // (indicator and flood lamps: one instanced box set, unlit so a red lamp stays red; sizes and turns ride in each instance's matrix)
-    const geo = new THREE.BoxGeometry(1, 1, 1), mat = new THREE.MeshBasicMaterial({ toneMapped: false }), heads = new THREE.InstancedMesh(geo, mat, lamps.length), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
-    lamps.forEach((l, i) => { q.setFromEuler(e.set(0, l.yaw, 0)); heads.setMatrixAt(i, m4.compose(new THREE.Vector3(l.x, l.y, l.z), q, new THREE.Vector3(l.w, l.h, l.d))); heads.setColorAt(i, new THREE.Color(l.color)); });
-    heads.instanceMatrix.needsUpdate = true; if (heads.instanceColor) heads.instanceColor.needsUpdate = true; heads.frustumCulled = false; heads.castShadow = false;
-    group.add(heads); owned.push(geo, mat);
+    const geo = new THREE.BoxGeometry(1, 1, 1), mat = new THREE.MeshBasicMaterial({ toneMapped: false }), hm = new THREE.InstancedMesh(geo, mat, lamps.length), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+    lamps.forEach((l, i) => { q.setFromEuler(e.set(0, l.yaw, 0)); hm.setMatrixAt(i, m4.compose(new THREE.Vector3(l.x, l.y, l.z), q, new THREE.Vector3(l.w, l.h, l.d))); hm.setColorAt(i, new THREE.Color(l.color)); });
+    hm.instanceMatrix.needsUpdate = true; if (hm.instanceColor) hm.instanceColor.needsUpdate = true; hm.frustumCulled = false; hm.castShadow = false;
+    heads = hm; group.add(hm); owned.push(geo, mat);
   }
-  return { group, key: portsKey(ins), dispose: () => { for (const o of owned) o.dispose(); } };
+  const setState = (st: PortState): void => { if (!heads) return; lamps.forEach((l, i) => { if (l.state) heads!.setColorAt(i, new THREE.Color(STATE_COLOR[st])); }); if (heads.instanceColor) heads.instanceColor.needsUpdate = true; };
+  return { group, key: portsKey(ins), setState, dispose: () => { for (const o of owned) o.dispose(); } };
 }

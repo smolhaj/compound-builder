@@ -173,6 +173,7 @@ import { isGradedTier } from '../sim/dome/grading';
 import { makeDomePlant, plantKey, type DomePlantFx, type PlantLook } from './fx/DomePlant';
 import { interiorPlan, type Obstacle } from './fx/domeInteriorPlan';
 import { plantLayout } from '../sim/dome/plant';
+import { getDoorLook } from './buildkit/domeBuildings';
 import { makeVehiclePorts, type PortFixtures, type PortInput } from './fx/VehiclePorts';
 import { planToPort, portFrameOf } from '../sim/dome/portRoad';
 import { insideLane, portCycleSeconds, vehicleTail } from '../sim/dome/vehiclePort';
@@ -473,6 +474,8 @@ export class HomesteadWorld {
   private _portKey = '';
   private _ports: PortFixtures | null = null;
   private _portTail: Array<[number, number]> = [];
+  /** QA: set the state lamps of every entrance (green open, amber cycling, red sealed). */
+  setPortState(s: 'open' | 'cycling' | 'sealed'): void { this._ports?.setState(s); }
   private _syncPorts(game: GameState): void {
     const domes = standingDomes(game).filter(d => portFrameOf(d));
     const guarded = guardCount(game) > 0;
@@ -482,7 +485,7 @@ export class HomesteadWorld {
     const pr = planToPort(this._baseRef, domes, (x, z) => this.parcel.height(x, z));
     const ins: PortInput[] = domes.map(d => {
       const f = portFrameOf(d)!;
-      return { id: d.id, tier: d.tier, frame: f, lane: insideLane(f), guarded, persons: d.airlocks.filter(a => !a.role).map(a => ({ angle: a.angle, x: a.x, z: a.z })), state: 'open' as const, baseY: this._built.get(d.id)?.group.position.y ?? this.groundAt(d.x, d.z) };
+      return { id: d.id, tier: d.tier, frame: f, lane: insideLane(f), guarded, persons: d.airlocks.filter(a => !a.role).map(a => ({ angle: a.angle, x: a.x, z: a.z })), state: getDoorLook() === 'sealed' ? 'sealed' as const : 'open' as const, baseY: this._built.get(d.id)?.group.position.y ?? this.groundAt(d.x, d.z) };
     });
     if (this._ports) { this._root.remove(this._ports.group); this._ports.dispose(); this._ports = null; }
     if (ins.length) { const f = makeVehiclePorts(ins, (x, z) => this.groundAt(x, z)); this._root.add(f.group); this._ports = f; }

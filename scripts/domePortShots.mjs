@@ -66,7 +66,7 @@ try {
   if (want('second')) { await pr(E(-(R + 9 * S), 3 * S, 3), E(-R, 0.5 * S, 0), 58); await shot('second-entrance-opposite'); }
   if (want('eye')) {
     // (the delivery truck stops short on this lot's county road whatever a dome does, so the shot stands a truck on the apron by hand)
-    await page.evaluate(async ([x, z, heading]) => { const m = await import('/src/game/props/truckGeometry.ts'); const t = m.buildTruck(); t.position.set(x, window.__cb.world.groundAt(x, z) + 0.04, z); t.rotation.y = heading; window.__cb.ws.scene.add(t); window.__truckProp = t; }, [E(R + 1.1 * S, 0.25 * S, 0)[0], E(R + 1.1 * S, 0.25 * S, 0)[2], (a ? a.angle : 0) + Math.PI]);
+    await page.evaluate(async ([x, z, heading]) => { const m = await import('/src/game/props/truckGeometry.ts'); const t = m.buildTruck(); const THREE = await import('/node_modules/three/build/three.module.js'); const rc = new THREE.Raycaster(new THREE.Vector3(x, 30, z), new THREE.Vector3(0, -1, 0)); const hits = (window.__cb.ws.scene.getObjectByName('vehicle_ports') ? rc.intersectObject(window.__cb.ws.scene.getObjectByName('vehicle_ports'), true) : []); t.position.set(x, hits.length ? hits[0].point.y : window.__cb.world.groundAt(x, z), z); t.rotation.y = heading; window.__cb.ws.scene.add(t); window.__truckProp = t; }, [E(R + 1.1 * S, 0.25 * S, 0)[0], E(R + 1.1 * S, 0.25 * S, 0)[2], (a ? a.angle : 0) + Math.PI]);
     await person(...[E(R + 2.6 * S, 0.9 * S, 0)].map(p => [p[0], p[2]])[0]);
     await frames(2);
     await pr(E(R + 5.2 * S, -1.9 * S, 0.5), [gate[0], 0.3 * S, gate[2]], 58); await shot('eye-at-port-truck-person');
@@ -78,6 +78,8 @@ try {
   }
   const pa = dm.persons[0], pu = pa ? [Math.sin(pa.angle), Math.cos(pa.angle)] : u, pn = [pu[1], -pu[0]];
   const EP = (rho, lam, h) => [dm.x + pu[0] * rho + pn[0] * lam, h, dm.z + pu[1] * rho + pn[1] * lam];   // a point on the person airlock's frame
+  if (want('cycling')) { await set(`cb.world.setPortState('cycling')`); await pr(EP(R + 0.8 * S, 0.0, 0.3 * S), EP(R - 0.2, 0, 0.22 * S), 55); await shot('chamber-person-cycling'); }
+  if (want('sealed-lamp')) { await set(`cb.world.setPortState('sealed')`); await pr(E(R + 1.5 * S, 0.1, 0.32 * S), E(R - 0.6, 0, 0.25 * S), 58); await shot('chamber-port-sealed'); }
   if (want('chamber-person')) { await pr(EP(R + 0.8 * S, 0.0, 0.3 * S), EP(R - 0.2, 0, 0.22 * S), 55); await shot('chamber-person-eye'); }
   if (want('chamber-port')) { await pr(E(R + 1.5 * S, 0.1, 0.32 * S), E(R - 0.6, 0, 0.25 * S), 58); await shot('chamber-port-eye'); }
   const lightsOn = () => page.evaluate(() => window.__cb.game.setState(st => { const g = structuredClone(st.game); g.utilities.lit = ['x']; return { game: g }; }));

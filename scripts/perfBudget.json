@@ -129,15 +129,15 @@
      "loadMsFail": 60000
     },
     "medium": {
-     "drawCalls": 411,
+     "drawCalls": 420,
      "triangles": 788512,
-     "shadowTriangles": 240000,
+     "shadowTriangles": 243000,
      "shadowCasters": 345,
      "heapMB": 105,
      "loadMsFail": 60000
     },
     "high": {
-     "drawCalls": 411,
+     "drawCalls": 420,
      "triangles": 1089251,
      "shadowTriangles": 295000,
      "shadowCasters": 350,
@@ -158,19 +158,19 @@
      "loadMsFail": 60000
     },
     "medium": {
-     "drawCalls": 412,
+     "drawCalls": 423,
      "triangles": 796372,
-     "shadowTriangles": 240000,
+     "shadowTriangles": 244000,
      "shadowCasters": 345,
      "heapMB": 105,
      "loadMsFail": 60000
     },
     "high": {
-     "drawCalls": 412,
+     "drawCalls": 423,
      "triangles": 1097338,
      "shadowTriangles": 295000,
      "shadowCasters": 350,
-     "heapMB": 120,
+     "heapMB": 123,
      "loadMsFail": 60000
     }
    }
