@@ -106,8 +106,9 @@ try {
   if (want('insideperson')) { await person(...[EP(R - 1.5 * S, 0.5 * S, 0)].map(q => [q[0], q[2]])[0]); await frames(2); await pr(EP(R - 1.1 * S, 0.1, 0.45), EP(R + 1.2, 0, 0.3), 62); await shot('inside-person-hatch'); }
   if (want('pick')) {
     await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await frames(2);
-    lap(JSON.stringify(await page.evaluate(async () => { const T = await import('/node_modules/three/build/three.module.js'); const ws = window.__cb.ws, cam = ws.camera, rc = new T.Raycaster(), out = [];
-      for (const [x, y] of [[0, -0.7], [0, -0.45], [-0.5, -0.5], [0, -0.1], [0.5, -0.3]]) { rc.setFromCamera(new T.Vector2(x, y), cam); const h = rc.intersectObjects(ws.scene.children, true).filter(q => q.object.isMesh && q.object.visible)[0]; out.push(h ? [x, y, h.object.name, h.object.material?.name || h.object.userData?.mat, h.object.material?.color?.getHexString?.(), h.distance.toFixed(2)] : [x, y, null]); } return out; })));
+    lap(JSON.stringify(await page.evaluate(async ([W, H]) => { const T = await import('/node_modules/three/build/three.module.js'); const ws = window.__cb.ws, cam = ws.camera, rc = new T.Raycaster(), out = [];
+      for (const [px, py] of [[1030, 465], [1010, 530], [1000, 575], [200, 400]]) { rc.setFromCamera(new T.Vector2(px / W * 2 - 1, 1 - py / H * 2), cam); const hs = rc.intersectObjects(ws.scene.children, true).filter(q => q.object.isMesh && q.object.visible && q.object.material?.type !== 'MeshBasicMaterial' || false).slice(0, 3);
+        out.push(hs.map(h => { let o = h.object, chain = []; while (o && chain.length < 5) { chain.push(o.name || o.type); o = o.parent; } const g = h.object.geometry, col = g.attributes.color, fi = h.faceIndex * 3; return [chain.join('<'), +h.distance.toFixed(2), h.point.toArray().map(v => +v.toFixed(2)), col ? [col.getX(fi), col.getY(fi), col.getZ(fi)].map(v => +v.toFixed(2)) : null, h.object.geometry.index ? 'idx' : 'nonidx', g.attributes.position.count]; })); } return out; }, [W, H])));
   }
   if (want('inside-night')) { await lightsOn(); await set(`cb.store.getState().setTimeOfDay(21.5)`); await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await shot('inside-looking-out-night'); }
   if (want('night')) {

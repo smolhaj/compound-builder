@@ -25,12 +25,13 @@ export function interiorPieces(plan: InteriorPlan, ground: (lx: number, lz: numb
   plan.segs.forEach((s, i) => {
     const y = gy(s.x, s.z) + 0.002;
     const w = s.w ?? PATH_W, lane = w >= LANE_W;
-    pieces.push(box(w, 0.02, s.len, s.x, y, s.z, s.rot, lane ? 0x6f6c68 : 0x8f846f, 0, 0, 0, 0.16, i));
-    for (const k of [-1, 1]) pieces.push(box(0.022, 0.028, s.len, s.x, y, s.z, s.rot, 0x5f5a50, k * (w / 2 + 0.006), 0, 0, 0.1, i + 7));
+    if (lane) return;   // (the vehicle lane is the entrance complex's own poured lane, fx/VehiclePorts: a second one drawn here floated in slabs over it)
+    pieces.push(box(w, 0.02, s.len, s.x, y, s.z, s.rot, lane ? 0x6f6c68 : 0x8e9094, 0, 0, 0, 0.16, i));
+    for (const k of [-1, 1]) pieces.push(box(0.022, 0.028, s.len, s.x, y, s.z, s.rot, 0x5a5d62, k * (w / 2 + 0.006), 0, 0, 0.1, i + 7));
   });
   if (plan.plaza) {
-    const g = new THREE.CylinderGeometry(plan.plaza.r, plan.plaza.r, 0.02, 28); g.translate(plan.plaza.x, gy(plan.plaza.x, plan.plaza.z) + 0.012, plan.plaza.z); pieces.push(col(g, 0x9a8f7a));
-    const ring = new THREE.CylinderGeometry(plan.plaza.r + 0.03, plan.plaza.r + 0.03, 0.026, 28); ring.translate(plan.plaza.x, gy(plan.plaza.x, plan.plaza.z) + 0.008, plan.plaza.z); pieces.push(col(ring, 0x5f5a50));
+    const g = new THREE.CylinderGeometry(plan.plaza.r, plan.plaza.r, 0.02, 28); g.translate(plan.plaza.x, gy(plan.plaza.x, plan.plaza.z) + 0.012, plan.plaza.z); pieces.push(col(g, 0x969a9d));
+    const ring = new THREE.CylinderGeometry(plan.plaza.r + 0.03, plan.plaza.r + 0.03, 0.026, 28); ring.translate(plan.plaza.x, gy(plan.plaza.x, plan.plaza.z) + 0.008, plan.plaza.z); pieces.push(col(ring, 0x5a5d62));
   }
   for (const b of plan.benches) {
     const y = gy(b.x, b.z), { len, dep, seat, back } = BENCH;
