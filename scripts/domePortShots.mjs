@@ -72,6 +72,7 @@ try {
     if (want('yardduct')) { const e = w(Y.pts.eye2), l = w(Y.pts.wall); await pr([e[0], 0.3, e[1]], [l[0], 0.2, l[1]], 62); await shot('yard-intake-duct'); }
     if (want('yardwide')) { const e = w(Y.pts.mid), l = w(Y.pts.stack); await pr([e[0], 0.45, e[1]], [l[0], 0.15, l[1]], 70); await shot('yard-wide'); }
   }
+  if (process.env.NOCOVER) { await set(`cb.world.cover.setAmount(0)`); await frames(2); }
   if (want('shellclean')) { for (const [k, nm] of [[Math.PI, 'a'], [2.2, 'b']]) { const ia = a.angle + k, iu = [Math.sin(ia), Math.cos(ia)], inn = [iu[1], -iu[0]]; await pr([dm.x + iu[0] * (R + 2.2) + inn[0] * 1.1, 0.5, dm.z + iu[1] * (R + 2.2) + inn[1] * 1.1], [dm.x + iu[0] * R, 0.3, dm.z + iu[1] * R], 55); await shot('shell-base-clean-' + nm); } }
   if (want('closeup')) { await pr(E(R + 6.5 * S, -3.5 * S, 2.2 * S), gate, 52); await shot('port-closeup'); }
   if (want('second')) { await pr(E(-(R + 9 * S), 3 * S, 3), E(-R, 0.5 * S, 0), 58); await shot('second-entrance-opposite'); }
@@ -127,6 +128,37 @@ try {
       { const e = w(Y.up), l = w(Y.mid); await pr([e[0], 5.2, e[1]], [l[0], 1.5, l[1]], 55); await shot(`yard-roof-${st}-above`); }
     }
     await set(`cb.world.setYardRoofLook(null)`);
+  }
+  if (want('yardwalls')) {
+    // the yard roof sealed: closer poses on the wall tops (inner wall against the shell, both ends) and low angles from outside, to prove one level plane with no gaps
+    const Y = await page.evaluate(async ([t, r, rot]) => { const m = await import('/src/sim/dome/plantYard.ts'); const g = m.yardGeometry(t, r, rot); const P = (u, v) => m.yardPoint(g, u, v); return { W: g.W, D: g.D, c: P(0, g.D / 2), a: P(-0.3 * g.W, g.D + 4), b: P(0.5 * g.W + 3.5, g.D * 0.5), eL: P(-0.5 * g.W - 3, g.D * 0.2), inn0: P(0.42 * g.W, 0), inn1: P(-0.42 * g.W, 0), out: P(0, g.D + 0.3), far: P(0, -3) }; }, [dm.tier, R, ROT]);
+    const w = q => [dm.x + q[0], dm.z + q[1]];
+    for (const st of (process.env.ROOFS || 'closed').split(',')) {
+      await set(`cb.world.setYardRoofLook('${st}')`); await frames(3);
+      { const e = w(Y.a), l = w(Y.c); await pr([e[0], 0.35, e[1]], [l[0], 1.5, l[1]], 60); await shot(`yard-roof-${st}-low-outside-north`); }
+      { const e = w(Y.b), l = w(Y.c); await pr([e[0], 0.3, e[1]], [l[0], 1.5, l[1]], 60); await shot(`yard-roof-${st}-low-outside-end`); }
+      { const e = w(Y.far), l = w(Y.out); await pr([e[0], 3.2, e[1]], [l[0], 1.2, l[1]], 62); await shot(`yard-roof-${st}-inner-wall-from-dome-side`); }
+      { const e = w(Y.eL), l = w(Y.c); await pr([e[0], 1.6, e[1]], [l[0], 1.4, l[1]], 55); await shot(`yard-roof-${st}-oblique`); }
+    }
+    await set(`cb.world.setYardRoofLook(null)`);
+  }
+  if (want('spikescan')) {
+    // every thin triangle near the shell base (world space, radius within 1.2 of the shell, up to 0.9 above the stem): material, aspect (2*area / longest edge^2), normal y, vertices relative to the dome centre
+    const out = await page.evaluate(async ([cx, cz, R]) => { const T = await import('/node_modules/three/build/three.module.js'); const rows = [];
+      window.__cb.ws.scene.traverse(o => { if (!o.isMesh || !o.geometry?.attributes?.position) return; o.updateWorldMatrix(true, false); const p = o.geometry.attributes.position, ix = o.geometry.index; const n = ix ? ix.count : p.count;
+        for (let i = 0; i + 2 < n; i += 3) { const v = [0, 1, 2].map(k => new T.Vector3().fromBufferAttribute(p, ix ? ix.getX(i + k) : i + k).applyMatrix4(o.matrixWorld)); const tr = new T.Triangle(...v), area = tr.getArea(); if (area < 1e-10) continue;
+          const L = Math.max(v[0].distanceTo(v[1]), v[1].distanceTo(v[2]), v[2].distanceTo(v[0])), q = 2 * area / (L * L); if (q > 0.03) continue;
+          const c = [(v[0].x + v[1].x + v[2].x) / 3 - cx, (v[0].z + v[1].z + v[2].z) / 3 - cz], rr = Math.hypot(c[0], c[1]); if (Math.abs(rr - R) > 1.2) continue;
+          const ymin = Math.min(...v.map(a => a.y)), ymax = Math.max(...v.map(a => a.y)); const gy = window.__cb.world.groundAt(v[0].x, v[0].z); if (ymax - gy > 1.0 || ymax - ymin < 0.03) continue;
+          const nn = new T.Vector3(); tr.getNormal(nn); rows.push({ m: o.name || o.material?.name, q: +q.toFixed(4), L: +L.toFixed(3), ny: +nn.y.toFixed(2), h: +(ymax - ymin).toFixed(3), top: +(ymax - gy).toFixed(3), r: +rr.toFixed(2), a: +Math.atan2(c[0], c[1]).toFixed(2) }); } });
+      const by = {}; for (const r of rows) (by[r.m] ||= []).push(r); return Object.entries(by).map(([k, v]) => [k, v.length, v.sort((a, b) => a.q - b.q).slice(0, 6)]); }, [dm.x, dm.z, dm.r]);
+    for (const o of out) lap(JSON.stringify(o));
+  }
+  if (want('spikeinst')) {
+    // which instanced meshes (grass, scrub, brush) have instances right at the shell base
+    const out = await page.evaluate(async ([cx, cz, R]) => { const T = await import('/node_modules/three/build/three.module.js'); const res = []; const m4 = new T.Matrix4(), v = new T.Vector3();
+      window.__cb.ws.scene.traverse(o => { if (!o.isInstancedMesh) return; let n = 0, ex = null; for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, m4); m4.premultiply(o.matrixWorld); v.setFromMatrixPosition(m4); const rr = Math.hypot(v.x - cx, v.z - cz); if (Math.abs(rr - R) < 1.0) { n++; ex ||= [+(rr - R).toFixed(2), +v.y.toFixed(2), +Math.atan2(v.x - cx, v.z - cz).toFixed(2)]; } } if (n) res.push([o.name || o.parent?.name, o.material?.name, o.count, n, ex, o.geometry.type]); }); return res; }, [dm.x, dm.z, dm.r]);
+    for (const o of out) lap(JSON.stringify(o));
   }
   if (want('hideopen')) {
     await pr(E(R + 1.5 * S, -0.55 * S, 0.3), E(R - 0.1, 0.15 * S, 0.3), 62);

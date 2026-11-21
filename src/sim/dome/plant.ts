@@ -47,6 +47,10 @@ export interface PlantPart {
   onShell?: { theta: number; phi: number };
   /** Stands on the shell's base band, y0 above the base (not above the ground). */
   high?: boolean;
+  /** On the yard's level plane: y0 is measured from the plane (the highest ground inside the yard's footprint), not from the ground, so a roof is one flat plane on sloping land. */
+  lvl?: boolean;
+  /** A wall run: its top is `wallTop` above the yard's level plane whatever the ground does (bottom: the lowest ground under the run, y0 below it), so the wall tops are level. */
+  wallTop?: number;
   /** The plant unit it belongs to (`chiller`, `chiller2`, `air`...): a damaged unit is drawn burned. */
   unit?: string;
   /** Part of the sealed passage (drawn in the cutaway and underground views). */
@@ -103,7 +107,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
   const hasAir = level >= 1, hasWater = loop !== 'none', hasBank = level >= 3;
   const yard = yardGeometry(tier, r, rot);
   const spare = (k: PlantKind): boolean => spares.includes(k);
-  const push = (p: PlantPart): void => { parts.push(p.onShell || p.high ? p : { ...p, color: weather(p.color, p.x, p.z) }); };
+  const push = (p: PlantPart): void => { parts.push(p.onShell || p.high || p.lvl ? p : { ...p, color: weather(p.color, p.x, p.z) }); };
 
   // ── frame helpers ──
   const B = (f: Fr, dx: number, dz: number, w: number, h: number, d: number, color: number, y0 = 0, unit?: string, yaw = 0, extra: Partial<PlantPart> = {}): void => {
@@ -277,9 +281,9 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
     for (const [dx, dz, w, d] of [[0, 0.1, W - 0.14, 0.05], [0, D - 0.1, W - 0.14, 0.05], [-(W - 0.2) / 2, D / 2, 0.05, D - 0.14], [(W - 0.2) / 2, D / 2, 0.05, D - 0.14]] as const) B(Fy, dx, dz, w, 0.075, d, C.cap, 0);
     const pu = g.portal.u;
     B(Fy, pu, 0.5 * D * 0.5, g.portal.w + 0.1, 0.05, D * 0.5, C.conc, 0);                                    // the walkway in from the inner door
-    const seg = (ax: number, az: number, bx: number, bz: number, h: number, th: number, color: number, y0: number): void => {
+    const seg = (ax: number, az: number, bx: number, bz: number, h: number, th: number, color: number, y0: number, top?: number, lvl = false): void => {
       const len = Math.hypot(bx - ax, bz - az); if (len < 1e-4) return;
-      push({ shape: 'box', x: (ax + bx) / 2, z: (az + bz) / 2, y0, w: len, h, d: th, r: 0, rot: Math.atan2(-(bz - az), bx - ax), color });
+      push({ shape: 'box', x: (ax + bx) / 2, z: (az + bz) / 2, y0, w: len, h, d: th, r: 0, rot: Math.atan2(-(bz - az), bx - ax), color, ...(top !== undefined ? { wallTop: top } : {}), ...(lvl ? { lvl: true } : {}) });
     };
     // the arcology's yard is ARMORED AND ROOFED (owner, 2026-11-21): armored walls as tall as the plant, a closed roof, no outside gate (it is entered only from inside, through its own airlock)
     const WALL_H = tier === 'arcology' ? Math.max(1.5, 1.6 * Math.min(s, W / 5.4)) : YARD_H, WALL_C = tier === 'arcology' ? C.armor : C.conc;
@@ -287,7 +291,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       const len = Math.hypot(bx - ax, bz - az), k = Math.max(1, Math.ceil(len / 0.9));
       for (let i = 0; i < k; i++) {
         const x0 = ax + (bx - ax) * i / k, z0 = az + (bz - az) * i / k, x1 = ax + (bx - ax) * (i + 1) / k, z1 = az + (bz - az) * (i + 1) / k;
-        seg(x0, z0, x1, z1, WALL_H + 0.14, YARD_T, WALL_C, -0.14); seg(x0, z0, x1, z1, 0.03, YARD_T + 0.04, C.cap, WALL_H);
+        seg(x0, z0, x1, z1, WALL_H + 0.14, YARD_T, WALL_C, -0.14, tier === 'arcology' ? WALL_H : undefined); seg(x0, z0, x1, z1, 0.03, YARD_T + 0.04, C.cap, WALL_H, undefined, tier === 'arcology');
       }
     };
     const [a0, a1, a2, a3] = [P(-W / 2, 0), P(W / 2, 0), P(W / 2, D), P(-W / 2, D)];
@@ -296,29 +300,31 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
     const gl = P(pu - g.portal.w / 2 - 0.05, 0), gr = P(pu + g.portal.w / 2 + 0.05, 0);
     wallRun(a0[0], a0[1], gl[0], gl[1]); wallRun(gr[0], gr[1], a1[0], a1[1]);
     seg(gl[0], gl[1], gr[0], gr[1], 0.1, YARD_T, C.conc, 0.1 + PORTAL_H);                                       // the lintel over the opening
-    if (tier === 'arcology') seg(gl[0], gl[1], gr[0], gr[1], WALL_H - (0.2 + PORTAL_H), YARD_T, WALL_C, 0.2 + PORTAL_H);      // (armored infill over the lintel up to the roof beam: no strip of sky above the portal)
-    for (const [x, z] of [a0, a1, a2, a3, gl, gr]) push({ shape: 'box', x, z, y0: -0.14, w: 0.16, h: WALL_H + 0.3, d: 0.16, r: 0, rot: g.phi, color: C.cap });
+    if (tier === 'arcology') seg(gl[0], gl[1], gr[0], gr[1], WALL_H - (0.2 + PORTAL_H), YARD_T, WALL_C, 0.2 + PORTAL_H, WALL_H);      // (armored infill over the lintel up to the roof beam: no strip of sky above the portal)
+    if (tier === 'arcology') seg(gl[0], gl[1], gr[0], gr[1], 0.03, YARD_T + 0.04, C.cap, WALL_H, undefined, true);      // (and the same cap on it as on every wall top, so the top of the inner wall has no step)
+    for (const [x, z] of [a0, a1, a2, a3, gl, gr]) push({ shape: 'box', x, z, y0: -0.14, w: 0.16, h: WALL_H + 0.3, d: 0.16, r: 0, rot: g.phi, color: C.cap, ...(tier === 'arcology' ? { wallTop: WALL_H + 0.16 } : {}) });
     if (tier === 'arcology') {
       // the retractable roof (sim/dome/yardRoof.ts): FOUR identical leaves, each W/4 wide and spanning wall to wall across the yard, on a continuous armored perimeter beam that sits on
       // the wall tops. One regular pane grid; every seam (between leaves and over the wall tops) is covered by a gasketed cover plate, so nothing shows through when it is closed.
       // The two inner leaves slide out over the two outer ones (raised a deck's height, resting on them): vent slides them part way (a gasketed gap), open parks them fully.
+      const BL = (f: Fr, dx: number, dz: number, w: number, h: number, d: number, color: number, y0: number, yaw = 0): void => B(f, dx, dz, w, h, d, color, y0, undefined, yaw, { lvl: true });
       const st = o.roof ?? 'closed', y0 = WALL_H + 0.07, GLASS = 0x4c8d96, GASKET = 0x16181a, lw = W / 4, DECK = 0.075;
       const nu = Math.max(1, Math.round(lw / 1.0)), nv = Math.max(2, Math.round(D / 1.0)), cw = lw / nu, cd = D / nv;
       // the perimeter beam: a continuous armored ring on the wall tops that the leaves seal against, and its end caps
-      B(Fy, 0, -0.02, W + 0.2, 0.07, 0.16, C.armor, WALL_H); B(Fy, 0, D + 0.02, W + 0.2, 0.07, 0.16, C.armor, WALL_H);
-      for (const sd of [-1, 1]) B(Fy, sd * (W / 2 + 0.02), D / 2, 0.16, 0.07, D + 0.24, C.armor, WALL_H);
-      for (const sd of [-1, 1]) for (const v of [-0.1, D + 0.1]) B(Fy, sd * (W / 2 + 0.2), v, 0.26, 0.2, 0.2, C.dark, WALL_H - 0.02);   // the drive housings at the rail ends
+      BL(Fy, 0, -0.02, W + 0.2, 0.07, 0.16, C.armor, WALL_H); BL(Fy, 0, D + 0.02, W + 0.2, 0.07, 0.16, C.armor, WALL_H);
+      for (const sd of [-1, 1]) BL(Fy, sd * (W / 2 + 0.02), D / 2, 0.16, 0.07, D + 0.24, C.armor, WALL_H);
+      for (const sd of [-1, 1]) for (const v of [-0.1, D + 0.1]) BL(Fy, sd * (W / 2 + 0.2), v, 0.26, 0.2, 0.2, C.dark, WALL_H - 0.02);   // the drive housings at the rail ends
       const slide = ST_SLIDE[st] * W;
       const leaf = (cu: number, lift: number): void => {
         const yb = y0 + lift;
-        B(Fy, cu, D / 2, lw + 0.04, 0.02, D + 0.04, 0x244b52, yb - 0.012);                                                      // a solid underlay under every leaf: no ground or sky shows through a pane edge
+        BL(Fy, cu, D / 2, lw + 0.04, 0.02, D + 0.04, 0x244b52, yb - 0.012);                                                      // a solid underlay under every leaf: no ground or sky shows through a pane edge
         for (let a = 0; a < nu; a++) for (let b = 0; b < nv; b++) {
           const px = cu - lw / 2 + (a + 0.5) * cw, pv = (b + 0.5) * cd;
-          B(Fy, px, pv, cw, 0.02, cd, GLASS, yb);                                                                                  // the glazed pane, filling its whole cell
-          B(Fy, px, pv, Math.hypot(cw, cd), 0.022, 0.028, C.steel, yb + 0.02, undefined, Math.atan2(cd, cw));                        // its diagonal strut
+          BL(Fy, px, pv, cw, 0.02, cd, GLASS, yb);                                                                                  // the glazed pane, filling its whole cell
+          BL(Fy, px, pv, Math.hypot(cw, cd), 0.022, 0.028, C.steel, yb + 0.02, Math.atan2(cd, cw));                        // its diagonal strut
         }
-        for (let a = 0; a <= nu; a++) B(Fy, cu - lw / 2 + a * cw, D / 2, 0.05, 0.045, D, C.armor, yb);                              // the mullions along the leaf (a bar over every pane edge)
-        for (let b = 0; b <= nv; b++) B(Fy, cu, b * cd, lw, 0.045, 0.05, C.armor, yb);                                               // and across it
+        for (let a = 0; a <= nu; a++) BL(Fy, cu - lw / 2 + a * cw, D / 2, 0.05, 0.045, D, C.armor, yb);                              // the mullions along the leaf (a bar over every pane edge)
+        for (let b = 0; b <= nv; b++) BL(Fy, cu, b * cd, lw, 0.045, 0.05, C.armor, yb);                                               // and across it
       };
       // inner leaves ride a deck above the outer ones when slid out; the outer leaves stay put over the end bays
       leaf(-3 * W / 8, 0); leaf(3 * W / 8, 0);
@@ -326,9 +332,9 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       leaf(-W / 8 - slide, lift); leaf(W / 8 + slide, lift);
       // the gasketed cover plates over every seam between leaves: a black gasket under an armored strip, full width of the yard
       const seams = slide > 0 ? [-W / 4, W / 4] : [-W / 4, 0, W / 4];
-      for (const u of seams) { B(Fy, u, D / 2, 0.07, 0.02, D, GASKET, y0 - 0.005); B(Fy, u, D / 2, 0.15, 0.03, D + 0.04, C.armor, y0 + 0.045); }
+      for (const u of seams) { BL(Fy, u, D / 2, 0.07, 0.02, D, GASKET, y0 - 0.005); BL(Fy, u, D / 2, 0.15, 0.03, D + 0.04, C.armor, y0 + 0.045); }
       // when slid back, the centre gap is lined with gasket strips on the leaf edges (a gasketed vent) and the parked leaves stand on spacer blocks over the beam
-      if (slide > 0) for (const sd of [-1, 1]) { B(Fy, sd * (W / 8 + slide - lw / 2), D / 2, 0.05, 0.03, D, GASKET, y0 + lift + 0.02); for (const v of [0.05, D - 0.05]) B(Fy, sd * (3 * W / 8), v, lw, DECK - 0.005, 0.06, C.armor, y0 + 0.045); }
+      if (slide > 0) for (const sd of [-1, 1]) { BL(Fy, sd * (W / 8 + slide - lw / 2), D / 2, 0.05, 0.03, D, GASKET, y0 + lift + 0.02); for (const v of [0.05, D - 0.05]) BL(Fy, sd * (3 * W / 8), v, lw, DECK - 0.005, 0.06, C.armor, y0 + 0.045); }
     }
     // the camera mast at the outer corner (with a lamp), and the pad where a tower can stand
     push({ shape: 'cyl', x: g.camera[0], z: g.camera[1], y0: 0, w: 0, h: 0.95, d: 0, r: 0.016, rot: g.phi, color: C.dark });
