@@ -18,7 +18,7 @@ const STEM: Record<DomeTier, number> = { earthen: 0.04, geodesic: 0.06, glass: 0
 export interface PortInput {
   id: string; tier: DomeTier; frame: PortFrame; lane: InsideLane | null; guarded: boolean;
   /** Every person airlock of the dome: where its door stands (on the shell) and its axis angle (the main one beside the port, and the arcology's second). */
-  persons: Array<{ angle: number; x: number; z: number }>;
+  persons: Array<{ angle: number; x: number; z: number; off?: number }>;
   /** The height of the dome's group (its pad level): the doors' sill and the state panels are measured from it. */
   baseY: number;
   /** What the gates say: sealed (red), open (green: the outer gate stands open, the inner one shut). */
@@ -138,12 +138,12 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     for (const lam of [lamA + 0.04, lamB - 0.04]) { const [x, z] = at(R + APRON_LEN - 0.2, lam), y = topA(R + APRON_LEN - 0.2); geos.push(cyl(0.011, 0.48, x, y + 0.24, z, STEEL), box(0.12, 0.02, 0.05, x, y + 0.49, z, yaw, DARK)); lamps.push({ x, y: y + 0.475, z, w: 0.1, h: 0.012, d: 0.04, yaw, color: 0xfff4d8 }); }
     // ── state lamps: the lit window of each door's state panel (red sealed, amber cycling, green open), over the outer face of the port and of every person door ──
     const slot = state === 'open' ? 2 : 0, lampColor = state === 'open' ? 0x30ff80 : 0xff3a2a, bigK = tier === 'arcology' ? 1.6 : 1;
-    const panelLamp = (cxp: number, czp: number, pu: [number, number], vv: { dh: number; t: number }, ang: number): void => {
-      const lat: [number, number] = [pu[1], -pu[0]], rho = R + vv.t / 2 + 0.034, x = cxp + pu[0] * rho + lat[0] * (slot - 1) * 0.04 * bigK, z = czp + pu[1] * rho + lat[1] * (slot - 1) * 0.04 * bigK;
+    const panelLamp = (cxp: number, czp: number, pu: [number, number], vv: { dh: number; t: number }, ang: number, lam = 0): void => {
+      const lat: [number, number] = [pu[1], -pu[0]], rho = R + vv.t / 2 + 0.034, x = cxp + pu[0] * rho + lat[0] * (lam + (slot - 1) * 0.04 * bigK), z = czp + pu[1] * rho + lat[1] * (lam + (slot - 1) * 0.04 * bigK);
       lamps.push({ x, y: baseY + STEM[tier] + vv.dh + 0.047 * bigK, z, w: 0.026 * bigK, h: 0.026 * bigK, d: 0.012, yaw: ang, color: lampColor, state: true });
     };
     panelLamp(f.cx, f.cz, u, v, yaw);
-    for (const p of persons) panelLamp(f.cx, f.cz, [Math.sin(p.angle), Math.cos(p.angle)], vestibuleOf(tier, R), p.angle);
+    for (const p of persons) panelLamp(f.cx, f.cz, [Math.sin(p.angle), Math.cos(p.angle)], vestibuleOf(tier, R), p.angle, p.off ?? 0);
     // ── inside: the poured lane from the inner gate to the pad, level with the dome floor, curbed, striped, with a drain grate ──
     if (lane) {
       const rI = R - v.len, rP = R - v.len - Math.hypot(lane.pad[0] - f.inner[0], lane.pad[1] - f.inner[1]), top = (): number => yPad + 0.004;

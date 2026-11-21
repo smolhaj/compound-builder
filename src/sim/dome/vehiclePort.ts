@@ -95,35 +95,57 @@ function plantSpan(tier: DomeTier, r: number): number {
 }
 
 /**
- * The gap between the port's chamber and the person airlock beside it, in one gate complex (units, PROPOSED). The nav colliders close the shell ring in boxes as wide as one ring step
- * (buildkit/domeBuildings `shellColliders`), and each door's stub runs out as far as one of them: the neighbor's chamber must stand clear of that reach.
+ * The entrance module (owner, 2026-11-21): the person airlock and the vehicle port are two PARALLEL chambers side by side on one baseline, sharing one party wall, with the
+ * outer doors in one plane, the inner doors in line and one roofline. Both axes point the same way (the port's `angle`, radially out from the dome's center); the person chamber
+ * stands `personLateral` to the larger-angle side of the port's axis. The chambers touch (a wall each, no gap), so they cannot overlap inside the dome whatever the radius.
+ * The doors stand in the plane `entryR` (the shell's radius at the far edge of the module), so a little behind the skin where the shell curves away.
  */
-export function complexGap(tier: DomeTier, r: number): number {
+export function personLateral(tier: DomeTier, r: number): number {
+  const v = portVestibule(tier, r);
+  return v && moduleFits(tier, r) ? (v.w + VESTIBULE[tier].w) / 2 : 0;
+}
+/** Does the whole module (the port's chamber and the person's, side by side) fit inside the shell with room for its chambers? A tiny dome keeps the older layout: two radial chambers with a gap. */
+export function moduleFits(tier: DomeTier, r: number): boolean {
+  const v = portVestibule(tier, r);
+  if (!v || tier === 'earthen' || TIER[tier].airlocks < 1) return false;
+  return (v.w + VESTIBULE[tier].w) / 2 + VESTIBULE[tier].w / 2 <= 0.62 * r;
+}
+/** The gap (units) between the chambers of the older radial layout (tiny domes): the nav stubs need a ring step between them. */
+function legacyGap(tier: DomeTier, r: number): number {
   const ring = tier === 'glass' ? 56 : Math.max(24, Math.min(72, Math.round(r * 8)));
   return Math.max(0.2, 2 * Math.PI * r / ring + 0.05);
 }
-/** Angle between the port's axis and the person airlock's axis in the complex (radians): chamber half widths and the gap, over the radius. */
-export function personOffset(tier: DomeTier, r: number): number {
+/** The radius of the module's door plane: the shell's radius at the person chamber's far edge (the whole module then stands inside the skin). */
+export function entryR(tier: DomeTier, r: number): number {
+  if (!moduleFits(tier, r)) return r;
+  const far = personLateral(tier, r) + VESTIBULE[tier].w / 2;
+  return Math.sqrt(Math.max(r * r * 0.25, r * r - far * far));
+}
+/** The angle between the port's axis and the person airlock's axis (radians): zero in the module (the axes are parallel), the old radial offset for a tiny dome. */
+export function personAngleOffset(tier: DomeTier, r: number): number {
   const v = portVestibule(tier, r);
-  return v ? (v.w / 2 + VESTIBULE[tier].w / 2 + complexGap(tier, r)) / r : 0;
+  if (!v || tier === 'earthen' || TIER[tier].airlocks < 1 || moduleFits(tier, r)) return 0;
+  return (v.w / 2 + VESTIBULE[tier].w / 2 + legacyGap(tier, r)) / r;
+}
+/** The angle between the port's axis and the person airlock's door center as seen from the dome's center (a compatibility figure for lanes and arcs). */
+export function personOffset(tier: DomeTier, r: number): number {
+  return moduleFits(tier, r) ? Math.atan2(personLateral(tier, r), entryR(tier, r)) : personAngleOffset(tier, r);
 }
 /**
- * The public entrances of a dome: the main person airlock beside the vehicle port (one gate complex, on the one approach), and, on the arcology, a second person airlock
- * opposite (PROPOSED: the owner wants one entrance, two at most). `port` is the port's axis. The person airlock stands on the larger-angle side of the port.
+ * The public entrances of a dome: the person airlock beside the vehicle port (one module, on the one approach). The arcology has this one entrance only (owner, 2026-11-21: no second
+ * door; the escape tunnel is its sealed, egress-only emergency exit). `port` is the port's axis, which the person chamber shares (it stands at `personLateral` to its side).
  */
 export function personAngles(tier: DomeTier, r: number, port: number): number[] {
   const n = TIER[tier].airlocks;
   if (!n || tier === 'earthen') return [];
-  const out = [port + personOffset(tier, r)];
-  if (n > 1) out.push(port + Math.PI);
-  return out;
+  return [port + personAngleOffset(tier, r)];
 }
 
 /** Every stretch of the shell the gate complex must keep out of (centered on the port's axis; wide enough for the person airlock on either side). */
 export function blockedArcs(c: PortCtx): Arc[] {
   const v = portVestibule(c.tier, c.r);
   if (!v) return [];
-  const out: Arc[] = [], reach = v.w / 2 + personOffset(c.tier, c.r) * c.r + VESTIBULE[c.tier].w / 2;   // widest the complex reaches from the port's axis
+  const out: Arc[] = [], reach = v.w / 2 + personLateral(c.tier, c.r) + VESTIBULE[c.tier].w / 2;   // widest the complex reaches from the port's axis
   const turn = c.rot * Math.PI / 2;
   // the plant yard outside and the plant inside: the spans of the reference frame (glass and arcology)
   const y = yardGeometry(c.tier, c.r, c.rot);
@@ -208,7 +230,8 @@ const at = (cx: number, cz: number, u: Pt, rho: number, lam = 0): Pt => [cx + u[
 /** The frame of the port of the dome at (cx, cz) whose shell has radius r, at `angle`. The earthen dome has only its low door: the frame is that door with a gravel apron (no gates, no lane). */
 export function portFrame(tier: DomeTier, cx: number, cz: number, r: number, angle: number): PortFrame | null {
   const v = portVestibule(tier, r) ?? EARTHEN_DOOR;
-  const u: Pt = [Math.sin(angle), Math.cos(angle)], off = tier === 'earthen' ? 0 : personOffset(tier, r) * r;
+  const u: Pt = [Math.sin(angle), Math.cos(angle)], lat = tier === 'earthen' ? 0 : personLateral(tier, r), r0 = r, off = tier === 'earthen' ? 0 : lat || personAngleOffset(tier, r0) * r0;
+  r = entryR(tier, r0);
   // the apron reaches across the port's door and the person airlock's beside it (the larger-angle side)
   const hw = v.dw / 2 + 0.45 + off / 2;
   const apronC = at(cx, cz, u, r + APRON_LEN / 2, off / 2);
@@ -222,7 +245,7 @@ export function portFrame(tier: DomeTier, cx: number, cz: number, r: number, ang
     apron: { c: apronC, hl: APRON_LEN / 2, hw },
     bollards, camera: at(cx, cz, u, r + 0.35, -(v.cw / 2 + 0.3)), light: at(cx, cz, u, r + 0.35, -(v.cw / 2 + 0.55)), booth: at(cx, cz, u, r + 0.55, -(v.cw / 2 + 0.85)),
     fits: tier !== 'earthen' && vehicleFits(v),
-    person: tier === 'earthen' ? null : (() => { const pa = angle + personOffset(tier, r); return { angle: pa, outer: [cx + Math.sin(pa) * r, cz + Math.cos(pa) * r] as Pt }; })(),
+    person: tier === 'earthen' ? null : lat ? { angle, outer: at(cx, cz, u, r, lat) } : (() => { const pa = angle + personAngleOffset(tier, r0); return { angle: pa, outer: [cx + Math.sin(pa) * r, cz + Math.cos(pa) * r] as Pt }; })(),
   };
 }
 

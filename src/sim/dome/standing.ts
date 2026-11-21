@@ -4,7 +4,7 @@
  * written once. Pure (tested in siege.test.ts); a dome is a structure of a dome kind, so nothing here is saved.
  */
 import { vestibuleOf } from './vestibule';
-import { DEFAULT_BEARING, choosePortAngle, hasVehiclePort, personAngles, portVestibule } from './vehiclePort';
+import { DEFAULT_BEARING, choosePortAngle, entryR, hasVehiclePort, personAngles, personLateral, portVestibule } from './vehiclePort';
 import { CELL_FT, TIER, cellsOfKind, shellFt, tierOfKind, type DomeTier } from './tiers';
 import { isFinished } from '../construction';
 import type { GameState, Structure } from '../state';
@@ -29,6 +29,8 @@ export interface Airlock {
   outX: number; outZ: number; inX: number; inZ: number;
   /** Outside width of the chamber, and the width of each door's opening (world units). */
   w: number; dw: number;
+  /** The person chamber of the entrance module stands this far (world units) to the larger-angle side of the axis `angle` (parallel to the port's, not radial); absent: on the axis. */
+  off?: number;
   /** `link`: a dedicated airlock for a tunnel or walkway to another dome (sim/dome/links.ts), separate from the person airlocks; absent: a person airlock. */
   role?: 'link' | 'vehicle';
   /** The link this airlock serves (role `link`). */
@@ -52,10 +54,13 @@ export interface Dome {
 /** Panels in each tier's shell (a triangulated or gridded skin): what one lost panel is worth of the shell's health. */
 export const PANELS: Record<DomeTier, number> = { earthen: 1, geodesic: 150, glass: 288, arcology: 864 };
 
-/** One airlock at a world angle on a shell of radius `r` centered at (x, z). */
-export function airlockAt(tier: DomeTier, x: number, z: number, r: number, angle: number, index: number): Airlock {
-  const v = vestibuleOf(tier, r), s = Math.sin(angle), c = Math.cos(angle);
-  return { index, angle, x: x + s * r, z: z + c * r, outX: x + s * (r + 0.45), outZ: z + c * (r + 0.45), inX: x + s * (r - v.len), inZ: z + c * (r - v.len), w: v.w, dw: v.dw };
+/**
+ * One airlock on an axis at the world angle `angle` of a shell of radius `r` centered at (x, z). `off` is its lateral offset (the entrance module's person chamber stands beside the
+ * port on a PARALLEL axis); its doors stand in the module's plane `entryR`. Without an offset it is the plain radial airlock.
+ */
+export function airlockAt(tier: DomeTier, x: number, z: number, r: number, angle: number, index: number, off = 0): Airlock {
+  const v = vestibuleOf(tier, r), s = Math.sin(angle), c = Math.cos(angle), rc = off ? entryR(tier, r) : r, vx = c, vz = -s;
+  return { index, angle, ...(off ? { off } : {}), x: x + s * rc + vx * off, z: z + c * rc + vz * off, outX: x + s * (rc + 0.45) + vx * off, outZ: z + c * (rc + 0.45) + vz * off, inX: x + s * (rc - v.len) + vx * off, inZ: z + c * (rc - v.len) + vz * off, w: v.w, dw: v.dw };
 }
 
 /** The port's angle for a dome: the stamp, else the free angle nearest the east (a dome staked before the port existed), keeping clear of the link airlocks. */
@@ -70,7 +75,7 @@ export function portAngleOf(tier: DomeTier, st: Pick<Structure, 'rot' | 'portAng
 export function airlocksOf(tier: DomeTier, x: number, z: number, r: number, rot = 0, port?: number): Airlock[] {
   if (tier === 'earthen') return [airlockAt(tier, x, z, r, rot * Math.PI / 2, 0)];
   const pa = port ?? choosePortAngle({ tier, r, rot }, DEFAULT_BEARING).angle;
-  return personAngles(tier, r, pa).map((a, index) => airlockAt(tier, x, z, r, a, index));
+  return personAngles(tier, r, pa).map((a, index) => airlockAt(tier, x, z, r, a, index, personLateral(tier, r)));
 }
 
 /**
@@ -80,8 +85,8 @@ export function airlocksOf(tier: DomeTier, x: number, z: number, r: number, rot 
 export function vehicleAirlockOf(tier: DomeTier, st: Pick<Structure, 'x' | 'z'>, r: number, angle: number, index: number): Airlock | null {
   const v = portVestibule(tier, r);
   if (!v || !hasVehiclePort(tier)) return null;
-  const s = Math.sin(angle), c = Math.cos(angle);
-  return { index, angle, x: st.x + s * r, z: st.z + c * r, outX: st.x + s * (r + 0.45), outZ: st.z + c * (r + 0.45), inX: st.x + s * (r - v.len), inZ: st.z + c * (r - v.len), w: v.w, dw: v.dw, role: 'vehicle' };
+  const s = Math.sin(angle), c = Math.cos(angle), rc = entryR(tier, r);      // (the doors stand in the entrance module's plane)
+  return { index, angle, x: st.x + s * rc, z: st.z + c * rc, outX: st.x + s * (rc + 0.45), outZ: st.z + c * (rc + 0.45), inX: st.x + s * (rc - v.len), inZ: st.z + c * (rc - v.len), w: v.w, dw: v.dw, role: 'vehicle' };
 }
 
 /** What a raid or a defender counts as an entrance: the gate complex (the main person airlock and the vehicle port, side by side) is ONE; a second person airlock is another. Link airlocks and the plant's service airlock are not public entrances. */
@@ -90,8 +95,7 @@ export function entrancesOf(d: Pick<Dome, 'x' | 'z' | 'r' | 'airlocks' | 'tier'>
   const out: Array<{ angle: number; w: number; complex: boolean }> = [];
   persons.forEach((p, i) => {
     if (i === 0 && veh) {
-      const lo = Math.min(p.angle, veh.angle), hi = Math.max(p.angle, veh.angle);
-      out.push({ angle: (lo + hi) / 2, w: (hi - lo) * d.r + (veh.w + p.w) / 2, complex: true });
+      out.push({ angle: veh.angle + Math.atan2((p.off ?? 0) / 2, entryR(d.tier, d.r)), w: veh.w / 2 + (p.off ?? 0) + p.w / 2, complex: true });      // (one module: from the port's far edge to the person chamber's)
     } else out.push({ angle: p.angle, w: p.w, complex: false });
   });
   if (!persons.length && veh) out.push({ angle: veh.angle, w: veh.w, complex: true });

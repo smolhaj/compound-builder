@@ -46,7 +46,7 @@ const KINDS = (['geodesic', 'glass', 'arcology'] as const).flatMap(t => [kindOfC
 describe('people go through the airlocks of a dome, never through the shell', () => {
   for (const kind of KINDS) {
     it(`${kind}: a raider outside between two airlocks and a defender inside are routed through an airlock gap, with no clipping`, () => {
-      const w = world(kind), nav = boxWorld(grow(w.boxes, BODY)), R = w.airlocks[0] ? Math.hypot(w.airlocks[0].x, w.airlocks[0].z) : w.r;
+      const w = world(kind), nav = boxWorld(grow(w.boxes, BODY)), R = w.R;      // (the shell's radius: the doors stand a little behind it, in the entrance module's plane)
       // the raider starts outside on the far side from every airlock (the middle of two neighbors) and is sent to the middle of the dome
       // (the middle of the shell away from the entrances: opposite the gate complex, or between the arcology's two)
       const a0 = w.airlocks[0].angle, mid = (w.airlocks[1] ? (a0 + w.airlocks[1].angle) / 2 : a0 + Math.PI) + 0.02, out = R + 2;
@@ -69,7 +69,7 @@ describe('people go through the airlocks of a dome, never through the shell', ()
           if ((Math.hypot(q0.x, q0.z) - R) * (Math.hypot(q.x, q.z) - R) < 0) {
             crossings++;
             const near = Math.min(...[...w.airlocks.map(a => [a.x, a.z]), w.port.outer].map(([ax, az]) => Math.hypot(ax - q.x, az - q.z)));
-            expect(near).toBeLessThan(0.8);
+            expect(near).toBeLessThan(0.8 + (w.airlocks[0]?.w ?? 0) / 2);      // (the module is one wide opening: the crossing is within a half chamber of a door)
           }
         }
         prev = { x: p.x, z: p.z };
@@ -82,12 +82,12 @@ describe('people go through the airlocks of a dome, never through the shell', ()
     it(`${kind}: the chamber is a hollow room: in through the outer door, across the chamber, out the inner door, both ways, with no clip`, () => {
       const w = world(kind), nav = boxWorld(grow(w.boxes, BODY)), a = w.airlocks[0];
       // the chamber's middle is open floor; a spot beside it, through the side wall, is not
-      const midR = (Math.hypot(a.x, a.z) + Math.hypot(a.inX, a.inZ)) / 2, s = Math.sin(a.angle), c = Math.cos(a.angle);
-      expect(nav.solid(s * midR, c * midR)).toBe(false);
+      const mx = (a.x + a.inX) / 2, mz = (a.z + a.inZ) / 2;      // (the person chamber stands beside the port on a parallel axis)
+      expect(nav.solid(mx, mz)).toBe(false);
       for (const dir of [1, -1]) {
         const out = { x: a.outX, z: a.outZ }, inn = { x: 0.1, z: 0.1 };
         const from = dir === 1 ? out : inn, to = dir === 1 ? inn : out;
-        const via = { x: s * midR, z: c * midR };   // (through the chamber's middle: the dome has other doors beside it now)
+        const via = { x: mx, z: mz };   // (through the chamber's middle: the dome has other doors beside it now)
         const b: Battle = { night: false, duration: 60, units: [unit('r0', 'raider', from.x, from.z)], events: [{ t: 1, kind: 'move', unit: 'r0', x: via.x, z: via.z }, { t: 20, kind: 'move', unit: 'r0', x: to.x, z: to.z }, { t: 60, kind: 'end', result: 'repelled' }] };
         const r = routeBattle(b, nav);
         expect(r.unrouted).toBe(0);

@@ -69,9 +69,9 @@ export function wallBoxes(ax: number, az: number, bx: number, bz: number, thick:
 }
 
 /** The walls of one chamber as nav colliders: two side walls, the inner door's two stubs, and the outer door's two stubs flanking the opening. The doors themselves and the room between them are open. */
-export function chamberColliders(r: number, angle: number, v: Vestibule, reach: number | readonly [number, number] = SURROUND_PAD): Box[] {
+export function chamberColliders(r: number, angle: number, v: Vestibule, reach: number | readonly [number, number] = SURROUND_PAD, off = 0): Box[] {
   const { outer, inner } = chamberRho(r, v), half = v.cw / 2 + v.t / 2, out: Box[] = [];
-  const P = (rho: number, lam: number) => chamberPoint(angle, rho, lam);
+  const P = (rho: number, lam: number) => chamberPoint(angle, rho, lam + off);      // (`off`: the person chamber of the entrance module stands beside the port on a parallel axis)
   for (const s of [-1, 1]) {
     const a = P(inner, s * half), b = P(outer, s * half);
     out.push(...wallBoxes(a[0], a[1], b[0], b[1], v.t));
