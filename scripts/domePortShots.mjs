@@ -48,6 +48,7 @@ try {
   lap(JSON.stringify(info));
   await frames(4);
   const dm = await page.evaluate(async id => { const s = await import('/src/sim/dome/standing.ts'); const d = s.domesOf(window.__cb.game.getState().game).find(x => x.id === id); const a = d.airlocks.find(l => l.role === 'vehicle'); return { r: d.r, x: d.x, z: d.z, a: a ? { angle: a.angle, x: a.x, z: a.z, inX: a.inX, inZ: a.inZ } : null, persons: d.airlocks.filter(l => !l.role).map(l => ({ angle: l.angle, x: l.x, z: l.z })), tier: d.tier }; }, info.id);
+  dm.half = await page.evaluate(async c => c * (await import('/src/game/buildkit/kit.ts')).CELL / 2 - 0.03, +KIND.match(/_(\d+)$/)[1]);
   lap(JSON.stringify(dm));
   const gd = (x, z) => page.evaluate(([x, z]) => window.__cb.world.groundAt(x, z), [x, z]);
   const poseRaw = (e, l, fov = 60) => page.evaluate(([e, l, fov]) => { window.__cb.qa.pose = { x: e[0], y: e[1], z: e[2], lx: l[0], ly: l[1], lz: l[2], fov }; }, [e, l, fov]);
@@ -64,12 +65,14 @@ try {
   }
   const lightsOn = () => page.evaluate(() => window.__cb.game.setState(st => { const g = structuredClone(st.game); g.utilities.lit = ['x']; return { game: g }; }));
   if (want('intake')) {
-    for (const [k, nm] of [[Math.PI, 'a'], [2.2, 'b'], [-2.2, 'c']]) {
-      const ia = a.angle + k, iu = [Math.sin(ia), Math.cos(ia)], inn = [iu[1], -iu[0]];
+    const IA = await page.evaluate(async ([p, es, r, h]) => (await import('/src/sim/dome/intake.ts')).intakeAngles(p, es, r, h), [a.angle, [a.angle, ...dm.persons.map(q => q.angle)], R, dm.half]);
+    lap('intake angles ' + JSON.stringify(IA));
+    for (const [ia, nm] of IA.map((q, i) => [q, 'abc'[i]])) {
+      const iu = [Math.sin(ia), Math.cos(ia)], inn = [iu[1], -iu[0]];
       for (const [d, tag] of [[1.4, 'close'], [3.2, 'mid']]) await pr([dm.x + iu[0] * (R + d) + inn[0] * d * 0.5, 0.45 + d * 0.15, dm.z + iu[1] * (R + d) + inn[1] * d * 0.5], [dm.x + iu[0] * R, 0.3, dm.z + iu[1] * R], 55), await shot(`intake-${nm}-${tag}`);
     }
   }
-  if (want('intake-night')) { await lightsOn(); await set(`cb.store.getState().setTimeOfDay(21.5)`); const ia = a.angle + Math.PI, iu = [Math.sin(ia), Math.cos(ia)]; await pr([dm.x + iu[0] * (R + 1.6) + iu[1] * 0.7, 0.55, dm.z + iu[1] * (R + 1.6) - iu[0] * 0.7], [dm.x + iu[0] * R, 0.3, dm.z + iu[1] * R], 55); await shot('intake-night'); }
+  if (want('intake-night')) { await lightsOn(); await set(`cb.store.getState().setTimeOfDay(21.5)`); const ia = (await page.evaluate(async ([p, es, r, h]) => (await import('/src/sim/dome/intake.ts')).intakeAngles(p, es, r, h)[0], [a.angle, [a.angle, ...dm.persons.map(q => q.angle)], R, dm.half])), iu = [Math.sin(ia), Math.cos(ia)]; await pr([dm.x + iu[0] * (R + 1.6) + iu[1] * 0.7, 0.55, dm.z + iu[1] * (R + 1.6) - iu[0] * 0.7], [dm.x + iu[0] * R, 0.3, dm.z + iu[1] * R], 55); await shot('intake-night'); }
   if (want('closeup')) { await pr(E(R + 6.5 * S, -3.5 * S, 2.2 * S), gate, 52); await shot('port-closeup'); }
   if (want('second')) { await pr(E(-(R + 9 * S), 3 * S, 3), E(-R, 0.5 * S, 0), 58); await shot('second-entrance-opposite'); }
   if (want('eye')) {

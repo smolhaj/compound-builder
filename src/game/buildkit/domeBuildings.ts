@@ -19,6 +19,7 @@ import { CELL_FT, TIER, tierOfKind, type DomeTier } from '../../sim/dome/tiers';
 import { airlockAngles } from '../../sim/dome/standing';
 import { digState } from '../../sim/dome/dig';
 import type { BuildLayer } from './shell';
+import { intakeAngles } from '../../sim/dome/intake';
 import { DEFAULT_BEARING, choosePortAngle, personAngles, portVestibule } from '../../sim/dome/vehiclePort';
 
 /** The public entrances of a dome in its own frame (turn 0): the person airlock(s) of the gate complex and the vehicle port beside them (sim/dome/vehiclePort.ts). */
@@ -451,11 +452,7 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
   for (const h of doors.holes) airlock(p, tier, R, h, doors, y0);
   if (tier === 'arcology') {     // sealed filtered emergency intakes, spaced round the skirt and clear of every entrance
     p.layer = 'walls';
-    const clear = (a: number) => doors.holes.every(h => Math.abs(Math.atan2(Math.sin(a - h.a), Math.cos(a - h.a))) > 0.55);
-    const half = def.cellsX * CELL / 2 - 0.03, slack = (a: number) => half / Math.max(Math.abs(Math.sin(a)), Math.abs(Math.cos(a))) - R;      // room to the footprint's edge at angle a
-    for (const k of [2.2, Math.PI, -2.2]) {                // (each slides to the nearest angle that clears the entrances and keeps the stack inside the footprint)
-      for (const d of [0, 0.15, -0.15, 0.3, -0.3, 0.45, -0.45, 0.6, -0.6, 0.8, -0.8]) { const a = ent.port + k + d; if (clear(a) && slack(a) >= 0.4) { intakeStack(p, R, y0, a); break; } }
-    }
+    for (const a of intakeAngles(ent.port, doors.holes.map(h => h.a), R, def.cellsX * CELL / 2 - 0.03)) intakeStack(p, R, y0, a);
   }
   // colliders: the shell ring as short boxes, none at the airlocks (people cross only through them), and the chamber walls
   shellColliders(p, R, Math.max(24, Math.min(72, Math.round(R * 8))), doors);

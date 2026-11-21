@@ -22,3 +22,15 @@ export function intakeAir(air: { co2ppm: number; o2pct: number }, hrs: number): 
   const f = freshAir(), k = 1 - (1 - INTAKE.PULL) ** Math.max(0, hrs);
   return { co2ppm: Math.min(air.co2ppm, air.co2ppm + (f.co2ppm - air.co2ppm) * k), o2pct: Math.max(air.o2pct, air.o2pct + (f.o2pct - air.o2pct) * k) };
 }
+
+/**
+ * Where the arcology's sealed intake stacks stand on its skirt: three, spread round the shell from the vehicle port, each slid to the nearest angle that clears every
+ * entrance (`entranceAngles`) and leaves `room` of footprint beyond the shell (`half` is the footprint's half-width, `r` the shell radius, both in world units).
+ */
+export function intakeAngles(port: number, entranceAngles: readonly number[], r: number, half: number, room = 0.4): number[] {
+  const clear = (a: number): boolean => entranceAngles.every(e => Math.abs(Math.atan2(Math.sin(a - e), Math.cos(a - e))) > 0.55);
+  const slack = (a: number): number => half / Math.max(Math.abs(Math.sin(a)), Math.abs(Math.cos(a))) - r;
+  const out: number[] = [];
+  for (const k of [2.2, Math.PI, -2.2]) for (const d of [0, 0.15, -0.15, 0.3, -0.3, 0.45, -0.45, 0.6, -0.6, 0.8, -0.8]) { const a = port + k + d; if (clear(a) && slack(a) >= room) { out.push(a); break; } }
+  return out;
+}
