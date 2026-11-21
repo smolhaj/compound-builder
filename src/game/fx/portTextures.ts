@@ -85,3 +85,30 @@ export function worldUVs(g0: THREE.BufferGeometry, tile: number): THREE.BufferGe
   g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
   return g;
 }
+
+/** The entrance signs' atlas: two columns by four rows of 256 x 64 plates with real lettering (white on dark steel, one amber caution). Shared, 512 x 256. */
+export const SIGN_CELLS = ['SALLY PORT', 'VEHICLES ONLY', 'LOCK CYCLE', 'WAIT FOR GREEN', 'ENTRANCE', 'PERSONNEL AIRLOCK', 'SEALED', 'AUTHORIZED ONLY'] as const;
+export type SignCell = number;
+let _signs: THREE.CanvasTexture | null = null;
+export function signAtlas(): THREE.CanvasTexture {
+  if (_signs) return _signs;
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+  const g = c.getContext('2d')!;
+  SIGN_CELLS.forEach((txt, i) => {
+    const x = (i % 2) * 256, y = Math.floor(i / 2) * 64, amber = txt === 'WAIT FOR GREEN' || txt === 'SEALED';
+    g.fillStyle = amber ? '#d9a21e' : '#1d242c'; g.fillRect(x, y, 256, 64);
+    g.strokeStyle = amber ? '#1d242c' : '#cfd6dc'; g.lineWidth = 3; g.strokeRect(x + 4, y + 4, 248, 56);
+    g.fillStyle = amber ? '#1d242c' : '#f2f5f7'; g.font = 'bold 30px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    let fs = 30; while (g.measureText(txt).width > 220 && fs > 12) { fs -= 2; g.font = `bold ${fs}px sans-serif`; }
+    g.fillText(txt, x + 128, y + 34);
+    g.fillStyle = amber ? '#1d242c' : '#9aa4ad'; for (const bx of [12, 244]) for (const by of [12, 52]) { g.beginPath(); g.arc(x + bx, y + by, 2.2, 0, Math.PI * 2); g.fill(); }   // bolts
+  });
+  _signs = new THREE.CanvasTexture(c); _signs.colorSpace = THREE.SRGBColorSpace; _signs.anisotropy = 4;
+  return _signs;
+}
+/** A plate quad of cell `cell` (0..7) as a plane in the XY plane facing +z, sized w by h. */
+export function signQuad(cell: number, w: number, h: number): THREE.BufferGeometry {
+  const g = new THREE.PlaneGeometry(w, h), u0 = (cell % 2) * 0.5, v0 = 1 - (Math.floor(cell / 2) + 1) * 0.25, uv = g.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + uv.getX(i) * 0.5, v0 + uv.getY(i) * 0.25);
+  return g;
+}

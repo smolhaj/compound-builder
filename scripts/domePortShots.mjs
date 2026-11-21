@@ -103,7 +103,11 @@ try {
   if (want('gateclose')) { await pr(E(R + 1.5 * S, -0.55 * S, 0.3), E(R - 0.1, 0.15 * S, 0.3), 62); await shot('gate-close-eye'); }
   if (want('gatelow')) { await pr(E(R + 1.0 * S, 0.5 * S, 0.1), E(R - 0.1, -0.1, 0.35), 70); await shot('gate-low-angle'); }
   if (want('airlockclose')) { await pr(EP(R + 0.9 * S, -0.3 * S, 0.3), EP(R - 0.1, 0.05, 0.28), 62); await shot('person-airlock-close'); }
-  if (want('insideperson')) { await person(...[EP(R - 1.5 * S, 0.5 * S, 0)].map(q => [q[0], q[2]])[0]); await frames(2); await pr(EP(R - 1.1 * S, 0.1, 0.45), EP(R + 1.2, 0, 0.3), 62); await shot('inside-person-hatch'); }
+  if (want('insideperson') || want('hatchclose')) {
+    const lenP = await page.evaluate(async ([t, r]) => (await import('/src/sim/dome/vestibule.ts')).vestibuleOf(t, r).len, [dm.tier, R]);
+    if (want('insideperson')) { await pr(EP(R - lenP - 1.4 * S, 0.15 * S, 0.45), EP(R - lenP + 0.1, 0, 0.33), 62); await shot('inside-person-hatch-wide'); }
+    if (want('hatchclose')) { await pr(EP(R - lenP - 0.55 * S, 0.1 * S, 0.3), EP(R - lenP + 0.1, 0, 0.3), 58); await shot('inside-person-hatch-close'); }
+  }
   if (want('roofabove')) { await pr(E(R + 2.2 * S, -1.2 * S, 2.6 * S), E(R - 0.3, 0.1, 0.4), 55); await shot('entrance-roof-from-above'); }
   if (want('pick')) {
     await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await frames(2);
