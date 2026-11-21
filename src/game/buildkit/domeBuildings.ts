@@ -444,10 +444,13 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
   const ent = entrancesFor(tier, R, opts.port), doors = new Doorways(ent.persons, tier, R, y0, ent.port);
   // the panels that sit in a doorway window are left out first (the holes grow to cover them), then the struts that run along the hole
   const kept = tris.filter(([A, B, C]) => !doors.takes([V(...A), V(...B), V(...C)]));
+  const ekey = (A: [number, number], B: [number, number]): string => [A, B].map(([r, j]) => `${r}:${j}`).sort().join('|');
+  const bound = new Set<string>();      // every edge of a panel that stays: its frame is never cut, so no pane floats with a bare side next to a doorway
+  for (const [A, B, C] of kept) { bound.add(ekey(A, B)); bound.add(ekey(B, C)); bound.add(ekey(C, A)); }
   const edge = (A: [number, number], B: [number, number]) => {
-    const k = [A, B].map(([r, j]) => `${r}:${j}`).sort().join('|');
+    const k = ekey(A, B);
     if (seen.has(k)) return; seen.add(k);
-    if (doors.cuts(V(...A), V(...B))) return;
+    if (doors.cuts(V(...A), V(...B)) && !bound.has(k)) return;
     p.add(frameMat, strut(V(...A), V(...B), L.strut, seg));
   };
   for (const [A, B, C] of tris) { edge(A, B); edge(B, C); edge(C, A); }
@@ -513,7 +516,10 @@ function glass(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   const kerb: number[] = [];
   for (let m = 0; m < M; m++) { const c = V(P, m), d = V(P, m + 1); if (!doors.takes([c, d, [d[0], y0 + 0.07, d[2]], [c[0], y0 + 0.07, c[2]]])) kerb.push(m); }
   p.layer = 'frame';
-  const bar = (A: Pt3, B: Pt3, sides: number) => { if (!doors.cuts(A, B)) p.add('steel', strut(A, B, L.strut, sides)); };
+  const gk = (A: Pt3, B: Pt3): string => [A, B].map(q => q.map(v => v.toFixed(3)).join(',')).sort().join('|');
+  const bound = new Set<string>();      // the edges of every pane that stays keep their members, so no pane floats with a bare side beside a doorway
+  for (const [i, m] of keptCells) { const c = cell(i, m); for (let q = 0; q < 4; q++) bound.add(gk(c[q], c[(q + 1) % 4])); }
+  const bar = (A: Pt3, B: Pt3, sides: number) => { if (!doors.cuts(A, B) || bound.has(gk(A, B))) p.add('steel', strut(A, B, L.strut, sides)); };
   for (let i = 1; i <= P; i++) for (let m = 0; m < M; m++) bar(V(i, m), V(i, m + 1), 4);                // the parallels
   for (let i = 1; i < P; i++) for (let m = 0; m < M; m++) bar(V(i, m), V(i + 1, m), 4);                 // the meridians
   const top = dir(R - 0.03, th(1) * 0.0, 0, y0);
