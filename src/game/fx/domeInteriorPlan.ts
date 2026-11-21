@@ -90,6 +90,12 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
       if (Math.hypot(x, z) >= r * 0.92 || obstacles.some(o => Math.abs(x - o.x) < o.hx + LANE_W / 2 + 0.03 && Math.abs(z - o.z) < o.hz + LANE_W / 2 + 0.03)) break;
       out.segs.push({ x, z, rot: Math.atan2(sx, sz), len: STEP + 0.01, w: LANE_W });
     }
+    // lamp posts down both sides of the lane, every few steps, so the truck lane reads lit and clean at night
+    const px = Math.cos(a), pz = -Math.sin(a);
+    for (let rho = r * 0.8, k = 0; rho > r1 && k < 6; rho -= STEP * 3, k++) for (const side of [-1, 1]) {
+      const x = sx * rho + px * (LANE_W / 2 + 0.12) * side, z = sz * rho + pz * (LANE_W / 2 + 0.12) * side;
+      if (Math.hypot(x, z) < r * 0.93 && !obstacles.some(o => Math.abs(x - o.x) < o.hx + 0.05 && Math.abs(z - o.z) < o.hz + 0.05)) out.lamps.push({ x, z });
+    }
   }
   if (out.plaza) {
     const k = 6, pr = out.plaza.r + 0.2;
