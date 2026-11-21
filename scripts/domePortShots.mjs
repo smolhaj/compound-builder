@@ -85,7 +85,7 @@ try {
   }
   if (want('inside')) {
     await person(...[E(R - len - 1.4, 0.9 * S, 0)].map(p => [p[0], p[2]])[0]);
-    await pr(E(Rd - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await shot('inside-looking-out');
+    await pr(E(R - len - 1.0 * S - (dm.tier === 'arcology' ? 0.4 : 0), 0.1, 1.2), E(R + 1.5, 0, 0.9), 62); await shot('inside-looking-out');
   }
   const pa = dm.persons[0], pu = pa ? [Math.sin(pa.angle), Math.cos(pa.angle)] : u, pn = [pu[1], -pu[0]];
   const EP = (rho, lam, h) => [dm.x + pu[0] * rho + pn[0] * lam, h, dm.z + pu[1] * rho + pn[1] * lam];   // a point on the person airlock's frame
@@ -110,9 +110,9 @@ try {
   }
   if (want('roofabove')) { await pr(E(R + 2.2 * S, -1.2 * S, 2.6 * S), E(R - 0.3, 0.1, 0.4), 55); await shot('entrance-roof-from-above'); }
   if (want('pick')) {
-    await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await frames(2);
+    await pr(E(Rd - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await frames(2);
     lap(JSON.stringify(await page.evaluate(async ([W, H]) => { const T = await import('/node_modules/three/build/three.module.js'); const ws = window.__cb.ws, cam = ws.camera, rc = new T.Raycaster(), out = [];
-      for (const [px, py] of [[575, 470], [575, 300], [1420, 600]]) { rc.setFromCamera(new T.Vector2(px / W * 2 - 1, 1 - py / H * 2), cam); const hs = rc.intersectObjects(ws.scene.children, true).filter(q => q.object.isMesh && q.object.visible && q.object.material?.type !== 'MeshBasicMaterial' || false).slice(0, 3);
+      for (const [px, py] of [[960, 200], [300, 700], [1600, 700], [960, 900]]) { rc.setFromCamera(new T.Vector2(px / W * 2 - 1, 1 - py / H * 2), cam); const hs = rc.intersectObjects(ws.scene.children, true).filter(q => q.object.isMesh && q.object.visible && q.object.material?.type !== 'MeshBasicMaterial' || false).slice(0, 3);
         out.push(hs.map(h => { let o = h.object, chain = []; while (o && chain.length < 5) { chain.push(o.name || o.type); o = o.parent; } const g = h.object.geometry, col = g.attributes.color, fi = h.faceIndex * 3; return [chain.join('<'), +h.distance.toFixed(2), h.point.toArray().map(v => +v.toFixed(2)), 'ground', +window.__cb.world.groundAt(h.point.x, h.point.z).toFixed(3), col ? [col.getX(fi), col.getY(fi), col.getZ(fi)].map(v => +v.toFixed(2)) : null, h.object.geometry.index ? 'idx' : 'nonidx', g.attributes.position.count]; })); } return out; }, [W, H])));
   }
   if (want('inside-night')) { await lightsOn(); await set(`cb.store.getState().setTimeOfDay(21.5)`); await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await shot('inside-looking-out-night'); }
