@@ -98,7 +98,7 @@ function embankment(R: number, ground: (x: number, z: number) => number, top: nu
   const P = (k: number, i: number): Pt3 => {
     const a = (i % n) * TAU / n, r = R + 0.05 + reach[i % n] * k / rings, x = r * Math.sin(a), z = r * Math.cos(a), t = k / rings;
     const lerp = top - (top - (ground(R * Math.sin(a) + 0, R * Math.cos(a) + 0) - 0.0)) * (t * t * (3 - 2 * t));
-    return [x, k === 0 ? top : Math.max(ground(x, z) + 0.004, Math.min(top, lerp)), z];
+    return [x, k === 0 ? top : Math.min(top, Math.max(ground(x, z) + 0.004, lerp)), z];      // (never above the stem's top: where the ground stands higher it is buried, it must not climb the skirt as dark slivers)
   };
   for (let i = 0; i < n; i++) for (let k = 0; k < rings; k++) {
     const A = P(k, i), B = P(k, i + 1), C = P(k + 1, i + 1), D = P(k + 1, i);
@@ -453,7 +453,7 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
     }
     // a continuous armored base ring where the band meets the foundation, and a gasket seam along the band's top where the panels meet it: no gap shows between skin and footing
     p.layer = 'walls';
-    p.add('panel_dark', ringWall(R - 0.03, R + 0.05, y0 + 0.06, () => y0 - 0.03, nWall));
+    p.add('panel_dark', ringWall(R - 0.03, R + 0.016, y0 + 0.06, () => y0 - 0.03, nWall));      // (a narrow ledge: a wide one threw dark shadow slivers up the skirt)
     p.add('panel_dark', ringWall(R - 0.025, R + 0.018, y0 + band + 0.012, () => y0 + band - 0.012, nWall));
     // the crown spire: a mast with a lit tip
     p.layer = 'frame';

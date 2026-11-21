@@ -166,7 +166,8 @@ import { ritualCtx } from './people/ritualGoals';
 import { homeSafety, homeSafetyInput, type HomeSafety } from './atmosphere/homeSafety';
 import { ritualsOf, stanceOf, tableSet } from '../sim/rituals';
 import { bedHour, pickHomeLine } from '../sim/domesticLines';
-import { domeOf, domeLook, domesOf as domesLive } from '../sim/dome/live';
+import { domeOf, domeLook, domesOf as domesLive, yardRoofOf } from '../sim/dome/live';
+import type { RoofState } from '../sim/dome/yardRoof';
 import { TIER, cellsOfKind, shellFt, tierOfKind } from '../sim/dome/tiers';
 import { inYard, yardGeometry } from '../sim/dome/plantYard';
 import { isGradedTier } from '../sim/dome/grading';
@@ -176,7 +177,9 @@ import { plantLayout } from '../sim/dome/plant';
 import { getDoorLook } from './buildkit/domeBuildings';
 import { makeVehiclePorts, type PortFixtures, type PortInput } from './fx/VehiclePorts';
 import { planToPort, portFrameOf } from '../sim/dome/portRoad';
-import { insideLane, portCycleSeconds, vehicleTail } from '../sim/dome/vehiclePort';
+import { insideLane, onApron, portCycleSeconds, vehicleTail, type PortFrame } from '../sim/dome/vehiclePort';
+/** Clear ground round a dome's shell and apron (world units: 2 = 40 ft). */
+const KILL_ZONE = 2.0;
 import { guardCount } from '../sim/guards';
 import { makeLinkFixtures, linksKey, type LinkFixtureInput, type LinkFixtures } from './fx/DomeLinks';
 import { domeFrom, domesOf as standingDomes } from '../sim/dome/standing';
@@ -482,10 +485,11 @@ export class HomesteadWorld {
     const key = domes.map(d => `${d.id}:${d.x},${d.z}:${portFrameOf(d)!.angle.toFixed(3)}`).join('|') + `|${this._baseRef.signature}|${this._drive ? 1 : 0}|${guarded ? 1 : 0}`;
     if (key === this._portKey) return;
     this._portKey = key;
+    { const zk = domes.map(d => portFrameOf(d)!).map(f => `${f.cx.toFixed(2)},${f.cz.toFixed(2)},${f.angle.toFixed(3)}`).join('|'); const had = this._portZones.map(f => `${f.cx.toFixed(2)},${f.cz.toFixed(2)},${f.angle.toFixed(3)}`).join('|'); this._portZones = domes.map(d => portFrameOf(d)!); if (zk !== had && this._quality && this._batchDepth === 0) { this._plant(this._quality); this._water(this._quality); } }
     const pr = planToPort(this._baseRef, domes, (x, z) => this.parcel.height(x, z));
     const ins: PortInput[] = domes.map(d => {
       const f = portFrameOf(d)!;
-      return { id: d.id, tier: d.tier, frame: f, lane: insideLane(f), guarded, persons: d.airlocks.filter(a => !a.role).map(a => ({ angle: a.angle, x: a.x, z: a.z, off: a.off })), state: getDoorLook() === 'sealed' ? 'sealed' as const : 'open' as const, baseY: this._built.get(d.id)?.group.position.y ?? this.groundAt(d.x, d.z) };
+      return { id: d.id, tier: d.tier, frame: f, lane: insideLane(f), guarded, roadY: pr ? ((x: number, z: number): number | null => { let best = 0.6, y: number | null = null; for (const p of pr.plan.pts.slice(-40)) { const dd = Math.hypot(p.x - x, p.z - z); if (dd < best) { best = dd; y = p.y; } } return y; }) : undefined, persons: d.airlocks.filter(a => !a.role).map(a => ({ angle: a.angle, x: a.x, z: a.z, off: a.off })), state: getDoorLook() === 'sealed' ? 'sealed' as const : 'open' as const, baseY: this._built.get(d.id)?.group.position.y ?? this.groundAt(d.x, d.z) };
     });
     if (this._ports) { this._root.remove(this._ports.group); this._ports.dispose(); this._ports = null; }
     if (ins.length) { const f = makeVehiclePorts(ins, (x, z) => this.groundAt(x, z)); this._root.add(f.group); this._ports = f; }
@@ -588,7 +592,7 @@ export class HomesteadWorld {
     const dst = domeStateOf(game, ref), hurt: Record<string, 'ok' | 'damaged' | 'down'> = {};
     for (const u of plantUnitsOf(game, ref, dst)) if (u.cond !== 'ok') hurt[u.id] = u.cond;
     const dark = plantFxOf(game, ref, dst).power === 'dark', inter = this._interiorFor(b, game, ref, dst.filtering, dark);
-    const plook: PlantLook = { loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark, interior: inter.plan, interiorKey: inter.key };
+    const plook: PlantLook = { roof: this._roofQA ?? yardRoofOf(game, ref.st.id), loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark, interior: inter.plan, interiorKey: inter.key };
     const key = plantKey(ref.tier, ref.r, dst.filtering, plook), cur = this._domePlants.get(b.placed.id);
     if (cur) cur.setView(this._view);
     if (!cur || cur.key !== key) {
@@ -866,12 +870,22 @@ export class HomesteadWorld {
 
   /** Parcel trees (near, detailed) inside the margin; regional far trees beyond it. */
   /** Is (x, z) in (or within `m` of) a dome's open crater or the moat round its skirt? Trees and ground cover keep out. */
+  /** QA: force the arcology's plant yard roof state for a shot (null: the game's own state, interlocks included). */
+  private _roofQA: RoofState | null = null;
+  setYardRoofLook(s: RoofState | null): void { this._roofQA = s; for (const [, f] of this._domePlants) { this._root.remove(f.group); f.dispose(); } this._domePlants.clear(); }
+  /** The kill zone round every dome (owner, 2026-11-21): no tree, shrub or rock within about 40 ft (2 units) of the shell's base or of the apron and the road's end, so the approach is open ground. */
+  private _portZones: PortFrame[] = [];
+  private _inKillZone(x: number, z: number): boolean {
+    for (const b of this._built.values()) if (b.cover && Math.hypot(x - b.placed.x, z - b.placed.z) < KIT[b.placed.kind].cellsX * CELL / 2 + KILL_ZONE) return true;
+    for (const f of this._portZones) if (onApron(f, x, z, KILL_ZONE)) return true;
+    return false;
+  }
   private _inPit(x: number, z: number, m = 0): boolean { for (const c of this._pitCircles) { const d = Math.hypot(x - c[0], z - c[1]); if (d < c[2] + m && d >= c[3] - m) return true; } return false; }
 
   private _plant(q: Quality): void {
     const margin = TREE_MARGIN;
     const inHome = (x: number, z: number) => x > -margin && x < PARCEL_SIZE + margin && z > -margin && z < PARCEL_SIZE + margin;
-    const blocked = (x: number, z: number) => this.onBuilding(x, z, 0.6, true, true) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5) || this.onPerimeterLine(x, z, 0.25) || this._inPit(x, z, 0.4);
+    const blocked = (x: number, z: number) => this.onBuilding(x, z, 0.6, true, true) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5) || this.onPerimeterLine(x, z, 0.25) || this._inPit(x, z, 0.4) || this._inKillZone(x, z);
     // the home square, then each bought neighbor parcel (its own id range; the home square's ids never change)
     const plantAll = (density: number, block: (x: number, z: number) => boolean) => [
       ...planParcelTrees(this.parcel, { margin, density, blocked: block }),
@@ -1032,7 +1046,7 @@ export class HomesteadWorld {
           continue;
         }
         // rocks: ledges and loose stone, more on the steep and wooded ground (one chance in a few hundred cells)
-        if (rw.rocks.count > 0 && (tone * 997) % 1 < rw.rocks.count / 4000 * (1 + 3 * Math.min(1, (this.parcel.lot ? this.parcel.lotSlope(px, pz) : this.parcel.region.slope(px, pz)) * 4 + s.forest * 0.5) + (this.parcel.lot ? 14 * this.parcel.lot.rock(px, pz) : 0)) && dz > hw + 1.5 && !blocked(px, pz)) {
+        if (rw.rocks.count > 0 && !this._inKillZone(px, pz) && (tone * 997) % 1 < rw.rocks.count / 4000 * (1 + 3 * Math.min(1, (this.parcel.lot ? this.parcel.lotSlope(px, pz) : this.parcel.region.slope(px, pz)) * 4 + s.forest * 0.5) + (this.parcel.lot ? 14 * this.parcel.lot.rock(px, pz) : 0)) && dz > hw + 1.5 && !blocked(px, pz)) {
           const [r0, r1] = rw.rocks.size;
           rocks.push({ x: px, y: this.groundAt(px, pz), z: pz, s: r0 + (r1 - r0) * sR * sR, flat: (tone * 31.7) % 1 < rw.rocks.flat ? 1 : 0, rot, tone: (tone * 13.3) % 1 });
         }
@@ -1431,6 +1445,7 @@ export class HomesteadWorld {
         blocked: (x, z, r, tree) => tree && this.treeClearance(x, z) < r,
       },
       quality: q, season: seasonState.plants, seed: this.parcel.seed,
+      dry: (x, z) => this.onBuilding(x, z, 0.8, true, true),      // (a dome's graded pad, terraces and plant yard are dry ground: the stream ends at their edge)
     });
     // the terrain's damp bank band follows the creek's depth raster; a lot's lake sets its own shore level
     const wb = this.stream.wetBank;
@@ -2720,7 +2735,7 @@ export class HomesteadWorld {
       // the room as the household keeps it tonight (atmosphere/nightLife: up, asleep, on watch, away)
       const room = this.atmos.room(b.placed.id);
       const home = KIT[b.placed.kind].sleeps > 0;
-      const fill = this._view === 'full' ? 0.25 : 0.12;
+      const fill = (this._view === 'full' ? 0.25 : 0.12) * (b.cover ? 0.1 : 1);      // (a dome's warm fill light would wash its own gates and base ring brown from outside by day)
       b.light.intensity = room !== undefined ? fill * (0.3 + 0.7 * this.air.daylight) + room * 1.4 * night * lampScale(this.atmos.warmth) : fill + (home ? (lit ? night * 1.25 : night * 0.25) : night * 0.1);
       if (pick) this._noteLight(cands, b, above);
     }

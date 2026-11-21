@@ -8,7 +8,7 @@
 import { portTextures, portUV, signAtlas, signQuad } from './portTextures';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { APRON_LEN, type InsideLane, type PortFrame } from '../../sim/dome/vehiclePort';
+import { APRON_LEN, apronTop, type InsideLane, type PortFrame } from '../../sim/dome/vehiclePort';
 import type { DomeTier } from '../../sim/dome/tiers';
 import { vestibuleOf } from '../../sim/dome/vestibule';
 
@@ -21,6 +21,8 @@ export interface PortInput {
   persons: Array<{ angle: number; x: number; z: number; off?: number }>;
   /** The height of the dome's group (its pad level): the doors' sill and the state panels are measured from it. */
   baseY: number;
+  /** The road's own surface height at a point near its end (the planned road, sim/dome/portRoad), or null away from it: the apron's top meets it exactly, so the road drives straight on. */
+  roadY?: (x: number, z: number) => number | null;
   /** What the gates say: sealed (red), open (green: the outer gate stands open, the inner one shut). */
   state: 'open' | 'sealed';
 }
@@ -94,7 +96,7 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
   const lamps: Array<{ x: number; y: number; z: number; w: number; h: number; d: number; yaw: number; color: number; state?: boolean }> = [];
   const signs: Array<{ x: number; y: number; z: number; w: number; h: number; yaw: number; cell: number }> = [];
   const signPost = (x: number, z: number, yaw: number, k: number, cells: number[]): void => { const gy = ground(x, z); geos.push(cyl(0.008 * k, (0.14 + 0.1 * cells.length) * k, x, gy + (0.14 + 0.1 * cells.length) * k / 2, z, STEEL)); cells.forEach((c, i) => signs.push({ x, y: gy + (0.1 + 0.1 * (cells.length - i)) * k, z, w: 0.34 * k, h: 0.085 * k, yaw, cell: c })); };
-  for (const { frame: f, lane, tier, persons, state, baseY } of ins) {
+  for (const { frame: f, lane, tier, persons, state, baseY, roadY } of ins) {
     const { u, v } = f, yaw = f.angle, R = f.r, F: Fr = { cx: f.cx, cz: f.cz, u };
     const clad = CLAD[tier], accent = ACCENT[tier];
     const at = (rho: number, lam: number): [number, number] => P(F, rho, lam);
@@ -106,7 +108,12 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     // the top follows the highest ground under each cross-section (never buried, never stretched over a dip), eased so the ramp stays gentle; the skirts close the sides
     const nS = 8, hs: number[] = [];
     for (let k = 0; k <= nS; k++) { const r = R + APRON_LEN * k / nS; let m = -Infinity; for (const l of [lamA, 0, lamB]) m = Math.max(m, ground(...at(r, l))); hs.push(Math.max(m + 0.012, k === 0 ? yPad : -Infinity)); }
-    for (let k = 1; k <= nS; k++) hs[k] = Math.max(hs[k - 1] - 0.05 * APRON_LEN / nS, Math.min(hs[k - 1] + 0.05 * APRON_LEN / nS, hs[k]));   // (at most 5 percent a step)
+    // where the planned road runs on to the apron it sets the height: the apron's top is the road's own surface along the axis (a straight ramp from the sill to the road at the toe, never a
+    // step, never a wall in front of the road); with no planned road (a QA scene) the ground decides, eased to at most 5 percent a step
+    const rY = (k: number): number | null => { const v = roadY?.(...at(R + APRON_LEN * k / nS, 0)); return v === null || v === undefined || !Number.isFinite(v) ? null : v - 0.004; };   // (a hair under the road's own surface, so the gravel runs on over the apron's toe)
+    const toeY = rY(nS);
+    if (toeY !== null) for (let k = 1; k <= nS; k++) hs[k] = apronTop(hs[0], toeY, k, nS);
+    else for (let k = 1; k <= nS; k++) hs[k] = Math.max(hs[k - 1] - 0.05 * APRON_LEN / nS, Math.min(hs[k - 1] + 0.05 * APRON_LEN / nS, hs[k]));   // (at most 5 percent a step)
     const topA = (rho: number): number => { const t = Math.max(0, Math.min(1, (rho - R) / APRON_LEN)) * nS, k = Math.min(nS - 1, Math.floor(t)); return hs[k] + (hs[k + 1] - hs[k]) * (t - k); };
     geos.push(slab(F, R - 0.02, R + APRON_LEN, lamA, lamB, topA, ground, POUR));
     for (const [l0, l1] of [[lamA, lamA + 0.035], [lamB - 0.035, lamB]] as const) geos.push(slab(F, R - 0.02, R + APRON_LEN, l0, l1, r => topA(r) + 0.022, ground, CURB));   // the straight curbs
@@ -121,6 +128,16 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
       if (Math.abs(lam) < v.dw * 0.5 + 0.05 || (f.person && Math.abs(lam - offP) < 0.42)) continue;
       const y = topA(R + APRON_LEN - 0.12);
       geos.push(cyl(0.02, 0.13, bx, y + 0.065, bz, STEEL), cyl(0.023, 0.03, bx, y + 0.1, bz, YELLOW));
+    }
+    // ── the vehicle barrier at the road's end (anti-ram): a second bollard line across the road beyond the apron's toe, a crash-rated boom-gate arm lowered across the lane on two
+    //    armored posts (striped red and white), and a second camera mast on the far side so two cameras and two floodlights cover the apron ──
+    { const re = R + APRON_LEN + 0.16, ye = topA(R + APRON_LEN - 0.02), nB = 7;
+      for (let i = 0; i < nB; i++) { const lam = lamA + 0.05 + (lamB - lamA - 0.1) * i / (nB - 1), [bx, bz] = at(re + 0.12, lam); geos.push(cyl(0.024, 0.2, bx, ye + 0.1, bz, STEEL), cyl(0.027, 0.03, bx, ye + 0.17, bz, YELLOW)); }       // the ram-rated bollard line
+      for (const lam of [lamA + 0.02, lamB - 0.02]) { const [px, pz] = at(re, lam); geos.push(box(0.07, 0.2, 0.07, px, ye + 0.1, pz, yaw, DARK), box(0.08, 0.02, 0.08, px, ye + 0.21, pz, yaw, STEEL)); }   // the armored gate posts
+      const nA = 6, wA = (lamB - lamA - 0.12) / nA;
+      for (let i = 0; i < nA; i++) { const [ax, az] = at(re, lamA + 0.06 + wA * (i + 0.5)); geos.push(box(wA, 0.03, 0.025, ax, ye + 0.15, az, yaw, i % 2 ? 0xe8e8e8 : 0xc23a2e)); }        // the boom arm, striped
+      const [cx2, cz2] = at(R + 0.35, lamB + 0.12); geos.push(cyl(0.012, 0.5, cx2, ground(cx2, cz2) + 0.25, cz2, DARK), box(0.05, 0.035, 0.08, cx2, ground(cx2, cz2) + 0.52, cz2, yaw + 0.5, DARK), cyl(0.008, 0.03, cx2, ground(cx2, cz2) + 0.56, cz2, STEEL));   // the second camera mast
+      lamps.push({ x: cx2, y: ground(cx2, cz2) + 0.5, z: cz2, w: 0.018, h: 0.012, d: 0.012, yaw, color: 0xff4a3a });                                                                                           // its red recording lamp
     }
     // ── the gatehouse: a steel-clad cabin with a window on the gate and a hazard sign, beside the apron ──
     { const [gx, gz] = at(R + 0.62, lamA - 0.3), y = ground(gx, gz);

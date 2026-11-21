@@ -54,7 +54,7 @@ try {
   const poseRaw = (e, l, fov = 60) => page.evaluate(([e, l, fov]) => { window.__cb.qa.pose = { x: e[0], y: e[1], z: e[2], lx: l[0], ly: l[1], lz: l[2], fov }; }, [e, l, fov]);
   const pr = async (e, l, fov = 55) => poseRaw([e[0], (await gd(e[0], e[2])) + e[1], e[2]], [l[0], (await gd(l[0], l[2])) + l[1], l[2]], fov);
   const person = async (x, z) => page.evaluate(async ([x, z]) => { const m = await import('/src/game/HomesteadWorld.ts'); window.__cb.ws.scene.add(m.scaleFigure(x, z, window.__cb.world.groundAt(x, z))); }, [x, z]);
-  await set(`const s = cb.store.getState(); s.setTimeOfDay(${process.env.NIGHT ? 21.5 : 15.5}); s.setBuildingView('full'); s.setSeasonMode?.('summer'); s.setWeatherMode('clear');`);
+  await set(`const s = cb.store.getState(); s.setTimeOfDay(${process.env.NIGHT ? 21.5 : (process.env.TOD || 15.5)}); s.setBuildingView('full'); s.setSeasonMode?.('summer'); s.setWeatherMode('clear');`);
   const a = dm.a, u = a ? [Math.sin(a.angle), Math.cos(a.angle)] : [1, 0], n = [u[1], -u[0]], R = dm.r;
   const E = (rho, lam, h) => [dm.x + u[0] * rho + n[0] * lam, h, dm.z + u[1] * rho + n[1] * lam];   // a point on the port's frame: rho out along its axis, lam across, h above the ground
   const Rd = await page.evaluate(async ([t, r]) => (await import('/src/sim/dome/vehiclePort.ts')).entryR(t, r), [dm.tier, R]);      // (the module's door plane)
@@ -109,11 +109,66 @@ try {
     if (want('hatchclose')) { await pr(EP(R - lenP - 0.55 * S, 0.1 * S, 0.3), EP(R - lenP + 0.1, 0, 0.3), 58); await shot('inside-person-hatch-close'); }
   }
   if (want('roofabove')) { await pr(E(R + 2.2 * S, -1.2 * S, 2.6 * S), E(R - 0.3, 0.1, 0.4), 55); await shot('entrance-roof-from-above'); }
+  if (want('yardinside')) {
+    // inside the armored, roofed plant yard: the roof is hidden for the shot (the building view's cutaway) and the camera stands in the yard
+    await set(`cb.store.getState().setBuildingView('cutaway')`); await frames(2);
+    const Y = await page.evaluate(async ([t, r, rot]) => { const m = await import('/src/sim/dome/plantYard.ts'); const g = m.yardGeometry(t, r, rot); const P = (u, v) => m.yardPoint(g, u, v); return { W: g.W, D: g.D, stack: P(0.24 * g.W, 0.72 * g.D), eye: P(0.24 * g.W + 0.9, 0.72 * g.D + 1.1), wall: P(0.24 * g.W, 0.1), mid: P(0.24 * g.W + 0.5, 0.95 * g.D) }; }, [dm.tier, R, ROT]);
+    const w = q => [dm.x + q[0], dm.z + q[1]];
+    { const e = w(Y.eye), l = w(Y.stack); await pr([e[0], 0.5, e[1]], [l[0], 0.15, l[1]], 60); await shot('yard-inside-intake-valve'); }
+    { const e = w(Y.mid), l = w(Y.wall); await pr([e[0], 0.55, e[1]], [l[0], 0.15, l[1]], 62); await shot('yard-inside-duct-to-collar'); }
+  }
+  if (want('killzone')) { await pr([dm.x - u[0] * R * 0.3 + n[0] * 2, R * 4.2, dm.z - u[1] * R * 0.3 + n[1] * 2], E(R + 2.5, 0, 0), 62); await shot('aerial-kill-zone'); }
+  if (want('roofstates')) {
+    const Y = await page.evaluate(async ([t, r, rot]) => { const m = await import('/src/sim/dome/plantYard.ts'); const g = m.yardGeometry(t, r, rot); const P = (u, v) => m.yardPoint(g, u, v); return { W: g.W, D: g.D, out: P(-0.1 * g.W, g.D + 3.2), outEye: P(0.55 * g.W, g.D + 2.4), mid: P(0, g.D * 0.5), up: P(0.05 * g.W, g.D * 0.5 - 2.0) }; }, [dm.tier, R, ROT]);
+    const w = q => [dm.x + q[0], dm.z + q[1]];
+    for (const st of ['closed', 'vent', 'open']) {
+      await set(`cb.world.setYardRoofLook('${st}')`); await frames(3);
+      { const e = w(Y.outEye), l = w(Y.mid); await pr([e[0], 0.55, e[1]], [l[0], 1.2, l[1]], 62); await shot(`yard-roof-${st}-eye`); }
+      { const e = w(Y.up), l = w(Y.mid); await pr([e[0], 5.2, e[1]], [l[0], 1.5, l[1]], 55); await shot(`yard-roof-${st}-above`); }
+    }
+    await set(`cb.world.setYardRoofLook(null)`);
+  }
+  if (want('hideopen')) {
+    await pr(E(R + 1.5 * S, -0.55 * S, 0.3), E(R - 0.1, 0.15 * S, 0.3), 62);
+    const re = process.env.HIDE || 'bldg_openings';
+    await page.evaluate(re => { const rx = new RegExp(re); window.__cb.ws.scene.traverse(o => { if (o.isMesh && (rx.test(o.name) || rx.test(o.material?.name || ''))) { o.layers.disable(0); o.visible = false; o.frustumCulled = true; o.onBeforeRender = () => {}; } }); window.__hid = []; window.__cb.ws.scene.traverse(o => { if (o.isMesh && rx.test(o.name)) window.__hid.push(o.name); }); }, re); lap('hidden ' + await page.evaluate(() => window.__hid.length)); await page.evaluate(() => { const t = window.__cb.ws.scene; const hide = () => t.traverse(o => { if (o.isMesh && window.__hid.includes(o.name)) o.visible = false; }); hide(); window.__hide = hide; });
+    await frames(2); await shot('hidden-' + re.replace(/[^a-z]/g, ''));
+  }
+  if (want('apronside')) { await pr(E(R + 3.2 * S, -2.6 * S, 0.12), E(R + 1.0 * S, 0, 0.1), 50); await shot('apron-side-on-low'); }
+  if (want('apronback')) { await pr(E(R + 0.9 * S, 0.1, 0.35), E(R + 7 * S, 0, 0.1), 62); await shot('apron-looking-back-down-road'); }
+  if (want('roadeye')) { await pr(E(R + 6.5 * S, 0.0, 0.4), E(R + 0.2, 0, 0.3), 60); await shot('road-to-gate-eye'); }
+  if (want('roofdown')) {
+    const Y = await page.evaluate(async ([t, r, rot]) => { const m = await import('/src/sim/dome/plantYard.ts'); const g = m.yardGeometry(t, r, rot); return { c: g.center }; }, [dm.tier, R, ROT]);
+    await set(`cb.world.setYardRoofLook('closed')`); await frames(3);
+    const c = [Y.c[0] + dm.x, Y.c[1] + dm.z]; await pr([c[0] - 0.01, 9.5, c[1]], [c[0], 0, c[1]], 50); await shot('yard-roof-closed-straight-down');
+    await set(`cb.world.setYardRoofLook(null)`);
+  }
+  if (want('roadinfo')) {
+    lap(JSON.stringify(await page.evaluate(([x, z, ux, uz, R]) => { const w = window.__cb.world, pts = w.plan.pts.slice(-14).map(p => [+((p.x - x) * ux + (p.z - z) * uz - R).toFixed(2), +p.y.toFixed(3), +w.groundAt(p.x, p.z).toFixed(3)]); return { pts, gate: w.groundAt(x + ux * R, z + uz * R), toe: w.groundAt(x + ux * (R + 1.6), z + uz * (R + 1.6)) }; }, [dm.x, dm.z, u[0], u[1], Rd])));
+  }
+  if (want('spikehide')) {
+    const ia = a.angle + 2.2, iu = [Math.sin(ia), Math.cos(ia)], inn = [iu[1], -iu[0]];
+    await pr([dm.x + iu[0] * (R + 2.2) + inn[0] * 1.1, 0.5, dm.z + iu[1] * (R + 2.2) + inn[1] * 1.1], [dm.x + iu[0] * R, 0.3, dm.z + iu[1] * R], 55);
+    for (const re of ['bldg_foundation', 'bldg_frame', 'bldg_walls_steel', 'bldg_walls_panel_dark', 'bldg_walls_lamp|bldg_walls_concrete', 'regional|terrain_skirt|grade']) {
+      await page.evaluate(re => { const rx = new RegExp(re); window.__hide = () => window.__cb.ws.scene.traverse(o => { if (o.isMesh && rx.test(o.name)) o.visible = false; }); if (window.__hi) clearInterval(window.__hi); window.__hi = setInterval(window.__hide, 5); }, re);
+      await page.waitForTimeout(300); await frames(2);
+      const n = await page.evaluate(re => { const rx = new RegExp(re); let c = 0; window.__cb.ws.scene.traverse(o => { if (o.isMesh && rx.test(o.name)) c++; }); return c; }, re);
+      lap(`${re}: ${n} meshes`); await shot('spike-hide-' + re.replace(/[^a-z]/g, '').slice(0, 24));
+    }
+    await page.evaluate(() => { clearInterval(window.__hi); });
+  }
+  if (want('spikegeo')) {
+    lap(JSON.stringify(await page.evaluate(async ([cx, cz]) => { const T = await import('/node_modules/three/build/three.module.js'); const out = [];
+      window.__cb.ws.scene.traverse(o => { if (!o.isMesh || !/^bldg_/.test(o.name) || o.name.startsWith('bldg_stakes')) return; const p = o.geometry.attributes.position; o.updateWorldMatrix(true, false); let n = 0, ex = null;
+        for (let i = 0; i + 2 < p.count; i += 3) { const v = [0, 1, 2].map(k => new T.Vector3().fromBufferAttribute(p, i + k).applyMatrix4(o.matrixWorld)); const area = new T.Triangle(...v).getArea(), ymax = Math.max(...v.map(q => q.y)), ymin = Math.min(...v.map(q => q.y));
+          if (ymax - ymin > 0.04 && ymax - ymin < 0.5 && ymax < 2.1 && ymin > 1.2 && area < 0.02 && Math.hypot(v[0].x - cx, v[0].z - cz) > 6) { n++; ex = ex || [v[0].x - cx, v[0].y, v[0].z - cz, ymax - ymin, area].map(q => +q.toFixed(3)); } }
+        if (n) out.push([o.name, n, ex]); }); return out; }, [dm.x, dm.z])));
+  }
   if (want('pick')) {
-    await pr(E(Rd - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await frames(2);
+    await pr(E(R + 1.5 * S, -0.55 * S, 0.3), E(R - 0.1, 0.15 * S, 0.3), 62); await frames(2);
     lap(JSON.stringify(await page.evaluate(async ([W, H]) => { const T = await import('/node_modules/three/build/three.module.js'); const ws = window.__cb.ws, cam = ws.camera, rc = new T.Raycaster(), out = [];
-      for (const [px, py] of [[960, 200], [300, 700], [1600, 700], [960, 900]]) { rc.setFromCamera(new T.Vector2(px / W * 2 - 1, 1 - py / H * 2), cam); const hs = rc.intersectObjects(ws.scene.children, true).filter(q => q.object.isMesh && q.object.visible && q.object.material?.type !== 'MeshBasicMaterial' || false).slice(0, 3);
-        out.push(hs.map(h => { let o = h.object, chain = []; while (o && chain.length < 5) { chain.push(o.name || o.type); o = o.parent; } const g = h.object.geometry, col = g.attributes.color, fi = h.faceIndex * 3; return [chain.join('<'), +h.distance.toFixed(2), h.point.toArray().map(v => +v.toFixed(2)), 'ground', +window.__cb.world.groundAt(h.point.x, h.point.z).toFixed(3), col ? [col.getX(fi), col.getY(fi), col.getZ(fi)].map(v => +v.toFixed(2)) : null, h.object.geometry.index ? 'idx' : 'nonidx', g.attributes.position.count]; })); } return out; }, [W, H])));
+      for (const [px, py] of [[700, 330], [900, 330], [450, 300]]) { rc.setFromCamera(new T.Vector2(px / W * 2 - 1, 1 - py / H * 2), cam); const hs = rc.intersectObjects(ws.scene.children, true).filter(q => q.object.isMesh && q.object.visible && q.object.material?.type !== 'MeshBasicMaterial' || false).slice(0, 3);
+        out.push(hs.map(h => { let o = h.object, chain = []; while (o && chain.length < 5) { chain.push(o.name || o.type); o = o.parent; } const g = h.object.geometry, col = g.attributes.color, fi = h.faceIndex * 3, mt = h.object.material; return [chain.join('<'), +h.distance.toFixed(2), mt?.color?.getHexString?.(), mt?.map ? 'map' : 'nomap', mt?.emissive?.getHexString?.(), mt?.name, col ? [col.getX(fi), col.getY(fi), col.getZ(fi)].map(v => +v.toFixed(2)) : null, h.object.geometry.index ? 'idx' : 'nonidx', g.attributes.position.count]; })); } return out; }, [W, H])));
   }
   if (want('inside-night')) { await lightsOn(); await set(`cb.store.getState().setTimeOfDay(21.5)`); await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await shot('inside-looking-out-night'); }
   if (want('night')) {

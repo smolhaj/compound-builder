@@ -669,13 +669,16 @@ export interface SiteQuery {
   rule?(kind: string, x: number, z: number): PlaceProblem | null;
 }
 
-export type PlaceProblem = 'cross_slope' | 'needs_house' | 'needs_slope' | 'no_climb' | 'no_creek' | 'no_head' | 'no_water' | 'not_connected' | 'not_on_bank' | 'not_shore' | 'off_parcel' | 'overlaps' | 'pad_clash' | 'pad_over_road' | 'straddles_dome' | 'straddles_skirt' | 'airlock_lane' | 'utility_lane' | 'skirt_too_shallow' | 'earthen_hut' | 'thin_cover' | 'too_deep' | 'too_much_climb' | 'too_steep' | 'water';
+export type PlaceProblem = 'cross_slope' | 'needs_house' | 'needs_slope' | 'no_climb' | 'no_creek' | 'no_head' | 'no_water' | 'not_connected' | 'not_on_bank' | 'not_shore' | 'off_parcel' | 'overlaps' | 'pad_clash' | 'pad_over_road' | 'straddles_dome' | 'straddles_skirt' | 'airlock_lane' | 'utility_lane' | 'skirt_too_shallow' | 'earthen_hut' | 'thin_cover' | 'too_deep' | 'too_much_climb' | 'too_steep' | 'water' | 'water_near_dome';
 
 const levelOf = (d: KitPieceDef) => d.level ?? 'surface';
 /** Do pieces at these levels compete for the same ground? (Bunker rooms go under the yard and houses.) */
 const levelsMeet = (a: KitPieceDef, b: KitPieceDef) => levelOf(a) === 'cover' || levelOf(b) === 'cover' ? levelOf(a) === levelOf(b) : levelOf(a) === 'both' || levelOf(b) === 'both' || levelOf(a) === levelOf(b);
 /** The shell of a dome piece placed at (x, z): a circle inscribed in its square footprint. */
 export const domeCircle = (d: KitPieceDef, x: number, z: number) => ({ x, z, r: d.cellsX * CELL / 2 });
+
+/** How far past a dome's footprint water must stay (world units: the graded pad and terraces, the plant yard and the 40 ft kill zone). */
+export const DOME_WATER_MARGIN = 2.5;
 
 /** Why a piece can't go here (null = it can). Underground pieces also need underground.ts's rules. */
 export function placementProblem(def: KitPieceDef, x: number, z: number, rot: number, site: SiteQuery, placed: readonly Placed[]): PlaceProblem | null {
@@ -718,6 +721,15 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
       if (inside && !site.owned(px, pz)) return 'off_parcel';
       if (inside && !def.waterside && site.water(px, pz)) return 'water';
       if (!below && !cover && site.blocked?.(px, pz)) return 'overlaps';
+    }
+  }
+  // a dome keeps off water by more than its footprint (owner, 2026-11-21): its graded pad and terraces, the plant yard and the 40 ft kill zone reach about this far past the footprint,
+  // so a river or pond that close would run over the earthwork
+  if (round && !below) {
+    const M = DOME_WATER_MARGIN, nn = Math.min(40, Math.ceil((2 * (hx + M)) / 0.3));
+    for (let i = 0; i <= nn; i++) for (let j = 0; j <= nn; j++) {
+      const px = x - hx - M + 2 * (hx + M) * i / nn, pz = z - hz - M + 2 * (hz + M) * j / nn;
+      if (Math.hypot(px - x, pz - z) <= hx + M && site.water(px, pz)) return 'water_near_dome';
     }
   }
   // steepest grade across the footprint along either axis
@@ -772,6 +784,7 @@ export function placementProblem(def: KitPieceDef, x: number, z: number, rot: nu
 export const PROBLEM_TEXT: Record<PlaceProblem, string> = {
   off_parcel: 'Outside your land',
   water: 'In the creek',
+  water_near_dome: 'Too close to water: move the dome or pick another spot (its pad, plant yard and cleared ground need dry land)',
   too_steep: 'Too steep — find flatter ground',
   overlaps: 'Overlaps another building',
   not_connected: 'Start a bunker at a hatch or stairwell, then add rooms wall to wall',
