@@ -624,7 +624,9 @@ export class HomesteadWorld {
     // the plant's equipment is lit at night: a pool of light round every unit (the yard and gallery read as a working place, not a dark plane)
     { const big = plantLayout(ref.tier, ref.r, filtering, { rot: b.placed.rot }).parts.filter(q => !q.onShell && !q.high && q.shape === 'box' && q.h > 0.12 && Math.max(q.w, q.d) > 0.3 && Math.hypot(q.x, q.z) < ref.r * 1.8).sort((p, q) => Math.max(q.w, q.d) - Math.max(p.w, p.d)).slice(0, 8);
       // (the pool lies on the aisle side of each unit, in front of its doors, where the ground shows)
-      for (const q of big) { const d = Math.hypot(q.x, q.z) || 1, m = Math.max(q.w, q.d), off = m / 2 + 0.5; plan.glows.push({ x: q.x - q.x / d * off, z: q.z - q.z / d * off, r: m * 0.7 + 0.45 }); } }
+      for (const q of big) { const d = Math.hypot(q.x, q.z) || 1, m = Math.max(q.w, q.d), off = m / 2 + 0.5; plan.glows.push({ x: q.x - q.x / d * (off + 0.5), z: q.z - q.z / d * (off + 0.5), r: m * 0.8 + 1.1 }); if (plan.lamps.length < 26) plan.lamps.push({ x: q.x - q.x / d * (off + 0.35), z: q.z - q.z / d * (off + 0.35) }); } }
+    // a big dome's working floor is lit like an airtight plant hall: soft wide pools down the aisle in front of the plant (and round the middle), clean and even
+    if (ref.tier === 'arcology') { const yg = yardGeometry(ref.tier, ref.r, b.placed.rot); if (yg) for (const f of [0.35, 0.55, 0.75]) { const x = Math.sin(yg.phi) * ref.r * f, z = Math.cos(yg.phi) * ref.r * f; plan.glows.push({ x, z, r: 2.4 }); plan.lamps.push({ x: x + Math.cos(yg.phi) * 0.9, z: z - Math.sin(yg.phi) * 0.9 }); } }
     const made = { plan, key };
     this._interiorCache.set(b.placed.id, made);
     return made;

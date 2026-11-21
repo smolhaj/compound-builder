@@ -27,6 +27,8 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
   // a lit house throws its light on the lawn round it: the pool is centered a little toward the middle of the dome, so the lit part lies where the ground shows
   // (centered on the house it hides under the floor; lying at porch height it washes the deck to white)
   for (const o of obstacles) if (o.home) { const m = Math.max(o.hx, o.hz), d = Math.hypot(o.x, o.z) || 1, off = Math.min(d, m + 0.4); out.glows.push({ x: o.x - o.x / d * off, z: o.z - o.z / d * off, r: m * 1.5 + 0.35 }); }
+  // a lamp post by every lived-in house (on the side toward the middle of the dome, where its yard and porch usually lie)
+  for (const o of obstacles) if (o.home) { const m = Math.max(o.hx, o.hz) + 0.3, d = Math.hypot(o.x, o.z) || 1; if (d > m) { const x = o.x - o.x / d * m, z = o.z - o.z / d * m; if (free(x, z, 0.05, 1)) out.lamps.push({ x, z }); } }
   const plazaR = Math.min(0.9, r * 0.11);
   const plazaOk = free(0, 0, plazaR + 0.25, 1);
   if (plazaOk) out.plaza = { x: 0, z: 0, r: plazaR };
@@ -53,6 +55,8 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
         if (out.lamps.length < 9 && (b.rho === bs[0].rho || b.rho === bs[2].rho)) out.lamps.push({ x: x + sx * 0.14, z: z + sz * 0.14 });
       }
     }
+    // two lamp posts flank the inner door
+    for (const side of [-1, 1]) { const x = sx * r * 0.86 + px * 0.5 * side, z = sz * r * 0.86 + pz * 0.5 * side; if (free(x, z, 0.05, 0.97)) out.lamps.push({ x, z }); }
     // the door: a crate stack off the lane (a supply drop), a sign on the other side
     const dr = r * 0.82;
     for (const [side, kind] of [[1, 'crate'], [-1, 'sign']] as const) {
@@ -85,6 +89,12 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
       const x = sx * (rho - STEP / 2), z = sz * (rho - STEP / 2);
       if (Math.hypot(x, z) >= r * 0.92 || obstacles.some(o => Math.abs(x - o.x) < o.hx + LANE_W / 2 + 0.03 && Math.abs(z - o.z) < o.hz + LANE_W / 2 + 0.03)) break;
       out.segs.push({ x, z, rot: Math.atan2(sx, sz), len: STEP + 0.01, w: LANE_W });
+    }
+    // lamp posts down both sides of the lane, every few steps, so the truck lane reads lit and clean at night
+    const px = Math.cos(a), pz = -Math.sin(a);
+    for (let rho = r * 0.8, k = 0; rho > r1 && k < 6; rho -= STEP * 3, k++) for (const side of [-1, 1]) {
+      const x = sx * rho + px * (LANE_W / 2 + 0.12) * side, z = sz * rho + pz * (LANE_W / 2 + 0.12) * side;
+      if (Math.hypot(x, z) < r * 0.93 && !obstacles.some(o => Math.abs(x - o.x) < o.hx + 0.05 && Math.abs(z - o.z) < o.hz + 0.05)) out.lamps.push({ x, z });
     }
   }
   if (out.plaza) {
