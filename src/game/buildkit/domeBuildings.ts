@@ -26,7 +26,7 @@ const entrancesFor = (tier: DomeTier, R: number, port: number | undefined): { po
   const p = port ?? choosePortAngle({ tier, r: R, rot: 0 }, DEFAULT_BEARING).angle;
   return { port: p, persons: personAngles(tier, R, p) };
 };
-import { SHELL_INSET, SURROUND_PAD, axisOf, chamberColliders, chamberPoint, chamberRho, ringSkipped, vestibuleOf, type Vestibule } from '../../sim/dome/vestibule';
+import { SHELL_INSET, SURROUND_PAD, axisOf, chamberColliders, chamberRho, vestibuleOf, type Vestibule } from '../../sim/dome/vestibule';
 
 /** World units of berm banked round a dome's shell inside its footprint (the footprint is shell plus berm). */
 const bermU = (t: DomeTier): number => TIER[t].bermFt / (CELL_FT / CELL);

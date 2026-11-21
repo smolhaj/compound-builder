@@ -418,10 +418,10 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
   const hatches = level === 0 ? 1 : 2 + level, theta = 0.3;
   // (the arcology has no roof vent hatches: the plant breathes through the filtered, valved intake and exhaust in its armored yard, nothing opens in the skin)
   if (tier !== 'earthen' && tier !== 'arcology') for (const [i, phi] of phis(hatches, 0.5).entries()) {
-    const [x, z] = polar(r * Math.sin(theta), phi), vc = tier === 'arcology' ? C.armor : C.steel;
+    const [x, z] = polar(r * Math.sin(theta), phi), vc = C.steel;
     parts.push({ shape: 'box', x, z, y0: r * Math.cos(theta), w: 0.5 * s * 0.8, h: 0.1 * s, d: 0.5 * s * 0.8, r: 0, rot: phi, color: vc, onShell: { theta, phi }, unit: 'vents' });
     parts.push({ shape: 'box', x, z, y0: r * Math.cos(theta), w: 0.5 * s * 0.8, h: 0.03 * s, d: 0.36 * s, r: 0, rot: phi, color: C.louver, onShell: { theta, phi }, unit: 'vents' });
-    if (level >= 1 && i % 2 === 0 && tier !== 'arcology') parts.push({ shape: 'cyl', x, z, y0: r * Math.cos(theta), w: 0, h: 0.55 * s, d: 0, r: 0.045 * s, rot: phi, color: C.steel, onShell: { theta, phi }, unit: 'vents' });
+    if (level >= 1 && i % 2 === 0) parts.push({ shape: 'cyl', x, z, y0: r * Math.cos(theta), w: 0, h: 0.55 * s, d: 0, r: 0.045 * s, rot: phi, color: C.steel, onShell: { theta, phi }, unit: 'vents' });
   }
   if (tier !== 'earthen' && tier !== 'arcology') noteUnit('vents', polar(r * Math.sin(theta), 0.5)[0], polar(r * Math.sin(theta), 0.5)[1]);
 
