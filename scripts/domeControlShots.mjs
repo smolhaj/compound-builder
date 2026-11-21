@@ -96,6 +96,18 @@ try {
   if (want('nightbroad')) { await lightsOn(); await set(`cb.store.getState().setTimeOfDay(21.5)`); await at(up(Math.atan2(cbp.cx, cbp.cz) + 2.4, R * 0.7, 1.2), L(0, 0.3, 0), 64); await shot('night-in-long'); }
   if (want('exnight')) { await lightsOn(); await set(`cb.store.getState().setTimeOfDay(21.5)`); await at(up(a ? a.angle + 0.9 : 0.9, R * 2.2, R * 1.5), [C[0], cbp.y0 + 1.2, C[1]], 55); await shot('ex-night-aerial'); }
   if (want('cutbroad')) { await set(`cb.store.getState().setBuildingView('cutaway')`); await at(up(Math.atan2(cbp.cx, cbp.cz) + 0.7, R * 0.95, 2.6), L(0, 0.1, 0.2), 62); await shot('cutaway-whole'); await set(`cb.store.getState().setBuildingView('full')`); }
+  // ── the plan view: straight down over the dome, the yard airlock, the block and the entrance module together ──
+  const planAt = async (h, fov, nm) => { await at([dm.x + 0.05, cbp.y0 + h, dm.z + 0.05], [dm.x, cbp.y0, dm.z], fov); await shot(nm); };
+  if (want('plan')) await planAt(R * 2.1, 62, 'plan-view-overhead');
+  if (want('plancut')) { await set(`cb.store.getState().setBuildingView('cutaway')`); await planAt(R * 2.1, 62, 'plan-view-cutaway'); await set(`cb.store.getState().setBuildingView('full')`); }
+  if (want('plan2') || want('plan3')) {
+    const m = [(cbp.cx * 0.8), (cbp.cz * 0.8)], c = WP(m), toC = [-m[0] / Math.hypot(...m), -m[1] / Math.hypot(...m)];
+    if (want('plan2')) { await at([c[0], cbp.y0 + 3.6, c[1]], [c[0] + toC[0] * 0.5, cbp.y0, c[1] + toC[1] * 0.5], 100); await shot('plan-view-inside-over-gap'); }
+    if (want('plan3')) { await set(`cb.store.getState().setBuildingView('cutaway')`); await at([c[0], cbp.y0 + 3.6, c[1]], [c[0] + toC[0] * 0.5, cbp.y0, c[1] + toC[1] * 0.5], 100); await shot('plan-view-inside-over-gap-cutaway'); await set(`cb.store.getState().setBuildingView('full')`); }
+  }
+  if (want('gap1')) { const yd = cbp.yardDoor, k = 1 - 1.0 / Math.hypot(yd[0], yd[1]), g = WP([yd[0] * k, yd[1] * k]); await at([g[0], cbp.y0 + 0.26, g[1]], L(0, 0.25, hd), 66); await shot('gap-from-yard-airlock'); }
+  if (want('gap2')) { const gd = cbp.gateDoor, k = 4.9 / Math.hypot(gd[0], gd[1]), g = WP([gd[0] * k, gd[1] * k]); await at([g[0], cbp.y0 + 0.26, g[1]], L(0, 0.25, 0), 62); await shot('gap-from-sally-port-person-airlock'); }
+  if (want('gap3')) { const yd = cbp.yardDoor, gd = cbp.gateDoor, m = [(yd[0] + gd[0]) / 2, (yd[1] + gd[1]) / 2], k = 0.55, g = WP([m[0] * k, m[1] * k]); await at([g[0], cbp.y0 + 0.5, g[1]], L(0, 0.25, 0), 80); await shot('gap-wide-from-inside-both-ends'); }
   await page.close();
   }
 } finally { await browser.close(); vite.kill(); }

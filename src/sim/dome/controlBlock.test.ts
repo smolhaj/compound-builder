@@ -39,8 +39,9 @@ describe('the arcology control block plan', () => {
       expect(inBlock(p, p.manifold[0], p.manifold[1], 0.1)).toBe(false);
       const [lx, lz] = toBlock(p, p.landing[0], p.landing[1]);
       expect(Math.abs(lx)).toBeLessThan(0.01); expect(lz).toBeGreaterThan(p.d / 2);
-      // the yard path runs from the yard door in to the ring
-      expect(Math.hypot(p.paths[0][1][0], p.paths[0][1][1])).toBeLessThan(p.ringR + 0.1);
+      // the service strip: the yard path and the entrance path both end at the landing
+      expect(p.paths[0][0]).toEqual(p.yardDoor); expect(p.paths[1][0]).toEqual(p.gateDoor);
+      for (const pl of p.paths) expect(pl[pl.length - 1]).toEqual(p.landing);
       // pipes start at the manifold, end by the block, stay in the dome and never cross the footprint
       for (const run of p.pipes) {
         expect(run.pts[0]).toEqual(p.manifold);
@@ -51,11 +52,23 @@ describe('the arcology control block plan', () => {
       for (const [a, b] of [[-0.9, -0.4], [0.9, 0.4], [0, 0]]) { const lxx = a * p.w / 2, lzz = b * p.d / 2, x = p.cx + lxx * Math.cos(p.yaw) + lzz * Math.sin(p.yaw), z = p.cz - lxx * Math.sin(p.yaw) + lzz * Math.cos(p.yaw); expect(p.colliders.some(c => x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1)).toBe(true); }
     });
   }
-  it('stands between the yard airlock and the entrance in the usual layout', () => {
-    const p = controlBlockPlan('arcology', r, 141 * Math.PI / 180)!;
-    expect(p.between).toBe(true);
-    const yg = yardGeometry('arcology', r, 0)!;
-    expect(Math.abs(p.angle - yg.phi)).toBeGreaterThan(0.3);
+  it('stands in the gap between the yard airlock and the entrance, against the inner wall, whenever the gap is wide enough', () => {
+    const yg = yardGeometry('arcology', r, 0)!, S = Math.atan2(yg.portal.from[0], yg.portal.from[1]);
+    let between = 0;
+    for (const port of ports) {
+      const p = controlBlockPlan('arcology', r, port)!, G = port + Math.atan2(personLateral('arcology', r) / 2, entryR('arcology', r));
+      const wr = (a: number): number => { let d = a % (2 * Math.PI); if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI; return d; };
+      if (!p.between) continue;
+      between++;
+      // its centre is on the shorter arc between the two entrances
+      expect(Math.abs(wr(p.angle - S)) + Math.abs(wr(G - p.angle))).toBeLessThanOrEqual(Math.abs(wr(G - S)) + 1e-6);
+      // and it stands against the inner wall, not out in the lawn: the back face is within 2.2 of the shell
+      expect(r - (p.rho + p.d / 2)).toBeLessThan(2.2);
+    }
+    expect(between).toBeGreaterThanOrEqual(14);      // (the gap is wide enough in most layouts; the rest fall back to the far side)
+    const usual = controlBlockPlan('arcology', r, 141 * Math.PI / 180)!;
+    expect(usual.between).toBe(true);
+    expect(usual.w).toBeGreaterThanOrEqual(4.6);      // (the widest block fits in the usual gap)
   });
   it('turns with the dome: the world plan is the same block rotated', () => {
     const p = controlBlockPlan('arcology', r, 2.1)!, q = turnPlan(p, Math.PI / 2);

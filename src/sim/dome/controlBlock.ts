@@ -69,7 +69,7 @@ const nearSeg = (px: number, pz: number, a: Pt, b: Pt, rad: number): boolean => 
 interface Ctx { tier: DomeTier; r: number; port: number; yardDoor: Pt; er: Pt; manifold: Pt; gateDoor: Pt; gateZone: { u: Pt; lam0: number; lam1: number; u0: number; u1: number }; spoke: [Pt, Pt]; lane: Pt[]; ringR: number }
 
 /** The pieces of the dome's floor the block must keep clear of. */
-function contextOf(tier: DomeTier, r: number, port: number): Ctx | null {
+export function contextOf(tier: DomeTier, r: number, port: number): Ctx | null {
   const yg = yardGeometry(tier, r, 0), f = portFrame(tier, 0, 0, r, port);
   if (!yg || !f) return null;
   const lat = personLateral(tier, r), Re = entryR(tier, r), lane = insideLane(f), pv = vestibuleOf(tier, r), padRho = lane ? Math.hypot(lane.pad[0], lane.pad[1]) : Re - 3.5;
@@ -92,14 +92,14 @@ function blockedBy(c: Ctx, x: number, z: number, extra: readonly Rect[]): boolea
   // lam along (u[1], -u[0]) is x*u[1] - z*u[0]
   if (u > g.u0 && u < g.u1 && lam > g.lam0 && lam < g.lam1) return true;
   if (nearSeg(x, z, c.spoke[0], c.spoke[1], 0.75)) return true;
-  const yd = c.yardDoor, spurEnd: Pt = [yd[0] - c.er[0] * 3.4, yd[1] - c.er[1] * 3.4];
-  if (Math.hypot(x - yd[0], z - yd[1]) < 1.15 || nearSeg(x, z, yd, spurEnd, 0.7)) return true;
+  const yd = c.yardDoor, spurEnd: Pt = [yd[0] - c.er[0] * 1.3, yd[1] - c.er[1] * 1.3];
+  if (Math.hypot(x - yd[0], z - yd[1]) < 1.0 || nearSeg(x, z, yd, spurEnd, 0.55)) return true;
   for (const e of extra) if (x > e.x0 && x < e.x1 && z > e.z0 && z < e.z1) return true;
   return false;
 }
 
 /** Is a block of the given size at (angle, front radius) clear? Sampled on a grid, inflated by the margin. */
-function fits(c: Ctx, w: number, d: number, angle: number, rhoF: number, extra: readonly Rect[]): boolean {
+export function fits(c: Ctx, w: number, d: number, angle: number, rhoF: number, extra: readonly Rect[]): boolean {
   const rc = rhoF + d / 2, p = { cx: Math.sin(angle) * rc, cz: Math.cos(angle) * rc, yaw: angle + Math.PI };
   for (const lx of [-w / 2, w / 2]) for (const lz of [-d / 2, d / 2]) { const [x, z] = loc(p, lx, lz); if (Math.hypot(x, z) > c.r - CB.SHELL_CLEAR) return false; }
   const m = CB.MARGIN, nx = Math.ceil((w + 2 * m) / 0.14), nz = Math.ceil((d + 2 * m) / 0.14);
@@ -127,10 +127,11 @@ export function controlBlockPlan(tier: DomeTier, r: number, port: number, extra:
   const G = port + Math.atan2(personLateral(tier, r) / 2, entryR(tier, r)), T = S + wrap(G - S) / 2;
   // the widest block that fits in the gap goes there (the gap between the two entrances along the inner arc, as close to both as the clearances allow); the compact sizes follow, and
   // only when none fits on that arc does the search look at the far side (`between` false)
-  const sizes: Array<[number, number]> = [[CB.W_MAX, CB.D], [4.6, CB.D], [CB.W, CB.D], [CB.W - 0.4, CB.D - 0.1]];
+  const sizes: Array<[number, number]> = [[CB.W_MAX, 1.7], [4.6, 1.8], [CB.W, CB.D], [CB.W - 0.4, CB.D - 0.1]];
   const span = Math.abs(wrap(G - S)), inArc = (a: number): boolean => Math.abs(wrap(a - S)) + Math.abs(wrap(G - a)) <= span + 1e-6;
   let best: { a: number; rf: number; w: number; d: number; cost: number; between: boolean } | null = null;
-  const rfs = [c.ringR + CB.RING_CLEAR + CB.MARGIN, c.ringR + CB.RING_CLEAR + CB.MARGIN + 0.15, c.ringR + CB.RING_CLEAR + CB.MARGIN + 0.3];
+  // the block stands against the inner wall (its back as near the shell as the clearance allows), tucked into the gap: the largest front radius that fits
+  const rfMin = c.ringR + CB.RING_CLEAR + 0.02, rfs: number[] = []; for (let q = r - CB.SHELL_CLEAR - 1.6; q >= rfMin - 1e-9; q -= 0.1) rfs.push(q);
   for (const onlyBetween of [true, false]) {
     for (const [w, d] of sizes) {
       for (let k = 0; k < 720; k++) {
@@ -138,7 +139,7 @@ export function controlBlockPlan(tier: DomeTier, r: number, port: number, extra:
         if (onlyBetween && !between) continue;
         for (const rf of rfs) {
           if (!fits(c, w, d, a, rf, extra)) continue;
-          const cost = Math.abs(wrap(a - T)) + (rf - rfs[0]) * 0.05;
+          const cost = Math.abs(wrap(a - T)) - (rf - rfMin) * 0.02;
           if (!best || cost < best.cost - 1e-9) best = { a, rf, w, d, cost, between };
           break;      // (the nearest front radius that fits)
         }
@@ -157,10 +158,11 @@ export function controlBlockPlan(tier: DomeTier, r: number, port: number, extra:
   const manifold: Pt = [yd[0] + sideTo[0] * 0.62 + c.er[0] * 0.12, yd[1] + sideTo[1] * 0.62 + c.er[1] * 0.12];
   // footpaths: from the yard door straight in (along -er) to the ring path, and from the ring path to the landing
   const ringR = c.ringR;
-  let t = 0; for (let s = 0; s < 80; s++) { const q = s * 0.05, px = yd[0] - c.er[0] * q, pz = yd[1] - c.er[1] * q; if (Math.hypot(px, pz) <= ringR) { t = q; break; } t = q; }
-  const join: Pt = [yd[0] - c.er[0] * t, yd[1] - c.er[1] * t];
   const ringPt: Pt = [Math.sin(a) * ringR, Math.cos(a) * ringR];
-  const paths: Pt[][] = [[yd, join], [ringPt, landing]];
+  // the service strip: from the yard airlock and from the entrance module's inner door to the block's landing, round the block's front corners (outside the pipe lanes), plus a stub to the ring path
+  const inward = (q: Pt, k: number): Pt => [q[0] * (1 - k / Math.hypot(q[0], q[1])), q[1] * (1 - k / Math.hypot(q[0], q[1]))];
+  const Fy = loc(base, yardSide * (w / 2 + 0.75), d / 2 + 0.4), Fg = loc(base, -yardSide * (w / 2 + 0.55), d / 2 + 0.4);
+  const paths: Pt[][] = [[yd, inward(yd, 0.9), Fy, landing], [c.gateDoor, inward(c.gateDoor, 0.9), Fg, landing], [ringPt, landing]];
   // pipes: three runs from the manifold to the utility wings' outer wall on the yard side (and the climate wing's back wall), in the block's frame first
   const s = yardSide, wx = s * (w / 2 + 0.03), pipes: PipeRun[] = [];
   const bz = (k: number): number => -(d / 2) - 0.12 - 0.09 * k;      // (three lanes behind the block's back wall, nearest first)

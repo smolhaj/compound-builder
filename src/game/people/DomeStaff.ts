@@ -23,18 +23,10 @@ export const SEATS: ReadonlyArray<[number, number]> = [[-0.62, 0.13], [0, 0.13],
 /** The supervisor's place behind the second row, facing the wall of screens. */
 export const SUPERVISOR: [number, number] = [0.3, 0.2];
 
-const wrapA = (a: number): number => { let d = a % (Math.PI * 2); if (d > Math.PI) d -= Math.PI * 2; if (d < -Math.PI) d += Math.PI * 2; return d; };
 
 /** The route a staff member walks: from an airlock's inner door along the footpaths (the ring path between) to the block's landing. `from`: 'yard' or 'gate'. */
 export function routeOf(plan: ControlBlockPlan, from: 'yard' | 'gate'): Pt[] {
-  const R = plan.ringR, a1 = Math.atan2(plan.landing[0], plan.landing[1]);
-  const start = from === 'yard' ? plan.yardDoor : plan.gateDoor;
-  const join: Pt = from === 'yard' ? plan.paths[0][1] : [plan.gateDoor[0] * R / Math.hypot(...plan.gateDoor), plan.gateDoor[1] * R / Math.hypot(...plan.gateDoor)];
-  const a0 = Math.atan2(join[0], join[1]), da = wrapA(a1 - a0), n = Math.max(1, Math.ceil(Math.abs(da) / 0.12));
-  const pts: Pt[] = [start, join];
-  for (let i = 1; i <= n; i++) { const a = a0 + da * i / n; pts.push([Math.sin(a) * R, Math.cos(a) * R]); }
-  pts.push(plan.landing);
-  return pts;
+  return from === 'yard' ? plan.paths[0] : plan.paths[1];
 }
 const lengthOf = (pts: readonly Pt[]): number => { let L = 0; for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); return L; };
 /** The point at distance `s` along a polyline and the heading there. */

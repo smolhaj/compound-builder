@@ -116,7 +116,7 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
     out.control = control;
     for (const pl of control.paths) for (let i = 1; i < pl.length; i++) {
       const [ax, az] = pl[i - 1], [bx, bz] = pl[i], L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / STEP));
-      for (let k = 0; k < n; k++) { const t = (k + 0.5) / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t; if (!obstacles0.some(o => Math.abs(x - o.x) < o.hx + PATH_W / 2 && Math.abs(z - o.z) < o.hz + PATH_W / 2)) out.segs.push({ x, z, rot: Math.atan2(bx - ax, bz - az), len: L / n + 0.01 }); }
+      for (let k = 0; k < n; k++) { const t = (k + 0.5) / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t; if (!nearLane(x, z) && !obstacles0.some(o => Math.abs(x - o.x) < o.hx + PATH_W / 2 && Math.abs(z - o.z) < o.hz + PATH_W / 2)) out.segs.push({ x, z, rot: Math.atan2(bx - ax, bz - az), len: L / n + 0.01 }); }
     }
     const [dx, dz] = control.landing, ux = Math.sin(control.yaw + Math.PI), uz = Math.cos(control.yaw + Math.PI), lx = Math.cos(control.yaw), lz = -Math.sin(control.yaw);
     for (const sd of [-1, 1]) out.lamps.push({ x: dx + lx * 0.5 * sd - ux * 0.0, z: dz + lz * 0.5 * sd });
