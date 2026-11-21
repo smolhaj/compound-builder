@@ -27,7 +27,7 @@ const entrancesFor = (tier: DomeTier, R: number, port: number | undefined): { po
   const p = port ?? choosePortAngle({ tier, r: R, rot: 0 }, DEFAULT_BEARING).angle;
   return { port: p, persons: personAngles(tier, R, p) };
 };
-import { SHELL_INSET, SURROUND_PAD, axisOf, chamberColliders, chamberRho, ringSkipped, vestibuleOf, type Vestibule } from '../../sim/dome/vestibule';
+import { SHELL_INSET, SURROUND_PAD, axisOf, chamberColliders, chamberPoint, chamberRho, ringSkipped, vestibuleOf, type Vestibule } from '../../sim/dome/vestibule';
 
 /** World units of berm banked round a dome's shell inside its footprint (the footprint is shell plus berm). */
 const bermU = (t: DomeTier): number => TIER[t].bermFt / (CELL_FT / CELL);
@@ -334,6 +334,9 @@ function bulkheadFrame(p: Parts, R: number, y0: number, holes: Doorways['holes']
     const edgeA = veh.a - Math.sign(d) * veh.v.w / 2 / R, edgeB = h.a + Math.sign(d) * h.v.w / 2 / R, span = Math.atan2(Math.sin(edgeB - edgeA), Math.cos(edgeB - edgeA));
     const rho = Math.max(chamberRho(R, h.v).outer, chamberRho(R, veh.v).outer) + h.v.t / 2 + 0.016, top = y0 + Math.max(h.v.h, veh.v.h), n = 10, chord = Math.abs(span) * R / n + 0.01;
     p.layer = 'walls';
+    // the wall between the two chambers' outer faces: the same armored skin, from the plinth up to the roof cap, so the two doors read as two openings in one wall
+    { const iA = veh.a + Math.sign(d) * veh.v.w / 2 / R, iB = h.a - Math.sign(d) * h.v.w / 2 / R, sp = Math.atan2(Math.sin(iB - iA), Math.cos(iB - iA)), m = 4, rr = R - SHELL_INSET + 0.017;
+      for (let k = 0; k < m; k++) p.add('panel_steel', box(Math.abs(sp) * R / m + 0.012, top - y0 - 0.02, 0.026, 0, y0, rr).rotateY(iA + sp * (k + 0.5) / m)); }
     for (let k = 0; k < n; k++) {
       const a = edgeA + span * (k + 0.5) / n;
       p.add('panel_dark', box(chord, 0.034, 0.05, 0, top - 0.02, rho).rotateY(a));          // the roof cap
@@ -353,7 +356,13 @@ function shellColliders(p: Parts, R: number, ring: number, doors: Doorways): voi
     p.collide({ x0: x - h * Math.abs(Math.cos(a)) - 0.03, z0: z - h * Math.abs(Math.sin(a)) - 0.03, x1: x + h * Math.abs(Math.cos(a)) + 0.03, z1: z + h * Math.abs(Math.sin(a)) + 0.03 });
   }
   // (the shell ring leaves out every box that reaches the door's window, so the outer door's stubs run as far as those boxes did)
-  for (const g of gaps) p.collide(...chamberColliders(R, g.a, g.v, 2 * Math.PI * R / ring + 0.02));
+  // (a chamber that abuts a neighbor shares the wall with it on that side: its outer stub must stop there, not run on into the neighbor's doorway)
+  const step = 2 * Math.PI * R / ring + 0.02;
+  for (const g of gaps) {
+    const pt = chamberPoint(g.a, R, 0.1), plus = Math.sign(Math.atan2(Math.sin(Math.atan2(pt[0], pt[1]) - g.a), Math.cos(Math.atan2(pt[0], pt[1]) - g.a)));   // which way +lam runs round the shell
+    const abutting = (side: -1 | 1): boolean => gaps.some(o => { if (o === g) return false; const d = Math.atan2(Math.sin(o.a - g.a), Math.cos(o.a - g.a)); return Math.sign(d) === side * plus && Math.abs(d) * R < (o.v.w + g.v.w) / 2 + 0.08; });
+    p.collide(...chamberColliders(R, g.a, g.v, [abutting(-1) ? 0 : step, abutting(1) ? 0 : step]));
+  }
 }
 
 

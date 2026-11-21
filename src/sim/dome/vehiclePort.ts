@@ -98,8 +98,9 @@ function plantSpan(tier: DomeTier, r: number): number {
  * The gap between the port's chamber and the person airlock beside it, in one gate complex (units, PROPOSED). The nav colliders close the shell ring in boxes as wide as one ring step
  * (buildkit/domeBuildings `shellColliders`), and each door's stub runs out as far as one of them: the neighbor's chamber must stand clear of that reach.
  */
-export function complexGap(_tier: DomeTier, _r: number): number {
-  return 0;     // (2026-11-21, owner: the person airlock sits flush against the vehicle port, one housing, no strip of wall between the chambers)
+export function complexGap(tier: DomeTier, r: number): number {
+  const ring = tier === 'glass' ? 56 : Math.max(24, Math.min(72, Math.round(r * 8)));
+  return Math.max(0.2, 2 * Math.PI * r / ring + 0.05);
 }
 /** Angle between the port's axis and the person airlock's axis in the complex (radians): chamber half widths and the gap, over the radius. */
 export function personOffset(tier: DomeTier, r: number): number {

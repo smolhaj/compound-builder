@@ -214,7 +214,7 @@ describe('one entrance: the gate complex (PROPOSED, owner: one entrance, two at 
     for (const t of BIG) for (const ang of [0.3, 2.0, 4.5]) {
       const d = domeFrom(st(t, 0, ang))!, p = d.airlocks.find(a => !a.role)!, v = d.airlocks.find(a => a.role === 'vehicle')!;
       const gap = angDist(p.angle, v.angle) * d.r - (p.w + v.w) / 2;
-      expect(gap).toBeGreaterThanOrEqual(-1e-6); expect(gap).toBeLessThan(0.02);   // (the chambers abut: one housing, no strip of wall between them)
+      expect(gap).toBeGreaterThanOrEqual(0.19);   // (the chambers' nav stubs need this much between them; the kit fills it with one housing wall, see buildkit/domeBuildings bulkheadFrame)
       expect(angDist(p.angle, v.angle) * d.r).toBeLessThan(4);   // (side by side, not on another side of the dome)
       const ent = entrancesOf(d);
       expect(ent.length).toBe(t === 'arcology' ? 2 : 1);

@@ -69,7 +69,7 @@ export function wallBoxes(ax: number, az: number, bx: number, bz: number, thick:
 }
 
 /** The walls of one chamber as nav colliders: two side walls, the inner door's two stubs, and the outer door's two stubs flanking the opening. The doors themselves and the room between them are open. */
-export function chamberColliders(r: number, angle: number, v: Vestibule, reach = SURROUND_PAD): Box[] {
+export function chamberColliders(r: number, angle: number, v: Vestibule, reach: number | readonly [number, number] = SURROUND_PAD): Box[] {
   const { outer, inner } = chamberRho(r, v), half = v.cw / 2 + v.t / 2, out: Box[] = [];
   const P = (rho: number, lam: number) => chamberPoint(angle, rho, lam);
   for (const s of [-1, 1]) {
@@ -78,7 +78,7 @@ export function chamberColliders(r: number, angle: number, v: Vestibule, reach =
     // the two stubs of the inner door and of the outer door, from the door's edge to the side wall
     // (the outer ones run on past the side wall under the surround plate to `reach`, as far as the shell ring's skipped boxes did, so no seam is open)
     for (const rho of [inner, outer]) {
-      const c = P(rho, s * v.dw / 2), d = P(rho, s * (v.cw / 2 + v.t + (rho === outer ? reach : 0)));
+      const rc = typeof reach === 'number' ? reach : reach[s === -1 ? 0 : 1], c = P(rho, s * v.dw / 2), d = P(rho, s * (v.cw / 2 + v.t + (rho === outer ? rc : 0)));
       out.push(...wallBoxes(c[0], c[1], d[0], d[1], v.t));
     }
   }
