@@ -110,7 +110,7 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     geos.push(slab(F, R + APRON_LEN - 0.035, R + APRON_LEN, lamA, lamB, r => topA(r) + 0.012, ground, CURB));                                                                  // and the toe
     geos.push(mark(F, R + 0.05, R + APRON_LEN - 0.12, -0.012, 0.012, topA, YELLOW));                                                    // the center line to the gate
     geos.push(mark(F, R + 0.45, R + 0.5, -v.dw / 2, v.dw / 2, topA, PAINT));                                                           // the stop line before the gate
-    for (let k = 0; k < 5; k++) geos.push(mark(F, R + 0.12 + k * 0.1, R + 0.2 + k * 0.1, lamA + 0.05, lamA + 0.09, topA, YELLOW, 0.005));   // hazard chevrons along the curb
+    for (let k = 0; k < 3; k++) geos.push(mark(F, R + 0.12 + k * 0.1, R + 0.2 + k * 0.1, lamA + 0.05, lamA + 0.09, topA, YELLOW, 0.005));   // hazard chevrons along the curb
     // ── bollards across the apron's mouth, clear of the lanes into the doors ──
     for (const [bx, bz] of f.bollards) {
       const lam = lamOf([bx, bz]);
@@ -150,7 +150,7 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
       const nD = Math.max(2, Math.floor((rI - rP) / 0.16)); for (let k = 0; k < nD; k++) geos.push(mark(F, rP + 0.04 + k * (rI - rP) / nD, rP + 0.04 + k * (rI - rP) / nD + 0.07, -0.01, 0.01, top, PAINT));   // dashed center
       geos.push(mark(F, rI - 0.2, rI - 0.16, -lane.w / 2 + 0.05, lane.w / 2 - 0.05, top, PAINT));                                                                                    // the stop line at the inner gate
       const rg = (rI + rP) / 2; geos.push(mark(F, rg - 0.05, rg + 0.05, -lane.w / 2 + 0.05, lane.w / 2 - 0.05, top, DARK, 0.005));                                                       // the drain grate
-      for (let k = 0; k < 6; k++) geos.push(mark(F, rg - 0.045 + k * 0.018, rg - 0.038 + k * 0.018, -lane.w / 2 + 0.05, lane.w / 2 - 0.05, top, STEEL, 0.007));
+      for (let k = 0; k < 3; k++) geos.push(mark(F, rg - 0.045 + k * 0.036, rg - 0.038 + k * 0.018, -lane.w / 2 + 0.05, lane.w / 2 - 0.05, top, STEEL, 0.007));
       for (const s of [-1, 1] as const) { const [x, z] = at(rI - 0.25, s * (lane.w / 2 + 0.06)); lamps.push({ x, y: yPad + 0.04, z, w: 0.03, h: 0.012, d: 0.03, yaw, color: accent }); }  // lane marker lights
     }
     // ── a landing, canopy, sign and bollards at every person airlock (the main one is on the apron; the arcology's second stands alone) ──
@@ -181,7 +181,7 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
   if (geos.length) {
     const merged = mergeGeometries(geos, false); geos.forEach(g => g.dispose());
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.12, flatShading: true, side: THREE.DoubleSide });
-    const m = new THREE.Mesh(merged, mat); m.name = 'vehicle_port_fixtures'; m.matrixAutoUpdate = false; m.updateMatrix(); m.castShadow = true; m.receiveShadow = true;
+    const m = new THREE.Mesh(merged, mat); m.name = 'vehicle_port_fixtures'; m.matrixAutoUpdate = false; m.updateMatrix(); m.castShadow = false; m.receiveShadow = true;
     group.add(m); owned.push(merged, mat);
   }
   if (lamps.length) {

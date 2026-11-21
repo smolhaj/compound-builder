@@ -221,20 +221,18 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
     X(wall, v.dw, v.h - v.dh, v.t, 0, y0 + v.dh, rho);                                                           // the lintel
   }
   // panelled inner faces: a rib every few inches, a band at mid height, a hazard-striped kick plate, a vent grille and the air-shower strip
-  const pitch = (tier === 'arcology' ? 0.1 : 0.14), nRib = Math.max(2, Math.floor(len / pitch)), inFace = v.cw / 2 - 0.004;
+  const pitch = (tier === 'arcology' ? 0.45 : 0.6), nRib = Math.max(2, Math.floor(len / pitch)), inFace = v.cw / 2 - 0.004;
   for (let k = 0; k < nRib; k++) { const rho = inner + (k + 0.5) * len / nRib; for (const s of [-1, 1]) X(rib, 0.01, v.h - 0.08, 0.014, s * inFace, y0 + 0.05, rho); }
   for (const s of [-1, 1]) {
     X('panel_light', 0.018, 0.016, len, s * inFace, y0 + v.h * 0.5, mid);                                           // the band
-    const segs = Math.max(4, Math.floor(len / 0.07));
-    for (let k = 0; k < segs; k++) X(k % 2 ? 'panel_dark' : 'paint_yellow', 0.016, 0.035, len / segs, s * inFace, y0, inner + (k + 0.5) * len / segs);   // hazard kick plate
+    X('paint_yellow', 0.016, 0.035, len, s * inFace, y0, mid);   // hazard kick plate
     X('panel_dark', 0.024, v.dh * 0.22, Math.min(0.3, len * 0.3), s * inFace, y0 + v.dh * 0.52, mid + len * 0.18);       // the vent grille...
-    for (let k = 0; k < 4; k++) X('panel_light', 0.03, 0.008, Math.min(0.3, len * 0.3) * 0.9, s * (inFace - 0.001), y0 + v.dh * 0.56 + k * 0.018, mid + len * 0.18);   // ...and its slats
   }
   p.layer = 'roof';
   // the ceiling: glazed so the chamber reads from above, with aluminum panel joints, the air-shower strip (a row of nozzles) and lamp strips
   p.add(tier === 'geodesic' ? 'dome_polycarb' : tier === 'glass' ? 'dome_glass' : 'arcology', place(box(v.cw + 2 * v.t, 0.012, len + v.t, 0, y0 + v.h, mid)));
   for (const k of [0.1, 0.35, 0.6, 0.85]) X('panel_light', v.cw + 2 * v.t + 0.01, 0.016, 0.014, 0, y0 + v.h + 0.001, inner + len * k);
-  const nz = Math.max(4, Math.floor(len / 0.06));
+  const nz = 2;
   for (const s of [-1, 1]) { X('panel_light', 0.016, 0.012, len, s * v.cw * 0.28, y0 + v.h - 0.014, mid); for (let k = 0; k < nz; k++) X('panel_dark', 0.012, 0.014, 0.012, s * v.cw * 0.28, y0 + v.h - 0.026, inner + (k + 0.5) * len / nz); }
   X('lamp', v.cw * 0.5, 0.008, 0.03, 0, y0 + v.h - 0.02, mid - len * 0.22); X('lamp', v.cw * 0.5, 0.008, 0.03, 0, y0 + v.h - 0.02, mid + len * 0.22);
   // ── the surround: steel plates in the shell's plane round the outer door, as wide as the hole the doorway took out of the lattice; a heavy bulkhead frame where it meets the skin ──
@@ -258,7 +256,6 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
     X('panel_dark', 0.026, dhb + 0.02, 0.02, -(v.dw / 2 + 0.013), yb, z); X('panel_dark', 0.026, dhb + 0.02, 0.02, v.dw / 2 + 0.013, yb, z); X('panel_dark', v.dw + 0.052, 0.026, 0.02, 0, yb + dhb - 0.006, z);
     const gz = rho + face * 0.002;
     X('panel_dark', 0.012, dhb - 0.01, 0.014, -(v.dw / 2 - 0.004), yb, gz); X('panel_dark', 0.012, dhb - 0.01, 0.014, v.dw / 2 - 0.004, yb, gz); X('panel_dark', v.dw - 0.01, 0.012, 0.014, 0, yb + dhb - 0.016, gz);   // the gasket
-    for (let k = 0; k < 5; k++) { const yy = yb + 0.03 + k * (dhb - 0.07) / 4; X('panel_light', 0.012, 0.012, 0.012, -(v.dw / 2 + 0.013), yy, z + face * 0.01); X('panel_light', 0.012, 0.012, 0.012, v.dw / 2 + 0.013, yy, z + face * 0.01); }
   };
   /** The state panel over a door: a dark plate with three lamp windows (red sealed, amber cycling, green open); the world lights the one that is on (game/fx/VehiclePorts). */
   const panel = (rho: number, face: 1 | -1): void => {
@@ -288,14 +285,13 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
       const cx = s * (w / 2 + open) , geoms: Array<[KitMaterialId, THREE.BufferGeometry]> = [];
       const put = (m: KitMaterialId, bw: number, bh: number, bd: number, x: number, y: number, zz: number): void => { geoms.push([m, box(bw, bh, bd, x, y, zz)]); };
       // a barred gate: a heavy frame, a solid kick plate below, vertical bars above (so it never reads as a plank wall) and a mid rail
-      const gh = dhb * 0.97, nb = Math.max(4, Math.floor(w / 0.05)), plate = gh * 0.3;
+      const gh = dhb * 0.97, nb = Math.max(4, Math.floor(w / 0.1)), plate = gh * 0.3;
       put('panel_dark', w, 0.03, 0.026, 0, 0, 0); put('panel_dark', w, 0.03, 0.026, 0, gh - 0.03, 0);
       put('panel_steel', w, plate, 0.02, 0, 0.03, 0);
       put('panel_dark', w, 0.016, 0.03, 0, gh * 0.62, 0);
       for (let k = 0; k < nb; k++) put('panel_light', 0.012, gh - 0.06 - plate, 0.016, -w / 2 + 0.03 + k * (w - 0.06) / (nb - 1), 0.03 + plate, 0);
       put('paint_yellow', 0.02, dhb * 0.97 - 0.01, 0.03, -s * (w / 2 - 0.012), 0.005, 0);                                     // hazard band on the leading edge
       put('panel_dark', 0.012, dhb * 0.97 - 0.02, 0.034, -s * (w / 2), 0.01, 0);                                                    // the gasket seam
-      for (let k = 0; k < 4; k++) put('panel_light', 0.012, 0.012, 0.03, s * w * 0.3, dhb * (0.2 + 0.2 * k), 0);        // lock bolts
       for (const [m, g] of geoms) p.add(m, place(g.translate(cx, yb, z)));
     }
     X('panel_dark', v.dw * (shut ? 1 : 1.9) + 0.1, 0.022, 0.04, 0, y0 + v.dh, z);                                          // the track
@@ -312,7 +308,7 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
   panel(outer, 1); panel(inner, -1);
   // the outer face: a hazard-chevron sign plate and the interlock lamp
   X('paint_yellow', 0.22 * big, 0.04 * big, 0.01, 0, y0 + v.dh + 0.09 * big, outer + v.t / 2 + 0.02);
-  for (let k = 0; k < 5; k++) X('panel_dark', 0.018 * big, 0.04 * big, 0.012, (-0.08 + 0.04 * k) * big, y0 + v.dh + 0.09 * big, outer + v.t / 2 + 0.022);
+  for (let k = 0; k < 3; k++) X('panel_dark', 0.018 * big, 0.04 * big, 0.012, (-0.04 + 0.04 * k) * big, y0 + v.dh + 0.09 * big, outer + v.t / 2 + 0.022);
   p.layer = 'interior';
   p.add('gravel', place(box(v.cw * 1.1, 0.006, 0.5, 0, y0 - L.stem * 0.2 + 0.001, inner - 0.3)));
 }
