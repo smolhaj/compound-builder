@@ -124,6 +124,12 @@ try {
       for (const [px, py] of [[1090, 735], [1040, 700], [900, 830], [1060, 760]]) { rc.setFromCamera(new T.Vector2(px / W * 2 - 1, 1 - py / H * 2), cam); const hs = rc.intersectObjects(ws.scene.children, true).slice(0, 5);
         out.push(hs.map(h => { let o = h.object, chain = []; while (o && chain.length < 4) { chain.push(o.name || o.type); o = o.parent; } return [chain.join('<'), +h.distance.toFixed(2), +h.point.y.toFixed(3), h.object.material?.name || h.object.material?.type]; })); } return out; }, [W, H])));
   }
+  if (want('killhide')) {
+    await pr([dm.x - u[0] * R * 0.3 + n[0] * 2, R * 4.2, dm.z - u[1] * R * 0.3 + n[1] * 2], E(R + 2.5, 0, 0), 62); await frames(3);
+    lap(JSON.stringify(await page.evaluate(() => { const o = []; window.__cb.ws.scene.traverse(m => { if (m.isMesh && m.parent === window.__cb.ws.scene && !m.name && m.material?.type === 'ShaderMaterial') o.push([m.geometry.type, m.position.y, m.renderOrder, m.frustumCulled, m.material.transparent, m.material.uniforms ? Object.keys(m.material.uniforms).join(',') : '']); }); return o; })));
+    await page.evaluate(() => { window.__cb.ws.scene.traverse(m => { if (m.isMesh && m.parent === window.__cb.ws.scene && !m.name && m.material?.type === 'ShaderMaterial') m.visible = false; }); });
+    await shot('aerial-kill-zone-noshader');
+  }
   if (want('killzone')) { await pr([dm.x - u[0] * R * 0.3 + n[0] * 2, R * 4.2, dm.z - u[1] * R * 0.3 + n[1] * 2], E(R + 2.5, 0, 0), 62); await shot('aerial-kill-zone'); }
   if (want('roofstates')) {
     const Y = await page.evaluate(async ([t, r, rot]) => { const m = await import('/src/sim/dome/plantYard.ts'); const g = m.yardGeometry(t, r, rot); const P = (u, v) => m.yardPoint(g, u, v); return { W: g.W, D: g.D, out: P(-0.1 * g.W, g.D + 3.2), outEye: P(0.55 * g.W, g.D + 2.4), mid: P(0, g.D * 0.5), up: P(0.05 * g.W, g.D * 0.5 - 2.0) }; }, [dm.tier, R, ROT]);
