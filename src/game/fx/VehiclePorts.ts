@@ -8,7 +8,7 @@
 import { portTextures, portUV, signAtlas, signQuad } from './portTextures';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { APRON_LEN, type InsideLane, type PortFrame } from '../../sim/dome/vehiclePort';
+import { APRON_LEN, apronTop, type InsideLane, type PortFrame } from '../../sim/dome/vehiclePort';
 import type { DomeTier } from '../../sim/dome/tiers';
 import { vestibuleOf } from '../../sim/dome/vestibule';
 
@@ -21,6 +21,8 @@ export interface PortInput {
   persons: Array<{ angle: number; x: number; z: number; off?: number }>;
   /** The height of the dome's group (its pad level): the doors' sill and the state panels are measured from it. */
   baseY: number;
+  /** The road's own surface height at a point near its end (the planned road, sim/dome/portRoad), or null away from it: the apron's top meets it exactly, so the road drives straight on. */
+  roadY?: (x: number, z: number) => number | null;
   /** What the gates say: sealed (red), open (green: the outer gate stands open, the inner one shut). */
   state: 'open' | 'sealed';
 }
@@ -94,7 +96,7 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
   const lamps: Array<{ x: number; y: number; z: number; w: number; h: number; d: number; yaw: number; color: number; state?: boolean }> = [];
   const signs: Array<{ x: number; y: number; z: number; w: number; h: number; yaw: number; cell: number }> = [];
   const signPost = (x: number, z: number, yaw: number, k: number, cells: number[]): void => { const gy = ground(x, z); geos.push(cyl(0.008 * k, (0.14 + 0.1 * cells.length) * k, x, gy + (0.14 + 0.1 * cells.length) * k / 2, z, STEEL)); cells.forEach((c, i) => signs.push({ x, y: gy + (0.1 + 0.1 * (cells.length - i)) * k, z, w: 0.34 * k, h: 0.085 * k, yaw, cell: c })); };
-  for (const { frame: f, lane, tier, persons, state, baseY } of ins) {
+  for (const { frame: f, lane, tier, persons, state, baseY, roadY } of ins) {
     const { u, v } = f, yaw = f.angle, R = f.r, F: Fr = { cx: f.cx, cz: f.cz, u };
     const clad = CLAD[tier], accent = ACCENT[tier];
     const at = (rho: number, lam: number): [number, number] => P(F, rho, lam);
@@ -106,7 +108,12 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     // the top follows the highest ground under each cross-section (never buried, never stretched over a dip), eased so the ramp stays gentle; the skirts close the sides
     const nS = 8, hs: number[] = [];
     for (let k = 0; k <= nS; k++) { const r = R + APRON_LEN * k / nS; let m = -Infinity; for (const l of [lamA, 0, lamB]) m = Math.max(m, ground(...at(r, l))); hs.push(Math.max(m + 0.012, k === 0 ? yPad : -Infinity)); }
-    for (let k = 1; k <= nS; k++) hs[k] = Math.max(hs[k - 1] - 0.05 * APRON_LEN / nS, Math.min(hs[k - 1] + 0.05 * APRON_LEN / nS, hs[k]));   // (at most 5 percent a step)
+    // where the planned road runs on to the apron it sets the height: the apron's top is the road's own surface along the axis (a straight ramp from the sill to the road at the toe, never a
+    // step, never a wall in front of the road); with no planned road (a QA scene) the ground decides, eased to at most 5 percent a step
+    const rY = (k: number): number | null => { const v = roadY?.(...at(R + APRON_LEN * k / nS, 0)); return v === null || v === undefined || !Number.isFinite(v) ? null : v + 0.012; };
+    const toeY = rY(nS);
+    if (toeY !== null) for (let k = 1; k <= nS; k++) hs[k] = apronTop(hs[0], toeY, k, nS);
+    else for (let k = 1; k <= nS; k++) hs[k] = Math.max(hs[k - 1] - 0.05 * APRON_LEN / nS, Math.min(hs[k - 1] + 0.05 * APRON_LEN / nS, hs[k]));   // (at most 5 percent a step)
     const topA = (rho: number): number => { const t = Math.max(0, Math.min(1, (rho - R) / APRON_LEN)) * nS, k = Math.min(nS - 1, Math.floor(t)); return hs[k] + (hs[k + 1] - hs[k]) * (t - k); };
     geos.push(slab(F, R - 0.02, R + APRON_LEN, lamA, lamB, topA, ground, POUR));
     for (const [l0, l1] of [[lamA, lamA + 0.035], [lamB - 0.035, lamB]] as const) geos.push(slab(F, R - 0.02, R + APRON_LEN, l0, l1, r => topA(r) + 0.022, ground, CURB));   // the straight curbs

@@ -462,3 +462,9 @@ export function portWords(tier: DomeTier, r: number): string {
 }
 
 export { plantSize };
+
+/**
+ * The apron's top at `k` of `n` steps out from the sill (k = 0 is the sill): a straight ramp from the sill's height to the road's own surface height at the toe (`toeY`), so the road drives
+ * straight on with no step. Pure (tested in vehiclePort.test.ts: the join is flush and the ramp is no steeper than the road's grade).
+ */
+export const apronTop = (sillY: number, toeY: number, k: number, n: number): number => sillY + (toeY - sillY) * Math.max(0, Math.min(1, k / n));

@@ -53,6 +53,11 @@ export function derive(plan: RoadPlan, a: Approach, yard: Pt, height: (x: number
       all[i].y = lo <= hi ? Math.min(hi, Math.max(lo, all[i].y)) : (lo + hi) / 2;
     }
   }
+  // (each station was bounded against the two ends only: two neighbors could still differ by twice the grade. Smooth it with a forward and a backward pass so every step is within MAX_GRADE.)
+  for (let pass = 0; pass < 2; pass++) {
+    for (let i = k0 + 1; i < all.length - 1; i++) { const ds = all[i].s - all[i - 1].s; all[i].y = Math.max(all[i - 1].y - MAX_GRADE * ds, Math.min(all[i - 1].y + MAX_GRADE * ds, all[i].y)); }
+    for (let i = all.length - 2; i > k0; i--) { const ds = all[i + 1].s - all[i].s; all[i].y = Math.max(all[i + 1].y - MAX_GRADE * ds, Math.min(all[i + 1].y + MAX_GRADE * ds, all[i].y)); }
+  }
   const keepOut = all.slice(0, keep.length), tailOut = all.slice(keep.length);
   const pts = [...keepOut, ...tailOut], lengthU = pts[pts.length - 1].s, cutS = keep[keep.length - 1].s;
   const lengthM = lengthU * UNIT_M;

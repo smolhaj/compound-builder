@@ -134,6 +134,15 @@ try {
     await page.evaluate(re => { const rx = new RegExp(re); window.__cb.ws.scene.traverse(o => { if (o.isMesh && (rx.test(o.name) || rx.test(o.material?.name || ''))) { o.layers.disable(0); o.visible = false; o.frustumCulled = true; o.onBeforeRender = () => {}; } }); window.__hid = []; window.__cb.ws.scene.traverse(o => { if (o.isMesh && rx.test(o.name)) window.__hid.push(o.name); }); }, re); lap('hidden ' + await page.evaluate(() => window.__hid.length)); await page.evaluate(() => { const t = window.__cb.ws.scene; const hide = () => t.traverse(o => { if (o.isMesh && window.__hid.includes(o.name)) o.visible = false; }); hide(); window.__hide = hide; });
     await frames(2); await shot('hidden-' + re.replace(/[^a-z]/g, ''));
   }
+  if (want('apronside')) { await pr(E(R + 3.2 * S, -2.6 * S, 0.12), E(R + 1.0 * S, 0, 0.1), 50); await shot('apron-side-on-low'); }
+  if (want('apronback')) { await pr(E(R + 0.9 * S, 0.1, 0.35), E(R + 7 * S, 0, 0.1), 62); await shot('apron-looking-back-down-road'); }
+  if (want('roadeye')) { await pr(E(R + 6.5 * S, 0.0, 0.4), E(R + 0.2, 0, 0.3), 60); await shot('road-to-gate-eye'); }
+  if (want('roofdown')) {
+    const Y = await page.evaluate(async ([t, r, rot]) => { const m = await import('/src/sim/dome/plantYard.ts'); const g = m.yardGeometry(t, r, rot); return { c: g.center }; }, [dm.tier, R, ROT]);
+    await set(`cb.world.setYardRoofLook('closed')`); await frames(3);
+    const c = [Y.c[0] + dm.x, Y.c[1] + dm.z]; await pr([c[0] - 0.01, 9.5, c[1]], [c[0], 0, c[1]], 50); await shot('yard-roof-closed-straight-down');
+    await set(`cb.world.setYardRoofLook(null)`);
+  }
   if (want('pick')) {
     await pr(E(R + 1.5 * S, -0.55 * S, 0.3), E(R - 0.1, 0.15 * S, 0.3), 62); await frames(2);
     lap(JSON.stringify(await page.evaluate(async ([W, H]) => { const T = await import('/node_modules/three/build/three.module.js'); const ws = window.__cb.ws, cam = ws.camera, rc = new T.Raycaster(), out = [];

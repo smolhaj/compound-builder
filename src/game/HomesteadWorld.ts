@@ -485,11 +485,11 @@ export class HomesteadWorld {
     const key = domes.map(d => `${d.id}:${d.x},${d.z}:${portFrameOf(d)!.angle.toFixed(3)}`).join('|') + `|${this._baseRef.signature}|${this._drive ? 1 : 0}|${guarded ? 1 : 0}`;
     if (key === this._portKey) return;
     this._portKey = key;
-    { const zk = domes.map(d => portFrameOf(d)!).map(f => `${f.cx.toFixed(2)},${f.cz.toFixed(2)},${f.angle.toFixed(3)}`).join('|'); const had = this._portZones.map(f => `${f.cx.toFixed(2)},${f.cz.toFixed(2)},${f.angle.toFixed(3)}`).join('|'); this._portZones = domes.map(d => portFrameOf(d)!); if (zk !== had && this._quality && this._batchDepth === 0) { this._plant(this._quality); } }
+    { const zk = domes.map(d => portFrameOf(d)!).map(f => `${f.cx.toFixed(2)},${f.cz.toFixed(2)},${f.angle.toFixed(3)}`).join('|'); const had = this._portZones.map(f => `${f.cx.toFixed(2)},${f.cz.toFixed(2)},${f.angle.toFixed(3)}`).join('|'); this._portZones = domes.map(d => portFrameOf(d)!); if (zk !== had && this._quality && this._batchDepth === 0) { this._plant(this._quality); this._water(this._quality); } }
     const pr = planToPort(this._baseRef, domes, (x, z) => this.parcel.height(x, z));
     const ins: PortInput[] = domes.map(d => {
       const f = portFrameOf(d)!;
-      return { id: d.id, tier: d.tier, frame: f, lane: insideLane(f), guarded, persons: d.airlocks.filter(a => !a.role).map(a => ({ angle: a.angle, x: a.x, z: a.z, off: a.off })), state: getDoorLook() === 'sealed' ? 'sealed' as const : 'open' as const, baseY: this._built.get(d.id)?.group.position.y ?? this.groundAt(d.x, d.z) };
+      return { id: d.id, tier: d.tier, frame: f, lane: insideLane(f), guarded, roadY: pr ? ((x: number, z: number): number | null => { let best = 0.6, y: number | null = null; for (const p of pr.plan.pts.slice(-40)) { const dd = Math.hypot(p.x - x, p.z - z); if (dd < best) { best = dd; y = p.y; } } return y; }) : undefined, persons: d.airlocks.filter(a => !a.role).map(a => ({ angle: a.angle, x: a.x, z: a.z, off: a.off })), state: getDoorLook() === 'sealed' ? 'sealed' as const : 'open' as const, baseY: this._built.get(d.id)?.group.position.y ?? this.groundAt(d.x, d.z) };
     });
     if (this._ports) { this._root.remove(this._ports.group); this._ports.dispose(); this._ports = null; }
     if (ins.length) { const f = makeVehiclePorts(ins, (x, z) => this.groundAt(x, z)); this._root.add(f.group); this._ports = f; }
