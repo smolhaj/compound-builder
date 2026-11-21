@@ -207,7 +207,7 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
   const a = hole.a, v = hole.v, { outer, inner } = chamberRho(R, v), mid = (outer + inner) / 2, L = LOOK[tier];
   const place = (g: THREE.BufferGeometry): THREE.BufferGeometry => g.rotateY(a);
   // the lining by tier: aluminum for the light geodesic, steel for the glass dome, dark armored steel for the arcology (never stucco)
-  const wall: 'panel_light' | 'panel_steel' | 'panel_dark' = tier === 'geodesic' ? 'panel_light' : tier === 'glass' ? 'panel_steel' : 'panel_dark';
+  const wall: 'panel_light' | 'panel_steel' | 'panel_dark' = tier === 'geodesic' ? 'panel_light' : 'panel_steel';
   const rib: 'panel_light' | 'panel_steel' | 'panel_dark' = tier === 'arcology' ? 'panel_steel' : 'panel_dark';
   const half = v.cw / 2 + v.t / 2, stubW = v.cw / 2 + v.t - v.dw / 2, veh = !!hole.vehicle, len = outer - inner;
   const foot = y0 - 0.1, big = tier === 'arcology' ? 1.6 : 1;
@@ -310,7 +310,7 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
   X('paint_yellow', 0.22 * big, 0.04 * big, 0.01, 0, y0 + v.dh + 0.09 * big, outer + v.t / 2 + 0.02);
   for (let k = 0; k < 3; k++) X('panel_dark', 0.018 * big, 0.04 * big, 0.012, (-0.04 + 0.04 * k) * big, y0 + v.dh + 0.09 * big, outer + v.t / 2 + 0.022);
   p.layer = 'interior';
-  p.add('gravel', place(box(v.cw * 1.1, 0.006, 0.5, 0, y0 - L.stem * 0.2 + 0.001, inner - 0.3)));
+  p.add('panel_dark', place(box(v.cw * 1.1, 0.006, 0.5, 0, y0 - L.stem * 0.2 + 0.001, inner - 0.3)));   // (a steel threshold plate inside the inner door: no gravel or other brown)
 }
 
 /** The shell's colliders: the ring as short boxes with the airlocks' gaps left out, and each chamber's walls (so the chamber is a room and the doors are the only ways in). */
@@ -412,6 +412,10 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
       p.add('steel', quad(at(r + 0.012, a0, y0), at(r + 0.012, a1, y0), at(r + 0.012, a1, y0 + band), at(r + 0.012, a0, y0 + band), centre));
       const rl = R + 0.002; p.add('lamp', quad(at(rl + 0.014, a0, y0 + band - 0.07), at(rl + 0.014, a1, y0 + band - 0.07), at(rl + 0.014, a1, y0 + band), at(rl + 0.014, a0, y0 + band), centre));
     }
+    // a continuous armored base ring where the band meets the foundation, and a gasket seam along the band's top where the panels meet it: no gap shows between skin and footing
+    p.layer = 'walls';
+    p.add('panel_dark', ringWall(R - 0.03, R + 0.05, y0 + 0.06, () => y0 - 0.03, nWall));
+    p.add('panel_dark', ringWall(R - 0.025, R + 0.018, y0 + band + 0.012, () => y0 + band - 0.012, nWall));
     // the crown spire: a mast with a lit tip
     p.layer = 'frame';
     p.add('steel', pipe([0, y0 + R * 0.98, 0], [0, y0 + R * 1.18, 0], 0.025, 6));

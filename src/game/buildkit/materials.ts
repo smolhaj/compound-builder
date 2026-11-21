@@ -877,9 +877,9 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'pegboard': m = texMat(id, paintPegboard, 1, 0.8); break;
     case 'crop': m = new THREE.MeshStandardMaterial({ color: 0x4f8a34, roughness: 0.85 }); break;
     case 'grain': m = new THREE.MeshStandardMaterial({ color: 0xb8913f, roughness: 0.9 }); break;
-    case 'panel_steel': m = new THREE.MeshStandardMaterial({ color: 0x6d7782, roughness: 0.55, metalness: 0.2 }); break;
-    case 'panel_dark': m = new THREE.MeshStandardMaterial({ color: 0x343b43, roughness: 0.6, metalness: 0.2 }); break;
-    case 'panel_light': m = new THREE.MeshStandardMaterial({ color: 0xb6bec6, roughness: 0.45, metalness: 0.25 }); break;
+    case 'panel_steel': m = new THREE.MeshStandardMaterial({ color: 0x6a7c90, roughness: 0.55, metalness: 0.2 }); break;
+    case 'panel_dark': m = new THREE.MeshStandardMaterial({ color: 0x3e4a5a, roughness: 0.6, metalness: 0.2 }); break;
+    case 'panel_light': m = new THREE.MeshStandardMaterial({ color: 0xb4c2d0, roughness: 0.45, metalness: 0.25 }); break;
     case 'steel': m = new THREE.MeshStandardMaterial({ color: 0x7c8186, roughness: 0.4, metalness: 0.75 }); break;
     case 'copper': m = new THREE.MeshStandardMaterial({ color: 0xb8734a, roughness: 0.35, metalness: 0.85 }); break;
     case 'lead': m = new THREE.MeshStandardMaterial({ color: 0x4f5659, roughness: 0.55, metalness: 0.5 }); break;
