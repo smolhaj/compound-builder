@@ -110,7 +110,7 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     for (let k = 0; k <= nS; k++) { const r = R + APRON_LEN * k / nS; let m = -Infinity; for (const l of [lamA, 0, lamB]) m = Math.max(m, ground(...at(r, l))); hs.push(Math.max(m + 0.012, k === 0 ? yPad : -Infinity)); }
     // where the planned road runs on to the apron it sets the height: the apron's top is the road's own surface along the axis (a straight ramp from the sill to the road at the toe, never a
     // step, never a wall in front of the road); with no planned road (a QA scene) the ground decides, eased to at most 5 percent a step
-    const rY = (k: number): number | null => { const v = roadY?.(...at(R + APRON_LEN * k / nS, 0)); return v === null || v === undefined || !Number.isFinite(v) ? null : v + 0.012; };
+    const rY = (k: number): number | null => { const v = roadY?.(...at(R + APRON_LEN * k / nS, 0)); return v === null || v === undefined || !Number.isFinite(v) ? null : v - 0.004; };   // (a hair under the road's own surface, so the gravel runs on over the apron's toe)
     const toeY = rY(nS);
     if (toeY !== null) for (let k = 1; k <= nS; k++) hs[k] = apronTop(hs[0], toeY, k, nS);
     else for (let k = 1; k <= nS; k++) hs[k] = Math.max(hs[k - 1] - 0.05 * APRON_LEN / nS, Math.min(hs[k - 1] + 0.05 * APRON_LEN / nS, hs[k]));   // (at most 5 percent a step)

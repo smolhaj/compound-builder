@@ -311,6 +311,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       const slide = ST_SLIDE[st] * W;
       const leaf = (cu: number, lift: number): void => {
         const yb = y0 + lift;
+        B(Fy, cu, D / 2, lw + 0.04, 0.02, D + 0.04, 0x244b52, yb - 0.012);                                                      // a solid underlay under every leaf: no ground or sky shows through a pane edge
         for (let a = 0; a < nu; a++) for (let b = 0; b < nv; b++) {
           const px = cu - lw / 2 + (a + 0.5) * cw, pv = (b + 0.5) * cd;
           B(Fy, px, pv, cw, 0.02, cd, GLASS, yb);                                                                                  // the glazed pane, filling its whole cell

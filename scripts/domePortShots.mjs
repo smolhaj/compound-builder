@@ -143,6 +143,20 @@ try {
     const c = [Y.c[0] + dm.x, Y.c[1] + dm.z]; await pr([c[0] - 0.01, 9.5, c[1]], [c[0], 0, c[1]], 50); await shot('yard-roof-closed-straight-down');
     await set(`cb.world.setYardRoofLook(null)`);
   }
+  if (want('roadinfo')) {
+    lap(JSON.stringify(await page.evaluate(([x, z, ux, uz, R]) => { const w = window.__cb.world, pts = w.plan.pts.slice(-14).map(p => [+((p.x - x) * ux + (p.z - z) * uz - R).toFixed(2), +p.y.toFixed(3), +w.groundAt(p.x, p.z).toFixed(3)]); return { pts, gate: w.groundAt(x + ux * R, z + uz * R), toe: w.groundAt(x + ux * (R + 1.6), z + uz * (R + 1.6)) }; }, [dm.x, dm.z, u[0], u[1], Rd])));
+  }
+  if (want('spikehide')) {
+    const ia = a.angle + 2.2, iu = [Math.sin(ia), Math.cos(ia)], inn = [iu[1], -iu[0]];
+    await pr([dm.x + iu[0] * (R + 2.2) + inn[0] * 1.1, 0.5, dm.z + iu[1] * (R + 2.2) + inn[1] * 1.1], [dm.x + iu[0] * R, 0.3, dm.z + iu[1] * R], 55);
+    for (const re of ['bldg_foundation', 'bldg_frame', 'bldg_walls_steel', 'bldg_walls_panel_dark', 'bldg_walls_lamp|bldg_walls_concrete', 'regional|terrain_skirt|grade']) {
+      await page.evaluate(re => { const rx = new RegExp(re); window.__hide = () => window.__cb.ws.scene.traverse(o => { if (o.isMesh && rx.test(o.name)) o.visible = false; }); if (window.__hi) clearInterval(window.__hi); window.__hi = setInterval(window.__hide, 5); }, re);
+      await page.waitForTimeout(300); await frames(2);
+      const n = await page.evaluate(re => { const rx = new RegExp(re); let c = 0; window.__cb.ws.scene.traverse(o => { if (o.isMesh && rx.test(o.name)) c++; }); return c; }, re);
+      lap(`${re}: ${n} meshes`); await shot('spike-hide-' + re.replace(/[^a-z]/g, '').slice(0, 24));
+    }
+    await page.evaluate(() => { clearInterval(window.__hi); });
+  }
   if (want('pick')) {
     await pr(E(R + 1.5 * S, -0.55 * S, 0.3), E(R - 0.1, 0.15 * S, 0.3), 62); await frames(2);
     lap(JSON.stringify(await page.evaluate(async ([W, H]) => { const T = await import('/node_modules/three/build/three.module.js'); const ws = window.__cb.ws, cam = ws.camera, rc = new T.Raycaster(), out = [];
