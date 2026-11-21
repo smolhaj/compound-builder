@@ -11,8 +11,9 @@ export const PORT_TILE = 0.8;      // world units per repeat (16 ft: one slab of
 const lcg = (seed: number) => { let s = seed >>> 0; return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; }; };
 
 export function paintPortSheet(): HTMLCanvasElement {
-  const N = 512, c = document.createElement('canvas'); c.width = c.height = N;
+  const N = 512, c = document.createElement('canvas'); c.width = c.height = N / 2;        // (painted on a 512 grid, stored at half size: the shared sheet stays light)
   const g = c.getContext('2d', { willReadFrequently: true })!, r = lcg(4711);
+  g.scale(0.5, 0.5);
   g.fillStyle = 'rgb(238,238,238)'; g.fillRect(0, 0, N, N);
   for (let k = 0; k < 5200; k++) { const v = 150 + r() * 105; g.fillStyle = `rgba(${v},${v},${v},${0.18 + r() * 0.3})`; g.fillRect(r() * N, r() * N, 1 + r() * 1.6, 1 + r() * 1.6); }                 // aggregate
   for (let k = 0; k < 14; k++) { const x = r() * N, y = r() * N, rad = 30 + r() * 70, gr = g.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, 'rgba(120,118,112,0.16)'); gr.addColorStop(1, 'rgba(120,118,112,0)'); g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); }   // blotches
@@ -27,11 +28,15 @@ export function paintPortSheet(): HTMLCanvasElement {
 }
 
 export interface PortTextures { map: THREE.CanvasTexture; normalMap: THREE.Texture; dispose(): void }
+let _tex: PortTextures | null = null;
+/** One shared pair of maps for every entrance complex (painted once; kept for the page's life, like the kit materials). */
 export function portTextures(): PortTextures {
+  if (_tex) return _tex;
   const cv = paintPortSheet(), map = new THREE.CanvasTexture(cv);
   map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping; map.anisotropy = 4;
   const nm = generateNormalMap(cv, 1.5); nm.wrapS = nm.wrapT = THREE.RepeatWrapping;
-  return { map, normalMap: nm, dispose: () => { map.dispose(); nm.dispose(); } };
+  _tex = { map, normalMap: nm, dispose: () => { /* shared: never disposed per instance */ } };
+  return _tex;
 }
 
 /** World-scaled UVs by dominant normal axis (one repeat per PORT_TILE), for a non-indexed geometry with positions and normals. */
