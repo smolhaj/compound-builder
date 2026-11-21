@@ -128,6 +128,12 @@ try {
     }
     await set(`cb.world.setYardRoofLook(null)`);
   }
+  if (want('hideopen')) {
+    await pr(E(R + 1.5 * S, -0.55 * S, 0.3), E(R - 0.1, 0.15 * S, 0.3), 62);
+    const re = process.env.HIDE || 'bldg_openings';
+    await page.evaluate(re => { const rx = new RegExp(re); window.__cb.ws.scene.traverse(o => { if (o.isMesh && rx.test(o.name)) o.visible = false; }); }, re);
+    await frames(2); await shot('hidden-' + re.replace(/[^a-z]/g, ''));
+  }
   if (want('pick')) {
     await pr(E(R + 1.5 * S, -0.55 * S, 0.3), E(R - 0.1, 0.15 * S, 0.3), 62); await frames(2);
     lap(JSON.stringify(await page.evaluate(async ([W, H]) => { const T = await import('/node_modules/three/build/three.module.js'); const ws = window.__cb.ws, cam = ws.camera, rc = new T.Raycaster(), out = [];

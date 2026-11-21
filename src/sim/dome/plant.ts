@@ -26,7 +26,7 @@ import type { DomeTier } from './tiers';
 import { FRAME_SPANS } from './tiers';
 import type { WaterLoop } from './waterLoop';
 import type { PlantKind, PlantPlace } from './plantUnits';
-import { ROOF_SLIDE, type RoofState } from './yardRoof';
+import { ROOF_SLIDE as ST_SLIDE, type RoofState } from './yardRoof';
 import { CHAMBER_LEN, PORTAL_H, PORTAL_W, plantSize, yardGeometry, yardPoint, YARD_GAP, YARD_H, YARD_T, type YardGeom } from './plantYard';
 
 export type Shape = 'box' | 'cyl';
@@ -296,26 +296,38 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
     const gl = P(pu - g.portal.w / 2 - 0.05, 0), gr = P(pu + g.portal.w / 2 + 0.05, 0);
     wallRun(a0[0], a0[1], gl[0], gl[1]); wallRun(gr[0], gr[1], a1[0], a1[1]);
     seg(gl[0], gl[1], gr[0], gr[1], 0.1, YARD_T, C.conc, 0.1 + PORTAL_H);                                       // the lintel over the opening
+    if (tier === 'arcology') seg(gl[0], gl[1], gr[0], gr[1], WALL_H - (0.2 + PORTAL_H), YARD_T, WALL_C, 0.2 + PORTAL_H);      // (armored infill over the lintel up to the roof beam: no strip of sky above the portal)
     for (const [x, z] of [a0, a1, a2, a3, gl, gr]) push({ shape: 'box', x, z, y0: -0.14, w: 0.16, h: WALL_H + 0.3, d: 0.16, r: 0, rot: g.phi, color: C.cap });
     if (tier === 'arcology') {
-      // the retractable roof (sim/dome/yardRoof.ts): two leaves on rails along the yard's long walls, an armored frame with the dome's own glazing and diagonal struts, gaskets along
-      // every edge, drive housings at the ends. Closed: the leaves meet at a gasketed center seam, flush to the walls. Vent: slid partway, a gasketed gap. Open: parked over the end bays.
-      const sl = ROOF_SLIDE[o.roof ?? 'closed'] * W, y0 = WALL_H + 0.05, GLASS = 0x4c8d96, GASKET = 0x16181a;
-      for (const v of [0, D]) B(Fy, 0, v, W * 1.6, 0.03, 0.12, C.cap, WALL_H);                                    // the rail tracks along the yard walls, running on past the ends
-      for (const sd of [-1, 1]) for (const v of [0, D]) B(Fy, sd * (W / 2 + 0.3), v, 0.3, 0.2, 0.2, C.dark, WALL_H - 0.02);   // the drive housings
-      for (const sd of [-1, 1]) {
-        const cu = sd * (W / 4 + sl), lw = W / 2;
-        B(Fy, cu - lw / 2, D / 2, 0.08, 0.07, D + 0.12, C.armor, y0); B(Fy, cu + lw / 2, D / 2, 0.08, 0.07, D + 0.12, C.armor, y0);       // the frame's two long edges
-        B(Fy, cu, -0.02, lw, 0.07, 0.08, C.armor, y0); B(Fy, cu, D + 0.02, lw, 0.07, 0.08, C.armor, y0);                                       // and its two ends
-        const nx = Math.max(2, Math.round(lw / 0.9)), nz = Math.max(2, Math.round(D / 0.9)), cw = lw / nx, cd = D / nz;
-        for (let a = 0; a < nx; a++) for (let b = 0; b < nz; b++) {
+      // the retractable roof (sim/dome/yardRoof.ts): FOUR identical leaves, each W/4 wide and spanning wall to wall across the yard, on a continuous armored perimeter beam that sits on
+      // the wall tops. One regular pane grid; every seam (between leaves and over the wall tops) is covered by a gasketed cover plate, so nothing shows through when it is closed.
+      // The two inner leaves slide out over the two outer ones (raised a deck's height, resting on them): vent slides them part way (a gasketed gap), open parks them fully.
+      const st = o.roof ?? 'closed', y0 = WALL_H + 0.07, GLASS = 0x4c8d96, GASKET = 0x16181a, lw = W / 4, DECK = 0.075;
+      const nu = Math.max(1, Math.round(lw / 1.0)), nv = Math.max(2, Math.round(D / 1.0)), cw = lw / nu, cd = D / nv;
+      // the perimeter beam: a continuous armored ring on the wall tops that the leaves seal against, and its end caps
+      B(Fy, 0, -0.02, W + 0.2, 0.07, 0.16, C.armor, WALL_H); B(Fy, 0, D + 0.02, W + 0.2, 0.07, 0.16, C.armor, WALL_H);
+      for (const sd of [-1, 1]) B(Fy, sd * (W / 2 + 0.02), D / 2, 0.16, 0.07, D + 0.24, C.armor, WALL_H);
+      for (const sd of [-1, 1]) for (const v of [-0.1, D + 0.1]) B(Fy, sd * (W / 2 + 0.2), v, 0.26, 0.2, 0.2, C.dark, WALL_H - 0.02);   // the drive housings at the rail ends
+      const slide = ST_SLIDE[st] * W;
+      const leaf = (cu: number, lift: number): void => {
+        const yb = y0 + lift;
+        for (let a = 0; a < nu; a++) for (let b = 0; b < nv; b++) {
           const px = cu - lw / 2 + (a + 0.5) * cw, pv = (b + 0.5) * cd;
-          B(Fy, px, pv, cw - 0.05, 0.02, cd - 0.05, GLASS, y0 + 0.025);                                                                   // the glazed pane
-          B(Fy, px, pv, Math.hypot(cw, cd), 0.025, 0.03, C.steel, y0 + 0.045, undefined, Math.atan2(cd, cw));                                // its diagonal strut
+          B(Fy, px, pv, cw, 0.02, cd, GLASS, yb);                                                                                  // the glazed pane, filling its whole cell
+          B(Fy, px, pv, Math.hypot(cw, cd), 0.022, 0.028, C.steel, yb + 0.02, undefined, Math.atan2(cd, cw));                        // its diagonal strut
         }
-        B(Fy, cu - sd * lw / 2, D / 2, 0.035, 0.022, D + 0.08, GASKET, y0 + 0.07);                                                        // the gasket along the leaf's inner edge
-      }
-      B(Fy, 0, D / 2, 0.05, 0.026, D, GASKET, y0 + 0.07);                                                                                  // the center seam gasket (a gap when slid back)
+        for (let a = 0; a <= nu; a++) B(Fy, cu - lw / 2 + a * cw, D / 2, 0.05, 0.045, D, C.armor, yb);                              // the mullions along the leaf (a bar over every pane edge)
+        for (let b = 0; b <= nv; b++) B(Fy, cu, b * cd, lw, 0.045, 0.05, C.armor, yb);                                               // and across it
+      };
+      // inner leaves ride a deck above the outer ones when slid out; the outer leaves stay put over the end bays
+      leaf(-3 * W / 8, 0); leaf(3 * W / 8, 0);
+      const lift = slide > 0 ? DECK : 0;
+      leaf(-W / 8 - slide, lift); leaf(W / 8 + slide, lift);
+      // the gasketed cover plates over every seam between leaves: a black gasket under an armored strip, full width of the yard
+      const seams = slide > 0 ? [-W / 4, W / 4] : [-W / 4, 0, W / 4];
+      for (const u of seams) { B(Fy, u, D / 2, 0.07, 0.02, D, GASKET, y0 - 0.005); B(Fy, u, D / 2, 0.15, 0.03, D + 0.04, C.armor, y0 + 0.045); }
+      // when slid back, the centre gap is lined with gasket strips on the leaf edges (a gasketed vent) and the parked leaves stand on spacer blocks over the beam
+      if (slide > 0) for (const sd of [-1, 1]) { B(Fy, sd * (W / 8 + slide - lw / 2), D / 2, 0.05, 0.03, D, GASKET, y0 + lift + 0.02); for (const v of [0.05, D - 0.05]) B(Fy, sd * (3 * W / 8), v, lw, DECK - 0.005, 0.06, C.armor, y0 + 0.045); }
     }
     // the camera mast at the outer corner (with a lamp), and the pad where a tower can stand
     push({ shape: 'cyl', x: g.camera[0], z: g.camera[1], y0: 0, w: 0, h: 0.95, d: 0, r: 0.016, rot: g.phi, color: C.dark });

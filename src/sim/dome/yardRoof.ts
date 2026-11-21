@@ -40,4 +40,5 @@ const HAZARD = /flood|storm|hurricane|tornado|tsunami|heat|ice_age|blizzard|quak
 export const roofHazard = (kind: string | null | undefined): boolean => !!kind && HAZARD.test(kind);
 
 /** How far each half-leaf slides out from the center seam, as a share of the yard's width: closed 0, vent a gasketed gap, open parked over the end bays. */
-export const ROOF_SLIDE: Record<RoofState, number> = { closed: 0, vent: 0.1, open: 0.28 };
+/** The two inner leaves (W/4 wide) slide out over the outer ones: vent a gasketed gap, open parked fully over the end bays (the slide is W/4). */
+export const ROOF_SLIDE: Record<RoofState, number> = { closed: 0, vent: 0.1, open: 0.25 };
