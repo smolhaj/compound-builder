@@ -131,7 +131,7 @@ try {
   if (want('hideopen')) {
     await pr(E(R + 1.5 * S, -0.55 * S, 0.3), E(R - 0.1, 0.15 * S, 0.3), 62);
     const re = process.env.HIDE || 'bldg_openings';
-    await page.evaluate(re => { const rx = new RegExp(re); window.__cb.ws.scene.traverse(o => { if (o.isMesh && rx.test(o.name)) o.visible = false; }); }, re);
+    await page.evaluate(re => { const rx = new RegExp(re); window.__cb.ws.scene.traverse(o => { if (o.isMesh && (rx.test(o.name) || rx.test(o.material?.name || ''))) { o.layers.disable(0); o.visible = false; o.frustumCulled = true; o.onBeforeRender = () => {}; } }); window.__hid = []; window.__cb.ws.scene.traverse(o => { if (o.isMesh && rx.test(o.name)) window.__hid.push(o.name); }); }, re); lap('hidden ' + await page.evaluate(() => window.__hid.length)); await page.evaluate(() => { const t = window.__cb.ws.scene; const hide = () => t.traverse(o => { if (o.isMesh && window.__hid.includes(o.name)) o.visible = false; }); hide(); window.__hide = hide; });
     await frames(2); await shot('hidden-' + re.replace(/[^a-z]/g, ''));
   }
   if (want('pick')) {
