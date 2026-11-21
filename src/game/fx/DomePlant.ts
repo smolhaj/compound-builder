@@ -37,6 +37,8 @@ const STEM: Partial<Record<DomeTier, number>> = { glass: 0.08, arcology: 0.14 };
 
 function partGeometry(q: PlantPart, ground: (x: number, z: number) => number, stem: number, color = q.color): THREE.BufferGeometry {
   let g: THREE.BufferGeometry = q.shape === 'box' ? new THREE.BoxGeometry(q.w, q.h, q.d) : new THREE.CylinderGeometry(q.r2 ?? q.r, q.r, q.h, q.r < 0.03 ? 6 : 10);
+  if (q.shape === 'cyl' && !q.onShell && !q.lie && !q.high && q.y0 <= 0.001) noBottom(g as THREE.CylinderGeometry);
+  if (q.shape === 'box' && !q.onShell && !q.lie && !q.high && q.y0 <= 0.001) { const idx = g.index!.array as Uint16Array, keep: number[] = []; for (let f = 0; f < 6; f++) if (f !== 3) for (let k = 0; k < 6; k++) keep.push(idx[f * 6 + k]); g.setIndex(keep); }      // (a box standing on the floor: its underside is never seen)
   if (q.onShell) {
     const { theta, phi } = q.onShell;
     g.translate(0, q.h / 2, 0); g.rotateY(q.rot);
@@ -56,6 +58,13 @@ function partGeometry(q: PlantPart, ground: (x: number, z: number) => number, st
   for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   return g;
+}
+
+/** Leave out a cylinder's bottom cap (the last index group): a post standing on the floor never shows it. */
+function noBottom(g: THREE.CylinderGeometry): THREE.CylinderGeometry {
+  const grp = g.groups[2]; if (!grp) return g; const idx = g.index!.array, keep: number[] = [];
+  for (let i = 0; i < idx.length; i++) if (i < grp.start || i >= grp.start + grp.count) keep.push(idx[i]);
+  g.setIndex(keep); return g;
 }
 
 /** `r`: shell radius (world units); `ground(lx, lz)`: terrain height in the dome's local frame. */
@@ -89,7 +98,7 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
     geos.push(partGeometry({ shape: 'cyl', x: l.x, z: l.z, y0: 0, w: 0, h: l.y, d: 0, r: 0.014, rot: 0, color: 0x30343a }, ground, stem));
     // a real fixture: a flared base collar, a lantern housing (dark frame under the lens), a hooded cap and a ring
     const gy = ground(l.x, l.z);
-    geos.push(colorPart(new THREE.CylinderGeometry(0.022, 0.03, 0.06, 8), 0x23272c, l.x, gy + 0.03, l.z),
+    geos.push(colorPart(noBottom(new THREE.CylinderGeometry(0.022, 0.03, 0.06, 8)), 0x23272c, l.x, gy + 0.03, l.z),
       colorPart(new THREE.CylinderGeometry(0.03, 0.026, 0.014, 8), 0x23272c, l.x, gy + l.y + 0.006, l.z),
       colorPart(new THREE.CylinderGeometry(0.014, 0.046, 0.026, 8), 0x2d3238, l.x, gy + l.y + 0.074, l.z),
       colorPart(new THREE.CylinderGeometry(0.044, 0.044, 0.006, 8), 0x23272c, l.x, gy + l.y + 0.057, l.z));

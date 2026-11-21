@@ -26,6 +26,8 @@ const entrancesFor = (tier: DomeTier, R: number, port: number | undefined): { po
   const p = port ?? choosePortAngle({ tier, r: R, rot: 0 }, DEFAULT_BEARING).angle;
   return { port: p, persons: personAngles(tier, R, p) };
 };
+import { controlBlockPlan } from '../../sim/dome/controlBlock';
+import { addControlBlock } from './domeControl';
 import { SHELL_INSET, SURROUND_PAD, axisOf, chamberColliders, chamberRho, vestibuleOf, type Vestibule } from '../../sim/dome/vestibule';
 
 /** World units of berm banked round a dome's shell inside its footprint (the footprint is shell plus berm). */
@@ -228,7 +230,7 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
   for (let k = 0; k < nRib; k++) { const rho = inner + (k + 0.5) * len / nRib; for (const s of [-1, 1]) X(rib, 0.01, v.h - 0.08, 0.014, s * inFace, y0 + 0.05, rho); }
   for (const s of [-1, 1]) {
     X('panel_light', 0.018, 0.016, len, s * inFace, y0 + v.h * 0.5, mid);                                           // the band
-    X('paint_yellow', 0.016, 0.035, len, s * inFace, y0, mid);   // hazard kick plate
+    p.add('paint_yellow', place(box(0.016, 0.035, len, s * inFace, y0, mid)), 'openings');   // hazard kick plate (kept in the doors' layer: one mesh fewer)
     X('panel_dark', 0.024, v.dh * 0.22, Math.min(0.3, len * 0.3), s * inFace, y0 + v.dh * 0.52, mid + len * 0.18);       // the vent grille...
   }
   p.layer = 'roof';
@@ -237,7 +239,7 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
   for (const k of [0.1, 0.35, 0.6, 0.85]) X('panel_light', v.cw + 2 * v.t + 0.01, 0.016, 0.014, 0, y0 + v.h + 0.001, inner + len * k);
   const nz = 2;
   for (const s of [-1, 1]) { X('panel_light', 0.016, 0.012, len, s * v.cw * 0.28, y0 + v.h - 0.014, mid); for (let k = 0; k < nz; k++) X('panel_dark', 0.012, 0.014, 0.012, s * v.cw * 0.28, y0 + v.h - 0.026, inner + (k + 0.5) * len / nz); }
-  X('lamp', v.cw * 0.5, 0.008, 0.03, 0, y0 + v.h - 0.02, mid - len * 0.22); X('lamp', v.cw * 0.5, 0.008, 0.03, 0, y0 + v.h - 0.02, mid + len * 0.22);
+  for (const k of [-0.22, 0.22]) p.add('lamp', place(box(v.cw * 0.5, 0.008, 0.03, 0, y0 + v.h - 0.02, mid + len * k)), 'walls');      // (the lamp strips ride the walls' lamp mesh: one mesh fewer)
   // ── the surround: steel plates in the shell's plane round the outer door, as wide as the hole the doorway took out of the lattice; a heavy bulkhead frame where it meets the skin ──
   p.layer = 'walls';
   const lam0 = hole.shareLo ? -v.w / 2 : Math.min(hole.lam0, -(v.cw / 2 + v.t + SURROUND_PAD)), lam1 = hole.shareHi ? v.w / 2 : Math.max(hole.lam1, v.cw / 2 + v.t + SURROUND_PAD), top = Math.max(hole.y1, y0 + v.h) + 0.02;
@@ -316,8 +318,8 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
   for (let k = 0; k < 3; k++) X('panel_dark', 0.018 * big, 0.04 * big, 0.012, (-0.04 + 0.04 * k) * big, y0 + v.dh + 0.09 * big, outer + v.t / 2 + 0.022);
   if (!veh && tier === 'arcology') {     // a lit door: light strips up both jambs and across the head, so the entrance reads at night and from far off
     const zf = outer + v.t / 2 + 0.03;
-    for (const sx of [-1, 1]) X('lamp', 0.022, v.dh * 0.92, 0.012, sx * (v.dw / 2 + 0.03), y0 + v.dh / 2, zf);
-    X('lamp', v.dw + 0.08, 0.022, 0.012, 0, y0 + v.dh + 0.035, zf);
+    for (const sx of [-1, 1]) p.add('lamp', place(box(0.022, v.dh * 0.92, 0.012, sx * (v.dw / 2 + 0.03), y0 + v.dh / 2, zf)), 'walls');
+    p.add('lamp', place(box(v.dw + 0.08, 0.022, 0.012, 0, y0 + v.dh + 0.035, zf)), 'walls');
   }
   p.layer = 'interior';
   p.add('concrete', place(box(v.cw * 1.1, 0.006, 0.5, 0, y0 - L.stem * 0.2 + 0.001, inner - 0.3)));   // (a steel threshold plate inside the inner door: no gravel or other brown)
@@ -408,7 +410,7 @@ function earthen(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
 function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number, opts: BuildOpts, N: number, panelMat: 'dome_polycarb' | 'arcology', frameMat: 'aluminum' | 'steel'): THREE.Group {
   const p = new Parts(seed, opts), L = LOOK[tier], R = def.cellsX * CELL / 2 - 0.03 - bermU(tier), y0 = L.stem, g = opts.ground ?? (() => 0);
   const rim = (a: number) => g(R * Math.sin(a), R * Math.cos(a));
-  const nWall = Math.max(36, Math.min(120, Math.round(R * 14)));
+  const nWall = Math.max(36, Math.min(detailTier() === 'high' ? 120 : 84, Math.round(R * 14)));
   p.layer = 'stakes';
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.add('trim', box(0.012, 0.09, 0.012, sx * (def.cellsX * CELL / 2 - 0.03), -0.02, sz * (def.cellsZ * CELL / 2 - 0.03)));
   p.layer = 'foundation';
@@ -459,14 +461,18 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
     // the crown spire: a mast with a lit tip
     p.layer = 'frame';
     p.add('steel', pipe([0, y0 + R * 0.98, 0], [0, y0 + R * 1.18, 0], 0.025, 6));
-    p.add('lamp', new THREE.SphereGeometry(0.05, 8, 6).translate(0, y0 + R * 1.18 + 0.03, 0));
+    p.add('lamp', new THREE.SphereGeometry(0.05, 8, 6).translate(0, y0 + R * 1.18 + 0.03, 0), 'walls');
   }
   for (const h of doors.holes) airlock(p, tier, R, h, doors, y0);
   bulkheadFrame(p, R, y0, tier, doors.holes);
+  // the control block (arcology): one armored building inside, between the plant yard's service airlock and the entrance module (sim/dome/controlBlock.ts)
+  const cbPlan = tier === 'arcology' ? controlBlockPlan(tier, R, ent.port) : null;
+  if (cbPlan) addControlBlock(p, cbPlan, detailTier());
   // colliders: the shell ring as short boxes, none at the airlocks (people cross only through them), and the chamber walls
   shellColliders(p, R, Math.max(24, Math.min(72, Math.round(R * 8))), doors);
   const out = p.finish();
   out.userData.chimneyTop = null; out.userData.keep = ['frame', 'roof']; out.userData.layerFr = domeLayerFractions(tier); out.userData.digTier = tier;
+  out.userData.controlBlock = cbPlan;
   return out;
 }
 

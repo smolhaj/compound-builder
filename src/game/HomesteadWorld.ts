@@ -53,6 +53,7 @@ import { fenceLean } from './atmosphere/aging';
 import { LEANS, leanRun } from './atmosphere/fenceAging';
 import { FamilyRenderer } from './people/FamilyRenderer';
 import { setFigureDetail } from '../engine/world/people/figureKit';
+import { staffAt, type StaffFigure } from './people/DomeStaff';
 import { BunkerFolk, type WorldSpot } from './people/BunkerFolk';
 import { bunkerOccupants, hatchOpen } from '../sim/bunkerLife';
 import { DogRenderer } from './people/DogRenderer';
@@ -177,6 +178,7 @@ import { plantLayout } from '../sim/dome/plant';
 import { getDoorLook } from './buildkit/domeBuildings';
 import { makeVehiclePorts, type PortFixtures, type PortInput } from './fx/VehiclePorts';
 import { planToPort, portFrameOf } from '../sim/dome/portRoad';
+import { controlBlockPlan, turnPlan } from '../sim/dome/controlBlock';
 import { insideLane, onApron, portCycleSeconds, vehicleTail, type PortFrame } from '../sim/dome/vehiclePort';
 /** Clear ground round a dome's shell and apron (world units: 2 = 40 ft). */
 const KILL_ZONE = 2.0;
@@ -405,6 +407,7 @@ export class HomesteadWorld {
     this.stream = new StreamRenderer(ws.scene);
     this.lakes = new RegionalWaterRenderer(ws.scene);
     this.family = new FamilyRenderer(ws.scene);
+    this.family.setExtras(t => this._staffFigures(t));
     this.bunkerFolk = new BunkerFolk(ws.scene);
     this.dogs = new DogRenderer(ws.scene);
     this.guardPosts = new GuardPostProp(ws.scene);
@@ -628,7 +631,9 @@ export class HomesteadWorld {
       const rr = q.shape === 'box' ? Math.hypot(q.w, q.d) / 2 : q.r;
       if (rr > 0.06) obs.push({ x: q.x, z: q.z, hx: rr, hz: rr });
     }
-    const plan = interiorPlan(ref.tier, ref.r, angles, obs, b.placed.rot + 1, vehicles);
+    // the arcology's control block: planned in the dome's own frame exactly as the builder draws it (buildkit/domeBuildings), then turned with the dome
+    const cb0 = ref.tier === 'arcology' && vehicles.length ? controlBlockPlan(ref.tier, ref.r, vehicles[0] - b.placed.rot * Math.PI / 2) : null, cb = cb0 ? turnPlan(cb0, b.placed.rot * Math.PI / 2) : null;
+    const plan = interiorPlan(ref.tier, ref.r, angles, obs, b.placed.rot + 1, vehicles, cb);
     // the plant's equipment is lit at night: a pool of light round every unit (the yard and gallery read as a working place, not a dark plane)
     { const big = plantLayout(ref.tier, ref.r, filtering, { rot: b.placed.rot }).parts.filter(q => !q.onShell && !q.high && q.shape === 'box' && q.h > 0.12 && Math.max(q.w, q.d) > 0.3 && Math.hypot(q.x, q.z) < ref.r * 1.8).sort((p, q) => Math.max(q.w, q.d) - Math.max(p.w, p.d)).slice(0, 8);
       // (the pool lies on the aisle side of each unit, in front of its doors, where the ground shows)
@@ -638,6 +643,13 @@ export class HomesteadWorld {
     const made = { plan, key };
     this._interiorCache.set(b.placed.id, made);
     return made;
+  }
+
+  /** The control block's staff (people/DomeStaff): scenery figures at the consoles and on the footpaths of every finished arcology. */
+  private _staffFigures(t: number): StaffFigure[] {
+    const out: StaffFigure[] = [];
+    for (const b of this._built.values()) { const cb = b.cover && b.finished ? this._interiorCache.get(b.placed.id)?.plan.control : null; if (cb) out.push(...staffAt({ plan: cb, ox: b.placed.x, oz: b.placed.z, y: b.group.position.y + 0.01 }, t)); }
+    return out;
   }
 
   /** A gravel drive in to the yard (else a two-track, and the truck stops at the gate). */
@@ -2666,7 +2678,7 @@ export class HomesteadWorld {
       m.material = see ? xrayOf(ud.baseMat) : ud.baseMat;
       if (this._section?.id === b.placed.id) m.material = this._clipped(m.material, this._section.plane);
       // (a foundation's banked earth and a dome's stem wall, berm and embankment hug the ground: no shadow pass cost)
-      m.castShadow = !see && !['kit_glass', 'kit_dome_glass', 'kit_dome_polycarb', 'kit_string'].includes(ud.baseMat.name) && !ud.baseMat.name.startsWith('kit_glow') && !(layer === 'foundation' && (ud.baseMat.name === 'kit_earth' || b.cover)) && !(b.cover && layer === 'walls');
+      m.castShadow = !see && !['kit_glass', 'kit_dome_glass', 'kit_dome_polycarb', 'kit_string'].includes(ud.baseMat.name) && !ud.baseMat.name.startsWith('kit_glow') && !(layer === 'foundation' && (ud.baseMat.name === 'kit_earth' || b.cover)) && !(b.cover && (layer === 'walls' || layer === 'interior' || layer === 'decor'));
       if (layer === 'cutwalls') m.visible = v === 'cutaway' && b.finished;
       else if (v === 'cutaway' && CUTAWAY_HIDE.includes(layer) && (b.finished || layer !== 'walls')) m.visible = false;
       // seen from far off, the inside of an enclosed building is hidden (no draw, no shadow); only in the plain exterior view
