@@ -247,7 +247,9 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
   }
   const R0 = doors.shellRho(0) + 0.017;
   X('panel_light', lam1 - lam0, 0.016, 0.034, (lam0 + lam1) / 2, capY, R0);                                                         // the cap along the roof line
-  for (const s of [-1, 1]) X('panel_dark', 0.022, capY - y0, 0.04, s === -1 ? lam0 : lam1, y0, doors.shellRho(s === -1 ? lam0 : lam1) + 0.017);    // sealed bulkhead rims at the skin
+  const rimTop = Math.max(top, capY);
+  for (const s of [-1, 1]) X('panel_dark', 0.022, rimTop - y0, 0.04, s === -1 ? lam0 : lam1, y0, doors.shellRho(s === -1 ? lam0 : lam1) + 0.017);    // sealed bulkhead rims at the skin, up the full height of the re-glazed band (no open end)
+  if (top > capY) X('panel_light', lam1 - lam0 + 0.022, 0.016, 0.036, (lam0 + lam1) / 2, top - 0.004, R0);                                        // flashing along the band's top edge: it is framed on all four sides
   // ── the doors ──
   p.layer = 'openings';
   const ds = Math.max(0.01, 0.02 * big), yb = Math.min(y0, foot + 0.03), dhb = v.dh + (y0 - yb);   // (the doors stand on the chamber floor, not on the stem wall's sill)
