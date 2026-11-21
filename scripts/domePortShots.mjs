@@ -109,6 +109,15 @@ try {
     if (want('hatchclose')) { await pr(EP(R - lenP - 0.55 * S, 0.1 * S, 0.3), EP(R - lenP + 0.1, 0, 0.3), 58); await shot('inside-person-hatch-close'); }
   }
   if (want('roofabove')) { await pr(E(R + 2.2 * S, -1.2 * S, 2.6 * S), E(R - 0.3, 0.1, 0.4), 55); await shot('entrance-roof-from-above'); }
+  if (want('yardinside')) {
+    // inside the armored, roofed plant yard: the roof is hidden for the shot (the building view's cutaway) and the camera stands in the yard
+    await set(`cb.store.getState().setBuildingView('cutaway')`); await frames(2);
+    const Y = await page.evaluate(async ([t, r, rot]) => { const m = await import('/src/sim/dome/plantYard.ts'); const g = m.yardGeometry(t, r, rot); const P = (u, v) => m.yardPoint(g, u, v); return { W: g.W, D: g.D, stack: P(0.24 * g.W, 0.72 * g.D), eye: P(0.24 * g.W + 0.9, 0.72 * g.D + 1.1), wall: P(0.24 * g.W, 0.1), mid: P(0.24 * g.W + 0.5, 0.95 * g.D) }; }, [dm.tier, R, ROT]);
+    const w = q => [dm.x + q[0], dm.z + q[1]];
+    { const e = w(Y.eye), l = w(Y.stack); await pr([e[0], 0.5, e[1]], [l[0], 0.15, l[1]], 60); await shot('yard-inside-intake-valve'); }
+    { const e = w(Y.mid), l = w(Y.wall); await pr([e[0], 0.55, e[1]], [l[0], 0.15, l[1]], 62); await shot('yard-inside-duct-to-collar'); }
+  }
+  if (want('killzone')) { await pr([dm.x - u[0] * R * 0.3 + n[0] * 2, R * 4.2, dm.z - u[1] * R * 0.3 + n[1] * 2], E(R + 2.5, 0, 0), 62); await shot('aerial-kill-zone'); }
   if (want('pick')) {
     await pr(E(Rd - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await frames(2);
     lap(JSON.stringify(await page.evaluate(async ([W, H]) => { const T = await import('/node_modules/three/build/three.module.js'); const ws = window.__cb.ws, cam = ws.camera, rc = new T.Raycaster(), out = [];

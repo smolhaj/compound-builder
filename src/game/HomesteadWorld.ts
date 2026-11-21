@@ -2730,7 +2730,7 @@ export class HomesteadWorld {
       // the room as the household keeps it tonight (atmosphere/nightLife: up, asleep, on watch, away)
       const room = this.atmos.room(b.placed.id);
       const home = KIT[b.placed.kind].sleeps > 0;
-      const fill = this._view === 'full' ? 0.25 : 0.12;
+      const fill = (this._view === 'full' ? 0.25 : 0.12) * (b.cover ? 0.1 : 1);      // (a dome's warm fill light would wash its own gates and base ring brown from outside by day)
       b.light.intensity = room !== undefined ? fill * (0.3 + 0.7 * this.air.daylight) + room * 1.4 * night * lampScale(this.atmos.warmth) : fill + (home ? (lit ? night * 1.25 : night * 0.25) : night * 0.1);
       if (pick) this._noteLight(cands, b, above);
     }
