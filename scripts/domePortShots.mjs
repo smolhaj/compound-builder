@@ -78,6 +78,7 @@ try {
   }
   const pa = dm.persons[0], pu = pa ? [Math.sin(pa.angle), Math.cos(pa.angle)] : u, pn = [pu[1], -pu[0]];
   const EP = (rho, lam, h) => [dm.x + pu[0] * rho + pn[0] * lam, h, dm.z + pu[1] * rho + pn[1] * lam];   // a point on the person airlock's frame
+  if (want('seam')) { const sa = (dm.persons[1] ? dm.persons[1].angle : a.angle + 1.57) + 0.9, su = [Math.sin(sa), Math.cos(sa)]; const sx = dm.x + su[0] * (R + 1.2), sz = dm.z + su[1] * (R + 1.2); await pr([sx, 0.5, sz], [dm.x + su[0] * R, 0.45, dm.z + su[1] * R], 60); await shot('seam-base-ring-low'); await pr([dm.x + su[0] * (R + 6), 3.5, dm.z + su[1] * (R + 6)], [dm.x + su[0] * R, 0.8, dm.z + su[1] * R], 55); await shot('seam-aerial'); }
   if (want('cycling')) { await set(`cb.world.setPortState('cycling')`); await pr(EP(R + 0.8 * S, 0.0, 0.3 * S), EP(R - 0.2, 0, 0.22 * S), 55); await shot('chamber-person-cycling'); }
   if (want('sealed-lamp')) { await set(`cb.world.setPortState('sealed')`); await pr(E(R + 1.5 * S, 0.1, 0.32 * S), E(R - 0.6, 0, 0.25 * S), 58); await shot('chamber-port-sealed'); }
   if (want('chamber-person')) { await pr(EP(R + 0.8 * S, 0.0, 0.3 * S), EP(R - 0.2, 0, 0.22 * S), 55); await shot('chamber-person-eye'); }

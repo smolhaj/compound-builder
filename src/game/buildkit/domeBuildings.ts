@@ -412,6 +412,10 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
       p.add('steel', quad(at(r + 0.012, a0, y0), at(r + 0.012, a1, y0), at(r + 0.012, a1, y0 + band), at(r + 0.012, a0, y0 + band), centre));
       const rl = R + 0.002; p.add('lamp', quad(at(rl + 0.014, a0, y0 + band - 0.07), at(rl + 0.014, a1, y0 + band - 0.07), at(rl + 0.014, a1, y0 + band), at(rl + 0.014, a0, y0 + band), centre));
     }
+    // a continuous armored base ring where the band meets the foundation, and a gasket seam along the band's top where the panels meet it: no gap shows between skin and footing
+    p.layer = 'walls';
+    p.add('panel_dark', ringWall(R - 0.03, R + 0.05, y0 + 0.06, () => y0 - 0.03, nWall));
+    p.add('panel_dark', ringWall(R - 0.025, R + 0.018, y0 + band + 0.012, () => y0 + band - 0.012, nWall));
     // the crown spire: a mast with a lit tip
     p.layer = 'frame';
     p.add('steel', pipe([0, y0 + R * 0.98, 0], [0, y0 + R * 1.18, 0], 0.025, 6));
