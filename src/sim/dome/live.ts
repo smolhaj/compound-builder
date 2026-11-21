@@ -35,6 +35,7 @@ import { climateOpts, plantWearDay } from './plantClimateLive';
 import { shellSnowDay } from './snowLive';
 import { climateCards } from './climateReadout';
 import { ventsIced } from '../snowLoad';
+import { INTAKE, hasFilteredIntake, intakeAir } from './intake';
 import type { PlantKind } from './plantUnits';
 import { damagePlant, fxOf, plantJobs, rushPlant, rushQuote, specOf, unitsOf } from './plantLive';
 import { PLANT_SHORT, plantKinds, spareProblem, spareUsd } from './plantUnits';
@@ -99,6 +100,8 @@ export interface DomeState {
   powered: boolean;
   /** The last time the fail-safe vents opened (game time), or null. */
   ventedAt: number | null;
+  /** The last time the arcology's filtered emergency intake logged a cycle (game time; optional, so no save bump). */
+  intakeAt?: number;
   /** The structure this state belongs to (set when the state is filed under `GameState.domes`). */
   id?: string;
   /** Water loop level, and the game time its pumps are down until (a fouled membrane), or 0. (All below: save v100, optional.) */
@@ -417,7 +420,15 @@ function stepOne(s: GameState, d: DomeRef, st: DomeState, dtDays: number, multi:
     }
     // the fail-safe vents: bad air, or a sealed shell cooking in the sun with the plant dark
     const hot = st.indoorF >= HEAT_VENT_F;
-    if ((st.co2ppm >= LIVE.VENT_PPM || st.o2pct <= LIVE.VENT_O2 || hot) && !iced) {
+    if (hasFilteredIntake(d.tier)) {
+      // the arcology has no open vents: bad air is drawn through sealed, filtered intakes (sim/dome/intake.ts): the lockdown stays, no dust gets in, the media pays for it
+      if (st.co2ppm >= LIVE.VENT_PPM || st.o2pct <= LIVE.VENT_O2) {
+        const a = intakeAir({ co2ppm: st.co2ppm, o2pct: st.o2pct }, hrs);
+        st.co2ppm = a.co2ppm; st.o2pct = a.o2pct;
+        if (st.filtering !== 'none') st.filterHealth = Math.max(0, st.filterHealth - (INTAKE.WEAR_PER_DAY + 0.04 * dirt) * dtDays);
+        if (!st.intakeAt || s.clock.t - st.intakeAt > 1) { st.intakeAt = s.clock.t; out.push(`${name}the air had gone bad (${(st.co2ppm / 10000).toFixed(1)} percent CO2): the filtered emergency intakes are cycling. The lockdown holds and nothing from outside gets in.`); }
+      }
+    } else if ((st.co2ppm >= LIVE.VENT_PPM || st.o2pct <= LIVE.VENT_O2 || hot) && !iced) {
       st.lockdown = false; st.since = null; st.ventedAt = s.clock.t;
       out.push(hot && st.co2ppm < LIVE.VENT_PPM
         ? `${name}fail-safe vents opened on their own: the sealed shell had reached ${Math.round(st.indoorF)} F. The lockdown is over.${dirt > 0.2 ? ' There is dust in the air outside, and it is coming in.' : ''}`
