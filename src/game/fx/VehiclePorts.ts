@@ -29,7 +29,7 @@ const STATE_COLOR: Record<PortState, number> = { open: 0x30ff80, cycling: 0xffb0
 
 export const portsKey = (ins: readonly PortInput[]): string => ins.map(i => `${i.id}:${i.tier}:${i.frame.angle.toFixed(3)}:${i.frame.cx.toFixed(2)},${i.frame.cz.toFixed(2)}:${i.frame.r.toFixed(2)}:${i.lane ? 1 : 0}:${i.guarded ? 1 : 0}:${i.persons.length}:${i.state}`).join('|');
 
-const POUR = 0x8f8d86, CURB = 0x6f6d68, PAINT = 0xeae7da, YELLOW = 0xe3b92a, STEEL = 0x8a929a, DARK = 0x262a2f, GLASS = 0x6fa5b8;
+const POUR = 0x8a9097, CURB = 0x6b7078, PAINT = 0xeae7da, YELLOW = 0xe3b92a, STEEL = 0x8a929a, DARK = 0x262a2f, GLASS = 0x6fa5b8;
 const CLAD: Record<DomeTier, number> = { earthen: 0x7a6f5d, geodesic: 0x9aa3ab, glass: 0x56606a, arcology: 0x2a3037 };
 const ACCENT: Record<DomeTier, number> = { earthen: 0xffd070, geodesic: 0xffe9b0, glass: 0xdff3ff, arcology: 0x40e0ff };
 
@@ -171,6 +171,14 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
       for (const s of [-1, 1] as const) { const [qx, qz] = P(PF, R + cd - 0.03, s * (cw / 2 - 0.02)); geos.push(cyl(0.012 * (tier === 'arcology' ? 1.6 : 1), ch, qx, ground(qx, qz) + ch / 2, qz, STEEL)); }
       const [rx, rz] = P(PF, R + cd / 2, 0); geos.push(box(cw, 0.022, cd, rx, ground(rx, rz) + ch, rz, a, clad));
       const [sx, sz] = P(PF, R + cd - 0.005, 0); lamps.push({ x: sx, y: ground(sx, sz) + ch - 0.012, z: sz, w: cw * 0.8, h: 0.012, d: 0.012, yaw: a, color: accent });
+      if (tier === 'arcology') {
+        // an entrance sign tower beside the door: a tall dark pylon with a lit sign face and a big state lamp, readable from 150 ft
+        const [tx, tz] = P(PF, R + 0.15, w + 0.25), gy = ground(tx, tz);
+        geos.push(box(0.5, 2.6, 0.3, tx, gy + 1.3, tz, a, DARK), box(0.62, 0.1, 0.4, tx, gy + 2.65, tz, a, STEEL));
+        const [fx, fz] = P(PF, R + 0.15 + 0.17, w + 0.25);
+        lamps.push({ x: fx, y: gy + 2.1, z: fz, w: 0.4, h: 0.5, d: 0.03, yaw: a, color: accent });
+        lamps.push({ x: fx, y: gy + 1.45, z: fz, w: 0.26, h: 0.26, d: 0.03, yaw: a, color: lampColor, state: true });
+      }
       if (tier === 'arcology') for (const sg of [-1, 1] as const) { const [mx, mz] = P(PF, R + dp - 0.2, sg * (w - 0.05)); geos.push(cyl(0.02, 1.9, mx, ground(mx, mz) + 0.95, mz, STEEL), box(0.3, 0.05, 0.12, mx, ground(mx, mz) + 1.92, mz, a, DARK)); lamps.push({ x: mx, y: ground(mx, mz) + 1.88, z: mz, w: 0.26, h: 0.02, d: 0.08, yaw: a, color: 0xfff4d8 }); }   // tall floodlight masts
       const [cx2, cz2] = P(PF, R + 0.2, w - 0.02); geos.push(cyl(0.008, 0.32, cx2, ground(cx2, cz2) + 0.16, cz2, DARK), box(0.06, 0.03, 0.045, cx2, ground(cx2, cz2) + 0.33, cz2, a, DARK));   // a camera
       const [kx, kz] = P(PF, R + 0.16, -(w - 0.02)); geos.push(cyl(0.007, 0.16, kx, ground(kx, kz) + 0.08, kz, STEEL), box(0.04, 0.05, 0.03, kx, ground(kx, kz) + 0.17, kz, a, DARK)); lamps.push({ x: kx, y: ground(kx, kz) + 0.18, z: kz, w: 0.016, h: 0.012, d: 0.012, yaw: a, color: 0x40ff90 });   // keypad
