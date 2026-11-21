@@ -65,7 +65,7 @@ function slab(f: Fr, rho0: number, rho1: number, lam0: number, lam1: number, top
   const B = (rho: number, lam: number): number => { const [x, z] = P(f, rho, lam); return Math.min(floor(x, z) - 0.01, top(rho) - 0.03); };
   const quad = (a: number[], b: number[], c: number[], d: number[]): void => { pos.push(...a, ...b, ...c, ...a, ...c, ...d); };
   // the sides and the toe slope away (about 1 in 1.2) instead of dropping straight down: a low camera sees a banked edge, not a cliff
-  const K = 1.2, dr = (rho: number, lam: number): number => Math.max(0, top(rho) - B(rho, lam)) * K;
+  const K = 0.6, dr = (rho: number, lam: number): number => Math.max(0, top(rho) - B(rho, lam)) * K;
   const VB = (rho: number, lam: number, side: -1 | 1 | 0, end: 0 | 1 | -1 = 0): [number, number, number] => { const d = dr(rho, lam); const [x, z] = P(f, rho + end * d, lam + side * d); return [x, B(rho, lam), z]; };
   for (let i = 0; i < n; i++) {
     const r0 = rho0 + (rho1 - rho0) * i / n, r1 = rho0 + (rho1 - rho0) * (i + 1) / n;
