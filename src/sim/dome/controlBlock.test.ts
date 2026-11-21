@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { shellFt, TIER } from './tiers';
-import { controlBlockPlan, turnPlan, inBlock, toBlock, CB } from './controlBlock';
+import { controlBlockPlan, turnPlan, inBlock, toBlock, fromBlock, CB } from './controlBlock';
 import { choosePortAngle, DEFAULT_BEARING, portFrame, insideLane, entryR, personLateral } from './vehiclePort';
 import { yardGeometry } from './plantYard';
 
@@ -20,11 +20,13 @@ describe('the arcology control block plan', () => {
     it(`port ${(port * 180 / Math.PI).toFixed(0)} deg: fits the pad, clear of the lane, the airlocks and the yard's way in`, () => {
       const p = controlBlockPlan('arcology', r, port)!;
       expect(p).not.toBeNull();
-      // inside the shell with room, and in front of the ring path
-      for (const lx of [-p.w / 2, 0, p.w / 2]) for (const lz of [-p.d / 2, p.d / 2]) {
-        const [x, z] = [p.cx + lx * Math.cos(p.yaw) + lz * Math.sin(p.yaw), p.cz - lx * Math.sin(p.yaw) + lz * Math.cos(p.yaw)];
-        expect(Math.hypot(x, z)).toBeLessThan(r - CB.SHELL_CLEAR + 1e-6);
-        expect(Math.hypot(x, z)).toBeGreaterThan(p.ringR + 0.3);
+      // curved and flush: the back wall is an arc concentric with the shell, within 0.05 of its inner wall; every corner and the arc's middle are inside the pad, in front of the ring path
+      expect(Math.abs(p.rho + p.d / 2 - (r - CB.WALL_GAP))).toBeLessThan(0.05);
+      for (const lx of [-p.w / 2, -p.w / 4, 0, p.w / 4, p.w / 2]) for (const lz of [-p.d / 2, p.d / 2]) {
+        const [x, z] = fromBlock(p, lx, lz), rr = Math.hypot(x, z);
+        expect(rr).toBeLessThanOrEqual(r + 1e-6);
+        expect(rr).toBeGreaterThan(p.ringR + 0.3);
+        expect(Math.abs(rr - (lz < 0 ? p.rho + p.d / 2 : p.rho - p.d / 2))).toBeLessThan(1e-6);       // (both walls are concentric arcs)
       }
       // the lane, its pad and the module are clear
       const f = portFrame('arcology', 0, 0, r, port)!, lane = insideLane(f)!, lat = personLateral('arcology', r);
@@ -49,7 +51,7 @@ describe('the arcology control block plan', () => {
         for (let i = 1; i < run.pts.length; i++) for (let t = 0; t <= 1; t += 0.1) { const x = run.pts[i - 1][0] + (run.pts[i][0] - run.pts[i - 1][0]) * t, z = run.pts[i - 1][1] + (run.pts[i][1] - run.pts[i - 1][1]) * t; expect(inBlock(p, x, z, -0.03)).toBe(false); }
       }
       // colliders cover the footprint
-      for (const [a, b] of [[-0.9, -0.4], [0.9, 0.4], [0, 0]]) { const lxx = a * p.w / 2, lzz = b * p.d / 2, x = p.cx + lxx * Math.cos(p.yaw) + lzz * Math.sin(p.yaw), z = p.cz - lxx * Math.sin(p.yaw) + lzz * Math.cos(p.yaw); expect(p.colliders.some(c => x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1)).toBe(true); }
+      for (const [a, b] of [[-0.9, -0.4], [0.9, 0.4], [0, 0], [0.5, -0.9], [-0.5, 0.9]]) { const [x, z] = fromBlock(p, a * p.w / 2, b * p.d / 2); expect(p.colliders.some(c => x > c.x0 && x < c.x1 && z > c.z0 && z < c.z1)).toBe(true); }
     });
   }
   it('stands in the gap between the yard airlock and the entrance, against the inner wall, whenever the gap is wide enough', () => {
@@ -62,13 +64,13 @@ describe('the arcology control block plan', () => {
       between++;
       // its centre is on the shorter arc between the two entrances
       expect(Math.abs(wr(p.angle - S)) + Math.abs(wr(G - p.angle))).toBeLessThanOrEqual(Math.abs(wr(G - S)) + 1e-6);
-      // and it stands against the inner wall, not out in the lawn: the back face is within 2.2 of the shell
-      expect(r - (p.rho + p.d / 2)).toBeLessThan(2.2);
+      // and it stands against the inner wall (flush, no lawn behind it)
+      expect(Math.abs(r - (p.rho + p.d / 2) - CB.WALL_GAP)).toBeLessThan(0.05);
     }
     expect(between).toBeGreaterThanOrEqual(14);      // (the gap is wide enough in most layouts; the rest fall back to the far side)
     const usual = controlBlockPlan('arcology', r, 141 * Math.PI / 180)!;
     expect(usual.between).toBe(true);
-    expect(usual.w).toBeGreaterThanOrEqual(4.6);      // (the widest block fits in the usual gap)
+    expect(usual.w).toBeGreaterThanOrEqual(4.8);      // (the widest block fits in the usual gap)
   });
   it('turns with the dome: the world plan is the same block rotated', () => {
     const p = controlBlockPlan('arcology', r, 2.1)!, q = turnPlan(p, Math.PI / 2);

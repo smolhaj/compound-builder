@@ -19,9 +19,9 @@ export type Pt = [number, number];
 export interface Rect { x0: number; z0: number; x1: number; z1: number }
 
 /** Outside size of the block (width along the arc, depth in from the shell) and the clearances it keeps. */
-export const CB = { W_MAX: 5.4, W: 3.7, D: 1.9, SHELL_CLEAR: 0.8, RING_FRAC: 0.6, RING_CLEAR: 0.5, MARGIN: 0.22 } as const;
+export const CB = { W_MAX: 5.6, W: 3.7, D: 1.9, /** The back wall stands this far inside the shell's inner wall radius: flush against it, no lawn behind. */ WALL_GAP: 0.06, RING_FRAC: 0.6, RING_CLEAR: 0.5, MARGIN: 0.22 } as const;
 /** Height of the walls of the five wings and the Operations Room (world units). */
-export const CB_H = { ops: 0.52, wing: 0.6, tall: 0.78 } as const;
+export const CB_H = { ops: 0.5, wing: 0.6, tall: 0.7 } as const;
 
 export type PipeKind = 'power' | 'water' | 'chill';
 export interface PipeRun { kind: PipeKind; /** Waypoints in the plan's frame; the first is at the manifold, the last at the wing's wall. */ pts: Pt[]; /** Height of the pipe's axis above the floor. */ y: number }
@@ -54,11 +54,18 @@ export interface ControlBlockPlan {
 
 const TAU = Math.PI * 2;
 const wrap = (a: number): number => { let d = a % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; };
-const loc = (p: ControlBlockPlan | { cx: number; cz: number; yaw: number }, lx: number, lz: number): Pt => [p.cx + lx * Math.cos(p.yaw) + lz * Math.sin(p.yaw), p.cz - lx * Math.sin(p.yaw) + lz * Math.cos(p.yaw)];
-/** A point of the plan's frame in the block's own frame (the inverse of `controlLocal`). */
-export const toBlock = (p: { cx: number; cz: number; yaw: number }, x: number, z: number): Pt => { const dx = x - p.cx, dz = z - p.cz; return [dx * Math.cos(p.yaw) - dz * Math.sin(p.yaw), dx * Math.sin(p.yaw) + dz * Math.cos(p.yaw)]; };
+/**
+ * The block is curved: its back wall is an arc concentric with the shell (radius `rho + d/2`), its front wall a concentric arc, its end caps radial. A point of the block's own frame
+ * (x across, along the arc of the middle radius, positive toward decreasing angle; z in toward the dome's centre from the middle radius) is at radius `rho - z` and angle `angle - x / rho`.
+ */
+type Polar = { angle: number; rho: number };
+const loc = (p: Polar, lx: number, lz: number): Pt => { const rr = p.rho - lz, th = p.angle - lx / p.rho; return [rr * Math.sin(th), rr * Math.cos(th)]; };
+/** A point of the plan's frame in the block's own frame (the inverse of `fromBlock`). */
+export const toBlock = (p: Polar, x: number, z: number): Pt => [-wrap(Math.atan2(x, z) - p.angle) * p.rho, p.rho - Math.hypot(x, z)];
 /** A point of the block's own frame in the plan's frame. */
 export const fromBlock = loc;
+/** The direction (radians, a figure's `rot`) that points from a place in the block straight out toward the shell, i.e. at the wall of screens. */
+export const outwardAt = (p: Polar, lx: number): number => p.angle - lx / p.rho;
 
 /** A short path segment from a to b is within `rad` of the point (px, pz)? (capsule test) */
 const nearSeg = (px: number, pz: number, a: Pt, b: Pt, rad: number): boolean => {
@@ -98,16 +105,12 @@ function blockedBy(c: Ctx, x: number, z: number, extra: readonly Rect[]): boolea
   return false;
 }
 
-/** Is a block of the given size at (angle, front radius) clear? Sampled on a grid, inflated by the margin. */
-export function fits(c: Ctx, w: number, d: number, angle: number, rhoF: number, extra: readonly Rect[]): boolean {
-  const rc = rhoF + d / 2, p = { cx: Math.sin(angle) * rc, cz: Math.cos(angle) * rc, yaw: angle + Math.PI };
-  for (const lx of [-w / 2, w / 2]) for (const lz of [-d / 2, d / 2]) { const [x, z] = loc(p, lx, lz); if (Math.hypot(x, z) > c.r - CB.SHELL_CLEAR) return false; }
-  const m = CB.MARGIN, nx = Math.ceil((w + 2 * m) / 0.14), nz = Math.ceil((d + 2 * m) / 0.14);
+/** Is a curved block of this size at this angle clear (its back flush against the inner wall)? Sampled on a grid, inflated by the margin. */
+export function fits(c: Ctx, w: number, d: number, angle: number, extra: readonly Rect[]): boolean {
+  const p = { angle, rho: c.r - CB.WALL_GAP - d / 2 }, m = CB.MARGIN, nx = Math.ceil((w + 2 * m) / 0.14), nz = Math.ceil((d + 2 * m) / 0.14);
   for (let i = 0; i <= nx; i++) for (let j = 0; j <= nz; j++) {
     const lx = -(w / 2 + m) + (w + 2 * m) * i / nx, lz = -(d / 2 + m) + (d + 2 * m) * j / nz, [x, z] = loc(p, lx, lz), rho = Math.hypot(x, z);
     const inner = Math.abs(lx) <= w / 2 + 1e-6 && Math.abs(lz) <= d / 2 + 1e-6;
-    if (inner && rho > c.r - CB.SHELL_CLEAR) return false;
-    if (rho > c.r - 0.4) return false;
     if (rho < c.ringR + CB.RING_CLEAR - (inner ? 0 : m)) return false;
     if (blockedBy(c, x, z, extra)) return false;
   }
@@ -127,30 +130,25 @@ export function controlBlockPlan(tier: DomeTier, r: number, port: number, extra:
   const G = port + Math.atan2(personLateral(tier, r) / 2, entryR(tier, r)), T = S + wrap(G - S) / 2;
   // the widest block that fits in the gap goes there (the gap between the two entrances along the inner arc, as close to both as the clearances allow); the compact sizes follow, and
   // only when none fits on that arc does the search look at the far side (`between` false)
-  const sizes: Array<[number, number]> = [[CB.W_MAX, 1.7], [4.6, 1.8], [CB.W, CB.D], [CB.W - 0.4, CB.D - 0.1]];
+  const sizes: Array<[number, number]> = [[CB.W_MAX, CB.D], [4.8, CB.D], [CB.W, CB.D], [CB.W - 0.5, CB.D - 0.1]];
   const span = Math.abs(wrap(G - S)), inArc = (a: number): boolean => Math.abs(wrap(a - S)) + Math.abs(wrap(G - a)) <= span + 1e-6;
-  let best: { a: number; rf: number; w: number; d: number; cost: number; between: boolean } | null = null;
-  // the block stands against the inner wall (its back as near the shell as the clearance allows), tucked into the gap: the largest front radius that fits
-  const rfMin = c.ringR + CB.RING_CLEAR + 0.02, rfs: number[] = []; for (let q = r - CB.SHELL_CLEAR - 1.6; q >= rfMin - 1e-9; q -= 0.1) rfs.push(q);
+  let best: { a: number; w: number; d: number; cost: number; between: boolean } | null = null;
   for (const onlyBetween of [true, false]) {
     for (const [w, d] of sizes) {
       for (let k = 0; k < 720; k++) {
         const a = k * TAU / 720, between = inArc(a);
         if (onlyBetween && !between) continue;
-        for (const rf of rfs) {
-          if (!fits(c, w, d, a, rf, extra)) continue;
-          const cost = Math.abs(wrap(a - T)) - (rf - rfMin) * 0.02;
-          if (!best || cost < best.cost - 1e-9) best = { a, rf, w, d, cost, between };
-          break;      // (the nearest front radius that fits)
-        }
+        if (!fits(c, w, d, a, extra)) continue;
+        const cost = Math.abs(wrap(a - T));
+        if (!best || cost < best.cost - 1e-9) best = { a, w, d, cost, between };
       }
       if (best) break;
     }
     if (best) break;
   }
   if (!best) return null;
-  const { a, rf, w, d } = best, rc = rf + d / 2;
-  const base = { cx: Math.sin(a) * rc, cz: Math.cos(a) * rc, yaw: a + Math.PI };
+  const { a, w, d } = best, rc = c.r - CB.WALL_GAP - d / 2;
+  const base = { angle: a, rho: rc }, cxz = loc(base, 0, 0);
   const yardSide: 1 | -1 = wrap(S - a) < 0 ? 1 : -1;       // (local +x is toward decreasing angle)
   const door = loc(base, 0, d / 2), landing = loc(base, 0, d / 2 + 0.2);
   // the manifold where the buried lines surface: beside the yard door, on the side toward the block, close to the shell
@@ -163,25 +161,24 @@ export function controlBlockPlan(tier: DomeTier, r: number, port: number, extra:
   const inward = (q: Pt, k: number): Pt => [q[0] * (1 - k / Math.hypot(q[0], q[1])), q[1] * (1 - k / Math.hypot(q[0], q[1]))];
   const Fy = loc(base, yardSide * (w / 2 + 0.75), d / 2 + 0.4), Fg = loc(base, -yardSide * (w / 2 + 0.55), d / 2 + 0.4);
   const paths: Pt[][] = [[yd, inward(yd, 0.9), Fy, landing], [c.gateDoor, inward(c.gateDoor, 0.9), Fg, landing], [ringPt, landing]];
-  // pipes: three runs from the manifold to the utility wings' outer wall on the yard side (and the climate wing's back wall), in the block's frame first
+  // pipes: three runs from the manifold along the inner wall to the yard-side end cap of the block (the utility wings), each at its own height and offset so none crosses another
   const s = yardSide, wx = s * (w / 2 + 0.03), pipes: PipeRun[] = [];
-  const bz = (k: number): number => -(d / 2) - 0.12 - 0.09 * k;      // (three lanes behind the block's back wall, nearest first)
   const run = (kind: PipeKind, y: number, pts: Pt[]): void => { pipes.push({ kind, y, pts: [manifold, ...pts.map(q => loc(base, q[0], q[1]))] }); };
-  run('power', 0.06, [[wx + s * 0.14, bz(0)], [wx + s * 0.14, -0.5], [wx, -0.5]]);
-  run('water', 0.1, [[wx + s * 0.26, bz(1)], [wx + s * 0.26, 0.5], [wx, 0.5]]);
-  run('chill', 0.16, [[wx + s * 0.38, bz(2)], [s * 0.12, bz(2)], [s * 0.12, -(d / 2) - 0.02]]);
-  const plan: ControlBlockPlan = { ...base, w, d, angle: a, rho: rc, yardSide, landing, door, yardDoor: yd, manifold, gateDoor: c.gateDoor, paths, ringR, pipes, colliders: [], between: best.between };
+  run('power', 0.06, [[wx + s * 0.35, -0.6], [wx, -0.6]]);
+  run('chill', 0.16, [[wx + s * 0.6, -0.12], [wx, -0.12]]);
+  run('water', 0.1, [[wx + s * 0.85, 0.42], [wx, 0.42]]);
+  const plan: ControlBlockPlan = { cx: cxz[0], cz: cxz[1], yaw: a + Math.PI, w, d, angle: a, rho: rc, yardSide, landing, door, yardDoor: yd, manifold, gateDoor: c.gateDoor, paths, ringR, pipes, colliders: [], between: best.between };
   plan.colliders = collidersOf(plan);
   return plan;
 }
 
-/** Axis-aligned boxes that together cover the footprint (the nav boxes are axis-aligned): strips along the block's width, each the bounds of its own turned piece. */
-export function collidersOf(p: Pick<ControlBlockPlan, 'cx' | 'cz' | 'yaw' | 'w' | 'd'>): Rect[] {
+/** Axis-aligned boxes that together cover the curved footprint (the nav boxes are axis-aligned): one strip every ~0.3 along the arc, each the bounds of its own sector piece (corners and mid-edges). */
+export function collidersOf(p: Pick<ControlBlockPlan, 'angle' | 'rho' | 'w' | 'd'>): Rect[] {
   const n = Math.max(1, Math.ceil(p.w / 0.3)), out: Rect[] = [];
   for (let i = 0; i < n; i++) {
     const l0 = -p.w / 2 + p.w * i / n, l1 = -p.w / 2 + p.w * (i + 1) / n;
     let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
-    for (const lx of [l0, l1]) for (const lz of [-p.d / 2, p.d / 2]) { const [x, z] = loc(p, lx, lz); x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    for (const lx of [l0, (l0 + l1) / 2, l1]) for (const lz of [-p.d / 2, p.d / 2]) { const [x, z] = loc(p, lx, lz); x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
     out.push({ x0: x0 - 0.02, z0: z0 - 0.02, x1: x1 + 0.02, z1: z1 + 0.02 });
   }
   return out;
@@ -204,7 +201,7 @@ export function turnPlan(p: ControlBlockPlan, phi: number): ControlBlockPlan {
 export const obstaclesOf = (p: ControlBlockPlan): Array<{ x: number; z: number; hx: number; hz: number }> => p.colliders.map(c => ({ x: (c.x0 + c.x1) / 2, z: (c.z0 + c.z1) / 2, hx: (c.x1 - c.x0) / 2, hz: (c.z1 - c.z0) / 2 }));
 
 /** Is a point inside the footprint (grown by `pad`)? */
-export function inBlock(p: Pick<ControlBlockPlan, 'cx' | 'cz' | 'yaw' | 'w' | 'd'>, x: number, z: number, pad = 0): boolean {
+export function inBlock(p: Pick<ControlBlockPlan, 'angle' | 'rho' | 'w' | 'd'>, x: number, z: number, pad = 0): boolean {
   const [lx, lz] = toBlock(p, x, z);
   return Math.abs(lx) <= p.w / 2 + pad && Math.abs(lz) <= p.d / 2 + pad;
 }

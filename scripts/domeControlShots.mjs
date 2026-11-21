@@ -57,10 +57,10 @@ try {
   await set(`const s = cb.store.getState(); s.setTimeOfDay(${process.env.NIGHT ? 21.5 : (process.env.TOD || 15.5)}); s.setBuildingView('full'); s.setSeasonMode?.('summer'); s.setWeatherMode('clear');`);
   const a = dm.a, u = a ? [Math.sin(a.angle), Math.cos(a.angle)] : [1, 0], n = [u[1], -u[0]], R = dm.r;
   // ── the control block: its plan (the world's own, in the dome's frame) and helpers to stand the camera in the block's frame ──
-  const cbp = await page.evaluate(id => { const w = window.__cb.world; const b = [...w._built.values()].find(x => x.placed.id === id); const c = w._interiorCache.get(id)?.plan.control; return c ? { cx: c.cx, cz: c.cz, yaw: c.yaw, w: c.w, d: c.d, s: c.yardSide, y0: b.group.position.y, yardDoor: c.yardDoor, manifold: c.manifold, gateDoor: c.gateDoor, landing: c.landing } : null; }, info.id);
+  const cbp = await page.evaluate(id => { const w = window.__cb.world; const b = [...w._built.values()].find(x => x.placed.id === id); const c = w._interiorCache.get(id)?.plan.control; return c ? { angle: c.angle, rho: c.rho, cx: c.cx, cz: c.cz, yaw: c.yaw, w: c.w, d: c.d, s: c.yardSide, y0: b.group.position.y, yardDoor: c.yardDoor, manifold: c.manifold, gateDoor: c.gateDoor, landing: c.landing } : null; }, info.id);
   if (!cbp) { console.error('no control block plan'); await page.close(); continue; }
   lap(JSON.stringify(cbp));
-  const L = (lx, h, lz) => [dm.x + cbp.cx + lx * Math.cos(cbp.yaw) + lz * Math.sin(cbp.yaw), cbp.y0 + 0.02 + h, dm.z + cbp.cz - lx * Math.sin(cbp.yaw) + lz * Math.cos(cbp.yaw)];   // a point of the block's frame (x across, h up from the floor, z toward the front)
+  const L = (lx, h, lz) => { const rr = cbp.rho - lz, th = cbp.angle - lx / cbp.rho; return [dm.x + rr * Math.sin(th), cbp.y0 + 0.02 + h, dm.z + rr * Math.cos(th)]; };   // a point of the curved block's frame (x along the arc, h up from the floor, z in toward the dome's centre)
   const WP = q => [dm.x + q[0], dm.z + q[1]];
   const at = (e, l, fov = 55) => poseRaw(e, l, fov);
   const lightsOn = () => page.evaluate(() => window.__cb.game.setState(st => { const g = structuredClone(st.game); g.utilities.lit = ['x']; return { game: g }; }));

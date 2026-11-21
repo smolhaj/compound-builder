@@ -11,26 +11,29 @@ import type { KitMaterialId } from './materials';
 import type { DetailTier } from './buildingDetail';
 import { CB_H, type ControlBlockPlan } from '../../sim/dome/controlBlock';
 import { CTL_CELLS, type CtlCell } from './controlScreens';
-import { screenPlane } from './screenFeeds';
 
 type Face = 'px' | 'nx' | 'py' | 'ny' | 'pz' | 'nz';
 const FACE_AT: Record<Face, number> = { px: 0, nx: 1, py: 2, ny: 3, pz: 4, nz: 5 };
+/** Longest straight piece of a wall before it is split (the block is curved: each piece is a chord of the arc, so a wall bends in short flat runs). */
+let SEG = 0.9;
 
-/** A box standing on y (its bottom) with chosen faces left out (the underside by default): the index buffer drops six indices per face. */
+/** A box standing on y (its bottom) with chosen faces left out (the underside by default); a wide box is split into chords along x so the bend can curve it. */
 export function bx(w: number, h: number, d: number, x: number, y: number, z: number, skip: readonly Face[] = ['ny']): THREE.BufferGeometry {
-  const g = new THREE.BoxGeometry(w, h, d).translate(x, y + h / 2, z);
+  const g = new THREE.BoxGeometry(w, h, d, Math.max(1, Math.ceil(w / SEG)), 1, 1).translate(x, y + h / 2, z);
   if (!skip.length) return g;
   const idx = g.index!.array as Uint16Array | Uint32Array, drop = new Set(skip.map(f => FACE_AT[f])), keep: number[] = [];
-  for (let f = 0; f < 6; f++) if (!drop.has(f)) for (let k = 0; k < 6; k++) keep.push(idx[f * 6 + k]);
-  g.setIndex(keep);
+  g.groups.forEach(gr => { if (!drop.has(gr.materialIndex!)) for (let k = gr.start; k < gr.start + gr.count; k++) keep.push(idx[k]); });
+  g.clearGroups(); g.setIndex(keep);
   return g;
 }
 /** A vertical cylinder standing on y. */
 const cy = (r: number, h: number, x: number, y: number, z: number, seg = 10, r2 = r): THREE.BufferGeometry => new THREE.CylinderGeometry(r2, r, h, seg).translate(x, y + h / 2, z);
 
-/** A screen face of an atlas cell, turned `ry` about y (0 faces +z), its bottom-centre at (x, y, z). */
+/** A screen face of an atlas cell, turned `ry` about y (0 faces +z), its bottom-centre at (x, y, z); a wide one is split so the bend curves it with the wall. */
 function scr(cell: CtlCell, w: number, h: number, x: number, y: number, z: number, ry = 0, rx = 0): THREE.BufferGeometry {
-  const g = screenPlane(w, h, cell, 0, 0, 0);
+  const g = new THREE.PlaneGeometry(w, h, Math.max(1, Math.ceil(w / SEG)), 1), [cx, cyy, cw, ch] = CTL_CELLS[cell], uv = g.getAttribute('uv');
+  for (let k = 0; k < uv.count; k++) uv.setXY(k, (cx + uv.getX(k) * cw) / 1024, 1 - (cyy + (1 - uv.getY(k)) * ch) / 1024);
+  g.translate(0, h / 2, 0);
   if (rx) g.rotateX(rx);
   g.rotateY(ry).translate(x, y, z);
   g.userData.keepUV = true;
@@ -38,9 +41,8 @@ function scr(cell: CtlCell, w: number, h: number, x: number, y: number, z: numbe
 }
 /** A lamp swatch (0 red, 1 amber, 2 green, 3 white) as a small square facing +z turned by ry. */
 function lamp(i: number, w: number, h: number, x: number, y: number, z: number, ry = 0, rx = 0): THREE.BufferGeometry {
-  const g = new THREE.PlaneGeometry(w, h), [cx, cyy, cw, ch] = CTL_CELLS.ctl_lamps, uv = g.getAttribute('uv');
+  const g = new THREE.PlaneGeometry(w, h), [cx, cyy] = CTL_CELLS.ctl_lamps, uv = g.getAttribute('uv');
   for (let k = 0; k < uv.count; k++) uv.setXY(k, (cx + i * 32 + 4 + uv.getX(k) * 24) / 1024, 1 - (cyy + 4 + (1 - uv.getY(k)) * 24) / 1024);
-  void cw; void ch;
   if (rx) g.rotateX(rx);
   g.rotateY(ry).translate(x, y + h / 2, z);
   g.userData.keepUV = true;
@@ -49,8 +51,16 @@ function lamp(i: number, w: number, h: number, x: number, y: number, z: number, 
 
 export function addControlBlock(p: Parts, plan: ControlBlockPlan, detail: DetailTier): void {
   const hi = detail === 'high', mid = detail !== 'low';
+  SEG = hi ? 0.9 : 1.2;
   const { w, d, yardSide: s } = plan, hw = w / 2, hd = d / 2, e = 0.95, FY = 0.01, zo = -0.25, z0 = -0.05;
-  const place = (g: THREE.BufferGeometry): THREE.BufferGeometry => g.rotateY(plan.yaw).translate(plan.cx, FY, plan.cz);
+  // the bend: the block's frame (x along the arc of the middle radius, z in toward the dome's centre) becomes the curved block: radius rho - z, angle angle - x / rho, so the back and front
+  // walls are arcs concentric with the shell and the end caps are radial
+  const place = (g: THREE.BufferGeometry): THREE.BufferGeometry => {
+    const pos = g.getAttribute('position');
+    for (let i = 0; i < pos.count; i++) { const lx = pos.getX(i), lz = pos.getZ(i), rr = plan.rho - lz, th = plan.angle - lx / plan.rho; pos.setXYZ(i, rr * Math.sin(th), pos.getY(i) + FY, rr * Math.cos(th)); }
+    pos.needsUpdate = true; g.deleteAttribute('normal');
+    return g;
+  };
   const A = (layer: BuildLayer, m: KitMaterialId, g: THREE.BufferGeometry): void => p.add(m, place(g), layer);
   const yardCol = (a: number, b: number): [number, number] => (s > 0 ? [a, b] : [-b, -a]), gateCol = (a: number, b: number): [number, number] => (s > 0 ? [-b, -a] : [a, b]);
   const boxXZ = (x0: number, x1: number, zz0: number, zz1: number, h: number, y = 0, skip: readonly Face[] = ['ny']): THREE.BufferGeometry => bx(x1 - x0, h, zz1 - zz0, (x0 + x1) / 2, y, (zz0 + zz1) / 2, skip);
@@ -131,20 +141,17 @@ export function addControlBlock(p: Parts, plan: ControlBlockPlan, detail: Detail
   const rows: Array<[number, number[]]> = [[-0.04, [-0.62, 0, 0.62]], [0.42, [-0.56, 0.56]]];
   for (const [z, xs] of rows) for (const x of xs) { desk(x, z); chair(x, z + 0.17); }
   // the wall of screens on the Climate wing's front face: four system boards over a security board and the dome overview
-  const wz = zo + 0.006;
+  const wz = zo + 0.012;
   const board: Array<[CtlCell, number, number, number, number]> = [['ctl_power', -0.69, 0.3, 0.38, 0.19], ['ctl_water', -0.23, 0.3, 0.38, 0.19], ['ctl_air', 0.23, 0.3, 0.38, 0.19], ['ctl_doors', 0.69, 0.3, 0.38, 0.19], ['ctl_sec', -0.6, 0.06, 0.36, 0.18], ['ctl_map', 0.22, 0.04, 0.78, 0.26]];
   for (const [c, x, y, ww, hh] of board) { A('openings', 'panel_dark', bx(ww + 0.02, hh + 0.02, 0.012, x, y - 0.01, zo + 0.002, ['ny', 'nz'])); A('decor', 'screens', scr(c, ww, hh, x, y, wz + 0.002)); }
   A('openings', 'panel_dark', bx(2 * e - 0.04, 0.04, 0.03, 0, 0, zo + 0.014, ['ny']));       // the console rail under the board
   for (const sx of [-0.55, 0.55]) A('decor', 'screens', lamp(3, 0.9, 0.03, sx, rt - 0.03, 0.12, 0, Math.PI / 2));         // the ceiling light strips (white swatch, facing down)
   for (const sx of [-0.55, 0.55]) A('decor', 'screens', lamp(3, 0.9, 0.03, sx, rt - 0.03, 0.5, 0, Math.PI / 2));
 
-  // ── Climate (the middle of the back row): two air handlers with fans and a duct trunk on the roof, louvers on the back wall ──
   const ch = 0.7;
   A('decor', 'screens', scr('sign_air', 0.5, 0.094, 0, 0.585, zo + 0.006));
   for (const ax of [-0.45, 0.45]) { A('walls', 'panel_light', bx(0.62, 0.15, 0.36, ax, ch + 0.014, -hd + 0.4, ['ny'])); A('walls', 'panel_dark', bx(0.64, 0.02, 0.38, ax, ch + 0.14, -hd + 0.4, ['ny'])); A('walls', 'panel_dark', cy(0.1, 0.03, ax, ch + 0.16, -hd + 0.4, hi ? 14 : 8)); A('walls', 'panel_light', cy(0.012, 0.02, ax, ch + 0.19, -hd + 0.4, 6)); }
   A('walls', 'panel_light', bx(0.13, 0.13, 1.0, 0, ch + 0.014, -hd + 0.2, ['ny']));      // the duct trunk
-  for (let k = 0; k < (hi ? 7 : 3); k++) A('walls', 'panel_dark', bx(0.3, hi ? 0.012 : 0.04, 0.012, s * 0.12 - s * 0.3 * 0, 0.1 + k * 0.06, -hd - 0.006, ['ny', 'pz']));      // louvers on the back wall
-  A('walls', 'panel_dark', bx(0.07, 0.07, 0.05, s * 0.12, 0.13, -hd - 0.025, ['ny']));       // the chill line's flange on the back wall
 
   // ── Power (yard side, back row): the tallest wing: cooling fans on the roof, louvers and a heavy cable entry on the yard-side face, a warning sign ──
   { const [x0, x1] = wings[0].x, xc = (x0 + x1) / 2, ox = s * hw, wh = wings[0].h;
@@ -152,7 +159,8 @@ export function addControlBlock(p: Parts, plan: ControlBlockPlan, detail: Detail
     A('decor', 'screens', scr('sign_power', 0.5, 0.094, ox + s * 0.006, 0.58, -0.45, s > 0 ? Math.PI / 2 : -Math.PI / 2));
     A('decor', 'screens', scr('sign_hv', 0.34, 0.064, ox + s * 0.006, 0.42, -0.45, s > 0 ? Math.PI / 2 : -Math.PI / 2));
     for (let k = 0; k < (hi ? 6 : 2); k++) A('walls', 'panel_dark', bx(0.012, hi ? 0.016 : 0.1, 0.34, ox + s * 0.006, 0.14 + k * (hi ? 0.04 : 0.12), -0.22, ['ny', s > 0 ? 'nx' : 'px']));
-    A('walls', 'panel_dark', bx(0.05, 0.12, 0.12, ox + s * 0.025, 0.014, -0.5, ['ny'])); A('walls', 'panel_light', bx(0.02, 0.07, 0.07, ox + s * 0.056, 0.04, -0.5, ['ny']));       // the cable entry flange
+    A('walls', 'panel_dark', bx(0.05, 0.12, 0.12, ox + s * 0.025, 0.014, -0.6, ['ny'])); A('walls', 'panel_light', bx(0.02, 0.07, 0.07, ox + s * 0.056, 0.04, -0.6, ['ny']));       // the cable entry flange
+    A('walls', 'panel_dark', bx(0.05, 0.12, 0.12, ox + s * 0.025, 0.1, -0.12, ['ny'])); A('walls', 'panel_light', bx(0.02, 0.08, 0.08, ox + s * 0.056, 0.12, -0.12, ['ny']));       // the chilled-water duct's flange
     for (const fz of [-0.3, -0.7]) { A('walls', 'panel_dark', cy(0.09, 0.04, xc, wh + 0.016, fz, hi ? 14 : 8)); A('walls', 'panel_light', bx(0.2, 0.05, 0.2, xc, wh + 0.016, fz, ['ny', 'py'])); }
     A('walls', 'panel_light', bx(0.5, 0.012, 0.012, xc, wh + 0.1, -0.5)); }
 
@@ -160,7 +168,7 @@ export function addControlBlock(p: Parts, plan: ControlBlockPlan, detail: Detail
   { const [x0, x1] = wings[1].x, xc = (x0 + x1) / 2, ox = s * hw, wh = wings[1].h;
     A('decor', 'screens', scr('sign_water', 0.5, 0.094, xc, 0.4, hd + 0.006));
     A('walls', 'panel_dark', bx(0.16, 0.34, 0.016, xc + s * 0.1, 0.014, hd + 0.008, ['ny'])); A('openings', 'paint_yellow', bx(0.16, 0.03, 0.02, xc + s * 0.1, 0.014, hd + 0.011, ['ny']));
-    A('walls', 'panel_dark', bx(0.05, 0.12, 0.12, ox + s * 0.025, 0.014, 0.5, ['ny'])); A('walls', 'panel_light', bx(0.02, 0.07, 0.07, ox + s * 0.056, 0.04, 0.5, ['ny']));
+    A('walls', 'panel_dark', bx(0.05, 0.12, 0.12, ox + s * 0.025, 0.014, 0.42, ['ny'])); A('walls', 'panel_light', bx(0.02, 0.07, 0.07, ox + s * 0.056, 0.04, 0.42, ['ny']));
     for (const tz of [0.22, 0.7]) { A('walls', 'panel_light', cy(0.1, 0.32, xc - s * 0.12 + s * 0.04, wh + 0.016, tz, hi ? 16 : 8)); A('walls', 'panel_dark', cy(0.104, 0.014, xc - s * 0.08, wh + 0.33, tz, hi ? 16 : 8)); A('walls', 'panel_dark', cy(0.016, 0.1, xc - s * 0.08, wh + 0.34, tz, 6)); A('walls', 'panel_dark', cy(0.012, 0.3, xc + s * 0.25, wh + 0.016, tz, 6)); }
     A('walls', 'panel_dark', bx(0.012, 0.012, 0.52, xc + s * 0.25, wh + 0.28, 0.46, ['ny'])); }
 

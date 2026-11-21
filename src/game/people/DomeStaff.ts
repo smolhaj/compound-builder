@@ -6,7 +6,7 @@
 import { FIG_POSE, stridePhase, type FigurePose } from '../../engine/world/people/figureKit';
 import { pickPersonaWear, type Wear } from '../../engine/world/people/crowdWear';
 import type { ControlBlockPlan, Pt } from '../../sim/dome/controlBlock';
-import { fromBlock } from '../../sim/dome/controlBlock';
+import { fromBlock, outwardAt } from '../../sim/dome/controlBlock';
 import { detailTier } from '../buildkit/buildingDetail';
 
 export interface StaffSpec { plan: ControlBlockPlan; /** The dome's centre in the world and the floor height inside it. */ ox: number; oz: number; y: number }
@@ -55,9 +55,8 @@ const wearOf = (i: number): Wear => { let w = wearCache.get(i); if (!w) { w = pi
 export function staffAt(spec: StaffSpec, t: number, lite = detailTier() !== 'high'): StaffFigure[] {
   // (Medium and Low draw four of the six: the figure layer's triangles count against the dome's budget)
   const { plan, ox, oz, y } = spec, out: StaffFigure[] = [], P = (lx: number, lz: number): Pt => fromBlock(plan, lx, lz);
-  const facing = plan.yaw + Math.PI;           // (toward the wall of screens: local -z)
-  SEATS.forEach(([lx, lz], i) => { if (lite && i === 1) return; const [x, z] = P(lx, lz); out.push({ wear: wearOf(i), pose: { x: ox + x, y, z: oz + z, rot: facing + (i === 1 ? 0.15 * Math.sin(t * 0.3 + i) : 0), scale: 1, pose: FIG_POSE.BENCH, phase: i * 2.1, amp: 0, look: 0.2 * Math.sin(t * 0.4 + i * 1.7) } }); });
-  { const [x, z] = P(...SUPERVISOR); out.push({ wear: wearOf(3), pose: { x: ox + x, y, z: oz + z, rot: facing + 0.25 * Math.sin(t * 0.2), scale: 1, pose: FIG_POSE.STAND, phase: 1, amp: 0 } }); }
+  SEATS.forEach(([lx, lz], i) => { if (lite && i === 1) return; const [x, z] = P(lx, lz); out.push({ wear: wearOf(i), pose: { x: ox + x, y, z: oz + z, rot: outwardAt(plan, lx) + (i === 1 ? 0.15 * Math.sin(t * 0.3 + i) : 0), scale: 1, pose: FIG_POSE.BENCH, phase: i * 2.1, amp: 0, look: 0.2 * Math.sin(t * 0.4 + i * 1.7) } }); });
+  { const [x, z] = P(...SUPERVISOR); out.push({ wear: wearOf(3), pose: { x: ox + x, y, z: oz + z, rot: outwardAt(plan, SUPERVISOR[0]) + 0.25 * Math.sin(t * 0.2), scale: 1, pose: FIG_POSE.STAND, phase: 1, amp: 0 } }); }
   (['yard', 'gate'] as const).forEach((from, i) => {
     if (lite && i === 1) return;
     const w = walkerAt(routeOf(plan, from), t, i * 17);
