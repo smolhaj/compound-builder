@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { PARCEL_SIZE, ParcelTerrain } from './parcelTerrain';
 import { planToPort } from '../../sim/dome/portRoad';
-import { APRON_LEN, GRADE_BATTER, GRADE_LEN, apronSpan, portGrade } from '../../sim/dome/vehiclePort';
+import { LANE_HALF, barrierBollards, APRON_LEN, GRADE_BATTER, apronSpan, portGrade } from '../../sim/dome/vehiclePort';
 import { DOME_KIND, type DomeTier } from '../../sim/dome/tiers';
 import { domeFrom } from '../../sim/dome/standing';
 import { roadBedOf, type RoadPlan } from '../../sim/roadPlan';
@@ -73,5 +73,16 @@ describe('the road is level with the sally port', () => {
     // and the ground beside the road, past the toe, is level with the gravel: no lip
     for (const lam of [-0.9, 0.9]) expect(Math.abs(ground(...at(R + APRON_LEN + 0.1, lam)) + 0.024 - toeRoad), `beside ${lam}`).toBeLessThan(0.03);
     void d; void PARCEL_SIZE;
+  });
+});
+
+describe('the vehicle lane stays clear', () => {
+  it('no barrier bollard stands within the truck lane (its width and a margin each side), and some flank it', () => {
+    for (const tier of ['glass', 'arcology', 'geodesic'] as const) for (const ang of [1.2, 1.5]) {
+      const { pr } = scene(tier, ang), span = apronSpan(pr.frame), lams = barrierBollards(span);
+      expect(lams.length).toBeGreaterThan(2);
+      for (const l of lams) expect(Math.abs(l)).toBeGreaterThanOrEqual(LANE_HALF);
+      expect(lams.some(l => l < 0) && lams.some(l => l > 0)).toBe(true);
+    }
   });
 });

@@ -491,7 +491,7 @@ export class HomesteadWorld {
     this._applyPlan(pr ? pr.plan : this._baseRef, pr ? pr.drawn : undefined);
     const ins: PortInput[] = domes.map(d => {
       const f = portFrameOf(d)!;
-      return { id: d.id, tier: d.tier, frame: f, lane: insideLane(f), guarded, roadY: pr ? ((x: number, z: number): number | null => roadYAlong(pr.plan.pts.slice(-40), [{ s0: -Infinity, s1: Infinity }], x, z, 0.6)) : undefined, persons: d.airlocks.filter(a => !a.role).map(a => ({ angle: a.angle, x: a.x, z: a.z, off: a.off })), state: getDoorLook() === 'sealed' ? 'sealed' as const : 'open' as const, baseY: this._built.get(d.id)?.group.position.y ?? this.groundAt(d.x, d.z) };
+      return { id: d.id, tier: d.tier, frame: f, lane: insideLane(f), guarded, roadY: pr ? ((x: number, z: number): number | null => roadYAlong(pr.plan.pts.slice(-40), [{ s0: -Infinity, s1: Infinity }], x, z, 0.6)) : undefined, persons: d.airlocks.filter(a => !a.role).map(a => ({ angle: a.angle, x: a.x, z: a.z, off: a.off })), state: getDoorLook() !== 'open' ? 'sealed' as const : 'open' as const, baseY: this._built.get(d.id)?.group.position.y ?? this.groundAt(d.x, d.z) };
     });
     if (this._ports) { this._root.remove(this._ports.group); this._ports.dispose(); this._ports = null; }
     if (ins.length) { const f = makeVehiclePorts(ins, (x, z) => this.groundAt(x, z)); this._root.add(f.group); this._ports = f; }

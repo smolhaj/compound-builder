@@ -497,3 +497,12 @@ export function portGrade(rho: number, span: { lamA: number; lamB: number }, bed
   const cut = GRADE_BATTER + (bed.cutRatio - GRADE_BATTER) * k, fill = GRADE_BATTER + (bed.fillRatio - GRADE_BATTER) * k;
   return { half, cut, fill, reach: half + GRADE_BATTER * 4 };   // (a cut up to 4 units, 80 ft, deep still meets the hill on its batter; where the hill is lower the reach changes nothing)
 }
+
+/** Half the lane the barrier leaves clear for a vehicle: the truck's half width and a margin each side. */
+export const LANE_HALF = TRUCK.WIDTH / 2 + 0.2;
+/** Where the anti-ram bollard line's posts stand across the apron (lateral offsets): evenly spaced from curb to curb, none inside the vehicle lane (only the boom arm crosses it). */
+export function barrierBollards(span: { lamA: number; lamB: number }, n = 7): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) { const lam = span.lamA + 0.05 + (span.lamB - span.lamA - 0.1) * i / (n - 1); if (Math.abs(lam) >= LANE_HALF) out.push(lam); }
+  return out;
+}

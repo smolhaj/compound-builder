@@ -8,7 +8,7 @@
 import { portTextures, portUV, signAtlas, signQuad } from './portTextures';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { APRON_LEN, apronSpan, apronTop, type InsideLane, type PortFrame } from '../../sim/dome/vehiclePort';
+import { APRON_LEN, apronSpan, apronTop, barrierBollards, type InsideLane, type PortFrame } from '../../sim/dome/vehiclePort';
 import type { DomeTier } from '../../sim/dome/tiers';
 import { vestibuleOf } from '../../sim/dome/vestibule';
 
@@ -134,8 +134,8 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     }
     // ── the vehicle barrier at the road's end (anti-ram): a second bollard line across the road beyond the apron's toe, a crash-rated boom-gate arm lowered across the lane on two
     //    armored posts (striped red and white), and a second camera mast on the far side so two cameras and two floodlights cover the apron ──
-    { const re = R + APRON_LEN + 0.16, ye = topA(R + APRON_LEN - 0.02), nB = 7;
-      for (let i = 0; i < nB; i++) { const lam = lamA + 0.05 + (lamB - lamA - 0.1) * i / (nB - 1), [bx, bz] = at(re + 0.12, lam); geos.push(cyl(0.024, 0.2, bx, ye + 0.1, bz, STEEL), cyl(0.027, 0.03, bx, ye + 0.17, bz, YELLOW)); }       // the ram-rated bollard line
+    { const re = R + APRON_LEN + 0.16, ye = topA(R + APRON_LEN - 0.02);
+      for (const lam of barrierBollards({ lamA, lamB })) { const [bx, bz] = at(re + 0.12, lam); geos.push(cyl(0.024, 0.2, bx, ye + 0.1, bz, STEEL), cyl(0.027, 0.03, bx, ye + 0.17, bz, YELLOW)); }       // the ram-rated bollard line
       for (const lam of [lamA + 0.02, lamB - 0.02]) { const [px, pz] = at(re, lam); geos.push(box(0.07, 0.2, 0.07, px, ye + 0.1, pz, yaw, DARK), box(0.08, 0.02, 0.08, px, ye + 0.21, pz, yaw, STEEL)); }   // the armored gate posts
       const nA = 6, wA = (lamB - lamA - 0.12) / nA;
       for (let i = 0; i < nA; i++) { const [ax, az] = at(re, lamA + 0.06 + wA * (i + 0.5)); geos.push(box(wA, 0.03, 0.025, ax, ye + 0.15, az, yaw, i % 2 ? 0xe8e8e8 : 0xc23a2e)); }        // the boom arm, striped
