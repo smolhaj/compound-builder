@@ -166,7 +166,8 @@ import { ritualCtx } from './people/ritualGoals';
 import { homeSafety, homeSafetyInput, type HomeSafety } from './atmosphere/homeSafety';
 import { ritualsOf, stanceOf, tableSet } from '../sim/rituals';
 import { bedHour, pickHomeLine } from '../sim/domesticLines';
-import { domeOf, domeLook, domesOf as domesLive } from '../sim/dome/live';
+import { domeOf, domeLook, domesOf as domesLive, yardRoofOf } from '../sim/dome/live';
+import type { RoofState } from '../sim/dome/yardRoof';
 import { TIER, cellsOfKind, shellFt, tierOfKind } from '../sim/dome/tiers';
 import { inYard, yardGeometry } from '../sim/dome/plantYard';
 import { isGradedTier } from '../sim/dome/grading';
@@ -591,7 +592,7 @@ export class HomesteadWorld {
     const dst = domeStateOf(game, ref), hurt: Record<string, 'ok' | 'damaged' | 'down'> = {};
     for (const u of plantUnitsOf(game, ref, dst)) if (u.cond !== 'ok') hurt[u.id] = u.cond;
     const dark = plantFxOf(game, ref, dst).power === 'dark', inter = this._interiorFor(b, game, ref, dst.filtering, dark);
-    const plook: PlantLook = { loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark, interior: inter.plan, interiorKey: inter.key };
+    const plook: PlantLook = { roof: this._roofQA ?? yardRoofOf(game, ref.st.id), loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark, interior: inter.plan, interiorKey: inter.key };
     const key = plantKey(ref.tier, ref.r, dst.filtering, plook), cur = this._domePlants.get(b.placed.id);
     if (cur) cur.setView(this._view);
     if (!cur || cur.key !== key) {
@@ -869,6 +870,9 @@ export class HomesteadWorld {
 
   /** Parcel trees (near, detailed) inside the margin; regional far trees beyond it. */
   /** Is (x, z) in (or within `m` of) a dome's open crater or the moat round its skirt? Trees and ground cover keep out. */
+  /** QA: force the arcology's plant yard roof state for a shot (null: the game's own state, interlocks included). */
+  private _roofQA: RoofState | null = null;
+  setYardRoofLook(s: RoofState | null): void { this._roofQA = s; for (const [, f] of this._domePlants) { this._root.remove(f.group); f.dispose(); } this._domePlants.clear(); }
   /** The kill zone round every dome (owner, 2026-11-21): no tree, shrub or rock within about 40 ft (2 units) of the shell's base or of the apron and the road's end, so the approach is open ground. */
   private _portZones: PortFrame[] = [];
   private _inKillZone(x: number, z: number): boolean {

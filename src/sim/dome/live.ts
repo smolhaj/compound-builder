@@ -40,6 +40,7 @@ import type { PlantKind } from './plantUnits';
 import { damagePlant, fxOf, plantJobs, rushPlant, rushQuote, specOf, unitsOf } from './plantLive';
 import { PLANT_SHORT, plantKinds, spareProblem, spareUsd } from './plantUnits';
 import { billUpkeep } from './upkeep';
+import { effectiveRoof, roofHazard, roofRefusal, type RoofCtx, type RoofState } from './yardRoof';
 import {
   FILTERING, LIMIT_PPM, O2, SCRUB, BED_CAP, freshAir, lockdownClock, sealedAir, advancedFilterUsd, closedEcologyUsd, scrubberUsd,
   type AirCtx, type Clock, type Filtering,
@@ -69,6 +70,8 @@ export type LifeCard = 'foul' | 'plant' | 'blight' | 'power' | 'hot' | 'loop' | 
 export type DomeAlarm = 'ok' | 'low' | 'critical';
 
 export interface DomeState {
+  /** The arcology's plant yard roof as the player set it (sim/dome/yardRoof.ts): closed (the default), vent or open; the interlocks force it shut. Optional, so no save change. */
+  yardRoof?: RoofState;
   /** Sealed (true) or open (false). */
   lockdown: boolean;
   /** Game time the lockdown began, or null. */
@@ -370,6 +373,7 @@ export function stepDome(s: GameState, dtDays: number): string[] {
 function stepOne(s: GameState, d: DomeRef, st: DomeState, dtDays: number, multi: boolean): string[] {
   const out: string[] = [], name = multi ? `The ${domeLabel(s, d).toLowerCase()}'s ` : "The dome's ";
   const hrs = dtDays * 24;
+  if (st.yardRoof && st.yardRoof !== 'closed' && roofRefusal(roofCtxOf(s, st))) { st.yardRoof = 'closed'; out.push(`${name}plant yard roof has closed itself. ${roofRefusal(roofCtxOf(s, st)) ?? ''}`); }
   const powered = planPowered(s, d, st);
   st.powered = powered;
   const o = outside(s);
@@ -557,6 +561,26 @@ export function lockdownProblem(s: GameState, on: boolean, id?: string): string 
   const st = stateOf(s, d);
   if (on && st.lockdown) return 'already sealed';
   if (!on && !st.lockdown) return 'already open';
+  return null;
+}
+
+/** What the plant yard roof's interlocks read from the world (sim/dome/yardRoof.ts). */
+export function roofCtxOf(s: GameState, st: DomeState): RoofCtx {
+  const dz = s.disaster;
+  return { lockdown: st.lockdown, dirt: outsideDirt(s), hazard: !!dz.kind && roofHazard(dz.kind) && s.clock.t >= dz.hitAt - 1 && s.clock.t < dz.hitAt + 45, serviceLocked: true };
+}
+/** The roof as it stands now (what the player set, forced shut while an interlock holds). */
+export const yardRoofOf = (s: GameState, id?: string): RoofState => { const d = domeOf(s, id); return d ? effectiveRoof(stateOf(s, d).yardRoof, roofCtxOf(s, stateOf(s, d))) : 'closed'; };
+/** Set the arcology's plant yard roof. Returns why not, or null. Opening is refused while an interlock holds; closing always works. */
+export function setYardRoof(s: GameState, want: RoofState, id?: string): string | null {
+  const d = domeOf(s, id);
+  if (!d) return 'no dome stands finished yet';
+  if (d.tier !== 'arcology') return 'only the arcology has a roofed plant yard';
+  const st = ownState(s, d), why = want === 'closed' ? null : roofRefusal(roofCtxOf(s, st));
+  if (why) return why;
+  if ((st.yardRoof ?? 'closed') === want) return null;
+  st.yardRoof = want;
+  log(s, want === 'closed' ? 'The plant yard roof slides shut and seals.' : want === 'vent' ? 'The plant yard roof leaves slide back a little: a gasketed gap, the yard breathes.' : 'The plant yard roof leaves are parked: the yard is open to the sky.');
   return null;
 }
 

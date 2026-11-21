@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { useWorldStore } from '../../store/worldStore';
 import { skirtFacts } from '../../sim/dome/skirtFacts';
 import { FILTERING, LIMIT_PPM, type Filtering } from '../../sim/dome/air';
-import { outside, dayLoad, planPowered, buyFiltering, buyLoop, loopBill, loopProblem, domeClean, domeClock, domeViews, filteringBill, filteringProblem, freshClock, replaceFilters, setClimateMode, setLockdown, spareFiltersUsd, tendCostUsd, tendEcology, type DomeView } from '../../sim/dome/live';
+import { setYardRoof, yardRoofOf, outside, dayLoad, planPowered, buyFiltering, buyLoop, loopBill, loopProblem, domeClean, domeClock, domeViews, filteringBill, filteringProblem, freshClock, replaceFilters, setClimateMode, setLockdown, spareFiltersUsd, tendCostUsd, tendEcology, type DomeView } from '../../sim/dome/live';
 import { pluralize } from '../../sim/words';
 import { DomePlantSection } from './DomePlantSection';
 import { domeRunning } from '../../sim/dome/runningLine';
@@ -84,6 +84,16 @@ export function DomePanel() {
       <button data-testid="dome-lockdown" style={{ ...btn(st.lockdown), width: '100%', padding: '8px 9px', fontWeight: 700, letterSpacing: 0.5, background: st.lockdown ? '#8a3b2a' : '#3b6a3a', color: '#fff' }}
         title={st.lockdown ? 'Open the vents and airlocks. With dust in the air outside, it comes in.' : 'Shut the airlocks and vents. The air is then on a clock: people make CO2, the plant and the plants take it back.'}
         onClick={() => act(x => setLockdown(x, !st.lockdown, id))}>{st.lockdown ? 'OPEN THE DOME' : 'LOCK DOWN'}</button>
+      {d.tier === 'arcology' && (() => {
+        const roof = yardRoofOf(game, id), asked = st.yardRoof ?? 'closed';
+        return <div data-testid="dome-yard-roof" style={{ margin: '6px 0 2px' }}>
+          <Row label="Plant yard roof" value={roof === 'closed' ? 'sealed' : roof === 'vent' ? 'venting' : 'open to the sky'} tone={asked !== roof ? 'warn' : undefined} title="The plant yard stands outside the dome's envelope and is entered only from inside through its own airlock, so venting it never opens the dome. The roof shuts itself in lockdown, fallout, ash, smoke, floods, storms, heat and ice." />
+          <div style={{ display: 'flex', gap: 4 }}>
+            {(['closed', 'vent', 'open'] as const).map(r => <button key={r} data-testid={`dome-roof-${r}`} style={{ ...btn(roof === r), flex: 1, padding: '5px 4px' }} onClick={() => act(x => setYardRoof(x, r, id))}>{r === 'closed' ? 'Seal' : r === 'vent' ? 'Vent' : 'Open'}</button>)}
+          </div>
+          {asked !== roof && <Note>{`The roof was set to ${asked} and has been shut by an interlock (lockdown, hazard or dirty air).`}</Note>}
+        </div>;
+      })()}
       <Row label="Air left sealed" value={st.lockdown ? hoursText(st.hours) : clock ? hoursText(clock.hours === Infinity ? null : clock.hours) : '-'} tone={st.lockdown ? air : undefined} title="Hours until the CO2 hits the workplace limit (0.5 percent) or oxygen drops to 17 percent, from now, if nothing changes" />
       <Bar v={st.hours === null || !st.lockdown ? 1 : st.hours / 72} tone={air} />
       <Row label="CO2" value={`${(st.co2ppm / 10000).toFixed(2)} percent`} tone={st.co2ppm >= LIMIT_PPM.alarm ? 'bad' : st.co2ppm > 2000 ? 'warn' : undefined} title="Outside air is 0.04 percent. Headaches above 0.5 percent; the fail-safe vents open at 2 percent." />

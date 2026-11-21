@@ -291,7 +291,7 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
       // an armored blast gate: a heavy frame, a solid leaf, raised vertical stiffener ribs (so it never reads as a plank wall) and a mid rail
       const gh = dhb * 0.97, nb = Math.max(4, Math.floor(w / 0.1)), plate = gh * 0.3;
       put('panel_dark', w, 0.03, 0.026, 0, 0, 0); put('panel_dark', w, 0.03, 0.026, 0, gh - 0.03, 0);
-      put(tier === 'arcology' ? 'panel_dark' : 'panel_steel', w, gh - 0.06, 0.011, 0, 0.03, 0);                                                                   // a solid armored leaf: a shut gate shows no gap and no sky behind it
+      put(tier === 'arcology' ? 'steel' : 'panel_steel', w, gh - 0.06, 0.011, 0, 0.03, 0);                                                                   // a solid armored leaf: a shut gate shows no gap and no sky behind it
       put('panel_dark', w, 0.016, 0.03, 0, gh * 0.62, 0);
       for (let k = 0; k < nb; k++) put('panel_light', 0.012, gh - 0.06 - plate, 0.016, -w / 2 + 0.03 + k * (w - 0.06) / (nb - 1), 0.03 + plate, 0);
       put('paint_yellow', 0.02, dhb * 0.97 - 0.01, 0.03, -s * (w / 2 - 0.012), 0.005, 0);                                     // hazard band on the leading edge

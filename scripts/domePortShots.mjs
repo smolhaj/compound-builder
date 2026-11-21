@@ -118,11 +118,21 @@ try {
     { const e = w(Y.mid), l = w(Y.wall); await pr([e[0], 0.55, e[1]], [l[0], 0.15, l[1]], 62); await shot('yard-inside-duct-to-collar'); }
   }
   if (want('killzone')) { await pr([dm.x - u[0] * R * 0.3 + n[0] * 2, R * 4.2, dm.z - u[1] * R * 0.3 + n[1] * 2], E(R + 2.5, 0, 0), 62); await shot('aerial-kill-zone'); }
+  if (want('roofstates')) {
+    const Y = await page.evaluate(async ([t, r, rot]) => { const m = await import('/src/sim/dome/plantYard.ts'); const g = m.yardGeometry(t, r, rot); const P = (u, v) => m.yardPoint(g, u, v); return { W: g.W, D: g.D, out: P(-0.1 * g.W, g.D + 3.2), outEye: P(0.55 * g.W, g.D + 2.4), mid: P(0, g.D * 0.5), up: P(0.05 * g.W, g.D * 0.5 - 2.0) }; }, [dm.tier, R, ROT]);
+    const w = q => [dm.x + q[0], dm.z + q[1]];
+    for (const st of ['closed', 'vent', 'open']) {
+      await set(`cb.world.setYardRoofLook('${st}')`); await frames(3);
+      { const e = w(Y.outEye), l = w(Y.mid); await pr([e[0], 0.55, e[1]], [l[0], 1.2, l[1]], 62); await shot(`yard-roof-${st}-eye`); }
+      { const e = w(Y.up), l = w(Y.mid); await pr([e[0], 5.2, e[1]], [l[0], 1.5, l[1]], 55); await shot(`yard-roof-${st}-above`); }
+    }
+    await set(`cb.world.setYardRoofLook(null)`);
+  }
   if (want('pick')) {
-    await pr(E(Rd - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await frames(2);
+    await pr(E(R + 1.5 * S, -0.55 * S, 0.3), E(R - 0.1, 0.15 * S, 0.3), 62); await frames(2);
     lap(JSON.stringify(await page.evaluate(async ([W, H]) => { const T = await import('/node_modules/three/build/three.module.js'); const ws = window.__cb.ws, cam = ws.camera, rc = new T.Raycaster(), out = [];
-      for (const [px, py] of [[960, 200], [300, 700], [1600, 700], [960, 900]]) { rc.setFromCamera(new T.Vector2(px / W * 2 - 1, 1 - py / H * 2), cam); const hs = rc.intersectObjects(ws.scene.children, true).filter(q => q.object.isMesh && q.object.visible && q.object.material?.type !== 'MeshBasicMaterial' || false).slice(0, 3);
-        out.push(hs.map(h => { let o = h.object, chain = []; while (o && chain.length < 5) { chain.push(o.name || o.type); o = o.parent; } const g = h.object.geometry, col = g.attributes.color, fi = h.faceIndex * 3; return [chain.join('<'), +h.distance.toFixed(2), h.point.toArray().map(v => +v.toFixed(2)), 'ground', +window.__cb.world.groundAt(h.point.x, h.point.z).toFixed(3), col ? [col.getX(fi), col.getY(fi), col.getZ(fi)].map(v => +v.toFixed(2)) : null, h.object.geometry.index ? 'idx' : 'nonidx', g.attributes.position.count]; })); } return out; }, [W, H])));
+      for (const [px, py] of [[700, 330], [900, 330], [450, 300]]) { rc.setFromCamera(new T.Vector2(px / W * 2 - 1, 1 - py / H * 2), cam); const hs = rc.intersectObjects(ws.scene.children, true).filter(q => q.object.isMesh && q.object.visible && q.object.material?.type !== 'MeshBasicMaterial' || false).slice(0, 3);
+        out.push(hs.map(h => { let o = h.object, chain = []; while (o && chain.length < 5) { chain.push(o.name || o.type); o = o.parent; } const g = h.object.geometry, col = g.attributes.color, fi = h.faceIndex * 3, mt = h.object.material; return [chain.join('<'), +h.distance.toFixed(2), mt?.color?.getHexString?.(), mt?.map ? 'map' : 'nomap', mt?.emissive?.getHexString?.(), mt?.name, col ? [col.getX(fi), col.getY(fi), col.getZ(fi)].map(v => +v.toFixed(2)) : null, h.object.geometry.index ? 'idx' : 'nonidx', g.attributes.position.count]; })); } return out; }, [W, H])));
   }
   if (want('inside-night')) { await lightsOn(); await set(`cb.store.getState().setTimeOfDay(21.5)`); await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await shot('inside-looking-out-night'); }
   if (want('night')) {
