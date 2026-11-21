@@ -100,6 +100,14 @@ try {
     lap('haze meshes hidden ' + await page.evaluate(() => window.__hazeHidden)); await shot('diag-nohaze');
     await page.evaluate(() => { let n = 0; window.__cb.ws.scene.traverse(o => { if (o.isPointLight || o.isSpotLight) { o.visible = false; n++; } }); window.__nl = n; }); lap('lights off ' + await page.evaluate(() => window.__nl)); await shot('diag-nolights');
   }
+  if (want('gateclose')) { await pr(E(R + 1.5 * S, -0.55 * S, 0.3), E(R - 0.1, 0.15 * S, 0.3), 62); await shot('gate-close-eye'); }
+  if (want('gatelow')) { await pr(E(R + 1.0 * S, 0.5 * S, 0.1), E(R - 0.1, -0.1, 0.35), 70); await shot('gate-low-angle'); }
+  if (want('airlockclose')) { await pr(EP(R + 0.9 * S, -0.3 * S, 0.3), EP(R - 0.1, 0.05, 0.28), 62); await shot('person-airlock-close'); }
+  if (want('pick')) {
+    await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await frames(2);
+    lap(JSON.stringify(await page.evaluate(async () => { const T = await import('/node_modules/three/build/three.module.js'); const ws = window.__cb.ws, cam = ws.camera, rc = new T.Raycaster(), out = [];
+      for (const [x, y] of [[0, -0.7], [0, -0.45], [-0.5, -0.5], [0, -0.1], [0.5, -0.3]]) { rc.setFromCamera(new T.Vector2(x, y), cam); const h = rc.intersectObjects(ws.scene.children, true).filter(q => q.object.isMesh && q.object.visible)[0]; out.push(h ? [x, y, h.object.name, h.object.material?.name || h.object.userData?.mat, h.object.material?.color?.getHexString?.(), h.distance.toFixed(2)] : [x, y, null]); } return out; })));
+  }
   if (want('inside-night')) { await lightsOn(); await set(`cb.store.getState().setTimeOfDay(21.5)`); await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await shot('inside-looking-out-night'); }
   if (want('night')) {
     await lightsOn(); await set(`cb.store.getState().setTimeOfDay(21.5)`);
