@@ -49,7 +49,7 @@ function lamp(i: number, w: number, h: number, x: number, y: number, z: number, 
 
 export function addControlBlock(p: Parts, plan: ControlBlockPlan, detail: DetailTier): void {
   const hi = detail === 'high', mid = detail !== 'low';
-  const { w, d, yardSide: s } = plan, hw = w / 2, hd = d / 2, e = hw - 0.9, FY = 0.01, zo = -0.25, z0 = -0.05;
+  const { w, d, yardSide: s } = plan, hw = w / 2, hd = d / 2, e = 0.95, FY = 0.01, zo = -0.25, z0 = -0.05;
   const place = (g: THREE.BufferGeometry): THREE.BufferGeometry => g.rotateY(plan.yaw).translate(plan.cx, FY, plan.cz);
   const A = (layer: BuildLayer, m: KitMaterialId, g: THREE.BufferGeometry): void => p.add(m, place(g), layer);
   const yardCol = (a: number, b: number): [number, number] => (s > 0 ? [a, b] : [-b, -a]), gateCol = (a: number, b: number): [number, number] => (s > 0 ? [-b, -a] : [a, b]);

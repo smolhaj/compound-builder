@@ -19,7 +19,7 @@ export type Pt = [number, number];
 export interface Rect { x0: number; z0: number; x1: number; z1: number }
 
 /** Outside size of the block (width along the arc, depth in from the shell) and the clearances it keeps. */
-export const CB = { W: 3.7, D: 1.9, SHELL_CLEAR: 0.8, RING_FRAC: 0.6, RING_CLEAR: 0.5, MARGIN: 0.22 } as const;
+export const CB = { W_MAX: 5.4, W: 3.7, D: 1.9, SHELL_CLEAR: 0.8, RING_FRAC: 0.6, RING_CLEAR: 0.5, MARGIN: 0.22 } as const;
 /** Height of the walls of the five wings and the Operations Room (world units). */
 export const CB_H = { ops: 0.52, wing: 0.6, tall: 0.78 } as const;
 
@@ -125,18 +125,25 @@ export function controlBlockPlan(tier: DomeTier, r: number, port: number, extra:
   const yd = c.yardDoor, S = Math.atan2(yd[0], yd[1]);
   // the target is the middle of the shorter arc between the yard door and the entrance module's centre
   const G = port + Math.atan2(personLateral(tier, r) / 2, entryR(tier, r)), T = S + wrap(G - S) / 2;
-  const sizes: Array<[number, number]> = [[CB.W, CB.D], [CB.W - 0.4, CB.D - 0.1]];
-  let best: { a: number; rf: number; w: number; d: number; cost: number } | null = null;
+  // the widest block that fits in the gap goes there (the gap between the two entrances along the inner arc, as close to both as the clearances allow); the compact sizes follow, and
+  // only when none fits on that arc does the search look at the far side (`between` false)
+  const sizes: Array<[number, number]> = [[CB.W_MAX, CB.D], [4.6, CB.D], [CB.W, CB.D], [CB.W - 0.4, CB.D - 0.1]];
+  const span = Math.abs(wrap(G - S)), inArc = (a: number): boolean => Math.abs(wrap(a - S)) + Math.abs(wrap(G - a)) <= span + 1e-6;
+  let best: { a: number; rf: number; w: number; d: number; cost: number; between: boolean } | null = null;
   const rfs = [c.ringR + CB.RING_CLEAR + CB.MARGIN, c.ringR + CB.RING_CLEAR + CB.MARGIN + 0.15, c.ringR + CB.RING_CLEAR + CB.MARGIN + 0.3];
-  for (const [w, d] of sizes) {
-    for (let k = 0; k < 720; k++) {
-      const a = k * TAU / 720;
-      for (const rf of rfs) {
-        if (!fits(c, w, d, a, rf, extra)) continue;
-        const cost = Math.abs(wrap(a - T)) + (rf - rfs[0]) * 0.05;
-        if (!best || cost < best.cost - 1e-9) best = { a, rf, w, d, cost };
-        break;      // (the nearest front radius that fits)
+  for (const onlyBetween of [true, false]) {
+    for (const [w, d] of sizes) {
+      for (let k = 0; k < 720; k++) {
+        const a = k * TAU / 720, between = inArc(a);
+        if (onlyBetween && !between) continue;
+        for (const rf of rfs) {
+          if (!fits(c, w, d, a, rf, extra)) continue;
+          const cost = Math.abs(wrap(a - T)) + (rf - rfs[0]) * 0.05;
+          if (!best || cost < best.cost - 1e-9) best = { a, rf, w, d, cost, between };
+          break;      // (the nearest front radius that fits)
+        }
       }
+      if (best) break;
     }
     if (best) break;
   }
@@ -161,7 +168,7 @@ export function controlBlockPlan(tier: DomeTier, r: number, port: number, extra:
   run('power', 0.06, [[wx + s * 0.14, bz(0)], [wx + s * 0.14, -0.5], [wx, -0.5]]);
   run('water', 0.1, [[wx + s * 0.26, bz(1)], [wx + s * 0.26, 0.5], [wx, 0.5]]);
   run('chill', 0.16, [[wx + s * 0.38, bz(2)], [s * 0.12, bz(2)], [s * 0.12, -(d / 2) - 0.02]]);
-  const plan: ControlBlockPlan = { ...base, w, d, angle: a, rho: rc, yardSide, landing, door, yardDoor: yd, manifold, gateDoor: c.gateDoor, paths, ringR, pipes, colliders: [], between: Math.abs(wrap(a - T)) < Math.abs(wrap(G - S)) / 2 + 1e-6 };
+  const plan: ControlBlockPlan = { ...base, w, d, angle: a, rho: rc, yardSide, landing, door, yardDoor: yd, manifold, gateDoor: c.gateDoor, paths, ringR, pipes, colliders: [], between: best.between };
   plan.colliders = collidersOf(plan);
   return plan;
 }
