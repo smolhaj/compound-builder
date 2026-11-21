@@ -74,3 +74,24 @@ All 36 dome frames were re-shot (stale pre-merge `dome-*` frames removed). Glass
 
 Changes: lamp posts beside every lived-in house and flanking each person airlock; plant-unit lamp posts with larger pools; shot script keeps the plant sector free, adds the lane and entrance shots.
 Not done: the arcology 08 and 10 night frames are still dark (lane lamps would fix them). Interior pools are still soft, not rim-bright.
+
+
+## Round 4 (final): on main with #408 (airtight airlock look)
+All 36 dome frames re-shot again (glass 00 to 06 and 08 to 10, arcology 00 to 10 without 01 and 03). New this round: lamp posts down both sides of the vehicle lane (tested), and on the arcology, soft lit pools and lamp posts down the plant aisle so the floor in front of the units is lit, clean and even.
+
+Frames opened and judged: arcology 04 night (plant aisle lit, units and posts read), 02 night, 00 night (second entrance outside, lit band), 08 night (lane and both doors lamp-lit), 10 night (lit lane, both doors), 09 day (paved lane with markings, sealed doors with status lights); glass 04 night, 08 night, 09 day. The other frames of the set are from the same run and were opened in the previous round at the same poses.
+
+Known defects
+- Glass 08 night: a lamp post and a black wall fill the left edge; the lens is too close. Usable but not good.
+- At night the door leaves of the sally port and airlocks are near black (only status lights and lamps show).
+- The arcology lawn at night is a dark green; the paths are dark gravel and read only through lamp pools.
+- No frames of a walkway link end or the earthen dome.
+
+Perf (Medium / High, no budget touched)
+| Scene | Calls | Triangles | Shadow tris | Heap |
+|---|---|---|---|---|
+| mountain | 396 / 396 | 753k / 1042k | 234k / 283k | 99 / 115 MB |
+| dome_glass | 416 / 416 | 772k / 1058k | 243k / 292k | 103 / 119 MB |
+| dome_arcology | 419 / 418 | 792k / 1086k | 247k / 299k | 104 / 121 MB |
+
+dome_glass and dome_arcology are OVER the committed caps (411 / 412 calls, 240k shadow triangles, arcology high heap 121 vs 120 MB). This is not from this branch: a clean checkout of origin/main (58eca25, #408) measures the same 416 calls and 243k / 292k shadow triangles on dome_glass and 419 calls on arcology medium. This branch adds only about 1.3k to 2.3k triangles and no draw calls. The cause is #408's new sally-port and airlock geometry; someone needs to either trim that or the caps need a decision (the rule is never to raise them silently).
