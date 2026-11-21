@@ -157,6 +157,13 @@ try {
     }
     await page.evaluate(() => { clearInterval(window.__hi); });
   }
+  if (want('spikegeo')) {
+    lap(JSON.stringify(await page.evaluate(async ([cx, cz]) => { const T = await import('/node_modules/three/build/three.module.js'); const out = [];
+      window.__cb.ws.scene.traverse(o => { if (!o.isMesh || !/^bldg_/.test(o.name) || o.name.startsWith('bldg_stakes')) return; const p = o.geometry.attributes.position; o.updateWorldMatrix(true, false); let n = 0, ex = null;
+        for (let i = 0; i + 2 < p.count; i += 3) { const v = [0, 1, 2].map(k => new T.Vector3().fromBufferAttribute(p, i + k).applyMatrix4(o.matrixWorld)); const area = new T.Triangle(...v).getArea(), ymax = Math.max(...v.map(q => q.y)), ymin = Math.min(...v.map(q => q.y));
+          if (ymax - ymin > 0.04 && ymax - ymin < 0.5 && ymax < 2.1 && ymin > 1.2 && area < 0.02 && Math.hypot(v[0].x - cx, v[0].z - cz) > 6) { n++; ex = ex || [v[0].x - cx, v[0].y, v[0].z - cz, ymax - ymin, area].map(q => +q.toFixed(3)); } }
+        if (n) out.push([o.name, n, ex]); }); return out; }, [dm.x, dm.z])));
+  }
   if (want('pick')) {
     await pr(E(R + 1.5 * S, -0.55 * S, 0.3), E(R - 0.1, 0.15 * S, 0.3), 62); await frames(2);
     lap(JSON.stringify(await page.evaluate(async ([W, H]) => { const T = await import('/node_modules/three/build/three.module.js'); const ws = window.__cb.ws, cam = ws.camera, rc = new T.Raycaster(), out = [];
