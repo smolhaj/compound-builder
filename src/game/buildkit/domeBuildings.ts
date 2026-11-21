@@ -414,6 +414,10 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
   p.add('concrete', ringWall(R - 0.05, R + 0.04, y0, a => Math.min(y0 - 0.03, rim(a) - 0.08), nWall));
   if (tier === 'geodesic') p.add('earth', berm(R, bermU(tier) - 0.04, 0.12, g, y0 - 0.005, nWall));
   else { const emb = embankment(R + 0.04, g, y0 - 0.005, nWall); if (emb) p.add('earth', emb); }
+  if (tier === 'arcology') {      // the anchor flange: a bolted steel ring round the foot, so a sealed air-filled shell reads as anchored to its footing, not floating (a look only; no flood rule)
+    p.add('steel', ringWall(R + 0.045, R + 0.19, y0 - 0.02, a => Math.min(y0 - 0.06, rim(a) - 0.1), nWall));
+    for (let k = 0; k < 48; k++) { const a = (k + 0.5) / 48 * TAU, [bx, , bz] = at(R + 0.12, a, 0); p.add('panel_dark', box(0.035, 0.03, 0.035, bx, y0 - 0.02, bz).rotateY(0)); }
+  }
   const { rings, tris } = triDome(N);
   const th = (k: number) => k / N * Math.PI / 2;
   const phi = (k: number, j: number) => j * TAU / rings[k].length;

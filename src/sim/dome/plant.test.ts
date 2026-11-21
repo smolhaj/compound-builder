@@ -85,7 +85,7 @@ describe('what stands inside the shell and what stands outside', () => {
   });
   it('unit spots exist for every unit of the layout', () => {
     const p = plantLayout('arcology', 9, 'closed', { loop: 'recycle', spares: ['air', 'chiller', 'substation'] });
-    for (const id of ['chiller', 'chiller2', 'air', 'air2', 'substation', 'substation2', 'water', 'battery', 'vents']) expect(p.units.some(u => u.id === id), id).toBe(true);
+    for (const id of ['chiller', 'chiller2', 'air', 'air2', 'substation', 'substation2', 'water', 'battery', 'intake']) expect(p.units.some(u => u.id === id), id).toBe(true);
   });
 });
 
@@ -107,7 +107,7 @@ describe('the hardened yard, reached only from inside', () => {
     for (const [tier, r] of [['glass', 3.75], ['arcology', 9], ['arcology', 15]] as const) {
       const p = plantLayout(tier, r, 'closed', { loop: 'recycle' }), y = p.yard!;
       // every 0.25 unit along the outer wall line is covered by some wall part (a box at wall height, near the line)
-      const walls = p.parts.filter(q => q.shape === 'box' && q.h > 0.6 && q.h < 0.8 && q.w > 0.1 && q.d < 0.1);
+      const walls = p.parts.filter(q => q.shape === 'box' && q.h > 0.6 && q.h < 3 && q.w > 0.1 && q.d < 0.1);      // (the arcology's armored yard walls stand as tall as its plant)
       for (let u = -y.W / 2 + 0.1; u < y.W / 2 - 0.1; u += 0.25) {
         const x = y.center[0] + y.et[0] * u + y.er[0] * (y.D / 2), z = y.center[1] + y.et[1] * u + y.er[1] * (y.D / 2);
         const hit = walls.some(q => Math.hypot(q.x - x, q.z - z) < q.w / 2 + 0.05);
