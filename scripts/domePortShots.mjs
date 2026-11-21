@@ -57,7 +57,8 @@ try {
   await set(`const s = cb.store.getState(); s.setTimeOfDay(${process.env.NIGHT ? 21.5 : 15.5}); s.setBuildingView('full'); s.setSeasonMode?.('summer'); s.setWeatherMode('clear');`);
   const a = dm.a, u = a ? [Math.sin(a.angle), Math.cos(a.angle)] : [1, 0], n = [u[1], -u[0]], R = dm.r;
   const E = (rho, lam, h) => [dm.x + u[0] * rho + n[0] * lam, h, dm.z + u[1] * rho + n[1] * lam];   // a point on the port's frame: rho out along its axis, lam across, h above the ground
-  const gate = [dm.x + u[0] * R, 0.3, dm.z + u[1] * R];
+  const Rd = await page.evaluate(async ([t, r]) => (await import('/src/sim/dome/vehiclePort.ts')).entryR(t, r), [dm.tier, R]);      // (the module's door plane)
+  const gate = [dm.x + u[0] * Rd, 0.3, dm.z + u[1] * Rd];
   const len = await page.evaluate(async ([t, r]) => (await import('/src/sim/dome/vehiclePort.ts')).portVestibule(t, r)?.len ?? 0.3, [dm.tier, R]), S = Math.max(1, R / 3.7);
   if (want('aerial')) {
     await pr(E(R + 12, -8, 9), E(R - 1, 0, 0), 55); await shot('aerial-from-port-side');
@@ -84,7 +85,7 @@ try {
   }
   if (want('inside')) {
     await person(...[E(R - len - 1.4, 0.9 * S, 0)].map(p => [p[0], p[2]])[0]);
-    await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await shot('inside-looking-out');
+    await pr(E(Rd - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await shot('inside-looking-out');
   }
   const pa = dm.persons[0], pu = pa ? [Math.sin(pa.angle), Math.cos(pa.angle)] : u, pn = [pu[1], -pu[0]];
   const EP = (rho, lam, h) => [dm.x + pu[0] * rho + pn[0] * lam, h, dm.z + pu[1] * rho + pn[1] * lam];   // a point on the person airlock's frame
