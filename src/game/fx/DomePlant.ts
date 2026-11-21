@@ -77,7 +77,21 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
     for (const g of interiorPieces(look.interior, ground)) geos.push(g);
     for (const l of look.interior.lamps) lampList.push({ x: l.x, z: l.z, y: 0.62, k: 1.7 });
   }
-  for (const l of lampList) geos.push(partGeometry({ shape: 'cyl', x: l.x, z: l.z, y0: 0, w: 0, h: l.y, d: 0, r: 0.014, rot: 0, color: 0x30343a }, ground, stem));
+  const colorPart = (g: THREE.BufferGeometry, color: number, x: number, y: number, z: number): THREE.BufferGeometry => {
+    const ng = g.index ? g.toNonIndexed() : g; ng.deleteAttribute('uv'); ng.translate(x, y, z);
+    const c = new THREE.Color(color), col = new Float32Array(ng.attributes.position.count * 3);
+    for (let i = 0; i < col.length; i += 3) { col[i] = c.r; col[i + 1] = c.g; col[i + 2] = c.b; }
+    ng.setAttribute('color', new THREE.BufferAttribute(col, 3)); return ng;
+  };
+  for (const l of lampList) {
+    geos.push(partGeometry({ shape: 'cyl', x: l.x, z: l.z, y0: 0, w: 0, h: l.y, d: 0, r: 0.014, rot: 0, color: 0x30343a }, ground, stem));
+    // a real fixture: a flared base collar, a lantern housing (dark frame under the lens), a hooded cap and a ring
+    const gy = ground(l.x, l.z);
+    geos.push(colorPart(new THREE.CylinderGeometry(0.022, 0.03, 0.06, 8), 0x23272c, l.x, gy + 0.03, l.z),
+      colorPart(new THREE.CylinderGeometry(0.03, 0.026, 0.014, 8), 0x23272c, l.x, gy + l.y + 0.006, l.z),
+      colorPart(new THREE.CylinderGeometry(0.014, 0.046, 0.026, 8), 0x2d3238, l.x, gy + l.y + 0.074, l.z),
+      colorPart(new THREE.CylinderGeometry(0.044, 0.044, 0.006, 8), 0x23272c, l.x, gy + l.y + 0.057, l.z));
+  }
   const merged = geos.length ? mergeGeometries(geos, false) : null;
   geos.forEach(g => g.dispose());
   if (merged) {
@@ -89,13 +103,13 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
   const glows = look.interior?.glows ?? [];
   if (lampList.length && !look.dark) {
     const n = lampList.length, ng = glows.length;
-    const headGeo = new THREE.SphereGeometry(0.035, 8, 6), heads = new THREE.InstancedMesh(headGeo, kitMaterial('lamp'), n);
+    const headGeo = new THREE.CylinderGeometry(0.03, 0.026, 0.044, 8), heads = new THREE.InstancedMesh(headGeo, kitMaterial('lamp'), n);
     const poolGeo = new THREE.CircleGeometry(0.55, 20); poolGeo.rotateX(-Math.PI / 2);
     const pools = new THREE.InstancedMesh(poolGeo, kitMaterial('spill_electric'), n + ng);
     const m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), q0 = new THREE.Quaternion(), pos = new THREE.Vector3();
     lampList.forEach((l, i) => {
       const gy = ground(l.x, l.z);
-      heads.setMatrixAt(i, m4.makeTranslation(l.x, gy + l.y + 0.03, l.z));
+      heads.setMatrixAt(i, m4.makeTranslation(l.x, gy + l.y + 0.035, l.z));
       pools.setMatrixAt(i, m4.compose(pos.set(l.x, gy + 0.012, l.z), q0, sc.set(l.k, 1, l.k)));
     });
     glows.forEach((o, i) => pools.setMatrixAt(n + i, m4.compose(pos.set(o.x, ground(o.x, o.z) + (o.y ?? 0) + 0.02, o.z), q0, sc.set(o.r / 0.55, 1, o.r / 0.55))));

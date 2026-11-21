@@ -103,6 +103,7 @@ try {
   if (want('gateclose')) { await pr(E(R + 1.5 * S, -0.55 * S, 0.3), E(R - 0.1, 0.15 * S, 0.3), 62); await shot('gate-close-eye'); }
   if (want('gatelow')) { await pr(E(R + 1.0 * S, 0.5 * S, 0.1), E(R - 0.1, -0.1, 0.35), 70); await shot('gate-low-angle'); }
   if (want('airlockclose')) { await pr(EP(R + 0.9 * S, -0.3 * S, 0.3), EP(R - 0.1, 0.05, 0.28), 62); await shot('person-airlock-close'); }
+  if (want('insideperson')) { await person(...[EP(R - 1.5 * S, 0.5 * S, 0)].map(q => [q[0], q[2]])[0]); await frames(2); await pr(EP(R - 1.1 * S, 0.1, 0.45), EP(R + 1.2, 0, 0.3), 62); await shot('inside-person-hatch'); }
   if (want('pick')) {
     await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62); await frames(2);
     lap(JSON.stringify(await page.evaluate(async () => { const T = await import('/node_modules/three/build/three.module.js'); const ws = window.__cb.ws, cam = ws.camera, rc = new T.Raycaster(), out = [];
