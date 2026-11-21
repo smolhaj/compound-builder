@@ -49,3 +49,39 @@ export function portUV(g: THREE.BufferGeometry): void {
   }
   g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
 }
+
+/**
+ * A small shared sheet for painted and weathered utility surfaces (the dome plant's machinery, benches, crates, lamp posts): grain and brush streaks, speckle,
+ * scuffed edges and a few drips, near-white so the vertex colors keep their hues. 128 px, tiled every 0.4 units.
+ */
+export const WORK_TILE = 0.4;
+let _work: PortTextures | null = null;
+export function workTextures(): PortTextures {
+  if (_work) return _work;
+  const N = 128, c = document.createElement('canvas'); c.width = c.height = N;
+  const g = c.getContext('2d', { willReadFrequently: true })!, r = lcg(9001);
+  g.fillStyle = 'rgb(236,236,236)'; g.fillRect(0, 0, N, N);
+  for (let k = 0; k < 160; k++) { const v = r() < 0.5 ? 255 : 120, a = 0.06 + r() * 0.12; g.fillStyle = `rgba(${v},${v},${v},${a})`; g.fillRect(r() * N, r() * N, 14 + r() * 60, 0.8 + r() * 1.2); }     // grain and brush streaks
+  for (let k = 0; k < 700; k++) { const v = 140 + r() * 110; g.fillStyle = `rgba(${v},${v},${v},${0.2 + r() * 0.3})`; g.fillRect(r() * N, r() * N, 1, 1); }                                         // speckle
+  for (let k = 0; k < 6; k++) { g.fillStyle = 'rgba(40,36,30,0.14)'; g.fillRect(r() * N, r() * N * 0.5, 1.4, 12 + r() * 36); }                                                         // drips
+  g.fillStyle = 'rgba(30,30,34,0.5)'; g.fillRect(0, 0, N, 1.4); g.fillRect(0, 0, 1.4, N);                                                                                                // a seam line
+  g.fillStyle = 'rgba(255,255,255,0.3)'; g.fillRect(0, N - 1.6, N, 1.2);                                                                                                                 // worn edge
+  const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping; map.anisotropy = 2;
+  const nm = generateNormalMap(c, 1.3); nm.wrapS = nm.wrapT = THREE.RepeatWrapping;
+  _work = { map, normalMap: nm, dispose: () => { /* shared */ } };
+  return _work;
+}
+
+/** World-scaled UVs for a geometry (any indexing): one repeat per `tile` units, by dominant normal axis. */
+export function worldUVs(g0: THREE.BufferGeometry, tile: number): THREE.BufferGeometry {
+  const g = g0.index ? g0.toNonIndexed() : g0;
+  if (!g.attributes.normal) g.computeVertexNormals();
+  const p = g.attributes.position, n = g.attributes.normal, uv = new Float32Array(p.count * 2), k = 1 / tile;
+  for (let i = 0; i < p.count; i++) {
+    const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
+    const top = ay >= ax && ay >= az;
+    uv[i * 2] = (top ? p.getX(i) : ax >= az ? p.getZ(i) : p.getX(i)) * k; uv[i * 2 + 1] = (top ? p.getZ(i) : p.getY(i)) * k;
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return g;
+}

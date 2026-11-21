@@ -191,8 +191,8 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     const merged = mergeGeometries(geos, false); geos.forEach(g => g.dispose());
     if (!merged.attributes.normal) merged.computeVertexNormals();
     portUV(merged);
-    const tx = portTextures(); owned.push(tx);
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, map: tx.map, normalMap: tx.normalMap, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.82, metalness: 0.1, flatShading: true, side: THREE.DoubleSide });
+    const tx = typeof document !== 'undefined' ? portTextures() : null;
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, ...(tx ? { map: tx.map, normalMap: tx.normalMap, normalScale: new THREE.Vector2(0.9, 0.9) } : {}), roughness: 0.82, metalness: 0.1, flatShading: true, side: THREE.DoubleSide });
     const m = new THREE.Mesh(merged, mat); m.name = 'vehicle_port_fixtures'; m.matrixAutoUpdate = false; m.updateMatrix(); m.castShadow = false; m.receiveShadow = true;
     group.add(m); owned.push(merged, mat);
   }

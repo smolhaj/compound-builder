@@ -5,6 +5,7 @@
  * and one instanced mesh of light pools on the ground (the kit's additive `spill_electric` material): no real lights, so the light pool budget is untouched.
  * It rides in the dome's own group (local frame: the dome's center, y 0 at the shell's base). SCALE v2.
  */
+import { WORK_TILE, workTextures, worldUVs } from './portTextures';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { plantLayout, type PlantLine, type PlantPart } from '../../sim/dome/plant';
@@ -92,10 +93,13 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
       colorPart(new THREE.CylinderGeometry(0.014, 0.046, 0.026, 8), 0x2d3238, l.x, gy + l.y + 0.074, l.z),
       colorPart(new THREE.CylinderGeometry(0.044, 0.044, 0.006, 8), 0x23272c, l.x, gy + l.y + 0.057, l.z));
   }
-  const merged = geos.length ? mergeGeometries(geos, false) : null;
+  const merged0 = geos.length ? mergeGeometries(geos, false) : null;
   geos.forEach(g => g.dispose());
+  const merged = merged0 ? worldUVs(merged0, WORK_TILE) : null;
+  if (merged && merged0 !== merged) merged0!.dispose();
   if (merged) {
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0.25, flatShading: true });
+    const wt = typeof document !== 'undefined' ? workTextures() : null;      // (no canvas in the node tests)
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, ...(wt ? { map: wt.map, normalMap: wt.normalMap, normalScale: new THREE.Vector2(0.8, 0.8) } : {}), roughness: 0.78, metalness: 0.25, flatShading: true });
     const mesh = new THREE.Mesh(merged, mat);
     mesh.name = 'plant_machinery'; mesh.matrixAutoUpdate = false; mesh.updateMatrix();
     group.add(mesh); owned.push(merged, mat);

@@ -298,7 +298,12 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD
     diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.12, 0.30, 0.05 ) * ( 0.85 + 0.3 * seN1 ) * ( 1.0 - 0.6 * seLB.y ), seGreen * seaDomeM * 0.9 );
 #if defined( SEA_MUD ) && !defined( SEA_MUD_UV )
     // (the regional ground itself, whatever its season-time albedo: a maintained lawn inside the dome)
-    diffuseColor.rgb = mix( diffuseColor.rgb, vec3( 0.05, 0.27, 0.02 ) * ( 0.85 + 0.3 * seN1 ) * ( 1.0 - 0.6 * seLB.y ), seUp * seaDomeM * 0.95 );
+    // blade-scale grain and patches of a worn, sun-bleached sward, faded with distance so it never shimmers from the air
+    float seBF = 1.0 - smoothstep( 5.0, 28.0, length( vViewPosition ) );
+    float seBlade = 1.0 + seBF * ( ( seaNoise( seP.xz * 15.0 ) - 0.5 ) * 0.55 + ( seaNoise( seP.xz * 53.0 + 2.1 ) - 0.5 ) * 0.4 );
+    float sePatch = smoothstep( 0.55, 0.85, seaNoise( seP.xz * 0.9 + 11.7 ) );
+    vec3 seLawn = mix( vec3( 0.05, 0.27, 0.02 ), vec3( 0.17, 0.30, 0.06 ), sePatch * 0.7 );
+    diffuseColor.rgb = mix( diffuseColor.rgb, seLawn * ( 0.85 + 0.3 * seN1 ) * seBlade * ( 1.0 - 0.6 * seLB.y ), seUp * seaDomeM * 0.95 );
     totalEmissiveRadiance += vec3( 0.008, 0.05, 0.004 ) * ( 0.8 + 0.4 * seN1 ) * ( 1.0 - 0.6 * seLB.y ) * seUp * seaDomeM * uSeaDomeI.w;   // (by daylight, so a night interior is dark; keeps the grass green under the cold grade)
 #endif
   }

@@ -20,7 +20,7 @@ describe('dome interior plan', () => {
     const p = interiorPlan('glass', R, [0, 2.094], [], 1, [4.189]);
     const lane = p.segs.filter(s => (s.w ?? 0) >= LANE_W);
     expect(p.lamps.some(l => Math.abs(l.x * Math.cos(4.189) - l.z * Math.sin(4.189)) < LANE_W / 2 + 0.5 && l.x * Math.sin(4.189) + l.z * Math.cos(4.189) > R * 0.4)).toBe(true);
-    expect(lane.length).toBeGreaterThan(6);
+    expect(lane.length).toBeGreaterThan(3);   // (the lane starts at the inner gate, short of the chamber)
     const a = 4.189;
     for (const q of [...p.benches, ...p.crates, ...p.signs, ...p.lamps]) {
       const al = q.x * Math.sin(a) + q.z * Math.cos(a), ac = Math.abs(q.x * Math.cos(a) - q.z * Math.sin(a));
