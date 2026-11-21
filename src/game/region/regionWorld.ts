@@ -150,7 +150,7 @@ export const REGION_WORLD: Record<RegionId, RegionWorld> = {
     kind: 'desert', climate: 'desert_southwest', relief: 'bajada', cover: 2.2,
     trees: {
       timber: [
-        { kind: 'juniper', w: 0.42, scale: [0.8, 1.3], sx: [0.9, 1.2], sy: [0.85, 1.15] },     // one-seed juniper on the rocky rises
+        { kind: 'juniper', w: 0.48, scale: [0.8, 1.3], sx: [0.9, 1.2], sy: [0.85, 1.15] },     // one-seed juniper on the rocky rises
         { kind: 'mesquite', w: 0.26, scale: [0.8, 1.2] },                                      // honey mesquite on the flats
         { kind: 'paloverde', w: 0.16, scale: [0.8, 1.2] },                                     // foothill palo verde
         { kind: 'saguaro', w: 0.1, scale: [0.55, 1.2], sx: [0.9, 1.05], sy: [0.9, 1.1] },      // saguaro on the warm slopes (sparse)

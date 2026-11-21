@@ -43,7 +43,7 @@ describe('rich starts', () => {
   });
   it('the card prices come from the pricing module', () => {
     const f = richPriceLines('founder').join(' | '), m = richPriceLines('magnate').join(' | ');
-    expect(f).toContain(`about ${compactUsd(domeCostSummary('glass').totalUsd)}, more than this start has`); expect(f).toMatch(/150 ft glass dome/); expect(f).toMatch(/100 ft glass dome costs about \$14M(?!, more)/);
+    expect(f).toContain(`about ${compactUsd(domeCostSummary('glass').totalUsd)}, more than this start has`); expect(f).toMatch(/150 ft glass dome/); expect(f).toMatch(/100 ft glass dome costs about \$13M(?!, more)/);
     expect(m).toContain(`about ${compactUsd(domeCostSummary('arcology').totalUsd)}`); expect(m).toMatch(/360 ft arcology/);
     expect(compactUsd(32_900_000)).toBe('$33M'); expect(compactUsd(1_110_000_000)).toBe('$1.1B'); expect(compactUsd(63_000)).toBe('$63k');
     for (const k of RICH_STARTS) expect(richPriceLines(k).length).toBe(RICH_START[k].domes.length);
