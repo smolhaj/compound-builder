@@ -39,7 +39,7 @@ const LOOK: Record<DomeTier, { strut: number; stem: number; vestW: number; vestH
   earthen: { strut: 0, stem: 0.04, vestW: 0.24, vestH: 0.2, vestL: 0.2 },
   geodesic: { strut: 0.011, stem: 0.06, vestW: 0.42, vestH: 0.4, vestL: 0.5 },
   glass: { strut: 0.014, stem: 0.08, vestW: 0.55, vestH: 0.5, vestL: 0.7 },
-  arcology: { strut: 0.03, stem: 0.14, vestW: 1.7, vestH: 1.35, vestL: 2.0 },
+  arcology: { strut: 0.03, stem: 0.14, vestW: 1.7, vestH: 1.55, vestL: 2.0 },
 };
 
 /** Airlock angles (radians from +z, the side the family arrives on): evenly spread, the first at the front. */
@@ -309,6 +309,11 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
   // the outer face: a hazard-chevron sign plate and the interlock lamp
   X('paint_yellow', 0.22 * big, 0.04 * big, 0.01, 0, y0 + v.dh + 0.09 * big, outer + v.t / 2 + 0.02);
   for (let k = 0; k < 3; k++) X('panel_dark', 0.018 * big, 0.04 * big, 0.012, (-0.04 + 0.04 * k) * big, y0 + v.dh + 0.09 * big, outer + v.t / 2 + 0.022);
+  if (!veh && tier === 'arcology') {     // a lit door: light strips up both jambs and across the head, so the entrance reads at night and from far off
+    const zf = outer + v.t / 2 + 0.03;
+    for (const sx of [-1, 1]) X('lamp', 0.022, v.dh * 0.92, 0.012, sx * (v.dw / 2 + 0.03), y0 + v.dh / 2, zf);
+    X('lamp', v.dw + 0.08, 0.022, 0.012, 0, y0 + v.dh + 0.035, zf);
+  }
   p.layer = 'interior';
   p.add('panel_dark', place(box(v.cw * 1.1, 0.006, 0.5, 0, y0 - L.stem * 0.2 + 0.001, inner - 0.3)));   // (a steel threshold plate inside the inner door: no gravel or other brown)
 }
@@ -371,6 +376,28 @@ function earthen(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
   return out;
 }
 
+
+/**
+ * A sealed, filtered emergency intake on the arcology (sim/dome/intake.ts): an armored housing against the skirt with a hooded cap, two filter canisters
+ * with clamp bands, a locked service hatch and a status lamp. Nothing on it is open: no louvres, no grille, no mouth.
+ */
+function intakeStack(p: Parts, R: number, y0: number, a: number): void {
+  const rho = R + 0.075, yb = y0 - 0.02;
+  const put = (m: 'panel_dark' | 'panel_steel' | 'panel_light' | 'steel' | 'lamp', g: THREE.BufferGeometry) => p.add(m, g.rotateY(a));
+  put('panel_dark', box(0.34, 0.46, 0.14, 0, yb + 0.23, rho));                       // the armored housing
+  put('panel_steel', box(0.4, 0.04, 0.2, 0, yb + 0.48, rho));                        // the hooded cap, wider than the body (it sheds rain and ash)
+  put('panel_steel', box(0.42, 0.05, 0.22, 0, yb + 0.02, rho));                      // the footing plinth
+  for (const sx of [-1, 1]) {
+    put('steel', new THREE.CylinderGeometry(0.055, 0.055, 0.4, 10).translate(sx * 0.12, yb + 0.24, rho + 0.115));                // the filter canisters stand proud of the face
+    put('panel_dark', new THREE.CylinderGeometry(0.06, 0.06, 0.025, 10).translate(sx * 0.12, yb + 0.12, rho + 0.115));         // their clamp bands
+    put('panel_dark', new THREE.CylinderGeometry(0.06, 0.06, 0.025, 10).translate(sx * 0.12, yb + 0.36, rho + 0.115));
+    put('panel_steel', new THREE.CylinderGeometry(0.045, 0.058, 0.03, 10).translate(sx * 0.12, yb + 0.455, rho + 0.115));      // the capped crowns
+  }
+  put('panel_light', box(0.1, 0.14, 0.012, 0, yb + 0.2, rho + 0.076));               // the locked service hatch between them
+  put('steel', box(0.03, 0.02, 0.016, 0, yb + 0.18, rho + 0.082));                   // its lock
+  put('lamp', box(0.04, 0.025, 0.014, 0, yb + 0.38, rho + 0.078));                   // the status lamp
+}
+
 /** The shared build of a triangulated dome (geodesic and arcology). */
 function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number, opts: BuildOpts, N: number, panelMat: 'dome_polycarb' | 'arcology', frameMat: 'aluminum' | 'steel'): THREE.Group {
   const p = new Parts(seed, opts), L = LOOK[tier], R = def.cellsX * CELL / 2 - 0.03 - bermU(tier), y0 = L.stem, g = opts.ground ?? (() => 0);
@@ -422,6 +449,14 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
     p.add('lamp', new THREE.SphereGeometry(0.05, 8, 6).translate(0, y0 + R * 1.18 + 0.03, 0));
   }
   for (const h of doors.holes) airlock(p, tier, R, h, doors, y0);
+  if (tier === 'arcology') {     // sealed filtered emergency intakes, spaced round the skirt and clear of every entrance
+    p.layer = 'walls';
+    const clear = (a: number) => doors.holes.every(h => Math.abs(Math.atan2(Math.sin(a - h.a), Math.cos(a - h.a))) > 0.55);
+    const half = def.cellsX * CELL / 2 - 0.03, slack = (a: number) => half / Math.max(Math.abs(Math.sin(a)), Math.abs(Math.cos(a))) - R;      // room to the footprint's edge at angle a
+    for (const k of [2.2, Math.PI, -2.2]) {                // (each slides to the nearest angle that clears the entrances and keeps the stack inside the footprint)
+      for (const d of [0, 0.15, -0.15, 0.3, -0.3, 0.45, -0.45, 0.6, -0.6, 0.8, -0.8]) { const a = ent.port + k + d; if (clear(a) && slack(a) >= 0.4) { intakeStack(p, R, y0, a); break; } }
+    }
+  }
   // colliders: the shell ring as short boxes, none at the airlocks (people cross only through them), and the chamber walls
   shellColliders(p, R, Math.max(24, Math.min(72, Math.round(R * 8))), doors);
   const out = p.finish();

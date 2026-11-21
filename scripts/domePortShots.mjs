@@ -62,6 +62,14 @@ try {
     await pr(E(R + 12, -8, 9), E(R - 1, 0, 0), 55); await shot('aerial-from-port-side');
     await pr([dm.x - u[0] * R * 0.2 + n[0] * 3, R * 3.4, dm.z - u[1] * R * 0.2 + n[1] * 3], E(R + 3, 0, 0), 60); await shot('aerial-high');
   }
+  const lightsOn = () => page.evaluate(() => window.__cb.game.setState(st => { const g = structuredClone(st.game); g.utilities.lit = ['x']; return { game: g }; }));
+  if (want('intake')) {
+    for (const [k, nm] of [[Math.PI, 'a'], [2.2, 'b'], [-2.2, 'c']]) {
+      const ia = a.angle + k, iu = [Math.sin(ia), Math.cos(ia)], inn = [iu[1], -iu[0]];
+      for (const [d, tag] of [[1.4, 'close'], [3.2, 'mid']]) await pr([dm.x + iu[0] * (R + d) + inn[0] * d * 0.5, 0.45 + d * 0.15, dm.z + iu[1] * (R + d) + inn[1] * d * 0.5], [dm.x + iu[0] * R, 0.3, dm.z + iu[1] * R], 55), await shot(`intake-${nm}-${tag}`);
+    }
+  }
+  if (want('intake-night')) { await lightsOn(); await set(`cb.store.getState().setTimeOfDay(21.5)`); const ia = a.angle + Math.PI, iu = [Math.sin(ia), Math.cos(ia)]; await pr([dm.x + iu[0] * (R + 1.6) + iu[1] * 0.7, 0.55, dm.z + iu[1] * (R + 1.6) - iu[0] * 0.7], [dm.x + iu[0] * R, 0.3, dm.z + iu[1] * R], 55); await shot('intake-night'); }
   if (want('closeup')) { await pr(E(R + 6.5 * S, -3.5 * S, 2.2 * S), gate, 52); await shot('port-closeup'); }
   if (want('second')) { await pr(E(-(R + 9 * S), 3 * S, 3), E(-R, 0.5 * S, 0), 58); await shot('second-entrance-opposite'); }
   if (want('eye')) {
@@ -83,7 +91,6 @@ try {
   if (want('sealed-lamp')) { await set(`cb.world.setPortState('sealed')`); await pr(E(R + 1.5 * S, 0.1, 0.32 * S), E(R - 0.6, 0, 0.25 * S), 58); await shot('chamber-port-sealed'); }
   if (want('chamber-person')) { await pr(EP(R + 0.8 * S, 0.0, 0.3 * S), EP(R - 0.2, 0, 0.22 * S), 55); await shot('chamber-person-eye'); }
   if (want('chamber-port')) { await pr(E(R + 1.5 * S, 0.1, 0.32 * S), E(R - 0.6, 0, 0.25 * S), 58); await shot('chamber-port-eye'); }
-  const lightsOn = () => page.evaluate(() => window.__cb.game.setState(st => { const g = structuredClone(st.game); g.utilities.lit = ['x']; return { game: g }; }));
   if (want('diag')) {
     await pr(E(R - len - 1.0 * S, 0.1, 0.5), E(R + 1.5, 0, 0.4), 62);
     await page.evaluate(() => { let n = 0; window.__cb.ws.scene.traverse(o => { const m = o.material; if (o.isMesh && m && m.side === 1 && m.transparent && m.depthWrite === false && m.type === 'MeshBasicMaterial') { o.visible = false; n++; } }); window.__hazeHidden = n; });
