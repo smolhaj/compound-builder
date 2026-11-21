@@ -215,7 +215,7 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
   const X = (m: KitMaterialId, w: number, h: number, d: number, lam: number, y: number, rho: number): void => p.add(m, place(box(w, h, d, lam, y, rho)));
   p.layer = 'walls';
   // ── the sealed lining: floor plate, side walls and jambs, all steel, never stucco ──
-  X('panel_dark', v.cw + 2 * v.t - 0.012, 0.01, len + v.t - 0.012, 0, foot + 0.02, mid);                                               // the floor plate
+  X('concrete', v.cw + 2 * v.t - 0.012, 0.01, len + v.t - 0.012, 0, foot + 0.02, mid);                                               // the floor plate: neutral grey concrete, never tan
   for (const s of [-1, 1]) X(wall, v.t, v.h + y0 - foot, len + v.t, s * half, foot, mid);                        // the side walls
   for (const rho of [inner, outer]) {
     for (const s of [-1, 1]) X(wall, stubW, v.h + y0 - foot, v.t, s * (v.dw / 2 + stubW / 2), foot, rho);        // the door jambs
@@ -316,7 +316,29 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
     X('lamp', v.dw + 0.08, 0.022, 0.012, 0, y0 + v.dh + 0.035, zf);
   }
   p.layer = 'interior';
-  p.add('panel_dark', place(box(v.cw * 1.1, 0.006, 0.5, 0, y0 - L.stem * 0.2 + 0.001, inner - 0.3)));   // (a steel threshold plate inside the inner door: no gravel or other brown)
+  p.add('concrete', place(box(v.cw * 1.1, 0.006, 0.5, 0, y0 - L.stem * 0.2 + 0.001, inner - 0.3)));   // (a steel threshold plate inside the inner door: no gravel or other brown)
+}
+
+/**
+ * One bulkhead frame for a person airlock that abuts the vehicle port (the entrance complex): a continuous roof cap and base plinth across both chambers at one height, and a
+ * heavy end post at each outer edge, so the two doors read as two openings in one armored structure. Short boxes along the arc, each squared to the shell.
+ */
+function bulkheadFrame(p: Parts, R: number, y0: number, holes: Doorways['holes']): void {
+  const veh = holes.find(h => h.vehicle);
+  if (!veh) return;
+  for (const h of holes) {
+    if (h.vehicle || Math.abs(Math.atan2(Math.sin(h.a - veh.a), Math.cos(h.a - veh.a))) * R > (h.v.w + veh.v.w) / 2 + 0.06) continue;
+    const d = Math.atan2(Math.sin(h.a - veh.a), Math.cos(h.a - veh.a));
+    const edgeA = veh.a - Math.sign(d) * veh.v.w / 2 / R, edgeB = h.a + Math.sign(d) * h.v.w / 2 / R, span = Math.atan2(Math.sin(edgeB - edgeA), Math.cos(edgeB - edgeA));
+    const rho = Math.max(chamberRho(R, h.v).outer, chamberRho(R, veh.v).outer) + h.v.t / 2 + 0.016, top = y0 + Math.max(h.v.h, veh.v.h), n = 10, chord = Math.abs(span) * R / n + 0.01;
+    p.layer = 'walls';
+    for (let k = 0; k < n; k++) {
+      const a = edgeA + span * (k + 0.5) / n;
+      p.add('panel_dark', box(chord, 0.034, 0.05, 0, top - 0.02, rho).rotateY(a));          // the roof cap
+      p.add('panel_dark', box(chord, 0.115, 0.05, 0, y0 - 0.1, rho).rotateY(a));             // the base plinth
+    }
+    for (const e of [edgeA, edgeB]) { p.add('panel_steel', box(0.05, top - y0 + 0.085, 0.06, 0, y0 - 0.095, rho).rotateY(e)); p.add('lamp', box(0.012, 0.05, 0.01, 0, top - 0.09, rho + 0.032).rotateY(e)); }   // the end posts with a lamp each
+  }
 }
 
 /** The shell's colliders: the ring as short boxes with the airlocks' gaps left out, and each chamber's walls (so the chamber is a room and the doors are the only ways in). */
@@ -450,6 +472,7 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
     p.add('lamp', new THREE.SphereGeometry(0.05, 8, 6).translate(0, y0 + R * 1.18 + 0.03, 0));
   }
   for (const h of doors.holes) airlock(p, tier, R, h, doors, y0);
+  bulkheadFrame(p, R, y0, doors.holes);
   if (tier === 'arcology') {     // sealed filtered emergency intakes, spaced round the skirt and clear of every entrance
     p.layer = 'walls';
     for (const a of intakeAngles(ent.port, doors.holes.map(h => h.a), R, def.cellsX * CELL / 2 - 0.03)) intakeStack(p, R, y0, a);
@@ -503,6 +526,7 @@ function glass(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
   // the ring beam's glazed kerb: a low opaque band so the foot of the glass reads
   for (const m of kerb) p.add('steel', quad(V(P, m), V(P, m + 1), [V(P, m + 1)[0], y0 + 0.07, V(P, m + 1)[2]], [V(P, m)[0], y0 + 0.07, V(P, m)[2]], centre));
   for (const h of doors.holes) airlock(p, 'glass', R, h, doors, y0);
+  bulkheadFrame(p, R, y0, doors.holes);
   shellColliders(p, R, 56, doors);
   const out = p.finish();
   out.userData.chimneyTop = null; out.userData.keep = ['frame', 'roof']; out.userData.layerFr = domeLayerFractions('glass'); out.userData.digTier = 'glass';

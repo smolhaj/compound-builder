@@ -5,6 +5,7 @@
  * second entrance too). The gates and the sealed chamber are the dome's own geometry (buildkit/domeBuildings `airlock`). One merged vertex-colored mesh and two instanced lamp sets for every
  * entrance on the place. SCALE v2: 1 unit = 20 ft, a person 0.28, a door 0.37, a truck about 0.75 long.
  */
+import { portTextures, portUV } from './portTextures';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { APRON_LEN, type InsideLane, type PortFrame } from '../../sim/dome/vehiclePort';
@@ -188,7 +189,10 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
   let heads: THREE.InstancedMesh | null = null;
   if (geos.length) {
     const merged = mergeGeometries(geos, false); geos.forEach(g => g.dispose());
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8, metalness: 0.12, flatShading: true, side: THREE.DoubleSide });
+    if (!merged.attributes.normal) merged.computeVertexNormals();
+    portUV(merged);
+    const tx = portTextures(); owned.push(tx);
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, map: tx.map, normalMap: tx.normalMap, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.82, metalness: 0.1, flatShading: true, side: THREE.DoubleSide });
     const m = new THREE.Mesh(merged, mat); m.name = 'vehicle_port_fixtures'; m.matrixAutoUpdate = false; m.updateMatrix(); m.castShadow = false; m.receiveShadow = true;
     group.add(m); owned.push(merged, mat);
   }
