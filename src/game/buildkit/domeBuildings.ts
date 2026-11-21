@@ -19,7 +19,6 @@ import { CELL_FT, TIER, tierOfKind, type DomeTier } from '../../sim/dome/tiers';
 import { airlockAngles } from '../../sim/dome/standing';
 import { digState } from '../../sim/dome/dig';
 import type { BuildLayer } from './shell';
-import { intakeAngles } from '../../sim/dome/intake';
 import { DEFAULT_BEARING, choosePortAngle, personAngles, portVestibule } from '../../sim/dome/vehiclePort';
 
 /** The public entrances of a dome in its own frame (turn 0): the person airlock(s) of the gate complex and the vehicle port beside them (sim/dome/vehiclePort.ts). */
@@ -412,6 +411,96 @@ function earthen(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
 
 
 /**
+ * One bulkhead frame for a person airlock that abuts the vehicle port (the entrance complex): a continuous roof cap and base plinth across both chambers at one height, and a
+ * heavy end post at each outer edge, so the two doors read as two openings in one armored structure. Short boxes along the arc, each squared to the shell.
+ */
+function bulkheadFrame(p: Parts, R: number, y0: number, holes: Doorways['holes']): void {
+  const veh = holes.find(h => h.vehicle);
+  if (!veh) return;
+  for (const h of holes) {
+    if (h.vehicle || Math.abs(Math.atan2(Math.sin(h.a - veh.a), Math.cos(h.a - veh.a))) * R > (h.v.w + veh.v.w) / 2 + 0.06) continue;
+    const d = Math.atan2(Math.sin(h.a - veh.a), Math.cos(h.a - veh.a));
+    const edgeA = veh.a - Math.sign(d) * veh.v.w / 2 / R, edgeB = h.a + Math.sign(d) * h.v.w / 2 / R, span = Math.atan2(Math.sin(edgeB - edgeA), Math.cos(edgeB - edgeA));
+    const rho = Math.max(chamberRho(R, h.v).outer, chamberRho(R, veh.v).outer) + h.v.t / 2 + 0.016, top = y0 + Math.max(h.v.h, veh.v.h), n = 10, chord = Math.abs(span) * R / n + 0.01;
+    p.layer = 'walls';
+    // the wall between the two chambers' outer faces: the same armored skin, from the plinth up to the roof cap, so the two doors read as two openings in one wall
+    { const iA = veh.a + Math.sign(d) * veh.v.w / 2 / R, iB = h.a - Math.sign(d) * h.v.w / 2 / R, sp = Math.atan2(Math.sin(iB - iA), Math.cos(iB - iA)), m = 4, rr = R - SHELL_INSET + 0.017;
+      for (let k = 0; k < m; k++) p.add('panel_steel', box(Math.abs(sp) * R / m + 0.012, top - y0 - 0.02, 0.026, 0, y0, rr).rotateY(iA + sp * (k + 0.5) / m)); }
+    for (let k = 0; k < n; k++) {
+      const a = edgeA + span * (k + 0.5) / n;
+      p.add('panel_dark', box(chord, 0.034, 0.05, 0, top - 0.02, rho).rotateY(a));          // the roof cap
+      p.add('panel_dark', box(chord, 0.115, 0.05, 0, y0 - 0.1, rho).rotateY(a));             // the base plinth
+    }
+    for (const e of [edgeA, edgeB]) { p.add('panel_steel', box(0.05, top - y0 + 0.085, 0.06, 0, y0 - 0.095, rho).rotateY(e)); p.add('lamp', box(0.012, 0.05, 0.01, 0, top - 0.09, rho + 0.032).rotateY(e)); }   // the end posts with a lamp each
+  }
+}
+
+/** The shell's colliders: the ring as short boxes with the airlocks' gaps left out, and each chamber's walls (so the chamber is a room and the doors are the only ways in). */
+function shellColliders(p: Parts, R: number, ring: number, doors: Doorways): void {
+  const gaps = doors.holes;
+  for (let i = 0; i < ring; i++) {
+    const a = (i + 0.5) * TAU / ring, h = Math.PI * R / ring;
+    if (gaps.some(g => ringSkipped(a, R, g.a, g.v, h / R))) continue;
+    const x = R * Math.sin(a), z = R * Math.cos(a);
+    p.collide({ x0: x - h * Math.abs(Math.cos(a)) - 0.03, z0: z - h * Math.abs(Math.sin(a)) - 0.03, x1: x + h * Math.abs(Math.cos(a)) + 0.03, z1: z + h * Math.abs(Math.sin(a)) + 0.03 });
+  }
+  // (the shell ring leaves out every box that reaches the door's window, so the outer door's stubs run as far as those boxes did)
+  // (a chamber that abuts a neighbor shares the wall with it on that side: its outer stub must stop there, not run on into the neighbor's doorway)
+  const step = 2 * Math.PI * R / ring + 0.02;
+  for (const g of gaps) {
+    const pt = chamberPoint(g.a, R, 0.1), plus = Math.sign(Math.atan2(Math.sin(Math.atan2(pt[0], pt[1]) - g.a), Math.cos(Math.atan2(pt[0], pt[1]) - g.a)));   // which way +lam runs round the shell
+    const abutting = (side: -1 | 1): boolean => gaps.some(o => { if (o === g) return false; const d = Math.atan2(Math.sin(o.a - g.a), Math.cos(o.a - g.a)); return Math.sign(d) === side * plus && Math.abs(d) * R < (o.v.w + g.v.w) / 2 + 0.08; });
+    p.collide(...chamberColliders(R, g.a, g.v, [abutting(-1) ? 0 : step, abutting(1) ? 0 : step]));
+  }
+}
+
+
+// ── the buried works: the skirt ring and the utilities laid on the pit floor before it (sim/dome/dig.ts) ──
+
+/** The layers a dome times by its dig state (everything else follows the cabin timing in shell.layerFractions): the stem wall is poured at the end of the foundation stage, the stakes come out when the digging starts. The pit, skirt and utilities are drawn by buildkit/domeDig.ts. */
+export function domeLayerFractions(tier: DomeTier): (stage: number, f: number, supplied: boolean) => Partial<Record<BuildLayer, number>> {
+  return (stage, f, supplied) => {
+    const d = digState(tier, stage, f, supplied);
+    return { foundation: d.stem, stakes: stage === 0 && d.phase === 'layout' ? 1 : 0 };
+  };
+}
+
+// ── the four builders ──
+
+function earthen(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group {
+  const p = new Parts(seed, opts), R = def.cellsX * CELL / 2 - 0.02, L = LOOK.earthen, g = opts.ground ?? (() => 0);
+  const rim = (a: number) => g(R * Math.sin(a), R * Math.cos(a));
+  p.layer = 'stakes';
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.add('trim', box(0.012, 0.09, 0.012, sx * (def.cellsX * CELL / 2 - 0.03), -0.02, sz * (def.cellsZ * CELL / 2 - 0.03)));
+  p.layer = 'foundation';
+  p.add('fieldstone', ringWall(R - 0.05, R + 0.03, L.stem, a => Math.min(L.stem - 0.02, rim(a) - 0.06), 24));
+  p.layer = 'frame';
+  // earthbag courses: the shell as stacked rings, each a little smaller (plaster over them reads as soft ridges)
+  const prof: Array<[number, number]> = [];
+  const rows = 14;
+  for (let i = rows; i >= 0; i--) { const th = i / rows * Math.PI / 2, ridge = i < rows ? 0.008 * (i % 2 ? 1 : 0) : 0; prof.push([(R - 0.03 + ridge) * Math.sin(th) + 1e-4, L.stem + R * 0.95 * Math.cos(th)]); }   // (foot to crown: the lathe's faces then look outward)
+  p.layer = 'roof';
+  const lathe = new THREE.LatheGeometry(prof.map(([x, y]) => new THREE.Vector2(x, y)), 40);
+  p.add('adobe', lathe);
+  // the sod crown: a thin green cap over the top fifth, standing a hair proud of the plaster
+  const cap: Array<[number, number]> = [];
+  for (let i = 5; i >= 0; i--) { const th = i / 5 * 0.62; cap.push([(R - 0.03) * 1.006 * Math.sin(th) + 1e-4, L.stem + R * 0.95 * 1.006 * Math.cos(th)]); }
+  p.add('hedge', new THREE.LatheGeometry(cap.map(([x, y]) => new THREE.Vector2(x, y)), 28));
+  p.layer = 'openings';
+  // one low arched door on the front (+z): a dark recess, a lintel stone, a plank door
+  // (a plastered entry porch standing out of the wall, so the door is a real six foot door and not a hole in a curve)
+  p.add('adobe', box(0.3, 0.3, 0.2, 0, L.stem, R - 0.1));
+  p.add('door', box(0.17, 0.26, 0.012, 0, L.stem, R + 0.003));
+  p.add('fieldstone', box(0.34, 0.04, 0.22, 0, L.stem + 0.3, R - 0.1));
+  p.add('metal_roof', new THREE.CylinderGeometry(0.02, 0.02, 0.05, 8).translate(0, L.stem + R * 0.95 + 0.02, 0));   // the vent pipe
+  p.collide({ x0: -R * 0.85, z0: -R * 0.85, x1: R * 0.85, z1: R * 0.6 });
+  const out = p.finish();
+  out.userData.chimneyTop = null; out.userData.keep = ['frame', 'roof']; out.userData.layerFr = domeLayerFractions('earthen'); out.userData.digTier = 'earthen';
+  return out;
+}
+
+
+/**
  * A sealed, filtered emergency intake on the arcology (sim/dome/intake.ts): an armored housing against the skirt with a hooded cap, two filter canisters
  * with clamp bands, a locked service hatch and a status lamp. Nothing on it is open: no louvres, no grille, no mouth.
  */
@@ -487,10 +576,6 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
   }
   for (const h of doors.holes) airlock(p, tier, R, h, doors, y0);
   bulkheadFrame(p, R, y0, doors.holes);
-  if (tier === 'arcology') {     // sealed filtered emergency intakes, spaced round the skirt and clear of every entrance
-    p.layer = 'walls';
-    for (const a of intakeAngles(ent.port, doors.holes.map(h => h.a), R, def.cellsX * CELL / 2 - 0.03)) intakeStack(p, R, y0, a);
-  }
   // colliders: the shell ring as short boxes, none at the airlocks (people cross only through them), and the chamber walls
   shellColliders(p, R, Math.max(24, Math.min(72, Math.round(R * 8))), doors);
   const out = p.finish();

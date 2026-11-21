@@ -64,15 +64,14 @@ try {
     await pr([dm.x - u[0] * R * 0.2 + n[0] * 3, R * 3.4, dm.z - u[1] * R * 0.2 + n[1] * 3], E(R + 3, 0, 0), 60); await shot('aerial-high');
   }
   const lightsOn = () => page.evaluate(() => window.__cb.game.setState(st => { const g = structuredClone(st.game); g.utilities.lit = ['x']; return { game: g }; }));
-  if (want('intake')) {
-    const IA = await page.evaluate(async ([p, es, r, h]) => (await import('/src/sim/dome/intake.ts')).intakeAngles(p, es, r, h), [a.angle, [a.angle, ...dm.persons.map(q => q.angle)], R, dm.half]);
-    lap('intake angles ' + JSON.stringify(IA));
-    for (const [ia, nm] of IA.map((q, i) => [q, 'abc'[i]])) {
-      const iu = [Math.sin(ia), Math.cos(ia)], inn = [iu[1], -iu[0]];
-      for (const [d, tag] of [[1.4, 'close'], [3.2, 'mid']]) await pr([dm.x + iu[0] * (R + d) + inn[0] * d * 0.5, 0.45 + d * 0.15, dm.z + iu[1] * (R + d) + inn[1] * d * 0.5], [dm.x + iu[0] * R, 0.3, dm.z + iu[1] * R], 55), await shot(`intake-${nm}-${tag}`);
-    }
+  if (want('yardintake') || want('yardduct') || want('yardwide')) {
+    const Y = await page.evaluate(async ([t, r, rot]) => { const m = await import('/src/sim/dome/plantYard.ts'); const g = m.yardGeometry(t, r, rot); const P = (u, v) => m.yardPoint(g, u, v); return { W: g.W, D: g.D, pts: { stack: P(0.24 * g.W, 0.72 * g.D), eye: P(0.24 * g.W + 0.5, 0.72 * g.D + 1.0), eye2: P(0.24 * g.W + 0.25, 0.72 * g.D + 0.05), wall: P(0.24 * g.W, 0.07), mid: P(0.24 * g.W - 0.9, 0.55 * g.D + 0.7) } }; }, [dm.tier, R, ROT]);
+    const w = q => [dm.x + q[0], dm.z + q[1]];
+    if (want('yardintake')) { const e = w(Y.pts.eye), l = w(Y.pts.stack); await pr([e[0], 0.28, e[1]], [l[0], 0.2, l[1]], 58); await shot('yard-intake-eye'); }
+    if (want('yardduct')) { const e = w(Y.pts.eye2), l = w(Y.pts.wall); await pr([e[0], 0.3, e[1]], [l[0], 0.2, l[1]], 62); await shot('yard-intake-duct'); }
+    if (want('yardwide')) { const e = w(Y.pts.mid), l = w(Y.pts.stack); await pr([e[0], 0.45, e[1]], [l[0], 0.15, l[1]], 70); await shot('yard-wide'); }
   }
-  if (want('intake-night')) { await lightsOn(); await set(`cb.store.getState().setTimeOfDay(21.5)`); const ia = (await page.evaluate(async ([p, es, r, h]) => (await import('/src/sim/dome/intake.ts')).intakeAngles(p, es, r, h)[0], [a.angle, [a.angle, ...dm.persons.map(q => q.angle)], R, dm.half])), iu = [Math.sin(ia), Math.cos(ia)]; await pr([dm.x + iu[0] * (R + 1.6) + iu[1] * 0.7, 0.55, dm.z + iu[1] * (R + 1.6) - iu[0] * 0.7], [dm.x + iu[0] * R, 0.3, dm.z + iu[1] * R], 55); await shot('intake-night'); }
+  if (want('shellclean')) { for (const [k, nm] of [[Math.PI, 'a'], [2.2, 'b']]) { const ia = a.angle + k, iu = [Math.sin(ia), Math.cos(ia)], inn = [iu[1], -iu[0]]; await pr([dm.x + iu[0] * (R + 2.2) + inn[0] * 1.1, 0.5, dm.z + iu[1] * (R + 2.2) + inn[1] * 1.1], [dm.x + iu[0] * R, 0.3, dm.z + iu[1] * R], 55); await shot('shell-base-clean-' + nm); } }
   if (want('closeup')) { await pr(E(R + 6.5 * S, -3.5 * S, 2.2 * S), gate, 52); await shot('port-closeup'); }
   if (want('second')) { await pr(E(-(R + 9 * S), 3 * S, 3), E(-R, 0.5 * S, 0), 58); await shot('second-entrance-opposite'); }
   if (want('eye')) {

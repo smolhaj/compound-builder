@@ -313,6 +313,28 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       Ly(Fy, dx + bw / 2 + 0.06, v - dd * 0.2, 0.014 * s, 0.14, C.copper, y + 0.12 * s, 't', u); Ly(Fy, dx + bw / 2 + 0.06, v + dd * 0.2, 0.014 * s, 0.14, C.pipe, y + 0.12 * s, 't', u);   // refrigerant stubs
     };
     chill('chiller', v1); if (spare('chiller')) chill('chiller2', v2);
+    // the sealed, filtered emergency air intake (sim/dome/intake.ts) of the arcology stands in the yard with the rest of the plant: armored housing on a plinth, a hooded cap,
+    // two filter canisters with clamp bands, a locked service hatch and a status lamp, and an armored duct run back to a flanged collar on the shell. Nothing on it is open.
+    if (tier === 'arcology') {
+      const ix = 0.24 * W, iv = D * 0.72, k = kk, y = 0.045, face = iv + 0.1 * k;
+      B(Fy, ix, iv, 0.5 * k, 0.04, 0.34 * k, C.concDark, y);                                                    // the plinth
+      B(Fy, ix, iv, 0.34 * k, 0.46 * k, 0.2 * k, C.armor, y + 0.04);                                             // the armored housing
+      B(Fy, ix, iv, 0.4 * k, 0.04 * k, 0.26 * k, C.roof, y + 0.04 + 0.46 * k);                                   // the hooded cap, wider than the body
+      for (const sd of [-1, 1]) {
+        Cy(Fy, ix + sd * 0.12 * k, face + 0.05 * k, 0.055 * k, 0.4 * k, C.steel, y + 0.04);                      // the filter canisters stand proud of the face
+        for (const hh of [0.1, 0.32]) Cy(Fy, ix + sd * 0.12 * k, face + 0.05 * k, 0.06 * k, 0.025 * k, C.dark, y + 0.04 + hh * k);   // clamp bands
+        Cy(Fy, ix + sd * 0.12 * k, face + 0.05 * k, 0.045 * k, 0.03 * k, C.cap, y + 0.04 + 0.4 * k);               // capped crown
+      }
+      B(Fy, ix, face - 0.004, 0.1 * k, 0.14 * k, 0.012, C.white, y + 0.04 + 0.16 * k);                           // the locked service hatch between the canisters
+      B(Fy, ix, face + 0.004, 0.03 * k, 0.02 * k, 0.016, C.steel, y + 0.04 + 0.14 * k);                          // its lock
+      B(Fy, ix, face, 0.04 * k, 0.025 * k, 0.014, 0x4fa04f, y + 0.04 + 0.34 * k);                                 // the status lamp (green: the intake is ready and sealed)
+      // the duct run: an armored conduit back along the yard floor to the shell, on three pipe hangers, ending in a flanged collar
+      const dl = Math.max(0.2, iv - 0.1 * k - 0.07), dc = (iv - 0.1 * k + 0.07) / 2, dy = y + 0.04 + 0.12 * k;
+      Ly(Fy, ix, dc, 0.035 * k, dl, C.armor, dy, 'r');
+      for (const t of [0.2, 0.5, 0.8]) { const z = 0.07 + dl * t; Cy(Fy, ix, z, 0.012 * k, dy - y, C.steel, y); B(Fy, ix, z, 0.09 * k, 0.012, 0.03, C.steel, dy + 0.03 * k); }
+      B(Fy, ix, 0.07, 0.14 * k, 0.14 * k, 0.03, C.cap, dy - 0.07 * k);                                           // the flanged collar on the shell
+      noteUnit('intake', Fy.x, Fy.z);
+    }
     // the cooling tower: basin, body with fill louvers, a fan stack with a grille, a platform with rails, a ladder and a drift plume
     {
       const tx = -0.37 * W, tz = D * 0.5, u = 'chiller', tw = Math.min(0.7 * kk, W * 0.17), td = Math.min(0.62 * kk, D * 0.45), y = 0.045;
