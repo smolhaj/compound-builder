@@ -487,20 +487,24 @@ export class HomesteadWorld {
     this._portKey = key;
     { const zk = domes.map(d => portFrameOf(d)!).map(f => `${f.cx.toFixed(2)},${f.cz.toFixed(2)},${f.angle.toFixed(3)}`).join('|'); const had = this._portZones.map(f => `${f.cx.toFixed(2)},${f.cz.toFixed(2)},${f.angle.toFixed(3)}`).join('|'); this._portZones = domes.map(d => portFrameOf(d)!); if (zk !== had && this._quality && this._batchDepth === 0) { this._plant(this._quality); this._water(this._quality); } }
     const pr = planToPort(this._baseRef, domes, (x, z) => this.parcel.height(x, z));
+    // the road and the graded corridor first: the apron is laid on the ground as it is drawn once the corridor is cut
+    this._applyPlan(pr ? pr.plan : this._baseRef, pr ? pr.drawn : undefined);
     const ins: PortInput[] = domes.map(d => {
       const f = portFrameOf(d)!;
-      return { id: d.id, tier: d.tier, frame: f, lane: insideLane(f), guarded, roadY: pr ? ((x: number, z: number): number | null => { let best = 0.6, y: number | null = null; for (const p of pr.plan.pts.slice(-40)) { const dd = Math.hypot(p.x - x, p.z - z); if (dd < best) { best = dd; y = p.y; } } return y; }) : undefined, persons: d.airlocks.filter(a => !a.role).map(a => ({ angle: a.angle, x: a.x, z: a.z, off: a.off })), state: getDoorLook() === 'sealed' ? 'sealed' as const : 'open' as const, baseY: this._built.get(d.id)?.group.position.y ?? this.groundAt(d.x, d.z) };
+      return { id: d.id, tier: d.tier, frame: f, lane: insideLane(f), guarded, roadY: pr ? ((x: number, z: number): number | null => roadYAlong(pr.plan.pts.slice(-40), [{ s0: -Infinity, s1: Infinity }], x, z, 0.6)) : undefined, persons: d.airlocks.filter(a => !a.role).map(a => ({ angle: a.angle, x: a.x, z: a.z, off: a.off })), state: getDoorLook() === 'sealed' ? 'sealed' as const : 'open' as const, baseY: this._built.get(d.id)?.group.position.y ?? this.groundAt(d.x, d.z) };
     });
     if (this._ports) { this._root.remove(this._ports.group); this._ports.dispose(); this._ports = null; }
     if (ins.length) { const f = makeVehiclePorts(ins, (x, z) => this.groundAt(x, z)); this._root.add(f.group); this._ports = f; }
-    this._applyPlan(pr ? pr.plan : this._baseRef);
     this._portTail = pr ? vehicleTail(pr.frame).slice(1) : [];
     this.truck.setLock(pr && pr.dome.tier !== 'earthen' ? { x: pr.frame.outer[0], z: pr.frame.outer[1], s: portCycleSeconds(pr.dome.tier) } : null);
     this._tailKey = '';
   }
+  /** The plan the ground road is drawn from while a dome's port ends the road (its gravel stops under the apron's toe); null: `plan` itself. */
+  private _drawn: RoadPlan | null = null;
   /** Make `plan` the road in use: redraw the land along it, the road and the truck's way. */
-  private _applyPlan(plan: RoadPlan): void {
+  private _applyPlan(plan: RoadPlan, drawn?: RoadPlan): void {
     if (plan === this.plan) return;
+    this._drawn = drawn ?? null;
     const was = roadBedOf(this.plan).bbox;
     this.plan = plan;
     this.access = accessFromPlan(plan);
@@ -672,6 +676,7 @@ export class HomesteadWorld {
     if (plan === this._baseRef) return;
     this._baseRef = plan;
     this._portKey = '';
+    this._drawn = null;
     this.plan = plan;
     this.access = accessFromPlan(plan);
     this.parcel.setRoadBed(this._drive ? roadBedOf(plan) : null);
@@ -770,7 +775,7 @@ export class HomesteadWorld {
     road.receiveShadow = true; this._roads.add(road);
     if (this.countyGaps.length) this._roads.add(buildCountyBridges(this.countyGaps.map(g => ({ z0: g.z0, z1: g.z1, deckY: (z: number) => this._deckY(g, z), x: this.county.x, width: ROAD_W })), this.groundAt));
     // the way in: a curved ribbon on the benched ground, with its banks, rails, culverts, crossings and portals (game/region/roadWorks.ts)
-    this._roads.add(buildRoadWorks(this.plan, this.groundAt, { built: this._drive, bridgeDown: this._bridgeDown, surface: mat, track, driveW: DRIVE_W, natural: (x, z) => this.parcel.natural(x, z).h }));
+    this._roads.add(buildRoadWorks(this._drawn ?? this.plan, this.groundAt, { built: this._drive, bridgeDown: this._bridgeDown, surface: mat, track, driveW: DRIVE_W, natural: (x, z) => this.parcel.natural(x, z).h }));
     // the ranch gate on the property line stands square to the drive there (the drive leaves the line at an angle, and bends), and gives way to a wall's own gate once there is one
     const gate = buildGate(DRIVE_W);
     const { gate: gp } = this.access;

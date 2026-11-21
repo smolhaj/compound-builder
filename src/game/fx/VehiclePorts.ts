@@ -8,7 +8,7 @@
 import { portTextures, portUV, signAtlas, signQuad } from './portTextures';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { APRON_LEN, apronTop, type InsideLane, type PortFrame } from '../../sim/dome/vehiclePort';
+import { APRON_LEN, apronSpan, apronTop, type InsideLane, type PortFrame } from '../../sim/dome/vehiclePort';
 import type { DomeTier } from '../../sim/dome/tiers';
 import { vestibuleOf } from '../../sim/dome/vestibule';
 
@@ -32,6 +32,8 @@ const STATE_COLOR: Record<PortState, number> = { open: 0x30ff80, cycling: 0xffb0
 
 export const portsKey = (ins: readonly PortInput[]): string => ins.map(i => `${i.id}:${i.tier}:${i.frame.angle.toFixed(3)}:${i.frame.cx.toFixed(2)},${i.frame.cz.toFixed(2)}:${i.frame.r.toFixed(2)}:${i.lane ? 1 : 0}:${i.guarded ? 1 : 0}:${i.persons.length}:${i.state}`).join('|');
 
+/** How far the drawn gravel ribbon lies over the ground (game/region/roadWorks buildRoadWorks: 0.024). */
+const ROAD_LIFT = 0.024;
 const POUR = 0x8a9097, CURB = 0x6b7078, PAINT = 0xeae7da, YELLOW = 0xe3b92a, STEEL = 0x8a929a, DARK = 0x262a2f, GLASS = 0x6fa5b8;
 const CLAD: Record<DomeTier, number> = { earthen: 0x7a6f5d, geodesic: 0x9aa3ab, glass: 0x56606a, arcology: 0x2a3037 };
 const ACCENT: Record<DomeTier, number> = { earthen: 0xffd070, geodesic: 0xffe9b0, glass: 0xdff3ff, arcology: 0x40e0ff };
@@ -69,7 +71,7 @@ function slab(f: Fr, rho0: number, rho1: number, lam0: number, lam1: number, top
   const quad = (a: number[], b: number[], c: number[], d: number[]): void => { pos.push(...a, ...b, ...c, ...a, ...c, ...d); };
   // the sides and the toe slope away (about 1 in 1.2) instead of dropping straight down: a low camera sees a banked edge, not a cliff
   const K = 0.6, dr = (rho: number, lam: number): number => Math.max(0, top(rho) - B(rho, lam)) * K;
-  const VB = (rho: number, lam: number, side: -1 | 1 | 0, end: 0 | 1 | -1 = 0): [number, number, number] => { const d = dr(rho, lam); const [x, z] = P(f, rho + end * d, lam + side * d); return [x, B(rho, lam), z]; };
+  const VB = (rho: number, lam: number, side: -1 | 1 | 0, end: 0 | 1 | -1 = 0): [number, number, number] => { const d = end ? 0 : dr(rho, lam); const [x, z] = P(f, rho + end * d, lam + side * d); return [x, B(rho, lam), z]; };   // (the toe drops straight down: a slanted toe read as a steel wall across the road)
   for (let i = 0; i < n; i++) {
     const r0 = rho0 + (rho1 - rho0) * i / n, r1 = rho0 + (rho1 - rho0) * (i + 1) / n;
     quad(V(r0, lam0, top(r0)), V(r1, lam0, top(r1)), V(r1, lam1, top(r1)), V(r0, lam1, top(r0)));                                   // the top
@@ -104,20 +106,21 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     const offP = f.person ? lamOf(f.person.outer) : 0;
     const pad = ground(...f.inner), yPad = pad + 0.012;
     // ── the apron: a planar ramp from the sill (at the dome floor's level) out to the road's level, with curbs, stripes and a stop line ──
-    const lamA = -(v.dw / 2 + 0.45), lamB = Math.max(offP, 0) + (f.person ? 0.5 : v.dw / 2 + 0.45);
+    const { lamA, lamB } = apronSpan(f);
     // the top follows the highest ground under each cross-section (never buried, never stretched over a dip), eased so the ramp stays gentle; the skirts close the sides
     const nS = 8, hs: number[] = [];
     for (let k = 0; k <= nS; k++) { const r = R + APRON_LEN * k / nS; let m = -Infinity; for (const l of [lamA, 0, lamB]) m = Math.max(m, ground(...at(r, l))); hs.push(Math.max(m + 0.012, k === 0 ? yPad : -Infinity)); }
     // where the planned road runs on to the apron it sets the height: the apron's top is the road's own surface along the axis (a straight ramp from the sill to the road at the toe, never a
     // step, never a wall in front of the road); with no planned road (a QA scene) the ground decides, eased to at most 5 percent a step
-    const rY = (k: number): number | null => { const v = roadY?.(...at(R + APRON_LEN * k / nS, 0)); return v === null || v === undefined || !Number.isFinite(v) ? null : v - 0.004; };   // (a hair under the road's own surface, so the gravel runs on over the apron's toe)
+    const rY = (k: number): number | null => { const v = roadY?.(...at(R + APRON_LEN * k / nS, 0)); return v === null || v === undefined || !Number.isFinite(v) ? null : v + ROAD_LIFT + 0.008; };   // (the road's drawn surface: the plan's height plus the gravel's lift over the ground; the slab sits 0.008 (2 inches) over it, so the gravel under it never shows through)
     const toeY = rY(nS);
-    if (toeY !== null) for (let k = 1; k <= nS; k++) hs[k] = apronTop(hs[0], toeY, k, nS);
+    // (each step takes the road's own height there, so the slab is always a hair over the gravel under it, never under: the road's profile is within 6 percent, the apron's too)
+    if (toeY !== null) for (let k = 0; k <= nS; k++) { const ry = rY(k); hs[k] = k === 0 ? Math.max(hs[0], ry ?? -Infinity) : ry ?? apronTop(hs[0], toeY, k, nS); }
     else for (let k = 1; k <= nS; k++) hs[k] = Math.max(hs[k - 1] - 0.05 * APRON_LEN / nS, Math.min(hs[k - 1] + 0.05 * APRON_LEN / nS, hs[k]));   // (at most 5 percent a step)
     const topA = (rho: number): number => { const t = Math.max(0, Math.min(1, (rho - R) / APRON_LEN)) * nS, k = Math.min(nS - 1, Math.floor(t)); return hs[k] + (hs[k + 1] - hs[k]) * (t - k); };
     geos.push(slab(F, R - 0.02, R + APRON_LEN, lamA, lamB, topA, ground, POUR));
     for (const [l0, l1] of [[lamA, lamA + 0.035], [lamB - 0.035, lamB]] as const) geos.push(slab(F, R - 0.02, R + APRON_LEN, l0, l1, r => topA(r) + 0.022, ground, CURB));   // the straight curbs
-    geos.push(slab(F, R + APRON_LEN - 0.035, R + APRON_LEN, lamA, lamB, r => topA(r) + 0.012, ground, CURB));                                                                  // and the toe
+    // (no curb across the toe: the road drives on over it, flush)
     geos.push(mark(F, R + 0.05, R + APRON_LEN - 0.12, -0.012, 0.012, topA, YELLOW));                                                    // the center line to the gate
     { const k = tier === 'arcology' ? 1.6 : 1, [sx0, sz0] = at(R + 1.1, lamA + 0.12 * k); signPost(sx0, sz0, yaw, k, [0, 1, 2]); }                          // the port's sign: SALLY PORT, VEHICLES ONLY, LOCK CYCLE
     geos.push(mark(F, R + 0.45, R + 0.5, -v.dw / 2, v.dw / 2, topA, PAINT));                                                           // the stop line before the gate

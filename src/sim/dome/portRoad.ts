@@ -6,7 +6,8 @@
  */
 import type { RoadPlan, RoadPt } from '../roadPlan';
 import { UNIT_M, M_TO_FT } from '../roadStyle';
-import { approachRoute, inKeepout, insideLane, portFrame, yardCorners, type Approach, type Keepout, type PortFrame, type Pt } from './vehiclePort';
+import { approachRoute, inKeepout, insideLane, portFrame, yardCorners, apronSpan, portGrade, APRON_LEN, type Approach, type Keepout, type PortFrame, type Pt } from './vehiclePort';
+import { BED } from '../roadBed';
 import type { Dome } from './standing';
 
 /** The steepest the new stretch of road runs (rise over run): well under the truck's 12 percent and the 7 percent it takes in snow. */
@@ -14,7 +15,8 @@ export const MAX_GRADE = 0.06;
 /** How far back from the join the old drive's profile is eased (units). */
 export const BACK = 30;
 
-export interface PortRoad { plan: RoadPlan; frame: PortFrame; approach: Approach; dome: Dome }
+/** `plan` is the road in use (its last stations carry the graded corridor); `drawn` is the plan the ground road is drawn from: its gravel ends 0.1 unit under the apron's toe, where the apron's own surface takes over. */
+export interface PortRoad { plan: RoadPlan; drawn: RoadPlan; frame: PortFrame; approach: Approach; dome: Dome }
 
 /** The first dome (nearest the old yard) whose port the road is re-planned to, with the plan it makes; null when no dome with a port lies on or near the drive. */
 export function planToPort(plan: RoadPlan, domes: readonly Dome[], height: (x: number, z: number) => number): PortRoad | null {
@@ -30,7 +32,8 @@ export function planToPort(plan: RoadPlan, domes: readonly Dome[], height: (x: n
     // the old yard: kept when it is clear of the dome; else the deliveries unload on the inside pad (or, with no lane, on the apron)
     const lane = insideLane(f), under = Math.hypot(yard[0] - d.x, yard[1] - d.z) < d.r + 0.2 || inKeepout(keep, yard[0], yard[1], 0);
     const newYard: Pt = under || approach.cut ? (lane ? lane.pad : f.apronEnd) : yard;
-    return { plan: derive(plan, approach, newYard, height), frame: f, approach, dome: d };
+    const derived = grade(derive(plan, approach, newYard, height), f);
+    return { plan: derived, drawn: trimAtApron(derived, f), frame: f, approach, dome: d };
   }
   return null;
 }
@@ -74,4 +77,27 @@ export function derive(plan: RoadPlan, a: Approach, yard: Pt, height: (x: number
 export function portFrameOf(d: Dome): PortFrame | null {
   const a = d.airlocks.find(x => x.role === 'vehicle') ?? (d.tier === 'earthen' ? d.airlocks[0] : undefined);
   return a ? portFrame(d.tier, d.x, d.z, d.r, a.angle) : null;
+}
+
+/** Distance out from the gate plane of each station of `plan`, by the length of road left to the end (the straight run is on the axis: the same as its projection). */
+function rhoOf(plan: RoadPlan, f: PortFrame): number[] {
+  const end = plan.pts[plan.pts.length - 1], rhoEnd = (end.x - f.cx) * f.u[0] + (end.z - f.cz) * f.u[1] - f.r;
+  return plan.pts.map(p => end.s - p.s + rhoEnd);
+}
+
+/** The plan with the last `GRADE_LEN` units of its stations carrying the corridor's width and batters (read by `roadBedOf`, so the world cuts and fills the ground to it). */
+export function grade(plan: RoadPlan, f: PortFrame): RoadPlan {
+  const span = apronSpan(f), rho = rhoOf(plan, f);
+  return { ...plan, pts: plan.pts.map((p, i) => { const g = portGrade(rho[i], span, BED); return g ? { ...p, half: g.half, cut: g.cut, fill: g.fill, reach: g.reach } : p; }) };
+}
+
+/** The plan to draw the ground road from: its stations stop 0.1 unit short of the apron's toe (the last one interpolated), so no gravel shows through the apron's slab. */
+export function trimAtApron(plan: RoadPlan, f: PortFrame): RoadPlan {
+  const rho = rhoOf(plan, f), cut = APRON_LEN - 0.1;   // (the stations run in toward the gate: rho falls along the route)
+  let k = -1; for (let i = 0; i < rho.length; i++) if (rho[i] >= cut) k = i; else break;
+  if (k < 0 || k === rho.length - 1) return plan;
+  const a = plan.pts[k], b = plan.pts[k + 1], t = (rho[k] - cut) / (rho[k] - rho[k + 1]);
+  const m: RoadPt = { ...a, x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, y: a.y + (b.y - a.y) * t, s: a.s + (b.s - a.s) * t, bank: 0 };
+  const pts = [...plan.pts.slice(0, k + 1), m];
+  return { ...plan, pts, lengthU: m.s };
 }
