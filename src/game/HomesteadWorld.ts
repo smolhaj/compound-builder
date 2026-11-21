@@ -594,7 +594,7 @@ export class HomesteadWorld {
     if (!cur || cur.key !== key) {
       if (cur) { this._root.remove(cur.group); cur.dispose(); }
       const gx = b.placed.x, gz = b.placed.z, y0 = b.group.position.y;
-      const pf = makeDomePlant(ref.tier, ref.r, dst.filtering, (lx, lz) => this.parcel.height(gx + lx, gz + lz) - y0 + 0.01, plook);
+      const pf = makeDomePlant(ref.tier, ref.r, dst.filtering, (lx, lz) => (Math.hypot(lx, lz) < ref.r - 0.05 ? 0.01 : this.parcel.height(gx + lx, gz + lz) - y0 + 0.01), plook);   // (the floor inside the shell is the level pad: the dressing and posts stand on it, not on the natural slope under it)
       pf.setUnder(this._under); pf.setView(this._view);
       pf.group.position.set(gx, y0, gz);
       this._root.add(pf.group); this._domePlants.set(b.placed.id, pf);
