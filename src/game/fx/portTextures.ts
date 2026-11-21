@@ -67,8 +67,7 @@ export function workTextures(): PortTextures {
   g.fillStyle = 'rgba(30,30,34,0.5)'; g.fillRect(0, 0, N, 1.4); g.fillRect(0, 0, 1.4, N);                                                                                                // a seam line
   g.fillStyle = 'rgba(255,255,255,0.3)'; g.fillRect(0, N - 1.6, N, 1.2);                                                                                                                 // worn edge
   const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping; map.anisotropy = 2;
-  const nm = generateNormalMap(c, 1.3); nm.wrapS = nm.wrapT = THREE.RepeatWrapping;
-  _work = { map, normalMap: nm, dispose: () => { /* shared */ } };
+  _work = { map, normalMap: null as unknown as THREE.Texture, dispose: () => { /* shared */ } };       // (colour only: the normal map is not worth its memory at this size)
   return _work;
 }
 

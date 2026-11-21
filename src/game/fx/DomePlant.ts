@@ -99,7 +99,7 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
   if (merged && merged0 !== merged) merged0!.dispose();
   if (merged) {
     const wt = typeof document !== 'undefined' ? workTextures() : null;      // (no canvas in the node tests)
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, ...(wt ? { map: wt.map, normalMap: wt.normalMap, normalScale: new THREE.Vector2(0.8, 0.8) } : {}), roughness: 0.78, metalness: 0.25, flatShading: true });
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, ...(wt ? { map: wt.map } : {}), roughness: 0.78, metalness: 0.25, flatShading: true });
     const mesh = new THREE.Mesh(merged, mat);
     mesh.name = 'plant_machinery'; mesh.matrixAutoUpdate = false; mesh.updateMatrix();
     group.add(mesh); owned.push(merged, mat);
