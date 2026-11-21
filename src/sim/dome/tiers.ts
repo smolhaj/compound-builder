@@ -80,7 +80,7 @@ export const TIER: Record<DomeTier, TierSpec> = {
     blurb: 'A 60 ft geodesic dome of steel struts glazed in twin-wall polycarbonate, berm-footed, two airlocks: one climate under one skin, frost-free greens all winter.' },
   glass: { tier: 'glass', bermFt: 0, name: 'Glass & steel dome', cells: 15, minCells: 10, maxCells: 24, heightRatio: 0.5, skirtFt: 30, skirtThickFt: 3, airlocks: 1, hours: 40000, permitFee: 350000, reviewDays: 120, gateUsd: 15_000_000,
     blurb: 'A 150 ft steel gridshell glazed in laminated glass on a concrete ring beam: a conservatory over a whole yard, house, beds and well. Needs Founder money and an engineer\'s stamp.' },
-  arcology: { tier: 'arcology', bermFt: 0, name: 'Arcology dome', cells: 36, minCells: 24, maxCells: 60, heightRatio: 0.5, skirtFt: 60, skirtThickFt: 4, airlocks: 2, hours: 150000, permitFee: 15_000_000, reviewDays: 420, gateUsd: 500_000_000,
+  arcology: { tier: 'arcology', bermFt: 0, name: 'Arcology dome', cells: 36, minCells: 24, maxCells: 60, heightRatio: 0.5, skirtFt: 60, skirtThickFt: 4, airlocks: 1, hours: 150000, permitFee: 15_000_000, reviewDays: 420, gateUsd: 500_000_000,
     blurb: 'A 360 ft space-frame dome of clear polycarbonate-composite panels that rifle fire, rockets and shrapnel cannot get through. A small town under a sky of its own. Magnate money, a contractor firm and about a year of review.' },
 };
 

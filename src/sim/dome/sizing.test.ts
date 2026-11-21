@@ -4,6 +4,7 @@ import { domeCost } from './cost';
 import { domeGeometry } from './geometry';
 import { domeSiteReport, siteSummary } from './siting';
 import { domeFrom, airlocksOf } from './standing';
+import { entryR } from './vehiclePort';
 import { vestibuleOf, chamberColliders, chamberRho, wallBoxes, chamberPoint, ringSkipped } from './vestibule';
 import { BLUEPRINTS, totalBill } from '../blueprints';
 import { PERMIT_FEE, needsPermit } from '../paperwork';
@@ -93,7 +94,8 @@ describe('the airlock chamber', () => {
   });
   it('the airlock\'s outer door lies on the radius and its inner door a chamber\'s length in', () => {
     const [a] = airlocksOf('glass', 0, 0, 3, 0), v = vestibuleOf('glass', 3);
-    expect(Math.hypot(a.x, a.z)).toBeCloseTo(3, 6); expect(Math.hypot(a.inX, a.inZ)).toBeCloseTo(3 - v.len, 6);
+    const rc = a.off ? entryR('glass', 3) : 3;      // (a person chamber in the entrance module stands beside the port: its doors are in the module's plane)
+    expect(Math.hypot(a.x, a.z - 0) ** 2 - (a.off ?? 0) ** 2).toBeCloseTo(rc * rc, 6); expect(Math.hypot(a.inX, a.inZ) ** 2 - (a.off ?? 0) ** 2).toBeCloseTo((rc - v.len) ** 2, 6);
     expect(a.dw).toBeCloseTo(v.dw, 6);
   });
   it('wall boxes cover a slanted wall end to end', () => {

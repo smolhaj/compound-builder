@@ -19,6 +19,10 @@ const STEP = 0.3;
 
 const hash = (n: number): number => { let h = (n | 0) * 374761393 + 668265263; h = (h ^ (h >>> 13)) * 1274126177; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
 
+import { vestibuleOf } from '../../sim/dome/vestibule';
+import { portVestibule } from '../../sim/dome/vehiclePort';
+import type { DomeTier } from '../../sim/dome/tiers';
+
 export function interiorPlan(tier: string, r: number, angles: readonly number[], obstacles: readonly Obstacle[], seed = 1, vehicles: readonly number[] = []): InteriorPlan {
   const out: InteriorPlan = { segs: [], benches: [], crates: [], planters: [], signs: [], lamps: [], plaza: null, glows: [] };
   if (tier !== 'glass' && tier !== 'arcology' && tier !== 'geodesic') return out;
@@ -33,19 +37,23 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
   const plazaOk = free(0, 0, plazaR + 0.25, 1);
   if (plazaOk) out.plaza = { x: 0, z: 0, r: plazaR };
   const rho0 = r * 0.86, rho1 = plazaOk ? plazaR : r * 0.12;
+  // nothing on the floor stands inside an airlock's chamber or against its inner door: the chambers run in from the shell, so the floor's dressing stops short of them
+  const personLen = vestibuleOf(tier as DomeTier, r).len, portLen = portVestibule(tier as DomeTier, r)?.len ?? 0;
+  const innerOf = (len: number): number => r - len - 0.35;
   angles.forEach((a, ai) => {
+    const inner = innerOf(personLen);
     const sx = Math.sin(a), sz = Math.cos(a), px = sz, pz = -sx;   // along (outward) and across
     // the path, in pieces of one step; a piece that would cross a building is left out (the path stops at its door and goes on after it)
     const n = Math.max(0, Math.floor((rho0 - rho1) / STEP));
     for (let i = 0; i < n; i++) {
       const rho = rho0 - (i + 0.5) * STEP;
-      if (rho > r * 0.88) continue;
+      if (rho > Math.min(r * 0.88, inner)) continue;
       const x = sx * rho, z = sz * rho;
       if (free(x, z, PATH_W / 2 + 0.03) && free(sx * (rho + STEP / 2), sz * (rho + STEP / 2), PATH_W / 2) && free(sx * (rho - STEP / 2), sz * (rho - STEP / 2), PATH_W / 2)) out.segs.push({ x, z, rot: Math.atan2(sx, sz), len: STEP + 0.01 });
     }
     const onPath = (rho: number): boolean => out.segs.some(s => Math.hypot(s.x - sx * rho, s.z - sz * rho) < STEP * 0.6);
     // benches: every few steps, alternating sides, facing the path
-    const bs = [0.74, 0.56, 0.4].map((f, k) => ({ rho: r * f, side: (k + ai) % 2 ? 1 : -1 }));
+    const bs = [0.74, 0.56, 0.4].map((f, k) => ({ rho: Math.min(r * f, inner - 0.1 - k * 0.0), side: (k + ai) % 2 ? 1 : -1 }));
     for (const b of bs) {
       if (!onPath(b.rho)) continue;
       const off = PATH_W / 2 + BENCH.dep / 2 + 0.06, x = sx * b.rho + px * off * b.side, z = sz * b.rho + pz * off * b.side;
@@ -56,9 +64,9 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
       }
     }
     // two lamp posts flank the inner door
-    for (const side of [-1, 1]) { const x = sx * r * 0.86 + px * 0.5 * side, z = sz * r * 0.86 + pz * 0.5 * side; if (free(x, z, 0.05, 0.97)) out.lamps.push({ x, z }); }
+    for (const side of [-1, 1]) { const x = sx * Math.min(r * 0.86, inner - 0.05) + px * 0.5 * side, z = sz * Math.min(r * 0.86, inner - 0.05) + pz * 0.5 * side; if (free(x, z, 0.05, 0.97)) out.lamps.push({ x, z }); }
     // the door: a crate stack off the lane (a supply drop), a sign on the other side
-    const dr = r * 0.82;
+    const dr = Math.min(r * 0.82, inner - 0.15);
     for (const [side, kind] of [[1, 'crate'], [-1, 'sign']] as const) {
       const off = 0.62, x = sx * dr + px * off * side, z = sz * dr + pz * off * side;
       if (!free(x, z, 0.2, 0.95)) continue;
@@ -85,15 +93,16 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
   // the vehicle sally port: a paved lane from its inner door in to a parking pad (trucks stop on pavement, never on the lawn); nothing is set in its way
   for (const a of vehicles) {
     const sx = Math.sin(a), sz = Math.cos(a), r1 = r * 0.5;
-    for (let rho = r * 0.86; rho > r1; rho -= STEP) {
+    const vin = innerOf(portLen);
+    for (let rho = Math.min(r * 0.86, vin); rho > r1; rho -= STEP) {
       const x = sx * (rho - STEP / 2), z = sz * (rho - STEP / 2);
       if (Math.hypot(x, z) >= r * 0.92 || obstacles.some(o => Math.abs(x - o.x) < o.hx + LANE_W / 2 + 0.03 && Math.abs(z - o.z) < o.hz + LANE_W / 2 + 0.03)) break;
       out.segs.push({ x, z, rot: Math.atan2(sx, sz), len: STEP + 0.01, w: LANE_W });
     }
     // lamp posts down both sides of the lane, every few steps, so the truck lane reads lit and clean at night
     const px = Math.cos(a), pz = -Math.sin(a);
-    for (let rho = r * 0.8, k = 0; rho > r1 && k < 6; rho -= STEP * 3, k++) for (const side of [-1, 1]) {
-      const x = sx * rho + px * (LANE_W / 2 + 0.12) * side, z = sz * rho + pz * (LANE_W / 2 + 0.12) * side;
+    for (let rho = Math.min(r * 0.8, vin - 0.1), k = 0; rho > r1 && k < 6; rho -= STEP * 3, k++) for (const side of [-1, 1]) {
+      const x = sx * rho + px * 0.75 * side, z = sz * rho + pz * 0.75 * side;      // (beside the poured lane and its pad, never on them)
       if (Math.hypot(x, z) < r * 0.93 && !obstacles.some(o => Math.abs(x - o.x) < o.hx + 0.05 && Math.abs(z - o.z) < o.hz + 0.05)) out.lamps.push({ x, z });
     }
   }

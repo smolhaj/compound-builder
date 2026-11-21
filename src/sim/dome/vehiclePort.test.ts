@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DOME_KIND, DOME_TIERS, TIER, shellFt, type DomeTier } from './tiers';
-import { onApron, blockedArcs, approachRoute, angDist, bearingToRoad, choosePortAngle, hasVehiclePort, inKeepout, insideLane, portBill, portFrame, portVestibule, portWords, straightRun, TRUCK, vehicleFits, vehicleTail, yardCorners, STRAIGHT_LEN, APRON_LEN, type Pt } from './vehiclePort';
+import { entryR, moduleFits, personAngleOffset, personLateral, onApron, blockedArcs, approachRoute, angDist, bearingToRoad, choosePortAngle, hasVehiclePort, inKeepout, insideLane, portBill, portFrame, portVestibule, portWords, straightRun, TRUCK, vehicleFits, vehicleTail, yardCorners, STRAIGHT_LEN, APRON_LEN, type Pt } from './vehiclePort';
 import { domeFrom, FT_PER_UNIT } from './standing';
 import { yardGeometry } from './plantYard';
 import { domeCostSummary } from './costSummary';
@@ -47,7 +47,7 @@ describe('where the vehicle port stands', () => {
     expect(domeFrom(st('glass', 0, 1.0))!.airlocks.find(a => a.role === 'vehicle')!.angle).toBeCloseTo(1.0, 9);
     const d = domeFrom(st('glass'))!, p = d.airlocks.find(a => a.role === 'vehicle')!, y = yardGeometry('glass', d.r, 0)!;
     expect(angDist(p.angle, y.phi)).toBeGreaterThan(y.W / 2 / d.r);
-    expect(Math.hypot(p.x - d.x, p.z - d.z)).toBeCloseTo(d.r, 6);
+    expect(Math.hypot(p.x - d.x, p.z - d.z)).toBeCloseTo(entryR('glass', d.r), 6);      // (the doors stand in the entrance module's plane, a little behind the skin)
   });
   it('bearingToRoad points at the nearest road point', () => {
     expect(bearingToRoad(0, 0, [[10, -5], [10, 5]])).toBeCloseTo(Math.PI / 2, 6);
@@ -67,7 +67,7 @@ describe('the port itself', () => {
     for (const p of tail) expect(Math.abs((p[0] - 20) * f.u[1] - (p[1] - 20) * f.u[0])).toBeLessThan(1e-9);
     const depth = tail.map(p => (p[0] - 20) * f.u[0] + (p[1] - 20) * f.u[1]);
     for (let i = 1; i < depth.length; i++) expect(depth[i]).toBeLessThan(depth[i - 1]);
-    expect(depth[1]).toBeCloseTo(r - f.v.len, 6);
+    expect(depth[1]).toBeCloseTo(f.r - f.v.len, 6);
     expect(depth[depth.length - 1]).toBeGreaterThan(0);
   });
 });
@@ -197,7 +197,7 @@ describe('the new stretch of road is graded for a truck', () => {
     const plan = { pts, gateAt: 2, gate: { x: 70, z: 46, rot: 0 }, yard: [40, 40] as [number, number], structures: [], walls: [], rails: [], hairpins: [], lengthU: 40, lengthM: 240, lengthFt: 800 } as unknown as import('../roadPlan').RoadPlan;
     const d = domeFrom({ id: 'd', kind: DOME_KIND.glass, x: 40, z: 40, rot: 1, stage: 99, done: 0, supplied: true, finishedAt: 0, portAngle: 1.2 })!;
     // the ground: level at 0, then a step up to the pad (1.2 high) within 3 units of the shell
-    const h = (x: number, z: number): number => { const e = Math.hypot(x - 40, z - 40) - d.r; return e < 0.3 ? 1.2 : e < 3 ? 1.2 * (3 - e) / 2.7 : 0; };
+    const h = (x: number, z: number): number => { const e = Math.hypot(x - 40, z - 40) - entryR('glass', d.r); return e < 0.3 ? 1.2 : e < 3 ? 1.2 * (3 - e) / 2.7 : 0; };
     const pr = planToPort(plan, [d], h)!, tail = pr.plan.pts.slice(Math.max(0, pr.approach.joinAt - 55));
     for (let i = 1; i < tail.length; i++) expect(Math.abs(tail[i].y - tail[i - 1].y) / Math.hypot(tail[i].x - tail[i - 1].x, tail[i].z - tail[i - 1].z)).toBeLessThanOrEqual(MAX_GRADE + 1e-6);
     expect(tail[tail.length - 1].y).toBeCloseTo(1.2, 6);   // the apron sits at the pad's level
@@ -205,22 +205,32 @@ describe('the new stretch of road is graded for a truck', () => {
 });
 
 describe('one entrance: the gate complex (PROPOSED, owner: one entrance, two at most)', () => {
-  it('person airlocks are 1 on the geodesic and glass domes and 2 on the arcology; earthen keeps its one low door', () => {
-    expect([TIER.earthen.airlocks, TIER.geodesic.airlocks, TIER.glass.airlocks, TIER.arcology.airlocks]).toEqual([0, 1, 1, 2]);
+  it('person airlocks are 1 on the geodesic, glass and arcology domes (the arcology has no second entrance); earthen keeps its one low door', () => {
+    expect([TIER.earthen.airlocks, TIER.geodesic.airlocks, TIER.glass.airlocks, TIER.arcology.airlocks]).toEqual([0, 1, 1, 1]);
     for (const t of BIG) { const d = domeFrom(st(t, 0, 1.0))!; expect(d.airlocks.filter(a => !a.role).length).toBe(TIER[t].airlocks); }
   });
-  it('the person airlock stands beside the port on the same approach, clear of it by the gap, and counts as ONE entrance with it', async () => {
+  it('the person chamber stands beside the port on a parallel axis, sharing one party wall (no gap, no overlap), and counts as ONE entrance with it', async () => {
     const { entrancesOf } = await import('./standing');
     for (const t of BIG) for (const ang of [0.3, 2.0, 4.5]) {
       const d = domeFrom(st(t, 0, ang))!, p = d.airlocks.find(a => !a.role)!, v = d.airlocks.find(a => a.role === 'vehicle')!;
-      const gap = angDist(p.angle, v.angle) * d.r - (p.w + v.w) / 2;
-      expect(gap).toBeGreaterThanOrEqual(0.19);   // (the chambers do not touch)
-      expect(angDist(p.angle, v.angle) * d.r).toBeLessThan(4);   // (side by side, not on another side of the dome)
+      expect(moduleFits(t, d.r)).toBe(true);
+      // (parallel axes: the same angle; the person chamber stands to the +lam side by exactly the two half widths, so the two walls touch)
+      expect(p.angle).toBeCloseTo(v.angle, 9);
+      expect(p.off ?? 0).toBeCloseTo((p.w + v.w) / 2, 9);
+      // the outer doors are in one plane (the person chamber is shorter than the truck's, so its inner door stands nearer the shell)
+      const u = [Math.sin(v.angle), Math.cos(v.angle)], rho = (x: number, z: number): number => (x - d.x) * u[0] + (z - d.z) * u[1];
+      expect(rho(p.x, p.z)).toBeCloseTo(rho(v.x, v.z), 9);
       const ent = entrancesOf(d);
-      expect(ent.length).toBe(t === 'arcology' ? 2 : 1);
+      expect(ent.length).toBe(1);
       expect(ent.filter(e => e.complex).length).toBe(1);
-      if (t === 'arcology') { const second = d.airlocks.filter(a => !a.role)[1]; expect(angDist(second.angle, v.angle)).toBeCloseTo(Math.PI, 6); }
     }
+  });
+  it('a tiny dome that cannot hold the module keeps two radial chambers with a gap between them', async () => {
+    const r = 0.72, v = portVestibule('geodesic', r)!;
+    expect(moduleFits('geodesic', r)).toBe(false);
+    expect(personLateral('geodesic', r)).toBe(0);
+    expect(personAngleOffset('geodesic', r) * r).toBeGreaterThan((v.w + 0.42) / 2);
+    void angDist;
   });
   it('the apron reaches across the port and the person airlock, so one road serves both', () => {
     for (const t of BIG) {
@@ -230,12 +240,9 @@ describe('one entrance: the gate complex (PROPOSED, owner: one entrance, two at 
       expect(onApron(f, px, pz)).toBe(true);
     }
   });
-  it('the second entrance of the arcology never lands in the plant yard or a link lane either', () => {
-    const r = radius('arcology');
-    for (let rot = 0; rot < 4; rot++) for (let k = 0; k < 24; k++) {
-      const ctx = { tier: 'arcology' as const, r, rot, links: [k * 0.3] }, p = choosePortAngle(ctx, k * Math.PI / 12);
-      if (!p.free) continue;
-      for (const a of [p.angle, p.angle + Math.PI]) for (const b of blockedArcs(ctx)) expect(angDist(a, b.angle), `${rot} ${k} ${b.why}`).toBeGreaterThanOrEqual(b.half - 1e-9);
-    }
+  it('the arcology has one entrance only: no person airlock opposite the module', () => {
+    const d = domeFrom(st('arcology', 0, 1.0))!;
+    expect(d.airlocks.filter(a => !a.role).length).toBe(1);
+    expect(TIER.arcology.airlocks).toBe(1);
   });
 });

@@ -485,7 +485,7 @@ export class HomesteadWorld {
     const pr = planToPort(this._baseRef, domes, (x, z) => this.parcel.height(x, z));
     const ins: PortInput[] = domes.map(d => {
       const f = portFrameOf(d)!;
-      return { id: d.id, tier: d.tier, frame: f, lane: insideLane(f), guarded, persons: d.airlocks.filter(a => !a.role).map(a => ({ angle: a.angle, x: a.x, z: a.z })), state: getDoorLook() === 'sealed' ? 'sealed' as const : 'open' as const, baseY: this._built.get(d.id)?.group.position.y ?? this.groundAt(d.x, d.z) };
+      return { id: d.id, tier: d.tier, frame: f, lane: insideLane(f), guarded, persons: d.airlocks.filter(a => !a.role).map(a => ({ angle: a.angle, x: a.x, z: a.z, off: a.off })), state: getDoorLook() === 'sealed' ? 'sealed' as const : 'open' as const, baseY: this._built.get(d.id)?.group.position.y ?? this.groundAt(d.x, d.z) };
     });
     if (this._ports) { this._root.remove(this._ports.group); this._ports.dispose(); this._ports = null; }
     if (ins.length) { const f = makeVehiclePorts(ins, (x, z) => this.groundAt(x, z)); this._root.add(f.group); this._ports = f; }
@@ -594,7 +594,7 @@ export class HomesteadWorld {
     if (!cur || cur.key !== key) {
       if (cur) { this._root.remove(cur.group); cur.dispose(); }
       const gx = b.placed.x, gz = b.placed.z, y0 = b.group.position.y;
-      const pf = makeDomePlant(ref.tier, ref.r, dst.filtering, (lx, lz) => this.parcel.height(gx + lx, gz + lz) - y0 + 0.01, plook);
+      const pf = makeDomePlant(ref.tier, ref.r, dst.filtering, (lx, lz) => (Math.hypot(lx, lz) < ref.r - 0.05 ? 0.01 : this.parcel.height(gx + lx, gz + lz) - y0 + 0.01), plook);   // (the floor inside the shell is the level pad: the dressing and posts stand on it, not on the natural slope under it)
       pf.setUnder(this._under); pf.setView(this._view);
       pf.group.position.set(gx, y0, gz);
       this._root.add(pf.group); this._domePlants.set(b.placed.id, pf);
@@ -611,7 +611,7 @@ export class HomesteadWorld {
       { const odd = ((st.rot % 2) + 2) % 2 === 1, hx = (odd ? def.cellsZ : def.cellsX) * CELL / 2, hz = (odd ? def.cellsX : def.cellsZ) * CELL / 2; obs.push({ x: lx, z: lz, hx, hz, home: def.sleeps > 0, y: def.floorY }); }
       sig.push(`${st.id}@${Math.round(lx * 20)},${Math.round(lz * 20)}`);
     }
-    const locks = standingDomes(game).find(d => d.id === ref.st.id)?.airlocks ?? [], angles = locks.filter(a => a.role !== 'vehicle').map(a => a.angle), vehicles = locks.filter(a => a.role === 'vehicle').map(a => a.angle);
+    const locks = standingDomes(game).find(d => d.id === ref.st.id)?.airlocks ?? [], angles = locks.filter(a => a.role !== 'vehicle').map(a => (a.off ? Math.atan2(a.inX - ref.st.x, a.inZ - ref.st.z) : a.angle)), vehicles = locks.filter(a => a.role === 'vehicle').map(a => a.angle);
     sig.push(angles.map(a => a.toFixed(2)).join('/'), 'v' + vehicles.map(a => a.toFixed(2)).join('/'), filtering);
     const key = sig.join('|'), hit = this._interiorCache.get(b.placed.id);
     if (hit && hit.key === key) return hit;

@@ -112,10 +112,10 @@ describe('the skirt against a dig', () => {
 
 describe('a tunnel crosses a dome only through an airlock', () => {
   const dome = (tier: DomeTier = 'glass') => domeFrom({ id: 'dm', kind: KIND[tier], x: 10, z: -4, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 })!;
-  it('the entrances sit on the shell: one person airlock beside the port (two on the arcology, the second opposite)', () => {
-    for (const t of BUILT) { const d = dome(t); expect(d.airlocks.filter(a => !a.role).length).toBe(TIER[t].airlocks); for (const a of d.airlocks) expect(Math.hypot(a.x - d.x, a.z - d.z)).toBeCloseTo(d.r, 5); }
+  it('the entrances sit on the shell: one person airlock beside the port (the arcology has no second entrance)', () => {
+    for (const t of BUILT) { const d = dome(t); expect(d.airlocks.filter(a => !a.role).length).toBe(TIER[t].airlocks); for (const a of d.airlocks) { const h = Math.hypot(a.x - d.x, a.z - d.z); expect(h).toBeLessThanOrEqual(d.r + 1e-6); expect(h).toBeGreaterThan(d.r - 0.7); } }      // (the module's doors stand a little behind the skin)
     const a = airlocksOf('arcology', 0, 0, 9, 1, 0.5);
-    expect(a.length).toBe(2); expect(a[1].angle).toBeCloseTo(0.5 + Math.PI, 9); expect(a[0].angle).toBeGreaterThan(0.5);   // (the main one stands beside the port at 0.5)
+    expect(a.length).toBe(1); expect(a[0].angle).toBeCloseTo(0.5, 9); expect(a[0].off).toBeGreaterThan(0);   // (the person chamber stands beside the port's axis at 0.5, on a parallel axis)
   });
   it('a line that never meets the shell is untouched; one that meets it away from an airlock is refused with the nearest airlock named', () => {
     const d = dome();

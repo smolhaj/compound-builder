@@ -17,7 +17,7 @@
  * (`WITH_DOME`), or AFTER, by excavating under the finished floor with extra shoring (`AFTER_DOME`). A piece built with the dome waits for the crater to
  * be dug as deep as it needs, and the dome waits to backfill until every such piece has its walls and roof (`holdFor`, `holdDome`).
  */
-import { choosePortAngle, DEFAULT_BEARING, personAngles, portVestibule } from './vehiclePort';
+import { choosePortAngle, DEFAULT_BEARING, moduleFits, personAngles, personOffset, portVestibule } from './vehiclePort';
 import { TIER, CELL_FT, shellFt, cellsOfKind, tierOfKind, type DomeTier, FRAME_SPANS } from './tiers';
 import { domeGeometry } from './geometry';
 import { SKIRT_MARGIN_FT, DIG_DEPTH_FT, rectVsCircle, type Rect } from './siting';
@@ -90,7 +90,7 @@ export function inAirlockLane(d: DomeAt, r: Rect): boolean {
   if (d.tier === 'earthen') lanes.push({ a: d.rot * Math.PI / 2, w: v.w, len: v.len });
   else {
     const port = d.portAngle ?? choosePortAngle({ tier: d.tier, r: R, rot: d.rot }, DEFAULT_BEARING).angle;
-    for (const a of personAngles(d.tier, R, port)) lanes.push({ a, w: v.w, len: v.len });
+    for (const a of personAngles(d.tier, R, port)) lanes.push({ a: moduleFits(d.tier, R) ? a + personOffset(d.tier, R) : a, w: v.w, len: v.len });      // (the person chamber is parallel to the port's: its lane as seen from the center)
     if (pv) lanes.push({ a: port, w: pv.w, len: pv.len });
   }
   for (const l of lanes) {

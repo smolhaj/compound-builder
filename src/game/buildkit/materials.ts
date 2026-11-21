@@ -70,7 +70,7 @@ const TEX_WORLD: Partial<Record<KitMaterialId, number>> = {
   curtain: 0.15, curtain_red: 0.15, hedge: 0.25, hedge2: 0.25,
   pine_panel: 0.5, quilt_red: 0.12, quilt_blue: 0.12, rug: 0.3, books: 0.1,
   lap_white: 0.5, vinyl: 0.5, shingle: 0.5,
-  concrete: 0.6, whitewash: 0.5, wet_concrete: 0.6, metal_siding: 0.5, container_red: 0.4, container_blue: 0.4, container_green: 0.4, container_tan: 0.4, container_black: 0.4, container_rust: 0.4, shell_blue: 0.4, shell_rust: 0.4, shell_tan: 0.4, shell_green: 0.4, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
+  panel_steel: 0.36, panel_dark: 0.36, panel_light: 0.36, concrete: 0.6, whitewash: 0.5, wet_concrete: 0.6, metal_siding: 0.5, container_red: 0.4, container_blue: 0.4, container_green: 0.4, container_tan: 0.4, container_black: 0.4, container_rust: 0.4, shell_blue: 0.4, shell_rust: 0.4, shell_tan: 0.4, shell_green: 0.4, log_wall: 0.5, board_batten: 0.5, wire_mesh: 0.15, straw: 0.3, soil: 0.4, earth: 0.8, pegboard: 0.2,
   // 1 repeat: a 1.5 × 1.5 m patch of pea gravel; 2 × 2 pavers of 45 cm; 1.8 m of 13 cm floorboards
   gravel: 0.25, pavers: 0.15, floorboards: 0.3,
 };
@@ -87,6 +87,34 @@ function canvas(n: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
 }
 
 const rgb = (r: number, g: number, b: number) => `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+
+
+/**
+ * Armored steel plating, as a 2 x 2 sheet of plates: panel seams with a bevel highlight, rows of rivets with rust-free streaks beneath them, brushed grain, scuffs and
+ * edge wear, grime pooled at each plate's foot. Painted near-white so the material color tints it; `tone` shifts the base brightness (the kit's light, mid and dark panels).
+ */
+function paintPanelSteel(seed: number, tone: number): () => HTMLCanvasElement {
+  return () => {
+    const N = 256, h = N / 2, [c, g] = canvas(N), r = lcg(seed);
+    for (let py = 0; py < 2; py++) for (let px = 0; px < 2; px++) {
+      const x0 = px * h, y0 = py * h, t = tone * (0.93 + r() * 0.07);
+      g.fillStyle = rgb(236 * t, 238 * t, 241 * t); g.fillRect(x0, y0, h, h);
+      for (let k = 0; k < 90; k++) { const yy = y0 + r() * h, a = 0.05 + r() * 0.08; g.fillStyle = r() < 0.5 ? `rgba(255,255,255,${a})` : `rgba(20,26,34,${a})`; g.fillRect(x0 + r() * h * 0.3, yy, h * (0.4 + r() * 0.6), 0.7); }   // brushed grain
+      const gr = g.createLinearGradient(0, y0, 0, y0 + h); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.7, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(30,26,22,0.30)');
+      g.fillStyle = gr; g.fillRect(x0, y0, h, h);                                                                                          // grime at the plate's foot
+      for (let i = 0; i < 4; i++) for (const [rx, ry] of [[x0 + 8 + i * (h - 16) / 3, y0 + 7], [x0 + 8 + i * (h - 16) / 3, y0 + h - 7]] as const) {
+        g.fillStyle = 'rgba(25,30,38,0.75)'; g.beginPath(); g.arc(rx, ry, 2.1, 0, Math.PI * 2); g.fill();                                   // rivet
+        g.fillStyle = 'rgba(255,255,255,0.55)'; g.beginPath(); g.arc(rx - 0.6, ry - 0.7, 0.9, 0, Math.PI * 2); g.fill();
+        if (r() < 0.5) { g.fillStyle = 'rgba(40,34,28,0.22)'; g.fillRect(rx - 0.8, ry + 2, 1.6, 6 + r() * 16); }                              // a streak below it
+      }
+      for (let k = 0; k < 5; k++) { g.strokeStyle = `rgba(255,255,255,${0.25 + r() * 0.25})`; g.lineWidth = 0.7; g.beginPath(); const sx = x0 + r() * h, sy = y0 + r() * h; g.moveTo(sx, sy); g.lineTo(sx + 6 + r() * 14, sy + (r() - 0.5) * 6); g.stroke(); }  // scuffs
+      g.fillStyle = 'rgba(15,20,28,0.8)'; g.fillRect(x0, y0, h, 1.6); g.fillRect(x0, y0, 1.6, h);                                          // the seam
+      g.fillStyle = 'rgba(255,255,255,0.35)'; g.fillRect(x0 + 1.6, y0 + 1.6, h - 1.6, 1); g.fillRect(x0 + 1.6, y0 + 1.6, 1, h - 1.6);     // its bevel
+      g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(x0 + h - 2.2, y0, 1.6, h); g.fillRect(x0, y0 + h - 2.2, h, 1.6);                  // edge wear
+    }
+    return c;
+  };
+}
 
 /**
  * Lap siding: horizontal boards ~20 cm exposure (0.033 u → 15 boards per
@@ -877,9 +905,9 @@ export function kitMaterial(id: KitMaterialId): THREE.MeshStandardMaterial {
     case 'pegboard': m = texMat(id, paintPegboard, 1, 0.8); break;
     case 'crop': m = new THREE.MeshStandardMaterial({ color: 0x4f8a34, roughness: 0.85 }); break;
     case 'grain': m = new THREE.MeshStandardMaterial({ color: 0xb8913f, roughness: 0.9 }); break;
-    case 'panel_steel': m = new THREE.MeshStandardMaterial({ color: 0x6a7c90, roughness: 0.55, metalness: 0.2 }); break;
-    case 'panel_dark': m = new THREE.MeshStandardMaterial({ color: 0x3e4a5a, roughness: 0.6, metalness: 0.2 }); break;
-    case 'panel_light': m = new THREE.MeshStandardMaterial({ color: 0xb4c2d0, roughness: 0.45, metalness: 0.25 }); break;
+    case 'panel_steel': m = texMat(id, paintPanelSteel(201, 1), 1.6, 0.55, 0.2, 0.9); (m as THREE.MeshStandardMaterial).color.set(0x6a7c90); break;
+    case 'panel_dark': m = texMat(id, paintPanelSteel(202, 0.9), 1.6, 0.6, 0.2, 0.9); (m as THREE.MeshStandardMaterial).color.set(0x3e4a5a); break;
+    case 'panel_light': m = texMat(id, paintPanelSteel(203, 1), 1.4, 0.45, 0.25, 0.8); (m as THREE.MeshStandardMaterial).color.set(0xb4c2d0); break;
     case 'steel': m = new THREE.MeshStandardMaterial({ color: 0x7c8186, roughness: 0.4, metalness: 0.75 }); break;
     case 'copper': m = new THREE.MeshStandardMaterial({ color: 0xb8734a, roughness: 0.35, metalness: 0.85 }); break;
     case 'lead': m = new THREE.MeshStandardMaterial({ color: 0x4f5659, roughness: 0.55, metalness: 0.5 }); break;

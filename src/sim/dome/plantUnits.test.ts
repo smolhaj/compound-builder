@@ -247,7 +247,7 @@ describe('the yard is reached from inside', () => {
   it('the sally port and airlock hold rules are unchanged by the service airlock: the tier tables still rise', () => {
     const tiers = ['earthen', 'geodesic', 'glass', 'arcology'] as const;
     for (let i = 1; i < tiers.length; i++) { expect(SALLY_HOLD[tiers[i]]).toBeGreaterThanOrEqual(SALLY_HOLD[tiers[i - 1]]); expect(AIRLOCK_CYCLE_S[tiers[i]]).toBeGreaterThanOrEqual(AIRLOCK_CYCLE_S[tiers[i - 1]]); }
-    expect(TIER.arcology.airlocks).toBe(2); expect(TIER.glass.airlocks).toBe(1); expect(TIER.geodesic.airlocks).toBe(1);   // (PROPOSED, owner: one entrance, two at most; the service airlock is not one of the person airlocks)
+    expect(TIER.arcology.airlocks).toBe(1); expect(TIER.glass.airlocks).toBe(1); expect(TIER.geodesic.airlocks).toBe(1);   // (PROPOSED, owner: one entrance, two at most; the service airlock is not one of the person airlocks)
   });
   it('the whole plant layout stays within a part budget (merged into one mesh)', () => {
     for (const [tier, r] of [['glass', 3.75], ['glass', 6], ['arcology', 9], ['arcology', 15]] as const) expect(plantLayout(tier, r, 'closed', { loop: 'recycle', spares: ['chiller', 'air', 'substation'] }).parts.length).toBeLessThan(650);

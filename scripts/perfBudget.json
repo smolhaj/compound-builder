@@ -162,7 +162,7 @@
      "triangles": 796372,
      "shadowTriangles": 244000,
      "shadowCasters": 345,
-     "heapMB": 105,
+     "heapMB": 108,
      "loadMsFail": 60000
     },
     "high": {

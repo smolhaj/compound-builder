@@ -280,11 +280,13 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       const len = Math.hypot(bx - ax, bz - az); if (len < 1e-4) return;
       push({ shape: 'box', x: (ax + bx) / 2, z: (az + bz) / 2, y0, w: len, h, d: th, r: 0, rot: Math.atan2(-(bz - az), bx - ax), color });
     };
+    // the arcology's yard is ARMORED AND ROOFED (owner, 2026-11-21): armored walls as tall as the plant, a closed roof, no outside gate (it is entered only from inside, through its own airlock)
+    const WALL_H = tier === 'arcology' ? Math.max(1.5, 1.6 * Math.min(s, W / 5.4)) : YARD_H, WALL_C = tier === 'arcology' ? C.armor : C.conc;
     const wallRun = (ax: number, az: number, bx: number, bz: number): void => {
       const len = Math.hypot(bx - ax, bz - az), k = Math.max(1, Math.ceil(len / 0.9));
       for (let i = 0; i < k; i++) {
         const x0 = ax + (bx - ax) * i / k, z0 = az + (bz - az) * i / k, x1 = ax + (bx - ax) * (i + 1) / k, z1 = az + (bz - az) * (i + 1) / k;
-        seg(x0, z0, x1, z1, YARD_H + 0.14, YARD_T, C.conc, -0.14); seg(x0, z0, x1, z1, 0.03, YARD_T + 0.04, C.cap, YARD_H);
+        seg(x0, z0, x1, z1, WALL_H + 0.14, YARD_T, WALL_C, -0.14); seg(x0, z0, x1, z1, 0.03, YARD_T + 0.04, C.cap, WALL_H);
       }
     };
     const [a0, a1, a2, a3] = [P(-W / 2, 0), P(W / 2, 0), P(W / 2, D), P(-W / 2, D)];
@@ -293,7 +295,11 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
     const gl = P(pu - g.portal.w / 2 - 0.05, 0), gr = P(pu + g.portal.w / 2 + 0.05, 0);
     wallRun(a0[0], a0[1], gl[0], gl[1]); wallRun(gr[0], gr[1], a1[0], a1[1]);
     seg(gl[0], gl[1], gr[0], gr[1], 0.1, YARD_T, C.conc, 0.1 + PORTAL_H);                                       // the lintel over the opening
-    for (const [x, z] of [a0, a1, a2, a3, gl, gr]) push({ shape: 'box', x, z, y0: -0.14, w: 0.16, h: YARD_H + 0.3, d: 0.16, r: 0, rot: g.phi, color: C.cap });
+    for (const [x, z] of [a0, a1, a2, a3, gl, gr]) push({ shape: 'box', x, z, y0: -0.14, w: 0.16, h: WALL_H + 0.3, d: 0.16, r: 0, rot: g.phi, color: C.cap });
+    if (tier === 'arcology') {      // the closed roof: an armored slab over the whole yard on a perimeter beam, with a hooded rim
+      const rc = P(0, D / 2); push({ shape: 'box', x: rc[0], z: rc[1], y0: WALL_H, w: W + 0.12, h: 0.07, d: D + 0.12, r: 0, rot: g.phi, color: C.armor });
+      push({ shape: 'box', x: rc[0], z: rc[1], y0: WALL_H + 0.07, w: W * 0.96, h: 0.02, d: D * 0.96, r: 0, rot: g.phi, color: C.roof });
+    }
     // the camera mast at the outer corner (with a lamp), and the pad where a tower can stand
     push({ shape: 'cyl', x: g.camera[0], z: g.camera[1], y0: 0, w: 0, h: 0.95, d: 0, r: 0.016, rot: g.phi, color: C.dark });
     push({ shape: 'box', x: g.camera[0], z: g.camera[1], y0: 0.93, w: 0.07, h: 0.045, d: 0.12, r: 0, rot: g.phi + 0.6, color: C.louver });
@@ -313,6 +319,28 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       Ly(Fy, dx + bw / 2 + 0.06, v - dd * 0.2, 0.014 * s, 0.14, C.copper, y + 0.12 * s, 't', u); Ly(Fy, dx + bw / 2 + 0.06, v + dd * 0.2, 0.014 * s, 0.14, C.pipe, y + 0.12 * s, 't', u);   // refrigerant stubs
     };
     chill('chiller', v1); if (spare('chiller')) chill('chiller2', v2);
+    // the sealed, filtered emergency air intake (sim/dome/intake.ts) of the arcology stands in the yard with the rest of the plant: armored housing on a plinth, a hooded cap,
+    // two filter canisters with clamp bands, a locked service hatch and a status lamp, and an armored duct run back to a flanged collar on the shell. Nothing on it is open.
+    if (tier === 'arcology') {
+      const ix = 0.24 * W, iv = D * 0.72, k = kk, y = 0.045, face = iv + 0.1 * k;
+      B(Fy, ix, iv, 0.5 * k, 0.04, 0.34 * k, C.concDark, y);                                                    // the plinth
+      B(Fy, ix, iv, 0.34 * k, 0.46 * k, 0.2 * k, C.armor, y + 0.04);                                             // the armored housing
+      B(Fy, ix, iv, 0.4 * k, 0.04 * k, 0.26 * k, C.roof, y + 0.04 + 0.46 * k);                                   // the hooded cap, wider than the body
+      for (const sd of [-1, 1]) {
+        Cy(Fy, ix + sd * 0.12 * k, face + 0.05 * k, 0.055 * k, 0.4 * k, C.steel, y + 0.04);                      // the filter canisters stand proud of the face
+        for (const hh of [0.1, 0.32]) Cy(Fy, ix + sd * 0.12 * k, face + 0.05 * k, 0.06 * k, 0.025 * k, C.dark, y + 0.04 + hh * k);   // clamp bands
+        Cy(Fy, ix + sd * 0.12 * k, face + 0.05 * k, 0.045 * k, 0.03 * k, C.cap, y + 0.04 + 0.4 * k);               // capped crown
+      }
+      B(Fy, ix, face - 0.004, 0.1 * k, 0.14 * k, 0.012, C.white, y + 0.04 + 0.16 * k);                           // the locked service hatch between the canisters
+      B(Fy, ix, face + 0.004, 0.03 * k, 0.02 * k, 0.016, C.steel, y + 0.04 + 0.14 * k);                          // its lock
+      B(Fy, ix, face, 0.04 * k, 0.025 * k, 0.014, 0x4fa04f, y + 0.04 + 0.34 * k);                                 // the status lamp (green: the intake is ready and sealed)
+      // the duct run: an armored conduit back along the yard floor to the shell, on three pipe hangers, ending in a flanged collar
+      const dl = Math.max(0.2, iv - 0.1 * k - 0.07), dc = (iv - 0.1 * k + 0.07) / 2, dy = y + 0.04 + 0.12 * k;
+      Ly(Fy, ix, dc, 0.035 * k, dl, C.armor, dy, 'r');
+      for (const t of [0.2, 0.5, 0.8]) { const z = 0.07 + dl * t; Cy(Fy, ix, z, 0.012 * k, dy - y, C.steel, y); B(Fy, ix, z, 0.09 * k, 0.012, 0.03, C.steel, dy + 0.03 * k); }
+      B(Fy, ix, 0.07, 0.14 * k, 0.14 * k, 0.03, C.cap, dy - 0.07 * k);                                           // the flanged collar on the shell
+      noteUnit('intake', Fy.x, Fy.z);
+    }
     // the cooling tower: basin, body with fill louvers, a fan stack with a grille, a platform with rails, a ladder and a drift plume
     {
       const tx = -0.37 * W, tz = D * 0.5, u = 'chiller', tw = Math.min(0.7 * kk, W * 0.17), td = Math.min(0.62 * kk, D * 0.45), y = 0.045;
@@ -388,13 +416,14 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
   // ── on the structure: roof vent hatches (armored louvers on the arcology) ──
   const phis = (k: number, off: number): number[] => Array.from({ length: k }, (_, i) => off + i * Math.PI * 2 / k);
   const hatches = level === 0 ? 1 : 2 + level, theta = 0.3;
-  if (tier !== 'earthen') for (const [i, phi] of phis(hatches, 0.5).entries()) {
-    const [x, z] = polar(r * Math.sin(theta), phi), vc = tier === 'arcology' ? C.armor : C.steel;
+  // (the arcology has no roof vent hatches: the plant breathes through the filtered, valved intake and exhaust in its armored yard, nothing opens in the skin)
+  if (tier !== 'earthen' && tier !== 'arcology') for (const [i, phi] of phis(hatches, 0.5).entries()) {
+    const [x, z] = polar(r * Math.sin(theta), phi), vc = C.steel;
     parts.push({ shape: 'box', x, z, y0: r * Math.cos(theta), w: 0.5 * s * 0.8, h: 0.1 * s, d: 0.5 * s * 0.8, r: 0, rot: phi, color: vc, onShell: { theta, phi }, unit: 'vents' });
     parts.push({ shape: 'box', x, z, y0: r * Math.cos(theta), w: 0.5 * s * 0.8, h: 0.03 * s, d: 0.36 * s, r: 0, rot: phi, color: C.louver, onShell: { theta, phi }, unit: 'vents' });
-    if (level >= 1 && i % 2 === 0 && tier !== 'arcology') parts.push({ shape: 'cyl', x, z, y0: r * Math.cos(theta), w: 0, h: 0.55 * s, d: 0, r: 0.045 * s, rot: phi, color: C.steel, onShell: { theta, phi }, unit: 'vents' });
+    if (level >= 1 && i % 2 === 0) parts.push({ shape: 'cyl', x, z, y0: r * Math.cos(theta), w: 0, h: 0.55 * s, d: 0, r: 0.045 * s, rot: phi, color: C.steel, onShell: { theta, phi }, unit: 'vents' });
   }
-  if (tier !== 'earthen') noteUnit('vents', polar(r * Math.sin(theta), 0.5)[0], polar(r * Math.sin(theta), 0.5)[1]);
+  if (tier !== 'earthen' && tier !== 'arcology') noteUnit('vents', polar(r * Math.sin(theta), 0.5)[0], polar(r * Math.sin(theta), 0.5)[1]);
 
   // ── buried lines: power from the substation, chilled water from the chillers, both under the footing in sealed sleeves; the compound feeder; the passage ──
   if (yard) {
