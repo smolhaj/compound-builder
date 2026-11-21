@@ -382,7 +382,7 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD
   if ( seaDomeM > 0.002 ) {
     diffuseColor.rgb *= mix( vec3( 1.0 ), vec3( 1.05, 0.99, 0.89 ), seaDomeM );   // (subtle: the stronger cast blew wood, canvas and steel out flat orange in daylight)
     // (upright faces take a third of it: on a dark steel gate the orange self-light was most of what showed, and read as brown planks)
-    totalEmissiveRadiance += ( diffuseColor.rgb * vec3( 1.0, 0.5, 0.14 ) * 0.14 + vec3( 0.03, 0.015, 0.004 ) ) * seaDomeM * uSeaDomeI.w * mix( 0.3, 1.0, seUp );   // (the warm self-light follows daylight: at night the inside is lit only by its lamps and windows)
+    totalEmissiveRadiance += ( diffuseColor.rgb * vec3( 1.0, 0.5, 0.14 ) * 0.14 + vec3( 0.03, 0.015, 0.004 ) ) * seaDomeM * uSeaDomeI.w * mix( 0.3, 1.0, smoothstep( 0.6, 0.9, normalize( ( vec4( normal, 0.0 ) * viewMatrix ).xyz ).y ) );   // (the warm self-light follows daylight: at night the inside is lit only by its lamps and windows)
   }
 #endif
 `;
