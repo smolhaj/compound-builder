@@ -27,6 +27,8 @@ export interface StreamOptions {
   quality: Quality;
   season: string;
   seed: number;
+  /** Ground where the water must not render or flow (a dome's graded pad and plant yard): the stream ends at its edge. */
+  dry?(x: number, z: number): boolean;
 }
 
 const TEXEL: Record<Quality, number> = { high: 0.12, medium: 0.18, low: 0.3 };
@@ -66,7 +68,7 @@ export class StreamRenderer {
     for (let j = 0; j < H; j++) for (let i = 0; i < W; i++) {
       const x = ox + (i + 0.5) * texel, z = oz + (j + 0.5) * texel;
       const k = j * W + i;
-      const d = Math.abs(z - o.zAt(x)) > o.band ? -1 : o.waterY(x) - o.site.ground(x, z);
+      const d = Math.abs(z - o.zAt(x)) > o.band || o.dry?.(x, z) ? -1 : o.waterY(x) - o.site.ground(x, z);
       depth[k] = d;
       if (d > 0) wet[k] = 1;
       data[k * 4] = Math.round(Math.min(1, Math.max(0, (d + DEPTH_OFF) / DEPTH_RANGE)) * 255);

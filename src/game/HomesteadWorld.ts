@@ -485,7 +485,7 @@ export class HomesteadWorld {
     const key = domes.map(d => `${d.id}:${d.x},${d.z}:${portFrameOf(d)!.angle.toFixed(3)}`).join('|') + `|${this._baseRef.signature}|${this._drive ? 1 : 0}|${guarded ? 1 : 0}`;
     if (key === this._portKey) return;
     this._portKey = key;
-    { const zk = domes.map(d => portFrameOf(d)!).map(f => `${f.cx.toFixed(2)},${f.cz.toFixed(2)},${f.angle.toFixed(3)}`).join('|'); const had = this._portZones.map(f => `${f.cx.toFixed(2)},${f.cz.toFixed(2)},${f.angle.toFixed(3)}`).join('|'); this._portZones = domes.map(d => portFrameOf(d)!); if (zk !== had && this._quality && this._batchDepth === 0) this._plant(this._quality); }
+    { const zk = domes.map(d => portFrameOf(d)!).map(f => `${f.cx.toFixed(2)},${f.cz.toFixed(2)},${f.angle.toFixed(3)}`).join('|'); const had = this._portZones.map(f => `${f.cx.toFixed(2)},${f.cz.toFixed(2)},${f.angle.toFixed(3)}`).join('|'); this._portZones = domes.map(d => portFrameOf(d)!); if (zk !== had && this._quality && this._batchDepth === 0) { this._plant(this._quality); this._water(this._quality); } }
     const pr = planToPort(this._baseRef, domes, (x, z) => this.parcel.height(x, z));
     const ins: PortInput[] = domes.map(d => {
       const f = portFrameOf(d)!;
@@ -1445,6 +1445,7 @@ export class HomesteadWorld {
         blocked: (x, z, r, tree) => tree && this.treeClearance(x, z) < r,
       },
       quality: q, season: seasonState.plants, seed: this.parcel.seed,
+      dry: (x, z) => this.onBuilding(x, z, 0.8, true, true),      // (a dome's graded pad, terraces and plant yard are dry ground: the stream ends at their edge)
     });
     // the terrain's damp bank band follows the creek's depth raster; a lot's lake sets its own shore level
     const wb = this.stream.wetBank;
