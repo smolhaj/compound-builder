@@ -122,6 +122,16 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
       const y = topA(R + APRON_LEN - 0.12);
       geos.push(cyl(0.02, 0.13, bx, y + 0.065, bz, STEEL), cyl(0.023, 0.03, bx, y + 0.1, bz, YELLOW));
     }
+    // ── the vehicle barrier at the road's end (anti-ram): a second bollard line across the road beyond the apron's toe, a crash-rated boom-gate arm lowered across the lane on two
+    //    armored posts (striped red and white), and a second camera mast on the far side so two cameras and two floodlights cover the apron ──
+    { const re = R + APRON_LEN + 0.16, ye = topA(R + APRON_LEN - 0.02), nB = 7;
+      for (let i = 0; i < nB; i++) { const lam = lamA + 0.05 + (lamB - lamA - 0.1) * i / (nB - 1), [bx, bz] = at(re + 0.12, lam); geos.push(cyl(0.024, 0.2, bx, ye + 0.1, bz, STEEL), cyl(0.027, 0.03, bx, ye + 0.17, bz, YELLOW)); }       // the ram-rated bollard line
+      for (const lam of [lamA + 0.02, lamB - 0.02]) { const [px, pz] = at(re, lam); geos.push(box(0.07, 0.2, 0.07, px, ye + 0.1, pz, yaw, DARK), box(0.08, 0.02, 0.08, px, ye + 0.21, pz, yaw, STEEL)); }   // the armored gate posts
+      const nA = 6, wA = (lamB - lamA - 0.12) / nA;
+      for (let i = 0; i < nA; i++) { const [ax, az] = at(re, lamA + 0.06 + wA * (i + 0.5)); geos.push(box(wA, 0.03, 0.025, ax, ye + 0.15, az, yaw, i % 2 ? 0xe8e8e8 : 0xc23a2e)); }        // the boom arm, striped
+      const [cx2, cz2] = at(R + 0.35, lamB + 0.12); geos.push(cyl(0.012, 0.5, cx2, ground(cx2, cz2) + 0.25, cz2, DARK), box(0.05, 0.035, 0.08, cx2, ground(cx2, cz2) + 0.52, cz2, yaw + 0.5, DARK), cyl(0.008, 0.03, cx2, ground(cx2, cz2) + 0.56, cz2, STEEL));   // the second camera mast
+      lamps.push({ x: cx2, y: ground(cx2, cz2) + 0.5, z: cz2, w: 0.018, h: 0.012, d: 0.012, yaw, color: 0xff4a3a });                                                                                           // its red recording lamp
+    }
     // ── the gatehouse: a steel-clad cabin with a window on the gate and a hazard sign, beside the apron ──
     { const [gx, gz] = at(R + 0.62, lamA - 0.3), y = ground(gx, gz);
       geos.push(box(0.3, 0.012, 0.26, gx, y + 0.006, gz, yaw, CURB), box(0.26, 0.32, 0.22, gx, y + 0.17, gz, yaw, clad), box(0.3, 0.02, 0.27, gx, y + 0.34, gz, yaw, DARK));   // slab, cabin, flat roof

@@ -339,7 +339,24 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       Ly(Fy, ix, dc, 0.035 * k, dl, C.armor, dy, 'r');
       for (const t of [0.2, 0.5, 0.8]) { const z = 0.07 + dl * t; Cy(Fy, ix, z, 0.012 * k, dy - y, C.steel, y); B(Fy, ix, z, 0.09 * k, 0.012, 0.03, C.steel, dy + 0.03 * k); }
       B(Fy, ix, 0.07, 0.14 * k, 0.14 * k, 0.03, C.cap, dy - 0.07 * k);                                           // the flanged collar on the shell
+      // the closed blast-and-flood valve on the duct: an armored housing with a hand wheel and a red CLOSED band
+      const vz = 0.07 + dl * 0.5;
+      B(Fy, ix, vz, 0.17 * k, 0.2 * k, 0.17 * k, C.armor, dy - 0.1 * k); B(Fy, ix, vz, 0.19 * k, 0.025, 0.19 * k, C.cap, dy + 0.1 * k); B(Fy, ix, vz + 0.095 * k, 0.1 * k, 0.03 * k, 0.012, C.red, dy - 0.02 * k);
+      Cy(Fy, ix, vz, 0.05 * k, 0.012, C.steel, dy + 0.125 * k); Cy(Fy, ix, vz, 0.008, 0.06 * k, C.steel, dy + 0.105 * k);
       noteUnit('intake', Fy.x, Fy.z);
+      // the exhaust beside it: the same sealed stack, its valve housing and duct to its own collar (nothing opens to the yard)
+      const ex = 0.31 * W;
+      B(Fy, ex, iv, 0.5 * k, 0.04, 0.34 * k, C.concDark, y); B(Fy, ex, iv, 0.3 * k, 0.4 * k, 0.2 * k, C.armor, y + 0.04); B(Fy, ex, iv, 0.38 * k, 0.04 * k, 0.26 * k, C.roof, y + 0.04 + 0.4 * k);
+      Cy(Fy, ex, face + 0.02 * k, 0.07 * k, 0.34 * k, C.steel, y + 0.04); Cy(Fy, ex, face + 0.02 * k, 0.075 * k, 0.025 * k, C.dark, y + 0.04 + 0.28 * k); B(Fy, ex, face - 0.004, 0.09 * k, 0.12 * k, 0.012, C.white, y + 0.04 + 0.14 * k);
+      Ly(Fy, ex, dc, 0.035 * k, dl, C.armor, dy, 'r');
+      B(Fy, ex, vz, 0.17 * k, 0.2 * k, 0.17 * k, C.armor, dy - 0.1 * k); B(Fy, ex, vz, 0.19 * k, 0.025, 0.19 * k, C.cap, dy + 0.1 * k); B(Fy, ex, vz + 0.095 * k, 0.1 * k, 0.03 * k, 0.012, C.red, dy - 0.02 * k);
+      Cy(Fy, ex, vz, 0.05 * k, 0.012, C.steel, dy + 0.125 * k);
+      B(Fy, ex, 0.07, 0.14 * k, 0.14 * k, 0.03, C.cap, dy - 0.07 * k);
+      // power, water and data enter the shell through armored, flanged, valved sleeves: a flange on the skin, a short conduit, an isolation valve housing with a colored band
+      for (const [cx, band] of [[-0.31 * W, 0xe3b92a], [-0.25 * W, 0x2a6fc2], [-0.19 * W, 0x3aa856]] as const) {
+        B(Fy, cx, 0.07, 0.13 * k, 0.13 * k, 0.03, C.cap, y + 0.12 * k); Ly(Fy, cx, 0.2, 0.025 * k, 0.26, C.armor, y + 0.12 * k, 'r');
+        B(Fy, cx, 0.36, 0.1 * k, 0.12 * k, 0.1 * k, C.armor, y + 0.06 * k); B(Fy, cx, 0.36, 0.11 * k, 0.025 * k, 0.11 * k, band, y + 0.16 * k); Cy(Fy, cx, 0.36, 0.03 * k, 0.01, C.steel, y + 0.18 * k);
+      }
     }
     // the cooling tower: basin, body with fill louvers, a fan stack with a grille, a platform with rails, a ladder and a drift plume
     {
