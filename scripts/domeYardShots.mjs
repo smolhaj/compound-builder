@@ -19,14 +19,14 @@ const t0 = Date.now(); const lap = m => console.error(`[${Math.round((Date.now()
 try {
   for (const SC of SCENES) {
   const KIND = SC.kind, ROT = SC.rot, want = n => SC.shots.includes(n), PFX = `${TAG}${SC.name}-`;
-  const page = await browser.newPage({ viewport: { width: W, height: H } });
+  const page = await browser.newPage({ viewport: { width: W, height: H }, deviceScaleFactor: Number(process.env.DSF || 1) });
   page.setDefaultTimeout(900000);
   page.on('pageerror', e => console.error('pageerror:', e.message));
   await page.goto(`http://localhost:${port}/?seed=7&clean&lowrender=${PR}&region=${process.env.REGION ?? 'mountain_west'}&acres=40&relief=${process.env.RELIEF ?? 0}&lotseed=${process.env.LOTSEED ?? 8}&looktier=${process.env.LOOKTIER || "high"}`);
   await page.waitForFunction(() => window.__cb?.qa?.lowrender, null, { timeout: 300000 });
   await page.evaluate(() => window.__cb.store.getState().setQuality?.('high', true));
   const frames = async (n = 1) => { for (let i = 0; i < n; i++) await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(250); };
-  const shot = async name => { await frames(2); await page.evaluate(() => window.__cb.qa.renderFull('high')); await page.screenshot({ path: `${out}/${PFX}${name}.png` }); lap(name); };
+  const shot = async name => { await frames(2); await page.evaluate(() => window.__cb.qa.renderFull('high')); await page.screenshot({ path: `${out}/${PFX}${name}.png` }); lap(name + ' ' + await page.evaluate(() => [...window.__cb.world._domePlants.values()].map(p => p.group.userData.airHi).join())); };
   const set = js => page.evaluate(js => new Function('cb', js)(window.__cb), js);
   const info = await page.evaluate(async ([KIND, ROT, DOORS]) => {
     const cb = window.__cb, G = cb.game, w = cb.world; G.getState().setSpeed(0);
@@ -63,7 +63,7 @@ try {
   lap(JSON.stringify(yg).slice(0, 300));
   const gdy = (x, z) => page.evaluate(([x, z]) => window.__cb.world.groundAt(x, z), [x, z]);
   const yTop = await page.evaluate(async ([g, dr]) => { const m = await import('/src/sim/dome/plantYard.ts'); let mx = -1e9; for (let i = 0; i <= 8; i++) for (let j = 0; j <= 4; j++) { const p = m.yardPoint(g, -g.W / 2 + g.W * i / 8, g.D * j / 4); mx = Math.max(mx, window.__cb.world.groundAt(dr.x + p[0], dr.z + p[1])); } return mx; }, [{ phi: yg.phi, r: dm.r, er: yg.er, et: yg.et, W: yg.W, D: yg.D }, { x: dm.x, z: dm.z }]);
-  const Y = async (u, v, h) => { const p = await page.evaluate(async ([g, u, v]) => (await import('/src/sim/dome/plantYard.ts')).yardPoint(g, u, v), [{ phi: yg.phi, r: dm.r, er: yg.er, et: yg.et }, u, v]); const q = WP(p); return [q[0], (await gdy(q[0], q[1])) + h, q[1]]; };   // a point of the yard (u along the shell, v out from its inner wall) at height h over the yard's ground
+  const Y = async (u, v, h) => { const p = await page.evaluate(async ([g, u, v]) => (await import('/src/sim/dome/plantYard.ts')).yardPoint(g, u, v), [{ phi: yg.phi, r: dm.r, er: yg.er, et: yg.et }, u, v]); const q = WP(p); const inY = v >= 0.02 && Math.abs(u) <= yg.W / 2; return [q[0], (inY ? yTop + 0.045 : await gdy(q[0], q[1])) + h, q[1]]; };   // a point of the yard (u along the shell, v out from its inner wall) at height h over the yard's ground
   const setRoof = s => page.evaluate(s => window.__cb.world.setYardRoofLook(s), s);
   const lightsOn = () => page.evaluate(() => window.__cb.game.setState(st => { const g = structuredClone(st.game); g.utilities.lit = ['x']; return { game: g }; }));
   const inw = (q, k) => { const d = Math.hypot(q[0], q[1]); return [q[0] * (1 - k / d), q[1] * (1 - k / d)]; };
@@ -72,9 +72,15 @@ try {
   const back = k => dome([yg.from[0] - yg.er[0] * k, yg.from[1] - yg.er[1] * k], 0);
   const backH = (k, h) => { const q = back(k); return [q[0], y0 + h, q[2]]; };
   const airlock = s => page.evaluate(s => window.__cb.world.setYardAirlockLook(s), s);
+  const top = async (name, view) => { await airlock('both'); await set(`cb.store.getState().setBuildingView('${view}')`); const e = await Y(pu - 0.3, 0.9, 0), l = [e[0], e[1], e[2]]; await poseRaw2([e[0] + 0.001, e[1] + 9.5, e[2] + 0.001], l, 52); await shot(name); await set(`cb.store.getState().setBuildingView('full')`); };
+  if (want('t1')) { await setRoof('open'); await top('t1-topdown-roof-open-walls', 'full'); }
+  if (want('t2')) { await setRoof('closed'); await top('t2-topdown-roof-closed-walls', 'full'); }
+  if (want('t3')) { await setRoof('open'); await top('t3-topdown-roof-open-cutaway', 'cutaway'); }
+  if (want('t4')) { await setRoof('closed'); await top('t4-topdown-roof-closed-cutaway', 'cutaway'); }
   if (want('a1')) { await airlock('both'); await setRoof('closed'); await poseRaw2(backH(1.3, 0.22), await Y(pu, D * 0.6, 0.2), 54); await shot('a1-dome-to-yard'); }
   if (want('a2')) { await airlock('both'); await setRoof('closed'); await poseRaw2(await Y(pu, D * 0.45, 0.22), backH(4.5, 0.25), 56); await shot('a2-yard-to-dome'); }
-  if (want('tier')) console.error('TIER ' + await page.evaluate(async () => { const m = await import('/src/game/buildkit/buildingDetail.ts'); const w = window.__cb.world; return JSON.stringify([m.detailTier(), w._quality, [...w._domePlants.values()].map(p => p.key)]); }));
+  if (want('tier')) { await airlock('both'); await frames(2); }
+  if (want('tier')) console.error('TIER ' + await page.evaluate(async () => { const m = await import('/src/game/buildkit/buildingDetail.ts'); const w = window.__cb.world; return JSON.stringify([m.detailTier(), w._quality, [...w._domePlants.values()].map(p => [p.key, p.group.userData.airHi, p.group.children.map(c => c.name + ':' + (c.geometry?.attributes?.position?.count ?? 0))])]); }));
   if (want('a2b')) { await airlock('both'); await poseRaw2(await Y(pu, -0.4, 0.2), backH(3, 0.25), 70); await shot('a2b-inside-from-yard-end-looking-dome'); }
   if (want('a3')) { await airlock('both'); await poseRaw2(await Y(pu + 0.1, -0.98, 0.19), await Y(pu - 0.2, -1.0, 0.14), 84); await shot('a3-left-wall-spares'); }
   if (want('a4')) { await airlock('both'); await poseRaw2(await Y(pu - 0.1, -1.0, 0.19), await Y(pu + 0.2, -1.03, 0.17), 84); await shot('a4-right-wall-tools-ppe'); }
@@ -91,6 +97,10 @@ try {
       for (const [x, y] of [[-0.6, 0.4], [0.6, 0.4], [0, 0.55], [-0.6, -0.1], [0.6, -0.1], [-0.55, -0.4], [0, 0]]) { rc.setFromCamera(new THREE.Vector2(x, y), cam); out[x + ',' + y] = rc.intersectObjects(cb.ws.scene.children, true).slice(0, 4).map(h => h.object.name + '/' + (h.object.material?.name || h.object.material?.type) + '@' + h.distance.toFixed(2)); }
       return out; });
     console.error('RAY ' + JSON.stringify(hits, null, 1)); }
+  if (want('yup')) { await setRoof('closed'); await poseRaw2(await Y(0, D * 0.5, 0.25), await Y(0, D * 0.5, 2.0), 70); await frames(3);
+    console.error('RAYUP ' + JSON.stringify(await page.evaluate(async () => { const THREE = await import('/node_modules/three/build/three.module.js'); const cb = window.__cb, cam = cb.ws.camera, rc = new THREE.Raycaster(), out = {};
+      for (const [x, y] of [[-0.6, -0.3], [-0.3, 0.2], [0, 0], [0.5, -0.6]]) { rc.setFromCamera(new THREE.Vector2(x, y), cam); out[x + ',' + y] = rc.intersectObjects(cb.ws.scene.children, true).slice(0, 3).map(h => h.object.name + '/' + (h.object.material?.name || h.object.material?.type) + '@' + h.distance.toFixed(2) + ' c=' + (h.object.material?.color?.getHexString?.() ?? '')); }
+      return out; }), null, 1)); }
   if (want('y20')) { await poseRaw2(await Y(-Wd / 2 - 1.7, D * 0.12, 0.3), await Y(-Wd / 2, 0.0, 0.35), 62); await shot('y20-yard-wall-from-outside-beside-dome-base'); }
   if (want('y1')) { await poseRaw2(dome(inw(yg.from, 0.8), 0.24), dome(yg.from, 0.2), 58); await shot('y01-dome-side-door-closed'); }
   if (want('y2')) { await poseRaw2(dome(inw(yg.from, 0.35), 0.2), dome(yg.from, 0.2), 55); await shot('y02-dome-side-door-closeup'); }

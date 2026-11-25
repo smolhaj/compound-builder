@@ -27,7 +27,7 @@ import { FRAME_SPANS } from './tiers';
 import type { WaterLoop } from './waterLoop';
 import type { PlantKind, PlantPlace } from './plantUnits';
 import { ROOF_SLIDE as ST_SLIDE, type RoofState } from './yardRoof';
-import { CHAMBER_LEN, PORTAL_H, PORTAL_W, plantSize, yardGeometry, yardPoint, YARD_GAP, YARD_H, YARD_T, type YardGeom } from './plantYard';
+import { CHAMBER_LEN, PORTAL_H, PORTAL_W, inYard, plantSize, yardGeometry, yardPoint, YARD_GAP, YARD_H, YARD_T, type YardGeom } from './plantYard';
 
 export type Shape = 'box' | 'cyl';
 export type AirlockLook = 'sealed' | 'dome' | 'yard' | 'both' | 'cycling';
@@ -78,7 +78,7 @@ export { plantSize as plantScale };
 
 const C = {
   wall: 0xb9b4a6, roof: 0x6f7378, steel: 0x8d949b, dark: 0x3b4046, louver: 0x4d5258, tank: 0xd8e0e6, tankBlue: 0x4f86ad, conc: 0xa6a8a4, concDark: 0x8f918d, cap: 0xc4c5c0,
-  white: 0xe8e9e6, pipe: 0x9aa3ab, warm: 0xc79a4a, red: 0x9a3b32, armor: 0x7b8087, teal: 0x5f9c97, grille: 0x25282b, coil: 0x6d7479, skid: 0x6a4f3f, xfmr: 0x5d7566, porc: 0xb98a63,
+  white: 0xe8e9e6, pipe: 0x9aa3ab, warm: 0xc79a4a, red: 0x9a3b32, armor: 0x7b8087, teal: 0x5f9c97, grille: 0x25282b, coil: 0x6d7479, skid: 0x6a4f3f, xfmr: 0x7d8790, porc: 0xb98a63,
   yellow: 0xd2a82a, glass: 0x2d3a44, tower: 0xcfd6da, plume: 0xe9eef0, copper: 0xb0734a, hazard: 0xd8b02a, valve: 0xa23a2e, gate: 0x4b5257,
 };
 /** Accent of each bay's door in the service gallery. */
@@ -280,7 +280,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
     const g = yard, W = g.W, D = g.D, P = (u: number, v: number): [number, number] => yardPoint(g, u, v);
     const o0 = P(0, 0), Fy: Fr = { x: o0[0], z: o0[1], rot: g.phi };
     // slab with a curb all round (it also keeps the field brush out), the walkway strip from the inner door, and the wall
-    B(Fy, 0, D / 2, W - 0.14, 0.3, D - 0.14, C.concDark, -0.255);      // (the slab follows the ground under its middle; its footing is buried so the edge never floats)
+    B(Fy, 0, D / 2, W, 0.3, D, C.concDark, -0.255);      // (the slab follows the ground under its middle; its footing is buried so the edge never floats)
     for (const [dx, dz, w, d] of [[0, 0.1, W - 0.14, 0.05], [0, D - 0.1, W - 0.14, 0.05], [-(W - 0.2) / 2, D / 2, 0.05, D - 0.14], [(W - 0.2) / 2, D / 2, 0.05, D - 0.14]] as const) B(Fy, dx, dz, w, 0.075, d, C.cap, 0);
     const pu = g.portal.u;
     B(Fy, pu, 0.5 * D * 0.5, g.portal.w + 0.1, 0.05, D * 0.5, C.conc, 0);                                    // the walkway in from the inner door
@@ -320,7 +320,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       const slide = ST_SLIDE[st] * W;
       const leaf = (cu: number, lift: number): void => {
         const yb = y0 + lift;
-        BL(Fy, cu, D / 2, lw + 0.04, 0.02, D + 0.04, 0xb4c6cc, yb - 0.012);                                                      // a solid underlay under every leaf: no ground or sky shows through a pane edge
+        B(Fy, cu, D / 2, lw + 0.04, 0.02, D + 0.04, 0xb4c6cc, yb - 0.012, undefined, 0, { lvl: true, steel: true });                                                      // a solid underlay under every leaf: no ground or sky shows through a pane edge
         for (let a = 0; a < nu; a++) for (let b = 0; b < nv; b++) {
           const px = cu - lw / 2 + (a + 0.5) * cw, pv = (b + 0.5) * cd;
           BL(Fy, px, pv, cw, 0.02, cd, GLASS, yb);                                                                                  // the glazed pane, filling its whole cell
@@ -523,5 +523,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
   const unitSpots: PlantUnitSpot[] = [];
   for (const [id, p] of note) { const kind = id.replace(/2$/, '') as PlantKind; unitSpots.push({ id, kind, place: tier === 'arcology' && kind !== 'vents' && kind !== 'chiller' && kind !== 'substation' ? 'gallery' : kind === 'chiller' || kind === 'substation' ? (yard ? 'yard' : 'inside') : 'inside', x: p.x, z: p.z }); }
   void YARD_GAP; void tau;
+  // the yard is a graded pad: its equipment, slab and curbs stand on the one level plane (the walls and roof already do), so the slab never lies under the ground at a corner
+  if (yard) for (const q of parts) if (!q.lvl && !q.high && !q.onShell && q.wallTop === undefined && !q.passage && inYard(yard, 0, 0, q.x, q.z)) q.lvl = true;
   return { level, scale: s, parts, lamps, lines, units: unitSpots, yard, spans };
 }

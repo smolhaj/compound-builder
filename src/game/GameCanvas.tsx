@@ -812,7 +812,7 @@ export function GameCanvas() {
         const q = renderReq.quality;
         if (q) { setLook(q); ws.updateDayNight(t); }
         ws.renderFrame();
-        if (q) { setLook('low'); }
+        if (q) { setLook(lowRender.on ? lowRender.tier : 'low'); }
         renderReq.drawn();
       }
       qa.frames++;

@@ -131,7 +131,7 @@ export function addControlBlock(p: Parts, plan: ControlBlockPlan, detail: Detail
     A('interior', 'panel_dark', bx(0.5, 0.11, 0.12, x, 0, z, ['ny']));
     A('interior', 'panel_dark', bx(0.52, 0.012, 0.15, x, 0.11, z + 0.01, ['ny']));
     if (mid) { A('interior', 'panel_dark', bx(0.16, 0.014, 0.04, x - 0.1, 0.123, z + 0.045, ['ny'])); A('interior', 'panel_dark', bx(0.03, 0.03, 0.02, x + 0.13, 0.123, z - 0.01, ['ny'])); }
-    for (const dx of [-0.13, 0.13]) { A('interior', 'panel_dark', bx(0.012, 0.02, 0.012, x + dx, 0.123, z - 0.03, ['ny'])); A('interior', 'screens', scr(((dx < 0) ? 'ctl_mon_a' : 'ctl_mon_b'), 0.125, 0.1, x + dx, 0.14, z - 0.025, 0)); A('interior', 'panel_dark', bx(0.135, 0.11, 0.012, x + dx, 0.13, z - 0.034, ['ny', 'pz'])); }
+    for (const dx of [-0.13, 0.13]) { A('interior', 'panel_dark', bx(0.012, 0.02, 0.012, x + dx, 0.123, z - 0.03, ['ny'])); A('decor', 'screens', scr(((dx < 0) ? 'ctl_mon_a' : 'ctl_mon_b'), 0.125, 0.1, x + dx, 0.14, z - 0.025, 0)); A('interior', 'panel_dark', bx(0.135, 0.11, 0.012, x + dx, 0.13, z - 0.034, ['ny', 'pz'])); }
   };
   const chair = (x: number, z: number): void => {
     A('interior', 'panel_dark', bx(0.085, 0.012, 0.085, x, 0.065, z, ['ny']));

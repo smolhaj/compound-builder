@@ -18,6 +18,7 @@ import type { KitMaterialId } from './materials';
 import { CELL_FT, TIER, tierOfKind, type DomeTier } from '../../sim/dome/tiers';
 import { airlockAngles } from '../../sim/dome/standing';
 import { digState } from '../../sim/dome/dig';
+import type { Collider } from './interior';
 import type { BuildLayer } from './shell';
 import { DEFAULT_BEARING, choosePortAngle, entryR, personAngles, personLateral, portVestibule } from '../../sim/dome/vehiclePort';
 
@@ -26,7 +27,7 @@ const entrancesFor = (tier: DomeTier, R: number, port: number | undefined): { po
   const p = port ?? choosePortAngle({ tier, r: R, rot: 0 }, DEFAULT_BEARING).angle;
   return { port: p, persons: personAngles(tier, R, p) };
 };
-import { yardGeometry, yardPoint, YARD_GAP } from '../../sim/dome/plantYard';
+import { airlockDims, airlockLoc, yardGeometry, yardPoint, YARD_GAP } from '../../sim/dome/plantYard';
 import { controlBlockPlan } from '../../sim/dome/controlBlock';
 import { addControlBlock, scr as atlasQuad } from './domeControl';
 import { airlockSigns } from '../fx/AirlockProps';
@@ -345,8 +346,9 @@ function bulkheadFrame(p: Parts, R: number, y0: number, tier: DomeTier, holes: D
 }
 
 /** The shell's colliders: the ring as short boxes with the airlocks' gaps left out, and each chamber's walls (so the chamber is a room and the doors are the only ways in). */
-function shellColliders(p: Parts, R: number, ring: number, doors: Doorways): void {
+function shellColliders(p: Parts, R: number, ring: number, doors: Doorways, svc?: { a: number; hw: number; walls: Collider[] }): void {
   const gaps = doors.holes;
+  const angOff = (a: number): number => { const d = a - (svc?.a ?? -10); return Math.atan2(Math.sin(d), Math.cos(d)); };
   const inWindow = (x: number, z: number, g: Doorways['holes'][number], boxHalf: number): boolean => {
     const k = axisOf(g.a), rho = x * k.ux + z * k.uz, lam = x * k.vx + z * k.vz - g.off;
     return rho > R * 0.5 && Math.abs(lam) < g.v.cw / 2 + g.v.t + boxHalf;
@@ -355,11 +357,17 @@ function shellColliders(p: Parts, R: number, ring: number, doors: Doorways): voi
     const a = (i + 0.5) * TAU / ring, h = Math.PI * R / ring;
     const x = R * Math.sin(a), z = R * Math.cos(a);
     if (gaps.some(g => inWindow(x, z, g, h))) continue;
+    if (svc && svc.a >= 0 && Math.abs(angOff(a)) < svc.hw + h / R) {      // the plant yard's service doorway: the box is cut into short ones and the ones in the doorway left out
+      const n = 8, hs = h / n;
+      for (let k = 0; k < n; k++) { const as = a - h / R + (k + 0.5) * (2 * h / R) / n; if (Math.abs(angOff(as)) < svc.hw) continue; const xs = R * Math.sin(as), zs = R * Math.cos(as); p.collide({ x0: xs - hs * 1.3 - 0.03, z0: zs - hs * 1.3 - 0.03, x1: xs + hs * 1.3 + 0.03, z1: zs + hs * 1.3 + 0.03 }); }
+      continue;
+    }
     p.collide({ x0: x - h * Math.abs(Math.cos(a)) - 0.03, z0: z - h * Math.abs(Math.sin(a)) - 0.03, x1: x + h * Math.abs(Math.cos(a)) + 0.03, z1: z + h * Math.abs(Math.sin(a)) + 0.03 });
   }
   // (the shell ring leaves out every box that reaches a door's window, so the outer door's stubs run as far as those boxes did; the two chambers of the entrance module share
   // their party wall, so on that side the stubs stop at it)
   const step = 2 * Math.PI * R / ring + 0.02;
+  if (svc) p.collide(...svc.walls);
   for (const g of gaps) p.collide(...chamberColliders(entryR(doors.tier, R), g.a, g.v, [g.shareLo ? 0 : step, g.shareHi ? 0 : step], g.off));
 }
 
@@ -413,7 +421,7 @@ function earthen(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
 function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number, opts: BuildOpts, N: number, panelMat: 'dome_polycarb' | 'arcology', frameMat: 'aluminum' | 'steel'): THREE.Group {
   const p = new Parts(seed, opts), L = LOOK[tier], R = def.cellsX * CELL / 2 - 0.03 - bermU(tier), y0 = L.stem, g = opts.ground ?? (() => 0);
   const rim = (a: number) => g(R * Math.sin(a), R * Math.cos(a));
-  const nWall = Math.max(36, Math.min(detailTier() === 'high' ? 120 : 72, Math.round(R * 14)));
+  const nWall = Math.max(36, Math.min(detailTier() === 'high' ? 120 : 60, Math.round(R * 14)));
   p.layer = 'stakes';
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.add('trim', box(0.012, 0.09, 0.012, sx * (def.cellsX * CELL / 2 - 0.03), -0.02, sz * (def.cellsZ * CELL / 2 - 0.03)));
   // the plant yard's service passage runs through the footing and the skirt band: a doorway in the band (a lintel over it) and a gap in the rings at its angle
@@ -502,7 +510,20 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
   // the service airlock's label plates (spare-parts bins, door and high-voltage signs): atlas cells on the chamber's walls
   if (yg) for (const sg of airlockSigns(yg, detailTier() === 'high')) p.add('screens', atlasQuad(sg.cell, sg.w, sg.h, sg.x, g(sg.x, sg.z) + 0.012 + sg.y - sg.h / 2, sg.z, sg.ry), 'decor');
   // colliders: the shell ring as short boxes, none at the airlocks (people cross only through them), and the chamber walls
-  shellColliders(p, R, Math.max(24, Math.min(72, Math.round(R * 8))), doors);
+  const svcWalls: Collider[] = [];
+  if (yg) { const ad = airlockDims(yg); for (const sd of [-1, 1]) for (let t = ad.dzC - 0.02; t <= 0.12; t += 0.06) { const [wx, wz] = airlockLoc(ad.fr, sd * (t < ad.cz + ad.cl2 / 2 ? ad.pw / 2 + 0.03 : ad.pw / 2 - 0.02), t); svcWalls.push({ x0: wx - 0.035, z0: wz - 0.035, x1: wx + 0.035, z1: wz + 0.035 }); } }
+  if (yg) {      // the yard's wall ring is closed (no gate): a walker cannot cross it, except where the passage enters it
+    const ad = airlockDims(yg), cr = yg.corners;
+    for (let e = 0; e < cr.length; e++) {
+      const [ax, az] = cr[e], [bx, bz] = cr[(e + 1) % cr.length], len = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(len / 0.1));
+      for (let k = 0; k <= n; k++) {
+        const x = ax + (bx - ax) * k / n, z = az + (bz - az) * k / n, c = Math.cos(ad.fr.rot), sn = Math.sin(ad.fr.rot), dx = x - ad.fr.x, dz = z - ad.fr.z, lx = dx * c - dz * sn, lz = dx * sn + dz * c;
+        if (Math.abs(lx) < ad.pw / 2 + 0.03 && lz > -0.2 && lz < 0.2) continue;
+        svcWalls.push({ x0: x - 0.06, z0: z - 0.06, x1: x + 0.06, z1: z + 0.06 });
+      }
+    }
+  }
+  shellColliders(p, R, Math.max(24, Math.min(72, Math.round(R * 8))), doors, yg ? { a: portalA, hw: hwA, walls: svcWalls } : undefined);
   const out = p.finish();
   out.userData.chimneyTop = null; out.userData.keep = ['frame', 'roof']; out.userData.layerFr = domeLayerFractions(tier); out.userData.digTier = tier;
   out.userData.controlBlock = cbPlan;

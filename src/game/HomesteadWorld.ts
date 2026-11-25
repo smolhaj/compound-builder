@@ -170,7 +170,7 @@ import { bedHour, pickHomeLine } from '../sim/domesticLines';
 import { domeOf, domeLook, domesOf as domesLive, yardRoofOf } from '../sim/dome/live';
 import type { RoofState } from '../sim/dome/yardRoof';
 import { TIER, cellsOfKind, shellFt, tierOfKind } from '../sim/dome/tiers';
-import { inYard, yardGeometry } from '../sim/dome/plantYard';
+import { airlockDims, inYard, yardGeometry } from '../sim/dome/plantYard';
 import { isGradedTier } from '../sim/dome/grading';
 import { makeDomePlant, plantKey, type DomePlantFx, type PlantLook } from './fx/DomePlant';
 import { interiorPlan, type Obstacle } from './fx/domeInteriorPlan';
@@ -433,7 +433,7 @@ export class HomesteadWorld {
       scene: ws.scene, groundAt: this.groundAt, camp: this.camp, family: this.family,
       buildings: () => this._atmosBuildings(),
       runs: () => this._runs.flatMap(run => { const g = this._runGroups.get(run.id); return g ? [{ run, group: g.group }] : []; }),
-      blocked: (x, z) => this.onBuilding(x, z, 0.02, false) || this.onAccess(x, z, 0.1) || this.onCamp(x, z, 0.2),
+      blocked: (x, z) => this.onBuilding(x, z, 0.02, false) || this.onAccess(x, z, 0.1) || this.onCamp(x, z, 0.2) || this._inServiceLock(x, z),
     });
     this.paths = new PathLayer({
       scene: ws.scene, groundAt: this.groundAt, makeWorld: () => this._pathWorld(), extras: g => this._pathExtras(g),
@@ -1840,6 +1840,18 @@ export class HomesteadWorld {
   /** Is (x, z) on the camp (plus `pad`)? */
   onCamp(x: number, z: number, pad = 0): boolean {
     return Math.hypot(x - this.camp.x, z - this.camp.z) < 1.1 + pad;
+  }
+
+  /** Is (x, z) in a dome's service airlock (the chamber and its passage): no weeds grow on a steel floor. */
+  private _inServiceLock(x: number, z: number): boolean {
+    for (const b of this._built.values()) {
+      if (!b.cover) continue;
+      const tier = tierOfKind(b.placed.kind), yg = tier ? yardGeometry(tier, shellFt(tier, cellsOfKind(b.placed.kind) ?? TIER[tier].cells) / 40, b.placed.rot) : null;
+      if (!yg) continue;
+      const d = airlockDims(yg), dx = x - b.placed.x - d.fr.x, dz = z - b.placed.z - d.fr.z, c = Math.cos(d.fr.rot), sn = Math.sin(d.fr.rot), ax = dx * c - dz * sn, az = dx * sn + dz * c;
+      if (Math.abs(ax) < d.pw / 2 + 0.12 && az > d.dzC - 0.08 && az < 0.25) return true;
+    }
+    return false;
   }
 
   /** Is (x, z) within `pad` of a built footprint (porch included)? */

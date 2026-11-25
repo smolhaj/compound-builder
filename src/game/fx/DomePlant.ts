@@ -10,7 +10,7 @@ import { WORK_TILE, workTextures, worldUVs } from './portTextures';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { plantLayout, type AirlockLook, type PlantLine, type PlantPart } from '../../sim/dome/plant';
-import { yardPoint, type YardGeom } from '../../sim/dome/plantYard';
+import { inYard, yardPoint, type YardGeom } from '../../sim/dome/plantYard';
 import type { PlantCond, PlantKind } from '../../sim/dome/plantUnits';
 import type { WaterLoop } from '../../sim/dome/waterLoop';
 import type { Filtering } from '../../sim/dome/air';
@@ -75,7 +75,7 @@ function partGeometry(q: PlantPart, ground: (x: number, z: number) => number, st
     g.translate(q.x, stem + q.y0, q.z);
   } else if (q.lie) {
     g.rotateX(Math.PI / 2); g.rotateY(q.rot);
-    g.translate(q.x, ground(q.x, q.z) + q.y0, q.z);
+    g.translate(q.x, (q.lvl ? level : ground(q.x, q.z)) + q.y0, q.z);
   } else {
     g.translate(0, q.h / 2, 0); g.rotateY(q.rot);
     g.translate(q.x, q.lvl ? level + q.y0 : q.high ? stem + q.y0 : ground(q.x, q.z) + q.y0, q.z);
@@ -106,7 +106,7 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
   const geos: THREE.BufferGeometry[] = [], steelGeos: THREE.BufferGeometry[] = [];
   for (const q of plant.parts) (q.steel && canvas ? steelGeos : geos).push(partGeometry(q, ground, stem, tint(q.color, q.unit ? hurt[q.unit] : undefined), level));
   // the service airlock is fitted out (tools, PPE, spare parts for the yard machinery): colored low-poly pieces in the same merged mesh
-  if (plant.yard) { const d = airlockDims(plant.yard), [cx, cz] = airlockLoc(d.fr, 0, d.cz); for (const g of airlockPieces(plant.yard, ground(cx, cz) + 0.012, detailTier() === 'high')) geos.push(g); }
+  if (plant.yard) { const d = airlockDims(plant.yard), [cx, cz] = airlockLoc(d.fr, 0, d.cz); group.userData.airHi = detailTier(); for (const g of airlockPieces(plant.yard, ground(cx, cz) + 0.012, detailTier() === 'high')) geos.push(g); }
   // a unit that is out burns and smokes: stylized flames and a plume in the same merged mesh (no extra draw call)
   for (const u of plant.units) {
     const c = hurt[u.id]; if (!c || c === 'ok') continue;
@@ -129,9 +129,10 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
   };
   for (const l of lampList) {
     if (l.ceil) continue;      // (a ceiling lamp is just its lit disc, below)
-    geos.push(partGeometry({ shape: 'cyl', x: l.x, z: l.z, y0: 0, w: 0, h: l.y, d: 0, r: 0.014, rot: 0, color: 0x30343a }, ground, stem));
+    const onPad = !!plant.yard && inYard(plant.yard, 0, 0, l.x, l.z);      // (a lamp on the yard's pad stands on its level plane)
+    geos.push(partGeometry({ shape: 'cyl', x: l.x, z: l.z, y0: 0, w: 0, h: l.y, d: 0, r: 0.014, rot: 0, color: 0x30343a, ...(onPad ? { lvl: true } : {}) }, ground, stem, undefined, level));
     // a real fixture: a flared base collar, a lantern housing (dark frame under the lens), a hooded cap and a ring
-    const gy = ground(l.x, l.z);
+    const gy = onPad ? level + 0.045 : ground(l.x, l.z);
     geos.push(colorPart(noBottom(new THREE.CylinderGeometry(0.022, 0.03, 0.06, 8)), 0x23272c, l.x, gy + 0.03, l.z),
       colorPart(new THREE.CylinderGeometry(0.03, 0.026, 0.014, 8), 0x23272c, l.x, gy + l.y + 0.006, l.z),
       colorPart(new THREE.CylinderGeometry(0.014, 0.046, 0.026, 8), 0x2d3238, l.x, gy + l.y + 0.074, l.z),
@@ -149,7 +150,7 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
   }
   if (merged) {
     const wt = typeof document !== 'undefined' ? workTextures() : null;      // (no canvas in the node tests)
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, ...(wt ? { map: wt.map } : {}), roughness: 0.78, metalness: 0.25, flatShading: true });
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, ...(wt ? { map: wt.map } : {}), roughness: 0.78, metalness: 0.25, flatShading: true, emissive: 0x23282c });
     const mesh = new THREE.Mesh(merged, mat);
     mesh.name = 'plant_machinery'; mesh.matrixAutoUpdate = false; mesh.updateMatrix();
     group.add(mesh); owned.push(merged, mat);
@@ -162,7 +163,9 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
     const sm0 = mergeGeometries(steelGeos, false); steelGeos.forEach(g => g.dispose());
     if (sm0) {
       const sm = worldUV(sm0); if (sm !== sm0) sm0.dispose();
-      steelMesh = new THREE.Mesh(sm, kitMaterial(PLANT_STEEL));
+      // the same painted-steel textures as the dome, a lighter neutral tint and a little self-light so the inside reads (a clone of the shared material: no new texture, still one draw call)
+      const stm = (kitMaterial(PLANT_STEEL) as THREE.MeshStandardMaterial).clone(); stm.color.set(0xa4b0bc); stm.emissive.set(0x5a646b); owned.push(stm);
+      steelMesh = new THREE.Mesh(sm, stm);
       steelMesh.name = 'plant_steel'; steelMesh.matrixAutoUpdate = false; steelMesh.updateMatrix(); steelMesh.castShadow = false; steelMesh.receiveShadow = false;
       group.add(steelMesh); owned.push(sm);
     }
@@ -174,12 +177,13 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
     const poolGeo = new THREE.CircleGeometry(0.55, 20); poolGeo.rotateX(-Math.PI / 2);
     const pools = new THREE.InstancedMesh(poolGeo, kitMaterial('spill_electric'), n + ng);
     const m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), q0 = new THREE.Quaternion(), pos = new THREE.Vector3();
+    const qy = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), plant.yard?.phi ?? 0);
     lampList.forEach((l, i) => {
-      const gy = ground(l.x, l.z);
-      if (l.ceil) {      // a flat lit disc under the roof (or the tunnel's ceiling), its pool on the floor below
-        heads.setMatrixAt(i, m4.compose(pos.set(l.x, (l.ceil === 'lvl' ? level : gy) + l.y, l.z), q0, l.ceil === 'lvl' ? sc.set(11, 0.25, 11) : sc.set(2.4, 0.3, 2.4)));
+      const onPad = !!plant.yard && inYard(plant.yard, 0, 0, l.x, l.z), gy = l.ceil === 'lvl' || onPad ? level + (l.ceil === 'lvl' ? 0 : 0.045) : ground(l.x, l.z);
+      if (l.ceil) {      // a lit strip under the roof (or a disc in the tunnel's ceiling), its pool on the floor below
+        heads.setMatrixAt(i, m4.compose(pos.set(l.x, (l.ceil === 'lvl' ? level : gy) + l.y, l.z), l.ceil === 'lvl' ? qy : q0, l.ceil === 'lvl' ? sc.set(17, 0.3, 2.6) : sc.set(2.4, 0.3, 2.4)));
       } else heads.setMatrixAt(i, m4.makeTranslation(l.x, gy + l.y + 0.035, l.z));
-      pools.setMatrixAt(i, m4.compose(pos.set(l.x, gy + 0.012 + (l.ceil === 'lvl' ? 0.047 : 0), l.z), q0, sc.set(l.k, 1, l.k)));
+      pools.setMatrixAt(i, m4.compose(pos.set(l.x, (l.ceil === 'lvl' ? ground(l.x, l.z) + 0.059 : gy + 0.012), l.z), q0, sc.set(l.k, 1, l.k)));
     });
     glows.forEach((o, i) => pools.setMatrixAt(n + i, m4.compose(pos.set(o.x, ground(o.x, o.z) + (o.y ?? 0) + 0.02, o.z), q0, sc.set(o.r / 0.55, 1, o.r / 0.55))));
     for (const m of [heads, pools]) { m.instanceMatrix.needsUpdate = true; m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; group.add(m); }
