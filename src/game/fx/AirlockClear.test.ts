@@ -38,7 +38,7 @@ describe('the chamber lining', () => {
       for (let i = 0; i < pos.count; i++) { const [ax, az] = toAir(pos.getX(i), pos.getZ(i)); expect(Math.abs(ax)).toBeLessThanOrEqual(d.pw / 2 + 0.001); expect(az).toBeGreaterThan(d.dzC); expect(az).toBeLessThan(0.12); }
       expect(b.min.y).toBeGreaterThanOrEqual(0.012 - 0.001); expect(b.max.y).toBeLessThanOrEqual(d.ph);
     }
-    expect(tris(false)).toBeLessThan(140); expect(tris(true)).toBeLessThan(2200);
+    expect(tris(false)).toBeLessThan(140); expect(tris(true)).toBeLessThan(2400);
   });
   it('keeps a lane 0.15 wide clear below head height for a person and the door', () => {
     for (const hi of [false, true]) for (const p of airlockPieces(yg, 0, hi)) {

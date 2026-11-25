@@ -76,7 +76,7 @@ export function airlockPieces(g: YardGeom, floorY: number, hi: boolean): THREE.B
     Cy(0.018, 0.016, L + 0.054, 0.052, -0.052, 0x23282d, 8, true); B(0.02, 0.014, 0.018, L + 0.054, 0.078, -0.095, 0xd8dcd9, [3]);
     const hose = new THREE.TorusGeometry(0.026, 0.009, 4, 9); hose.rotateX(Math.PI / 2); place(hose, L + 0.054, 0.027, -0.03, 0x23282d);
     const hose2 = new THREE.TorusGeometry(0.026, 0.009, 4, 9); hose2.rotateX(Math.PI / 2); place(hose2, L + 0.054, 0.036, -0.03, 0x2c3238);
-    for (const [t, hex] of [[-0.205, 0x2f6fa8], [-0.15, 0xe8801f]] as const) { Cy(0.026, 0.078, L + 0.04, 0, t, hex, 8); Cy(0.0272, 0.007, L + 0.04, 0.012, t, 0x23282d, 8); Cy(0.0272, 0.007, L + 0.04, 0.058, t, 0x23282d, 8); Cy(0.0262, 0.012, L + 0.04, 0.031, t, 0xe8ecee, 8); Cy(0.02, 0.006, L + 0.04, 0.078, t, 0x9aa1a7, 8); }   // coolant and lube drums: dark rolling hoops, a white label band, a lid
+    for (const [t, hex] of [[-0.205, 0x2f6fa8], [-0.15, 0xe8801f]] as const) { Cy(0.026, 0.078, L + 0.04, 0, t, hex, 12); Cy(0.0272, 0.007, L + 0.04, 0.012, t, 0x23282d, 12); Cy(0.0272, 0.007, L + 0.04, 0.058, t, 0x23282d, 12); Cy(0.0262, 0.012, L + 0.04, 0.031, t, 0xe8ecee, 12); Cy(0.02, 0.006, L + 0.04, 0.078, t, 0x9aa1a7, 12); }   // coolant and lube drums: dark rolling hoops, a white label band, a lid
     B(0.06, 0.07, 0.11, L + 0.034, 0.14, -0.075, 0x9aa1a7, [3, 1]); for (const y of [0.15, 0.178, 0.206]) { B(0.004, 0.022, 0.1, L + 0.066, y, -0.075, 0x4a5056, [3, 1]); B(0.006, 0.004, 0.02, L + 0.069, y + 0.009, -0.075, 0xd2d9de, [3, 1]); }   // drawer cabinet with pulls
     // spare belt, fan blade and valve handles on a galvanized rail and hooks (each touches its hook)
     B(0.014, 0.012, 0.22, L + 0.007, 0.3, -0.1, GALV, [1, 3]);

@@ -173,7 +173,7 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
   const glows = look.interior?.glows ?? [];
   if (lampList.length && !look.dark) {
     const n = lampList.length, ng = glows.length;
-    const headGeo = new THREE.CylinderGeometry(0.03, 0.026, 0.044, 8), heads = new THREE.InstancedMesh(headGeo, kitMaterial('lamp'), n);
+    const headGeo = new THREE.BoxGeometry(0.06, 0.044, 0.06), heads = new THREE.InstancedMesh(headGeo, kitMaterial('lamp'), n);
     const poolGeo = new THREE.CircleGeometry(0.55, 20); poolGeo.rotateX(-Math.PI / 2);
     const pools = new THREE.InstancedMesh(poolGeo, kitMaterial('spill_electric'), n + ng);
     const m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), q0 = new THREE.Quaternion(), pos = new THREE.Vector3();
@@ -181,7 +181,7 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
     lampList.forEach((l, i) => {
       const onPad = !!plant.yard && inYard(plant.yard, 0, 0, l.x, l.z), gy = l.ceil === 'lvl' || onPad ? level + (l.ceil === 'lvl' ? 0 : 0.045) : ground(l.x, l.z);
       if (l.ceil) {      // a lit strip under the roof (or a disc in the tunnel's ceiling), its pool on the floor below
-        heads.setMatrixAt(i, m4.compose(pos.set(l.x, (l.ceil === 'lvl' ? level : gy) + l.y, l.z), l.ceil === 'lvl' ? qy : q0, l.ceil === 'lvl' ? sc.set(17, 0.3, 2.6) : sc.set(2.4, 0.3, 2.4)));
+        heads.setMatrixAt(i, m4.compose(pos.set(l.x, (l.ceil === 'lvl' ? level + 0.004 : gy) + l.y, l.z), l.ceil === 'lvl' ? qy : q0, l.ceil === 'lvl' ? sc.set(8.4, 0.25, 2.2) : sc.set(2.6, 0.3, 2.6)));
       } else heads.setMatrixAt(i, m4.makeTranslation(l.x, gy + l.y + 0.035, l.z));
       pools.setMatrixAt(i, m4.compose(pos.set(l.x, (l.ceil === 'lvl' ? ground(l.x, l.z) + 0.059 : gy + 0.012), l.z), q0, sc.set(l.k, 1, l.k)));
     });

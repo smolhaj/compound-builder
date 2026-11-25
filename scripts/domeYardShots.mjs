@@ -73,10 +73,12 @@ try {
   const backH = (k, h) => { const q = back(k); return [q[0], y0 + h, q[2]]; };
   const airlock = s => page.evaluate(s => window.__cb.world.setYardAirlockLook(s), s);
   const top = async (name, view) => { await airlock('both'); await set(`cb.store.getState().setBuildingView('${view}')`); const e = await Y(pu - 0.3, 0.9, 0), l = [e[0], e[1], e[2]]; await poseRaw2([e[0] + 0.001, e[1] + 9.5, e[2] + 0.001], l, 52); await shot(name); await set(`cb.store.getState().setBuildingView('full')`); };
+  if (want('t5')) { await setRoof('closed'); await airlock('both'); await set(`cb.store.getState().setBuildingView('${process.env.TV || 'cutaway'}')`); const ang = (Math.atan2(yg.from[0], yg.from[1]) + (dm.persons[0]?.angle ?? 1.2)) / 2, rr = dm.r * 0.8, c = await Y(pu - 0.3, 0.9, 0), m = WP([Math.sin(ang) * rr, Math.cos(ang) * rr]), e = [c[0] * 0.4 + m[0] * 0.6, c[1], c[2] * 0.4 + m[1] * 0.6]; await poseRaw2([e[0] + 0.001, e[1] + 17, e[2] + 0.001], e, 52); await shot('t5-topdown-' + (process.env.TV || 'cutaway') + '-with-control-block'); await set(`cb.store.getState().setBuildingView('full')`); }
   if (want('t1')) { await setRoof('open'); await top('t1-topdown-roof-open-walls', 'full'); }
   if (want('t2')) { await setRoof('closed'); await top('t2-topdown-roof-closed-walls', 'full'); }
   if (want('t3')) { await setRoof('open'); await top('t3-topdown-roof-open-cutaway', 'cutaway'); }
   if (want('t4')) { await setRoof('closed'); await top('t4-topdown-roof-closed-cutaway', 'cutaway'); }
+  if (want('weed')) { const c = await Y(pu, -1.0, 0); console.error('WEED ' + JSON.stringify(await page.evaluate(([x, z]) => { const w = window.__cb.world; return { lock: w._inServiceLock(x, z), blocked: w.onBuilding(x, z, 0.02, false), counts: w.atmos?.wildCounts, noGrow: !!w.atmos?._h?.noGrow }; }, [c[0], c[2]]))); }
   if (want('a1')) { await airlock('both'); await setRoof('closed'); await poseRaw2(backH(1.3, 0.22), await Y(pu, D * 0.6, 0.2), 54); await shot('a1-dome-to-yard'); }
   if (want('a2')) { await airlock('both'); await setRoof('closed'); await poseRaw2(await Y(pu, D * 0.45, 0.22), backH(4.5, 0.25), 56); await shot('a2-yard-to-dome'); }
   if (want('tier')) { await airlock('both'); await frames(2); }

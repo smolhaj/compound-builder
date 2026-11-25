@@ -120,3 +120,10 @@ export function airlockDims(g: YardGeom): { fr: { x: number; z: number; rot: num
 }
 /** A point of the airlock's frame (x across, z along, from `airlockDims().fr`) in the dome's local frame. */
 export const airlockLoc = (fr: { x: number; z: number; rot: number }, dx: number, dz: number): [number, number] => [fr.x + dx * Math.cos(fr.rot) + dz * Math.sin(fr.rot), fr.z - dx * Math.sin(fr.rot) + dz * Math.cos(fr.rot)];
+
+/** Is the world point (x, z) on the service lock's floor: the chamber and passage (plus a margin) or the yard's slab? Nothing grows there (weeds, reeds, ground cover). `ox, oz`: the dome's center. */
+export function inServiceLock(g: YardGeom, ox: number, oz: number, x: number, z: number): boolean {
+  const d = airlockDims(g), dx = x - ox - d.fr.x, dz = z - oz - d.fr.z, c = Math.cos(d.fr.rot), s = Math.sin(d.fr.rot), ax = dx * c - dz * s, az = dx * s + dz * c;
+  if (Math.abs(ax) < d.pw / 2 + 0.12 && az > d.dzC - 0.08 && az < 0.25) return true;
+  return inYard(g, ox, oz, x, z, 0.1);
+}

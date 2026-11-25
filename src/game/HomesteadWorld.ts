@@ -170,7 +170,7 @@ import { bedHour, pickHomeLine } from '../sim/domesticLines';
 import { domeOf, domeLook, domesOf as domesLive, yardRoofOf } from '../sim/dome/live';
 import type { RoofState } from '../sim/dome/yardRoof';
 import { TIER, cellsOfKind, shellFt, tierOfKind } from '../sim/dome/tiers';
-import { airlockDims, inYard, yardGeometry } from '../sim/dome/plantYard';
+import { inServiceLock, inYard, yardGeometry } from '../sim/dome/plantYard';
 import { isGradedTier } from '../sim/dome/grading';
 import { makeDomePlant, plantKey, type DomePlantFx, type PlantLook } from './fx/DomePlant';
 import { interiorPlan, type Obstacle } from './fx/domeInteriorPlan';
@@ -433,7 +433,8 @@ export class HomesteadWorld {
       scene: ws.scene, groundAt: this.groundAt, camp: this.camp, family: this.family,
       buildings: () => this._atmosBuildings(),
       runs: () => this._runs.flatMap(run => { const g = this._runGroups.get(run.id); return g ? [{ run, group: g.group }] : []; }),
-      blocked: (x, z) => this.onBuilding(x, z, 0.02, false) || this.onAccess(x, z, 0.1) || this.onCamp(x, z, 0.2) || this._inServiceLock(x, z),
+      blocked: (x, z) => this.onBuilding(x, z, 0.02, false) || this.onAccess(x, z, 0.1) || this.onCamp(x, z, 0.2)
+      , noGrow: (x, z) => this._inServiceLock(x, z),
     });
     this.paths = new PathLayer({
       scene: ws.scene, groundAt: this.groundAt, makeWorld: () => this._pathWorld(), extras: g => this._pathExtras(g),
@@ -961,6 +962,7 @@ export class HomesteadWorld {
       const cd = Math.hypot(x - this.camp.x, z - this.camp.z);
       if (cd < 1.7) { density = Math.min(density, cd < 1.2 ? 0 : (cd - 1.2) / 0.5 * 0.6); worn = Math.max(worn, 0.5 * (1 - cd / 1.7)); }
       if (this._pitCircles.length && this._inPit(x, z, 0.5)) density = 0;
+      if (this._inServiceLock(x, z)) density = 0;      // (a steel floor and a slab: no ground cover in the service lock or the plant yard)
       if (this.onAccess(x, z, 0.35)) density = 0;
       else if (this.onAccess(x, z, 0.8)) density = Math.min(density, 0.45);
       if (density > 0) {
@@ -1846,13 +1848,14 @@ export class HomesteadWorld {
   private _inServiceLock(x: number, z: number): boolean {
     for (const b of this._built.values()) {
       if (!b.cover) continue;
-      const tier = tierOfKind(b.placed.kind), yg = tier ? yardGeometry(tier, shellFt(tier, cellsOfKind(b.placed.kind) ?? TIER[tier].cells) / 40, b.placed.rot) : null;
-      if (!yg) continue;
-      const d = airlockDims(yg), dx = x - b.placed.x - d.fr.x, dz = z - b.placed.z - d.fr.z, c = Math.cos(d.fr.rot), sn = Math.sin(d.fr.rot), ax = dx * c - dz * sn, az = dx * sn + dz * c;
-      if (Math.abs(ax) < d.pw / 2 + 0.12 && az > d.dzC - 0.08 && az < 0.25) return true;
+      const k = `${b.placed.id}|${b.placed.kind}|${b.placed.rot}`;
+      let yg = this._lockGeo.get(k);
+      if (yg === undefined) { const tier = tierOfKind(b.placed.kind); yg = tier ? yardGeometry(tier, shellFt(tier, cellsOfKind(b.placed.kind) ?? TIER[tier].cells) / 40, b.placed.rot) : null; this._lockGeo.set(k, yg); }
+      if (yg && inServiceLock(yg, b.placed.x, b.placed.z, x, z)) return true;
     }
     return false;
   }
+  private readonly _lockGeo = new Map<string, ReturnType<typeof yardGeometry>>();
 
   /** Is (x, z) within `pad` of a built footprint (porch included)? */
   onBuilding(x: number, z: number, pad = 0, withPorch = true, domes = false): boolean {
