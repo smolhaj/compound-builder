@@ -39,12 +39,15 @@ const MATERIAL: Record<string, { glass: string; panes: string; Glass: string }> 
   glass: { glass: 'glass', panes: 'pane of glass', Glass: 'Glass' },
   geodesic: { glass: 'panels', panes: 'panel', Glass: 'Panels' },
   arcology: { glass: 'shell', panes: 'wall panel', Glass: 'Shell' },
+  'x-arcology': { glass: 'shell', panes: 'wall panel', Glass: 'Shell' },
   earthen: { glass: 'earth', panes: 'patch of dirt', Glass: 'Earth' },
 };
 /** Tier-correct wording for a line written about the glass dome (pure; a test holds it). */
 export function shellWording(text: string, tier: string): string {
   const m = MATERIAL[tier];
   if (!m || tier === 'glass') return text;
+  // (an arcology looks like glass, and a crew asking whether it even is glass is the point: that one question keeps the word)
+  if (tier === 'arcology') return text.split(/\b((?:even|really made of|made of) glass)\b/).map((part, i) => (i % 2 ? part : shellWording(part, 'x-arcology'))).join('');
   return text.replace(/Glass breaks\. Glass always breaks\./, `${m.Glass} cracks. ${m.Glass} always cracks.`).replace(/pane of glass/g, m.panes).replace(/\bGlass\b/g, m.Glass).replace(/\bglass\b/g, m.glass);
 }
 /** (Unused since the owner loosened the language rules: kept for a quiet-mode caption setting.) A softened caption: nothing stronger than "damn" (pure). */

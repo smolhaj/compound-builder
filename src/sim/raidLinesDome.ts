@@ -4,13 +4,24 @@
  * than "damn". Variant keys: a temper (`desperate`, `hard`, `savage`), a crew size (`small`, `large`) and `leader`.
  */
 type Variants = Partial<Record<string, readonly string[]>>;
+/** The heavy-weapon beats (docs/ux/arcology-heavy-fire): what a crew says when an RPG, a tank round, a machine gun, a mortar, a torch, a charge or a truck bomb does nothing to the sealed shell. */
+export type HeavyCtx = 'dome_heavy_rpg' | 'dome_heavy_tank' | 'dome_heavy_mg' | 'dome_heavy_mortar' | 'dome_heavy_thermite' | 'dome_heavy_charge' | 'dome_heavy_vbied'
+  | 'dome_disbelief' | 'dome_quiet' | 'dome_young_asks' | 'dome_never_seen' | 'dome_leave' | 'dome_curse';
+export type HeavyWeapon = 'rpg' | 'tank' | 'hmg' | 'amr' | 'mortar' | 'thermite' | 'charge' | 'vbied';
+/** Which pool follows which weapon's strike. */
+export const HEAVY_BEAT: Record<HeavyWeapon, HeavyCtx> = { rpg: 'dome_heavy_rpg', tank: 'dome_heavy_tank', hmg: 'dome_heavy_mg', amr: 'dome_heavy_mg', mortar: 'dome_heavy_mortar', thermite: 'dome_heavy_thermite', charge: 'dome_heavy_charge', vbied: 'dome_heavy_vbied' };
+/** The crew's disbelief, in the order it grows as the heavy weapons fail: shock, a young one asking, an old hand who has never seen it, the leader going quiet, a curse, then someone says to leave. */
+export const HEAVY_ESCALATION: readonly HeavyCtx[] = ['dome_disbelief', 'dome_young_asks', 'dome_never_seen', 'dome_curse', 'dome_quiet', 'dome_leave'];
+export const DOME_HEAVY_CTX: readonly (HeavyCtx | 'dome_react_heavy')[] = [...Object.values(HEAVY_BEAT).filter((c, i, a) => a.indexOf(c) === i), ...HEAVY_ESCALATION, 'dome_react_heavy'];
+
 export type DomeCtx = 'dome_scout' | 'dome_shots' | 'dome_tool' | 'dome_cut' | 'dome_airlock' | 'dome_ram' | 'dome_blast' | 'dome_skirt' | 'dome_argue' | 'dome_order' | 'dome_panic' | 'dome_vow'
-  | 'dome_watch' | 'dome_fire' | 'dome_holds' | 'dome_gone' | 'dome_angry' | 'dome_bounce' | 'dome_taunt' | 'dome_react_swing' | 'dome_react_bounce' | 'dome_react_limp' | 'dome_cross' | 'dome_spectate';
+  | 'dome_watch' | 'dome_fire' | 'dome_holds' | 'dome_gone' | 'dome_angry' | 'dome_bounce' | 'dome_taunt' | 'dome_react_swing' | 'dome_react_bounce' | 'dome_react_limp' | 'dome_cross' | 'dome_spectate'
+  | HeavyCtx | 'dome_react_heavy';
 
 /** Every key of every pool, so a test can hold the planner to using each one. */
 export const DOME_RAIDER_CTX: readonly DomeCtx[] = ['dome_scout', 'dome_shots', 'dome_tool', 'dome_cut', 'dome_airlock', 'dome_ram', 'dome_blast', 'dome_skirt', 'dome_argue', 'dome_order', 'dome_panic', 'dome_vow', 'dome_angry', 'dome_bounce', 'dome_cross'];
 export const DOME_DEFENDER_CTX: readonly DomeCtx[] = ['dome_watch', 'dome_fire', 'dome_holds', 'dome_gone', 'dome_taunt', 'dome_react_swing', 'dome_react_bounce', 'dome_react_limp', 'dome_spectate'];
-export const DOME_VARIANT_KEYS: readonly string[] = ['any', 'desperate', 'hard', 'savage', 'small', 'large', 'leader', 'kid', 'civ', 'vet', 'elder'];
+export const DOME_VARIANT_KEYS: readonly string[] = ['any', 'desperate', 'hard', 'savage', 'small', 'large', 'leader', 'kid', 'civ', 'vet', 'elder', 'young'];
 
 export const DOME_LINES: Record<'raider' | 'defender', Partial<Record<DomeCtx, Variants>>> = {
   raider: {
@@ -103,6 +114,66 @@ export const DOME_LINES: Record<'raider' | 'defender', Partial<Record<DomeCtx, V
       hard: ['Eyes on the dome, not on me.'],
       desperate: ['I cannot... I cannot do this.'],
     },
+    dome_heavy_rpg: {
+      any: ['That was a direct hit.', 'Hit it again.', 'I saw it hit. I saw it.', 'Where did it go? It hit.', 'Reload. Same spot.', 'Direct hit. Why is it still there?'],
+      leader: ['Again. Same place.', 'Load another.'],
+      young: ['Did that do anything?', 'Is that all it does?'],
+    },
+    dome_heavy_tank: {
+      any: ['That should have gone through.', 'That was a tank round.', 'Not a crack. Not one.', 'Say again? Where is the hole?', 'Load another. Load another one.', 'Gun is fine. We hit it. We hit it.'],
+      leader: ['Again.', 'Same point. Fire.'],
+      hard: ['What the fuck is that thing made of?'],
+      young: ['It did not even shake.'],
+    },
+    dome_heavy_mg: {
+      any: ['Rounds are just bouncing off it.', 'Fifty cal. Nothing.', 'I am hitting it. I am hitting it.', 'Check your sights. Check them.', 'Cease fire. Cease fire.', 'It just throws them back at us.'],
+      leader: ['Hold your fire.', 'Stop. Stop shooting at it.'],
+      young: ['Are we even hitting it?'],
+    },
+    dome_heavy_mortar: {
+      any: ['That landed right on it.', 'Was that short? That was not short.', 'Dust. That is all we got.', 'Again. Walk it up.', 'Right on the base. Nothing.'],
+      leader: ['Adjust. One more.'],
+      hard: ['Shit. That was dead on.'],
+    },
+    dome_heavy_thermite: {
+      any: ['It has been burning a full minute.', 'Look at the metal. It is cold.', 'Nothing under it. Nothing.', 'Hot on top and cold underneath.', 'Burned the whole canister. Not a mark.'],
+      young: ['Is it supposed to take this long?'],
+    },
+    dome_heavy_charge: {
+      any: ['Charge went. The gate did not move.', 'That was the whole breaching charge.', 'Not even scratched.', 'Gate is still shut. Still shut.', 'Dust off the gate. That is all.'],
+      leader: ['That was our best charge.'],
+      hard: ['Goddamn gate.'],
+    },
+    dome_heavy_vbied: {
+      any: ['Where is the damage?', 'There is not a mark on it.', 'That was a ton of explosive.', 'Look at it. Not one mark.', 'It is all still there. All of it.'],
+      leader: ['That was everything.'],
+      young: ['It is still standing.'],
+    },
+    dome_disbelief: {
+      any: ['That is not possible.', 'No. No, that is not possible.', 'What is it made of?', 'Nothing does that. Nothing.', 'It is just standing there.', 'I do not understand it.', 'It cannot be that strong.'],
+      young: ['How is it still there?'],
+    },
+    dome_quiet: {
+      any: ['...', 'Nobody say anything.'],
+      leader: ['Give me a minute.', 'Let me think.', 'Hold on.'],
+    },
+    dome_young_asks: {
+      any: ['Is it even glass?', 'Is that really glass?', 'What is it made of?', 'Is it glass? It looks like glass.'],
+      young: ['Why is it not breaking?', 'What is that stuff?', 'Is it really made of glass?'],
+    },
+    dome_never_seen: {
+      any: ['I have never seen anything like it.', 'Twenty years. Never seen anything like it.', 'I have seen bunkers fall to less than that.', 'Nobody told us it was like this.'],
+      leader: ['I have never seen a thing like it.'],
+    },
+    dome_leave: {
+      any: ['We should go.', 'This is not working. Let us go.', 'Boss, we should leave.', 'Nothing here for us. Go.', 'I am not staying for another one.'],
+      leader: ['Pack it up. We are leaving.'],
+      young: ['Can we go home?'],
+    },
+    dome_curse: {
+      any: ['Fuck this thing.', 'Damn thing.', 'Goddamn thing. Open up.', 'Shit. It is not even scratched.', 'What the fuck is this thing?'],
+      hard: ['Fuck. Fuck this.'],
+    },
   },
   defender: {
     dome_watch: {
@@ -140,6 +211,13 @@ export const DOME_LINES: Record<'raider' | 'defender', Partial<Record<DomeCtx, V
     },
     dome_gone: {
       any: ['They are pulling back.', 'Going down the road. Keep watching.', 'They are leaving. Stay put.', 'That is the last of them. Check the shell at first light.', 'Stay inside until it is light.'],
+    },
+    dome_react_heavy: {
+      any: ['That one was louder.', 'Stay back from the glass.', 'It is okay. It is okay.', 'Nothing moved. Look.', 'Are they still out there?', 'Same as before. It is holding.'],
+      kid: ['That was loud.', 'Did it hurt the glass?', 'Mom, did you feel that?'],
+      civ: ['Pour the tea. They will tire.', 'Keep eating. It is fine.', 'Hear that? Nothing. Not a sound inside.'],
+      vet: ['It is holding. Same as before.', 'Eyes on the east side.'],
+      elder: ['Lord, give them sense.', 'Let them wear themselves out.'],
     },
     dome_taunt: {
       any: ['Go home. You are not getting in.', 'Leave now.', 'It is not opening. Give it up.', 'Go on. Walk away.'],

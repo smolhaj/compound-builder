@@ -131,7 +131,7 @@ describe('what a raid leaves on the shell, and the audit claims', () => {
 describe('dome caption wording', () => {
   it('names the right shell for each tier', () => {
     const everyLine = Object.values(DOME_LINES).flatMap(r => Object.values(r)).flatMap(v => Object.values(v ?? {}).flat() as string[]);
-    for (const tier of ['geodesic', 'arcology', 'earthen']) for (const l of everyLine) expect(shellWording(l, tier), `${tier}: ${l}`).not.toMatch(/glass/i);
+    for (const tier of ['geodesic', 'arcology', 'earthen']) for (const l of everyLine) expect(shellWording(l, tier).replace(tier === 'arcology' ? /\b(even|really made of|made of) glass\b/g : /^$/, ''), `${tier}: ${l}`).not.toMatch(/glass/i);
     expect(shellWording('Everybody on the glass! All at once!', 'geodesic')).toBe('Everybody on the panels! All at once!');
     expect(shellWording('Everybody on the glass! All at once!', 'glass')).toBe('Everybody on the glass! All at once!');
   });

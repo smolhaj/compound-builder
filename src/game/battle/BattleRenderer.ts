@@ -21,6 +21,7 @@ import { getViolence, poolRadius, spatter, stain, woundSpot } from './bloodFx';
 import { buildVehicle } from '../props/vehicleGeometry';
 import { InvasionFx } from './InvasionFx';
 import { ShellFx } from './ShellFx';
+import { HeavyFx } from './HeavyFx';
 import { SceneProps } from './SceneProps';
 
 const RUN = 1.1;          // world units / s (≈ 6.5 m/s)
@@ -130,6 +131,8 @@ export class BattleRenderer {
   /** The invasion look: the ramming truck, the charge, the debris (game/battle/InvasionFx.ts). */
   readonly invasion: InvasionFx;
   readonly shellFx: ShellFx;
+  /** Heavy weapons against a sealed shell (visual only, idle cost zero; QA and the cutscene use it). */
+  readonly heavy: HeavyFx;
   /** The door leaf, the loot packs and the set fires (game/battle/SceneProps.ts). */
   readonly props: SceneProps;
   battle: Battle | null = null;
@@ -237,6 +240,7 @@ export class BattleRenderer {
       boom: (x, y, z, r, dust) => this._boom(x, y, z, r, dust), shake: v => { this.shake = Math.max(this.shake, v); }, gap: (id, at, w) => this.onGap?.(id, at, w),
     });
     this.shellFx = new ShellFx(this._group, { ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c), shake: v => { this.shake = Math.max(this.shake, v); }, tracer: (a, b) => this._tracer(a, b) });
+    this.heavy = new HeavyFx(this._group, { ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c), shake: v => { this.shake = Math.max(this.shake, v); }, tracer: (a, b) => this._tracer(a, b) });
     this.props = new SceneProps(this._group, { ground, puff: (p, r0, r1, life, rise, color, o0, glow) => this._puff(p, r0, r1, life, rise, color, o0, glow), flash: (p, k, c) => this._flash(p, k, c), glow: (i, p, k, c) => { const l = this._glows[i]; if (l) { l.position.copy(p); l.color.setHex(c); l.intensity = k; l.distance = 3 + k * 0.5; } }, shake: v => { this.shake = Math.max(this.shake, v); } });
     this.props.centerOf = () => ({ x: this._center.x, z: this._center.z });
     this._trGeo.setAttribute('position', new THREE.BufferAttribute(this._trPos, 3).setUsage(THREE.DynamicDrawUsage));
@@ -389,7 +393,7 @@ export class BattleRenderer {
   private _vehicle: THREE.Group | null = null;
 
   stop(): void {
-    this.invasion.end(); this.shellFx.end();
+    this.invasion.end(); this.shellFx.end(); this.heavy.end();
     this.props.end();
     if (this._vehicle) { this._group.remove(this._vehicle); this._vehicle.traverse(o => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).geometry.dispose(); }); this._vehicle = null; }
     for (const m of this._marks) { this._group.remove(m.sprite); m.sprite.material.dispose(); }
@@ -430,6 +434,7 @@ export class BattleRenderer {
     if (this._endAt >= 0 && this.time - this._endAt > END_HOLD) { this.stop(); this.onEnd?.(); return; }
     this._moveUnits(dt);
     this.invasion.update(dt);
+    this.heavy.update(dt);
     this.props.update(dt, id => { const u = this._units.get(id); return u ? { x: u.x, y: u.y, z: u.z, rot: u.rot, dead: u.dead, gone: u.gone } : null; });
     this._tickFx(dt);
     if (this._alarm) this._alarm.intensity = this._alarmOn ? (0.5 + 0.5 * Math.sin(this.time * 9)) * 6 : 0;
