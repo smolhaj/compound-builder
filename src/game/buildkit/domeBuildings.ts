@@ -28,7 +28,8 @@ const entrancesFor = (tier: DomeTier, R: number, port: number | undefined): { po
 };
 import { yardGeometry, yardPoint, YARD_GAP } from '../../sim/dome/plantYard';
 import { controlBlockPlan } from '../../sim/dome/controlBlock';
-import { addControlBlock } from './domeControl';
+import { addControlBlock, scr as atlasQuad } from './domeControl';
+import { airlockSigns } from '../fx/AirlockProps';
 import { SHELL_INSET, SURROUND_PAD, axisOf, chamberColliders, chamberRho, vestibuleOf, type Vestibule } from '../../sim/dome/vestibule';
 
 /** World units of berm banked round a dome's shell inside its footprint (the footprint is shell plus berm). */
@@ -412,7 +413,7 @@ function earthen(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
 function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number, opts: BuildOpts, N: number, panelMat: 'dome_polycarb' | 'arcology', frameMat: 'aluminum' | 'steel'): THREE.Group {
   const p = new Parts(seed, opts), L = LOOK[tier], R = def.cellsX * CELL / 2 - 0.03 - bermU(tier), y0 = L.stem, g = opts.ground ?? (() => 0);
   const rim = (a: number) => g(R * Math.sin(a), R * Math.cos(a));
-  const nWall = Math.max(36, Math.min(detailTier() === 'high' ? 120 : 84, Math.round(R * 14)));
+  const nWall = Math.max(36, Math.min(detailTier() === 'high' ? 120 : 72, Math.round(R * 14)));
   p.layer = 'stakes';
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.add('trim', box(0.012, 0.09, 0.012, sx * (def.cellsX * CELL / 2 - 0.03), -0.02, sz * (def.cellsZ * CELL / 2 - 0.03)));
   // the plant yard's service passage runs through the footing and the skirt band: a doorway in the band (a lintel over it) and a gap in the rings at its angle
@@ -455,7 +456,21 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
   };
   for (const [A, B, C] of tris) { edge(A, B); edge(B, C); edge(C, A); }
   p.layer = 'roof';
-  for (const [A, B, C] of kept) p.add(panelMat, tri(V(...A), V(...B), V(...C), centre, 0.07));
+  // a pane in the plant yard's doorway row is flat and leans in over the service airlock chamber: only the part above the chamber's ceiling stays (below it the opaque skirt band covers the foot)
+  const nearWin = (v: Pt3[]): boolean => portalA >= 0 && v.some(q => { let d = Math.atan2(q[0], q[2]) - portalA; d = Math.atan2(Math.sin(d), Math.cos(d)); return Math.abs(d) < hwA * 4; }) && v.some(q => q[1] < winTop + 0.3);
+  const clipAbove = (v: Pt3[], yc: number): Pt3[][] => {
+    const poly: Pt3[] = [];
+    for (let i = 0; i < v.length; i++) {
+      const a = v[i], b = v[(i + 1) % v.length], ia = a[1] >= yc, ib = b[1] >= yc;
+      if (ia) poly.push(a);
+      if (ia !== ib) { const t = (yc - a[1]) / (b[1] - a[1]); poly.push([a[0] + (b[0] - a[0]) * t, yc, a[2] + (b[2] - a[2]) * t]); }
+    }
+    return poly.length < 3 ? [] : poly.slice(2).map((c, i) => [poly[0], poly[i + 1], c]);
+  };
+  for (const [A, B, C] of kept) {
+    const v: Pt3[] = [V(...A), V(...B), V(...C)];
+    for (const [a, b, c] of nearWin(v) ? clipAbove(v, winTop + 0.2) : [v]) p.add(panelMat, tri(a, b, c, centre, 0.07));
+  }
   if (band) {
     p.layer = 'walls';
     const lowN = rings[N].length;
@@ -484,6 +499,8 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
   // the control block (arcology): one armored building inside, between the plant yard's service airlock and the entrance module (sim/dome/controlBlock.ts)
   const cbPlan = tier === 'arcology' ? controlBlockPlan(tier, R, ent.port) : null;
   if (cbPlan) addControlBlock(p, cbPlan, detailTier());
+  // the service airlock's label plates (spare-parts bins, door and high-voltage signs): atlas cells on the chamber's walls
+  if (yg) for (const sg of airlockSigns(yg, detailTier() === 'high')) p.add('screens', atlasQuad(sg.cell, sg.w, sg.h, sg.x, g(sg.x, sg.z) + 0.012 + sg.y - sg.h / 2, sg.z, sg.ry), 'decor');
   // colliders: the shell ring as short boxes, none at the airlocks (people cross only through them), and the chamber walls
   shellColliders(p, R, Math.max(24, Math.min(72, Math.round(R * 8))), doors);
   const out = p.finish();

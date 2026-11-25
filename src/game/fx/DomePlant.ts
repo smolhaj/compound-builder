@@ -21,13 +21,16 @@ import { worldUV } from '../buildkit/shell';
 export const PLANT_STEEL: KitMaterialId = 'panel_steel';
 import type { InteriorPlan } from './domeInteriorPlan';
 import { interiorPieces } from './DomeInterior';
+import { airlockPieces } from './AirlockProps';
+import { airlockDims, airlockLoc } from '../../sim/dome/plantYard';
+import { detailTier } from '../buildkit/buildingDetail';
 
 export interface DomePlantFx { group: THREE.Group; key: string; /** Show the buried lines (the underground view). */ setUnder(on: boolean): void; /** The building view: in the cutaway and x-ray views the machinery turns see-through and the sealed passage shows. */ setView(v: 'full' | 'cutaway' | 'xray'): void; dispose(): void }
 
 /** What the renderer needs of the plant's state: the loop, the spares, the dome's turn, which units are hurt, and whether the dome is dark. */
 export interface PlantLook { /** QA look of the yard's service airlock (plant.ts `AirlockLook`). */ airlock?: AirlockLook; /** The arcology's plant yard roof state (sim/dome/yardRoof.ts). */ roof?: RoofState; loop?: WaterLoop; spares?: readonly PlantKind[]; rot?: number; hurt?: Readonly<Record<string, PlantCond>>; dark?: boolean; /** The dome floor's dressing (paths, benches, crates, lamps; fx/domeInteriorPlan), merged into the plant's own draw calls, and its signature. */ interior?: InteriorPlan; interiorKey?: string }
 export const plantKey = (tier: DomeTier, r: number, filtering: Filtering, o: PlantLook = {}): string =>
-  `${tier}:${o.roof ?? 'closed'}:${o.airlock ?? 's'}:${r.toFixed(2)}:${filtering}:${o.loop ?? 'none'}:${(o.spares ?? []).join(',')}:${o.rot ?? 0}:${Object.entries(o.hurt ?? {}).filter(([, c]) => c !== 'ok').map(([k, c]) => k + c).sort().join(',')}:${o.interiorKey ?? ''}:${o.dark ? 1 : 0}`;
+  `${tier}:${o.roof ?? 'closed'}:${o.airlock ?? 's'}:${r.toFixed(2)}:${filtering}:${o.loop ?? 'none'}:${(o.spares ?? []).join(',')}:${o.rot ?? 0}:${Object.entries(o.hurt ?? {}).filter(([, c]) => c !== 'ok').map(([k, c]) => k + c).sort().join(',')}:${o.interiorKey ?? ''}:${o.dark ? 1 : 0}:${detailTier()}`;
 
 const LINE_COLOR: Record<PlantLine['kind'], number> = { power: 0xd9822b, chill: 0x4f9bd0, water: 0x2f7fb5, feeder: 0xe0a030, passage: 0x35e0c8 };
 const CHAR = 0x1c1a18;
@@ -102,6 +105,8 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
   const canvas = typeof document !== 'undefined';      // (no canvas in the node tests: the armored parts then join the machinery mesh)
   const geos: THREE.BufferGeometry[] = [], steelGeos: THREE.BufferGeometry[] = [];
   for (const q of plant.parts) (q.steel && canvas ? steelGeos : geos).push(partGeometry(q, ground, stem, tint(q.color, q.unit ? hurt[q.unit] : undefined), level));
+  // the service airlock is fitted out (tools, PPE, spare parts for the yard machinery): colored low-poly pieces in the same merged mesh
+  if (plant.yard) { const d = airlockDims(plant.yard), [cx, cz] = airlockLoc(d.fr, 0, d.cz); for (const g of airlockPieces(plant.yard, ground(cx, cz) + 0.012, detailTier() === 'high')) geos.push(g); }
   // a unit that is out burns and smokes: stylized flames and a plume in the same merged mesh (no extra draw call)
   for (const u of plant.units) {
     const c = hurt[u.id]; if (!c || c === 'ok') continue;

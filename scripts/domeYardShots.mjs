@@ -22,7 +22,7 @@ try {
   const page = await browser.newPage({ viewport: { width: W, height: H } });
   page.setDefaultTimeout(900000);
   page.on('pageerror', e => console.error('pageerror:', e.message));
-  await page.goto(`http://localhost:${port}/?seed=7&clean&lowrender=${PR}&region=${process.env.REGION ?? 'mountain_west'}&acres=40&relief=${process.env.RELIEF ?? 0}&lotseed=${process.env.LOTSEED ?? 8}`);
+  await page.goto(`http://localhost:${port}/?seed=7&clean&lowrender=${PR}&region=${process.env.REGION ?? 'mountain_west'}&acres=40&relief=${process.env.RELIEF ?? 0}&lotseed=${process.env.LOTSEED ?? 8}&looktier=${process.env.LOOKTIER || "high"}`);
   await page.waitForFunction(() => window.__cb?.qa?.lowrender, null, { timeout: 300000 });
   await page.evaluate(() => window.__cb.store.getState().setQuality?.('high', true));
   const frames = async (n = 1) => { for (let i = 0; i < n; i++) await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(250); };
@@ -72,6 +72,13 @@ try {
   const back = k => dome([yg.from[0] - yg.er[0] * k, yg.from[1] - yg.er[1] * k], 0);
   const backH = (k, h) => { const q = back(k); return [q[0], y0 + h, q[2]]; };
   const airlock = s => page.evaluate(s => window.__cb.world.setYardAirlockLook(s), s);
+  if (want('a1')) { await airlock('both'); await setRoof('closed'); await poseRaw2(backH(1.3, 0.22), await Y(pu, D * 0.6, 0.2), 54); await shot('a1-dome-to-yard'); }
+  if (want('a2')) { await airlock('both'); await setRoof('closed'); await poseRaw2(await Y(pu, D * 0.45, 0.22), backH(4.5, 0.25), 56); await shot('a2-yard-to-dome'); }
+  if (want('tier')) console.error('TIER ' + await page.evaluate(async () => { const m = await import('/src/game/buildkit/buildingDetail.ts'); const w = window.__cb.world; return JSON.stringify([m.detailTier(), w._quality, [...w._domePlants.values()].map(p => p.key)]); }));
+  if (want('a2b')) { await airlock('both'); await poseRaw2(await Y(pu, -0.4, 0.2), backH(3, 0.25), 70); await shot('a2b-inside-from-yard-end-looking-dome'); }
+  if (want('a3')) { await airlock('both'); await poseRaw2(await Y(pu + 0.1, -0.98, 0.19), await Y(pu - 0.2, -1.0, 0.14), 84); await shot('a3-left-wall-spares'); }
+  if (want('a4')) { await airlock('both'); await poseRaw2(await Y(pu - 0.1, -1.0, 0.19), await Y(pu + 0.2, -1.03, 0.17), 84); await shot('a4-right-wall-tools-ppe'); }
+  if (want('a5')) { await airlock('both'); await poseRaw2(await Y(pu + 0.02, -1.3, 0.2), await Y(pu - 0.06, -0.7, 0.14), 76); await shot('a5-rack-from-dome-end'); }
   if (want('y13')) { await airlock('both'); await setRoof('closed'); await poseRaw2(backH(1.3, 0.22), await Y(pu, D * 0.6, 0.2), 54); await shot('y13-looking-through-open-airlock-from-dome-into-yard'); }
   if (want('y14')) { await airlock('both'); await poseRaw2(await Y(pu, D * 0.55, 0.22), backH(4.5, 0.25), 56); await shot('y14-looking-through-open-airlock-from-yard-into-dome'); }
   if (want('y15')) { await airlock('both'); const cz = -0.45; await poseRaw2(await Y(pu, -0.55, 0.2), await Y(pu, 1.5, 0.2), 70); await shot('y15-inside-airlock-looking-toward-yard'); }
@@ -79,9 +86,12 @@ try {
   if (want('y17')) { await airlock('dome'); await poseRaw2(dome(inw(yg.from, 0.9), 0.24), dome(yg.from, 0.2), 58); await shot('y17-dome-side-door-open-inner-shut'); }
   if (want('y18')) { await airlock('yard'); await poseRaw2(await Y(pu, 1.0, 0.24), await Y(pu, 0.0, 0.2), 58); await shot('y18-yard-side-door-open-dome-shut'); }
   if (want('y19')) { await airlock('both'); await poseRaw2(await Y(pu, -1.0, 0.2), backH(3, 0.25), 70); await shot('y19-chamber-near-dome-door-looking-out'); await poseRaw2(await Y(pu, -0.5, 0.35), backH(3, 0.05), 80); await shot('y19b-chamber-looking-out-lower'); }
-  if (want('yray')) { await airlock('both'); await poseRaw2(await Y(pu, -0.35, 0.2), backH(3, 0.25), 70); await frames(3);
-    const hits = await page.evaluate(async () => { const THREE = await import('/node_modules/three/build/three.module.js'); const cb = window.__cb, cam = cb.ws.camera, rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(0, -0.25), cam); return rc.intersectObjects(cb.ws.scene.children, true).slice(0, 5).map(h => ({ n: h.object.name, d: +h.distance.toFixed(2), p: h.object.parent?.name, mat: h.object.material?.name })); });
-    console.error('RAY ' + JSON.stringify(hits)); }
+  if (want('yray')) { await airlock('both');     await poseRaw2(await Y(pu, -0.35, 0.2), backH(3, 0.25), 70); await frames(3);
+    const hits = await page.evaluate(async () => { const THREE = await import('/node_modules/three/build/three.module.js'); const cb = window.__cb, cam = cb.ws.camera, rc = new THREE.Raycaster(), out = {};
+      for (const [x, y] of [[-0.6, 0.4], [0.6, 0.4], [0, 0.55], [-0.6, -0.1], [0.6, -0.1], [-0.55, -0.4], [0, 0]]) { rc.setFromCamera(new THREE.Vector2(x, y), cam); out[x + ',' + y] = rc.intersectObjects(cb.ws.scene.children, true).slice(0, 4).map(h => h.object.name + '/' + (h.object.material?.name || h.object.material?.type) + '@' + h.distance.toFixed(2)); }
+      return out; });
+    console.error('RAY ' + JSON.stringify(hits, null, 1)); }
+  if (want('y20')) { await poseRaw2(await Y(-Wd / 2 - 1.7, D * 0.12, 0.3), await Y(-Wd / 2, 0.0, 0.35), 62); await shot('y20-yard-wall-from-outside-beside-dome-base'); }
   if (want('y1')) { await poseRaw2(dome(inw(yg.from, 0.8), 0.24), dome(yg.from, 0.2), 58); await shot('y01-dome-side-door-closed'); }
   if (want('y2')) { await poseRaw2(dome(inw(yg.from, 0.35), 0.2), dome(yg.from, 0.2), 55); await shot('y02-dome-side-door-closeup'); }
   if (want('y3')) { await poseRaw2(dome(inw(yg.from, 1.6), 0.3), dome(yg.from, 0.2), 62); await shot('y03-dome-side-approach'); }

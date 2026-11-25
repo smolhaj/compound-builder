@@ -5,17 +5,17 @@
  * entrance's state lamps (red sealed, amber cycling, green open: fx/VehiclePorts).
  */
 export type CtlCell = 'ctl_power' | 'ctl_water' | 'ctl_air' | 'ctl_doors' | 'ctl_sec' | 'ctl_map' | 'ctl_lamps' | 'ctl_mon_a' | 'ctl_mon_b'
-  | 'lbl_water' | 'lbl_chill' | 'lbl_power' | 'lbl_arrow' | 'sign_power' | 'sign_water' | 'sign_air' | 'sign_doors' | 'sign_sec' | 'sign_ops' | 'sign_ctl' | 'sign_hv';
+  | 'lbl_filters' | 'lbl_fuses' | 'lbl_gaskets' | 'lbl_belts' | 'lbl_water' | 'lbl_chill' | 'lbl_power' | 'lbl_arrow' | 'sign_power' | 'sign_water' | 'sign_air' | 'sign_doors' | 'sign_sec' | 'sign_ops' | 'sign_ctl' | 'sign_hv';
 
 /** Atlas cells in pixels (x, y, w, h) in the lower part of the 1024 x 1024 atlas, below the bunker's own cells. */
 export const CTL_CELLS: Record<CtlCell, [number, number, number, number]> = {
   ctl_power: [0, 672, 256, 128], ctl_water: [256, 672, 256, 128], ctl_air: [512, 672, 256, 128], ctl_doors: [768, 672, 256, 128],
-  ctl_sec: [0, 800, 256, 128], ctl_map: [256, 800, 384, 128], ctl_lamps: [640, 800, 128, 32], ctl_mon_a: [768, 800, 128, 128], ctl_mon_b: [896, 800, 128, 128],
+  ctl_sec: [0, 800, 256, 128], ctl_map: [256, 800, 384, 128], ctl_lamps: [640, 800, 32, 32], lbl_filters: [672, 800, 48, 16], lbl_fuses: [720, 800, 48, 16], lbl_gaskets: [672, 816, 48, 16], lbl_belts: [720, 816, 48, 16], ctl_mon_a: [768, 800, 128, 128], ctl_mon_b: [896, 800, 128, 128],
   lbl_water: [640, 832, 128, 24], lbl_chill: [640, 856, 128, 24], lbl_power: [640, 880, 128, 24], lbl_arrow: [640, 904, 128, 24],
   sign_power: [0, 928, 256, 48], sign_water: [256, 928, 256, 48], sign_air: [512, 928, 256, 48], sign_doors: [768, 928, 256, 48],
   sign_sec: [0, 976, 256, 48], sign_ops: [256, 976, 256, 48], sign_ctl: [512, 976, 256, 48], sign_hv: [768, 976, 256, 48],
 };
-/** The four lamp swatches in `ctl_lamps` (each 32 x 32, left to right): sealed red, cycling amber, open green, white. */
+/** The four lamp swatches in `ctl_lamps` (each 8 x 32, left to right): sealed red, cycling amber, open green, white. */
 export const LAMP_ORDER = ['red', 'amber', 'green', 'white'] as const;
 export const LAMP_HEX = { red: '#ff3a2a', amber: '#ffb020', green: '#30ff80', white: '#f4f8ff' } as const;
 
@@ -68,8 +68,13 @@ export function paintDomeControlCells(g: Ctx): void {
   }
   { const [x, y, w, h] = CTL_CELLS.lbl_arrow; g.fillStyle = '#e8f0f4'; g.fillRect(x, y, w, h); g.fillStyle = '#1a222a';
     for (let k = 0; k < 4; k++) { const ax = x + 8 + k * 30; g.beginPath(); g.moveTo(ax, y + 3); g.lineTo(ax + 16, y + h / 2); g.lineTo(ax, y + h - 3); g.lineTo(ax + 6, y + h / 2); g.closePath(); g.fill(); } }
+  // ── spare-parts bin labels (the airlock's shelving) ──
+  for (const [c, t, col] of [[CTL_CELLS.lbl_filters, 'FILTERS', '#3b9de0'], [CTL_CELLS.lbl_fuses, 'FUSES', '#e3b92a'], [CTL_CELLS.lbl_gaskets, 'GASKETS', '#cfd8de'], [CTL_CELLS.lbl_belts, 'BELTS', '#e8801f']] as const) {
+    const [x, y, w, h] = c; g.fillStyle = '#10161c'; g.fillRect(x, y, w, h); g.fillStyle = col; g.fillRect(x, y, 3, h);
+    mono(g, 10); g.textAlign = 'center'; g.fillStyle = '#f2f6f8'; g.fillText(t, x + w / 2 + 1, y + h / 2 + 1);
+  }
   // ── lamp swatches ──
-  { const [x, y] = CTL_CELLS.ctl_lamps; LAMP_ORDER.forEach((k, i) => { g.fillStyle = LAMP_HEX[k]; g.fillRect(x + i * 32, y, 32, 32); }); }
+  { const [x, y] = CTL_CELLS.ctl_lamps; LAMP_ORDER.forEach((k, i) => { g.fillStyle = LAMP_HEX[k]; g.fillRect(x + i * 8, y, 8, 32); }); }
   // ── power ──
   { const c = CTL_CELLS.ctl_power, [x, y] = c; frame(g, c, 'POWER  SELF-SUFFICIENT', '#f0a030');
     const rows: Array<[string, number, string, string]> = [['PV ARRAY', 0.82, '#ffd040', '412 kW'], ['BATTERY', 0.74, '#40e090', '74 %'], ['GENSET', 0.0, '#506070', 'STBY'], ['LOAD', 0.58, '#ff9040', '286 kW']];

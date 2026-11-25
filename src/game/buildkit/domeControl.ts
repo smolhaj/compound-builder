@@ -31,7 +31,7 @@ export function bx(w: number, h: number, d: number, x: number, y: number, z: num
 const cy = (r: number, h: number, x: number, y: number, z: number, seg = 10, r2 = r): THREE.BufferGeometry => new THREE.CylinderGeometry(r2, r, h, seg).translate(x, y + h / 2, z);
 
 /** A screen face of an atlas cell, turned `ry` about y (0 faces +z), its bottom-centre at (x, y, z); a wide one is split so the bend curves it with the wall. */
-function scr(cell: CtlCell, w: number, h: number, x: number, y: number, z: number, ry = 0, rx = 0): THREE.BufferGeometry {
+export function scr(cell: CtlCell, w: number, h: number, x: number, y: number, z: number, ry = 0, rx = 0): THREE.BufferGeometry {
   const g = new THREE.PlaneGeometry(w, h, Math.max(1, Math.ceil(w / SEG)), 1), [cx, cyy, cw, ch] = CTL_CELLS[cell], uv = g.getAttribute('uv');
   for (let k = 0; k < uv.count; k++) uv.setXY(k, (cx + uv.getX(k) * cw) / 1024, 1 - (cyy + (1 - uv.getY(k)) * ch) / 1024);
   g.translate(0, h / 2, 0);
@@ -43,7 +43,7 @@ function scr(cell: CtlCell, w: number, h: number, x: number, y: number, z: numbe
 /** A lamp swatch (0 red, 1 amber, 2 green, 3 white) as a small square facing +z turned by ry. */
 function lamp(i: number, w: number, h: number, x: number, y: number, z: number, ry = 0, rx = 0): THREE.BufferGeometry {
   const g = new THREE.PlaneGeometry(w, h), [cx, cyy] = CTL_CELLS.ctl_lamps, uv = g.getAttribute('uv');
-  for (let k = 0; k < uv.count; k++) uv.setXY(k, (cx + i * 32 + 4 + uv.getX(k) * 24) / 1024, 1 - (cyy + 4 + (1 - uv.getY(k)) * 24) / 1024);
+  for (let k = 0; k < uv.count; k++) uv.setXY(k, (cx + i * 8 + 2 + uv.getX(k) * 4) / 1024, 1 - (cyy + 4 + (1 - uv.getY(k)) * 24) / 1024);
   if (rx) g.rotateX(rx);
   g.rotateY(ry).translate(x, y + h / 2, z);
   g.userData.keepUV = true;
