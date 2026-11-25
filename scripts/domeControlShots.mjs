@@ -57,7 +57,7 @@ try {
   await set(`const s = cb.store.getState(); s.setTimeOfDay(${process.env.NIGHT ? 21.5 : (process.env.TOD || 15.5)}); s.setBuildingView('full'); s.setSeasonMode?.('summer'); s.setWeatherMode('clear');`);
   const a = dm.a, u = a ? [Math.sin(a.angle), Math.cos(a.angle)] : [1, 0], n = [u[1], -u[0]], R = dm.r;
   // ── the control block: its plan (the world's own, in the dome's frame) and helpers to stand the camera in the block's frame ──
-  const cbp = await page.evaluate(id => { const w = window.__cb.world; const b = [...w._built.values()].find(x => x.placed.id === id); const c = w._interiorCache.get(id)?.plan.control; return c ? { angle: c.angle, rho: c.rho, cx: c.cx, cz: c.cz, yaw: c.yaw, w: c.w, d: c.d, s: c.yardSide, y0: b.group.position.y, yardDoor: c.yardDoor, manifold: c.manifold, gateDoor: c.gateDoor, landing: c.landing } : null; }, info.id);
+  const cbp = await page.evaluate(id => { const w = window.__cb.world; const b = [...w._built.values()].find(x => x.placed.id === id); const c = w._interiorCache.get(id)?.plan.control; return c ? { pipes: c.pipes, angle: c.angle, rho: c.rho, cx: c.cx, cz: c.cz, yaw: c.yaw, w: c.w, d: c.d, s: c.yardSide, y0: b.group.position.y, yardDoor: c.yardDoor, manifold: c.manifold, gateDoor: c.gateDoor, landing: c.landing } : null; }, info.id);
   if (!cbp) { console.error('no control block plan'); await page.close(); continue; }
   lap(JSON.stringify(cbp));
   const L = (lx, h, lz) => { const rr = cbp.rho - lz, th = cbp.angle - lx / cbp.rho; return [dm.x + rr * Math.sin(th), cbp.y0 + 0.02 + h, dm.z + rr * Math.cos(th)]; };   // a point of the curved block's frame (x along the arc, h up from the floor, z in toward the dome's centre)
@@ -104,6 +104,13 @@ try {
     const m = [(cbp.cx * 0.8), (cbp.cz * 0.8)], c = WP(m), toC = [-m[0] / Math.hypot(...m), -m[1] / Math.hypot(...m)];
     if (want('plan2')) { await at([c[0], cbp.y0 + 3.6, c[1]], [c[0] + toC[0] * 0.5, cbp.y0, c[1] + toC[1] * 0.5], 100); await shot('plan-view-inside-over-gap'); }
     if (want('plan3')) { await set(`cb.store.getState().setBuildingView('cutaway')`); await at([c[0], cbp.y0 + 3.6, c[1]], [c[0] + toC[0] * 0.5, cbp.y0, c[1] + toC[1] * 0.5], 100); await shot('plan-view-inside-over-gap-cutaway'); await set(`cb.store.getState().setBuildingView('full')`); }
+  }
+  if (want('pipe1') || want('pipe2') || want('pipe3')) {
+    const toward = (q, k) => { const d = Math.hypot(q[0], q[1]) || 1; return [q[0] * (1 - k / d), q[1] * (1 - k / d)]; };
+    const pw = cbp.pipes[1].pts, mid = [(pw[0][0] + pw[1][0]) / 2, (pw[0][1] + pw[1][1]) / 2], end = cbp.pipes[0].pts[cbp.pipes[0].pts.length - 1];
+    if (want('pipe1')) { const e = WP(toward(cbp.manifold, 0.75)), m = WP(cbp.manifold); await at([e[0], cbp.y0 + 0.2, e[1]], [m[0], cbp.y0 + 0.1, m[1]], 60); await shot('pipes-manifold-closeup'); }
+    if (want('pipe2')) { const e = WP(toward(mid, 0.8)), m = WP(mid); await at([e[0], cbp.y0 + 0.22, e[1]], [m[0], cbp.y0 + 0.1, m[1]], 58); await shot('pipes-mid-run-closeup'); }
+    if (want('pipe3')) { const e = WP(toward(end, 0.8)), m = WP(end); await at([e[0], cbp.y0 + 0.22, e[1]], [m[0], cbp.y0 + 0.1, m[1]], 58); await shot('pipes-at-wing-wall-closeup'); }
   }
   if (want('gap1')) { const yd = cbp.yardDoor, k = 1 - 1.0 / Math.hypot(yd[0], yd[1]), g = WP([yd[0] * k, yd[1] * k]); await at([g[0], cbp.y0 + 0.26, g[1]], L(0, 0.25, hd), 66); await shot('gap-from-yard-airlock'); }
   if (want('gap2')) { const gd = cbp.gateDoor, k = 4.9 / Math.hypot(gd[0], gd[1]), g = WP([gd[0] * k, gd[1] * k]); await at([g[0], cbp.y0 + 0.26, g[1]], L(0, 0.25, 0), 62); await shot('gap-from-sally-port-person-airlock'); }

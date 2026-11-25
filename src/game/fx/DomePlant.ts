@@ -108,6 +108,12 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
   const merged = merged0 ? worldUVs(merged0, WORK_TILE) : null;
   if (merged && merged0 !== merged) merged0!.dispose();
   if (merged) {
+    // heap: the mesh is flat shaded (the shader derives the normals), so the normal attribute is dead weight; the vertex colors are 8-bit normalized, not three floats
+    merged.deleteAttribute('normal');
+    const c = merged.getAttribute('color');
+    if (c && !(c.array instanceof Uint8Array)) { const a = new Uint8Array(c.count * 3); for (let i = 0; i < a.length; i++) a[i] = Math.round(Math.max(0, Math.min(1, (c.array as Float32Array)[i])) * 255); merged.setAttribute('color', new THREE.BufferAttribute(a, 3, true)); }
+  }
+  if (merged) {
     const wt = typeof document !== 'undefined' ? workTextures() : null;      // (no canvas in the node tests)
     const mat = new THREE.MeshStandardMaterial({ vertexColors: true, ...(wt ? { map: wt.map } : {}), roughness: 0.78, metalness: 0.25, flatShading: true });
     const mesh = new THREE.Mesh(merged, mat);

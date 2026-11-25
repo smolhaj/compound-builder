@@ -18,6 +18,7 @@ const FACE_AT: Record<Face, number> = { px: 0, nx: 1, py: 2, ny: 3, pz: 4, nz: 5
 let SEG = 0.9;
 
 /** A box standing on y (its bottom) with chosen faces left out (the underside by default); a wide box is split into chords along x so the bend can curve it. */
+const bx_ = (w: number, h: number, d: number, x: number, y: number, z: number): THREE.BufferGeometry => new THREE.BoxGeometry(w, h, d).translate(x, y + h / 2, z);
 export function bx(w: number, h: number, d: number, x: number, y: number, z: number, skip: readonly Face[] = ['ny']): THREE.BufferGeometry {
   const g = new THREE.BoxGeometry(w, h, d, Math.max(1, Math.ceil(w / SEG)), 1, 1).translate(x, y + h / 2, z);
   if (!skip.length) return g;
@@ -194,5 +195,27 @@ export function addControlBlock(p: Parts, plan: ControlBlockPlan, detail: Detail
 
   // ── the front corners' lamps and the base of the whole block darkened (contact shade) ──
   for (const sx of [-hw, hw]) { A('walls', 'panel_dark', bx(0.03, 0.2, 0.03, sx, 0.014, hd + 0.01, ['ny'])); A('walls', 'lamp', bx(0.02, 0.025, 0.02, sx, 0.25, hd + 0.01, ['ny'])); }
+
+  // ── the utility pipe rack's labels and flow arrows (the pipes themselves are the floor dressing's, fx/DomeInterior): a lettered tag on a post by each run and arrows along it ──
+  for (const run of plan.pipes) {
+    const lblCell = run.kind === 'power' ? 'lbl_power' : run.kind === 'water' ? 'lbl_water' : 'lbl_chill', pr = run.kind === 'power' ? 0.03 : run.kind === 'water' ? 0.042 : 0.05;
+    let bi = 1, bl = 0;
+    for (let i = 1; i < run.pts.length; i++) { const l = Math.hypot(run.pts[i][0] - run.pts[i - 1][0], run.pts[i][1] - run.pts[i - 1][1]); if (l > bl) { bl = l; bi = i; } }
+    const [ax, az] = run.pts[bi - 1], [bx, bz] = run.pts[bi], dx = (bx - ax) / (bl || 1), dz = (bz - az) / (bl || 1), ya = run.y + FY;
+    const world = (layer: BuildLayer, m: KitMaterialId, g: THREE.BufferGeometry): void => p.add(m, g, layer);
+    for (const t of [0.3, 0.7]) {      // flow arrows along the top of the pipe (pointing from the manifold toward the block)
+      const g = new THREE.PlaneGeometry(0.2, 0.04), [cx, cyy, cw, ch] = CTL_CELLS.lbl_arrow, uv = g.getAttribute('uv');
+      for (let k = 0; k < uv.count; k++) uv.setXY(k, (cx + uv.getX(k) * cw) / 1024, 1 - (cyy + (1 - uv.getY(k)) * ch) / 1024);
+      g.rotateX(-Math.PI / 2); g.rotateY(Math.atan2(-dz, dx)); g.translate(ax + (bx - ax) * t, ya + pr * 1.12 + 0.003, az + (bz - az) * t); g.userData.keepUV = true;
+      world('decor', 'screens', g);
+    }
+    // the tag: on a thin post beside the run, facing the middle of the dome
+    const mx = (ax + bx) / 2, mz = (az + bz) / 2, d0 = Math.hypot(mx, mz) || 1, nx = -mx / d0, nz = -mz / d0, px = mx + nx * (pr + 0.1), pz = mz + nz * (pr + 0.1);
+    world('openings', 'panel_dark', bx_(0.012, 0.16, 0.012, px, FY, pz));
+    const g = new THREE.PlaneGeometry(0.2, 0.05), [cx, cyy, cw, ch] = CTL_CELLS[lblCell], uv = g.getAttribute('uv');
+    for (let k = 0; k < uv.count; k++) uv.setXY(k, (cx + uv.getX(k) * cw) / 1024, 1 - (cyy + (1 - uv.getY(k)) * ch) / 1024);
+    g.rotateY(Math.atan2(nx, nz)); g.translate(px + nx * 0.008, FY + 0.17, pz + nz * 0.008); g.userData.keepUV = true;
+    world('decor', 'screens', g);
+  }
   p.collide(...plan.colliders);
 }

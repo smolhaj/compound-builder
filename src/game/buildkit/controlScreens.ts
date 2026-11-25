@@ -5,12 +5,13 @@
  * entrance's state lamps (red sealed, amber cycling, green open: fx/VehiclePorts).
  */
 export type CtlCell = 'ctl_power' | 'ctl_water' | 'ctl_air' | 'ctl_doors' | 'ctl_sec' | 'ctl_map' | 'ctl_lamps' | 'ctl_mon_a' | 'ctl_mon_b'
-  | 'sign_power' | 'sign_water' | 'sign_air' | 'sign_doors' | 'sign_sec' | 'sign_ops' | 'sign_ctl' | 'sign_hv';
+  | 'lbl_water' | 'lbl_chill' | 'lbl_power' | 'lbl_arrow' | 'sign_power' | 'sign_water' | 'sign_air' | 'sign_doors' | 'sign_sec' | 'sign_ops' | 'sign_ctl' | 'sign_hv';
 
 /** Atlas cells in pixels (x, y, w, h) in the lower part of the 1024 x 1024 atlas, below the bunker's own cells. */
 export const CTL_CELLS: Record<CtlCell, [number, number, number, number]> = {
   ctl_power: [0, 672, 256, 128], ctl_water: [256, 672, 256, 128], ctl_air: [512, 672, 256, 128], ctl_doors: [768, 672, 256, 128],
   ctl_sec: [0, 800, 256, 128], ctl_map: [256, 800, 384, 128], ctl_lamps: [640, 800, 128, 32], ctl_mon_a: [768, 800, 128, 128], ctl_mon_b: [896, 800, 128, 128],
+  lbl_water: [640, 832, 128, 24], lbl_chill: [640, 856, 128, 24], lbl_power: [640, 880, 128, 24], lbl_arrow: [640, 904, 128, 24],
   sign_power: [0, 928, 256, 48], sign_water: [256, 928, 256, 48], sign_air: [512, 928, 256, 48], sign_doors: [768, 928, 256, 48],
   sign_sec: [0, 976, 256, 48], sign_ops: [256, 976, 256, 48], sign_ctl: [512, 976, 256, 48], sign_hv: [768, 976, 256, 48],
 };
@@ -60,6 +61,13 @@ export function paintDomeControlCells(g: Ctx): void {
   plate(g, CTL_CELLS.sign_power, 'POWER', '#f0a030'); plate(g, CTL_CELLS.sign_water, 'WATER', '#3b9de0'); plate(g, CTL_CELLS.sign_air, 'CLIMATE', '#35d0b8');
   plate(g, CTL_CELLS.sign_doors, 'DOORS / AIRLOCKS', '#f0d020'); plate(g, CTL_CELLS.sign_sec, 'SECURITY', '#e04838'); plate(g, CTL_CELLS.sign_ops, 'OPERATIONS', '#60e090');
   plate(g, CTL_CELLS.sign_ctl, 'DOME CONTROL', '#40e0ff'); plate(g, CTL_CELLS.sign_hv, 'HIGH VOLTAGE', '#e8b81c', true);
+  // ── pipe labels and the flow-arrow decal ──
+  for (const [c, t, col] of [[CTL_CELLS.lbl_water, 'WATER SUPPLY', '#3b9de0'], [CTL_CELLS.lbl_chill, 'CHILLED WATER', '#cfd8de'], [CTL_CELLS.lbl_power, 'POWER 480V', '#f0a030']] as const) {
+    const [x, y, w, h] = c; g.fillStyle = '#10161c'; g.fillRect(x, y, w, h); g.fillStyle = col; g.fillRect(x, y, 6, h); g.strokeStyle = '#8f9aa3'; g.lineWidth = 1; g.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    mono(g, 12); g.textAlign = 'center'; g.fillStyle = '#f2f6f8'; g.fillText(t, x + w / 2 + 3, y + h / 2 + 1);
+  }
+  { const [x, y, w, h] = CTL_CELLS.lbl_arrow; g.fillStyle = '#e8f0f4'; g.fillRect(x, y, w, h); g.fillStyle = '#1a222a';
+    for (let k = 0; k < 4; k++) { const ax = x + 8 + k * 30; g.beginPath(); g.moveTo(ax, y + 3); g.lineTo(ax + 16, y + h / 2); g.lineTo(ax, y + h - 3); g.lineTo(ax + 6, y + h / 2); g.closePath(); g.fill(); } }
   // ── lamp swatches ──
   { const [x, y] = CTL_CELLS.ctl_lamps; LAMP_ORDER.forEach((k, i) => { g.fillStyle = LAMP_HEX[k]; g.fillRect(x + i * 32, y, 32, 32); }); }
   // ── power ──
