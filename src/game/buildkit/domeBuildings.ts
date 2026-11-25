@@ -201,9 +201,10 @@ class Doorways {
  * QA and state: how the doors of every airlock built from now on are drawn. `open`: the outer door stands ajar or slid back and the inner one is sealed (the two are never open
  * together); `sealed`: both shut. The shots set it before the dome is placed; the game builds `open`.
  */
-let doorLook: 'open' | 'sealed' = 'open';
-export const setDoorLook = (d: 'open' | 'sealed'): void => { doorLook = d; };
-export const getDoorLook = (): 'open' | 'sealed' => doorLook;
+/** open: the outer gate open, the inner shut; sealed: both shut; inside: the outer shut, the inner open (the lock cycled to the dome side; QA looks). */
+let doorLook: 'open' | 'sealed' | 'inside' = 'open';
+export const setDoorLook = (d: 'open' | 'sealed' | 'inside'): void => { doorLook = d; };
+export const getDoorLook = (): 'open' | 'sealed' | 'inside' => doorLook;
 
 function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][number], doors: Doorways, y0: number): void {
   const a = hole.a, v = hole.v, off = hole.off, { outer, inner } = chamberRho(entryR(tier, R), v), mid = (outer + inner) / 2, L = LOOK[tier];
@@ -301,7 +302,7 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
     X('panel_dark', v.dw * (shut ? 1 : 1.9) + 0.1, 0.022, 0.04, 0, y0 + v.dh, z);                                          // the track
     X('panel_dark', v.dw + 0.2, 0.01, 0.03, 0, yb, z);                                                                    // the bottom guide
   };
-  const outerShut = doorLook === 'sealed', innerShut = true;
+  const outerShut = doorLook !== 'open', innerShut = doorLook !== 'inside';
   const personSwing = (rho: number, shut: boolean, into: 1 | -1): void => {
     const w = v.dw * 0.96;
     if (shut) leaf({ w, lam: 0, shut: true, rho: rho - into * 0.0, phi: 0, pivot: 0 });
