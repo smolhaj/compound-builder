@@ -22,11 +22,11 @@ try {
   const page = await browser.newPage({ viewport: { width: W, height: H } });
   page.setDefaultTimeout(900000);
   page.on('pageerror', e => console.error('pageerror:', e.message));
-  await page.goto(`http://localhost:${port}/?seed=7&clean&lowrender=${PR}&region=${process.env.REGION ?? 'mountain_west'}&acres=40&relief=${process.env.RELIEF ?? 0}&lotseed=${process.env.LOTSEED ?? 8}`);
+  await page.goto(`http://localhost:${port}/?seed=7&clean&lowrender=${PR}&region=${process.env.REGION ?? 'mountain_west'}&acres=40&relief=${process.env.RELIEF ?? 0}&lotseed=${process.env.LOTSEED ?? 8}${process.env.URLX || ""}`);
   await page.waitForFunction(() => window.__cb?.qa?.lowrender, null, { timeout: 300000 });
-  await page.evaluate(() => window.__cb.store.getState().setQuality?.('high', true));
+  await page.evaluate(q => window.__cb.store.getState().setQuality?.(q, true), process.env.Q || 'high');
   const frames = async (n = 1) => { for (let i = 0; i < n; i++) await page.evaluate(() => window.__cb.qa.renderNow()); await page.waitForTimeout(250); };
-  const shot = async name => { await frames(2); await page.evaluate(() => window.__cb.qa.renderFull('high')); await page.screenshot({ path: `${out}/${PFX}${name}.png` }); lap(name); };
+  const shot = async name => { await frames(2); await page.evaluate(q => window.__cb.qa.renderFull(q), process.env.Q || 'high'); await page.screenshot({ path: `${out}/${PFX}${name}.png` }); lap(name); };
   const set = js => page.evaluate(js => new Function('cb', js)(window.__cb), js);
   const info = await page.evaluate(async ([KIND, ROT, DOORS]) => {
     const cb = window.__cb, G = cb.game, w = cb.world; G.getState().setSpeed(0);
@@ -72,6 +72,10 @@ try {
     if (want('yardduct')) { const e = w(Y.pts.eye2), l = w(Y.pts.wall); await pr([e[0], 0.3, e[1]], [l[0], 0.2, l[1]], 62); await shot('yard-intake-duct'); }
     if (want('yardwide')) { const e = w(Y.pts.mid), l = w(Y.pts.stack); await pr([e[0], 0.45, e[1]], [l[0], 0.15, l[1]], 70); await shot('yard-wide'); }
   }
+  if (process.env.NOSSAO) { await page.evaluate(() => { const p = window.__cb.ws._ssaoPass; Object.defineProperty(p, 'enabled', { get: () => false, set: () => {} }); }); await frames(2); }
+  if (process.env.NOCAST) { await page.evaluate(re => { window.__nc = () => window.__cb.ws.scene.traverse(o => { if (o.isMesh && new RegExp(re).test(o.name)) o.castShadow = false; }); window.__nc(); window.__cb.ws.invalidateShadows?.(); }, process.env.NOCAST); await frames(4); }
+  if (process.env.HIDEMESH) { await page.evaluate(re => { window.__hm = () => window.__cb.ws.scene.traverse(o => { if ((o.isMesh || o.isInstancedMesh) && new RegExp(re).test(o.name)) { o.visible = false; o.layers.disable(0); o.count = o.isInstancedMesh ? 0 : o.count; } }); window.__hm(); setInterval(window.__hm, 5); }, process.env.HIDEMESH); await frames(2); }
+  if (process.env.NOCOVER) { await set(`cb.world.cover.visible = false; cb.ws.scene.traverse(o => { if (/ground_cover/.test(o.name)) o.visible = false; }); cb.ws.invalidateShadows?.()`); await frames(2); lap('cover state ' + JSON.stringify(await page.evaluate(() => { const r = []; window.__cb.ws.scene.traverse(o => { if (/ground_cover/.test(o.name)) r.push([o.name, o.visible, o.count]); }); return r; }))); }
   if (want('shellclean')) { for (const [k, nm] of [[Math.PI, 'a'], [2.2, 'b']]) { const ia = a.angle + k, iu = [Math.sin(ia), Math.cos(ia)], inn = [iu[1], -iu[0]]; await pr([dm.x + iu[0] * (R + 2.2) + inn[0] * 1.1, 0.5, dm.z + iu[1] * (R + 2.2) + inn[1] * 1.1], [dm.x + iu[0] * R, 0.3, dm.z + iu[1] * R], 55); await shot('shell-base-clean-' + nm); } }
   if (want('closeup')) { await pr(E(R + 6.5 * S, -3.5 * S, 2.2 * S), gate, 52); await shot('port-closeup'); }
   if (want('second')) { await pr(E(-(R + 9 * S), 3 * S, 3), E(-R, 0.5 * S, 0), 58); await shot('second-entrance-opposite'); }
@@ -148,6 +152,55 @@ try {
     }
     await set(`cb.world.setYardRoofLook(null)`);
   }
+  if (want('yardwalls')) {
+    // the yard roof sealed: closer poses on the wall tops (inner wall against the shell, both ends) and low angles from outside, to prove one level plane with no gaps
+    const Y = await page.evaluate(async ([t, r, rot]) => { const m = await import('/src/sim/dome/plantYard.ts'); const g = m.yardGeometry(t, r, rot); const P = (u, v) => m.yardPoint(g, u, v); return { W: g.W, D: g.D, c: P(0, g.D / 2), a: P(-0.3 * g.W, g.D + 4), b: P(0.5 * g.W + 3.5, g.D * 0.5), eL: P(-0.5 * g.W - 3, g.D * 0.2), inn0: P(0.42 * g.W, 0), inn1: P(-0.42 * g.W, 0), out: P(0, g.D + 0.3), far: P(0, -3) }; }, [dm.tier, R, ROT]);
+    const w = q => [dm.x + q[0], dm.z + q[1]];
+    for (const st of (process.env.ROOFS || 'closed').split(',')) {
+      await set(`cb.world.setYardRoofLook('${st}')`); await frames(3);
+      { const e = w(Y.a), l = w(Y.c); await pr([e[0], 0.35, e[1]], [l[0], 1.5, l[1]], 60); await shot(`yard-roof-${st}-low-outside-north`); }
+      { const e = w(Y.b), l = w(Y.c); await pr([e[0], 0.3, e[1]], [l[0], 1.5, l[1]], 60); await shot(`yard-roof-${st}-low-outside-end`); }
+      { const e = w(Y.far), l = w(Y.out); await pr([e[0], 3.2, e[1]], [l[0], 1.2, l[1]], 62); await shot(`yard-roof-${st}-inner-wall-from-dome-side`); }
+      { const e = w(Y.eL), l = w(Y.c); await pr([e[0], 1.6, e[1]], [l[0], 1.4, l[1]], 55); await shot(`yard-roof-${st}-oblique`); }
+    }
+    await set(`cb.world.setYardRoofLook(null)`);
+  }
+  if (want('spikescan')) {
+    // every thin triangle near the shell base (world space, radius within 1.2 of the shell, up to 0.9 above the stem): material, aspect (2*area / longest edge^2), normal y, vertices relative to the dome centre
+    const out = await page.evaluate(async ([cx, cz, R]) => { const T = await import('/node_modules/three/build/three.module.js'); const rows = [];
+      window.__cb.ws.scene.traverse(o => { if (!o.isMesh || !o.geometry?.attributes?.position) return; o.updateWorldMatrix(true, false); const p = o.geometry.attributes.position, ix = o.geometry.index; const n = ix ? ix.count : p.count;
+        for (let i = 0; i + 2 < n; i += 3) { const v = [0, 1, 2].map(k => new T.Vector3().fromBufferAttribute(p, ix ? ix.getX(i + k) : i + k).applyMatrix4(o.matrixWorld)); const tr = new T.Triangle(...v), area = tr.getArea(); if (area < 1e-10) continue;
+          const L = Math.max(v[0].distanceTo(v[1]), v[1].distanceTo(v[2]), v[2].distanceTo(v[0])), q = 2 * area / (L * L); if (q > 0.03) continue;
+          const c = [(v[0].x + v[1].x + v[2].x) / 3 - cx, (v[0].z + v[1].z + v[2].z) / 3 - cz], rr = Math.hypot(c[0], c[1]); if (Math.abs(rr - R) > 1.2) continue;
+          const ymin = Math.min(...v.map(a => a.y)), ymax = Math.max(...v.map(a => a.y)); const gy = window.__cb.world.groundAt(v[0].x, v[0].z); if (ymax - gy > 1.0 || ymax - ymin < 0.03) continue;
+          const nn = new T.Vector3(); tr.getNormal(nn); rows.push({ m: o.name || o.material?.name, q: +q.toFixed(4), L: +L.toFixed(3), ny: +nn.y.toFixed(2), h: +(ymax - ymin).toFixed(3), top: +(ymax - gy).toFixed(3), r: +rr.toFixed(2), a: +Math.atan2(c[0], c[1]).toFixed(2) }); } });
+      const by = {}; for (const r of rows) (by[r.m] ||= []).push(r); return Object.entries(by).map(([k, v]) => [k, v.length, v.sort((a, b) => a.q - b.q).slice(0, 6)]); }, [dm.x, dm.z, dm.r]);
+    for (const o of out) lap(JSON.stringify(o));
+  }
+  if (want('spikeinst')) {
+    // which instanced meshes (grass, scrub, brush) have instances right at the shell base
+    const out = await page.evaluate(async ([cx, cz, R]) => { const T = await import('/node_modules/three/build/three.module.js'); const res = []; const m4 = new T.Matrix4(), v = new T.Vector3();
+      window.__cb.ws.scene.traverse(o => { if (!o.isInstancedMesh) return; let n = 0, ex = null; for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, m4); m4.premultiply(o.matrixWorld); v.setFromMatrixPosition(m4); const rr = Math.hypot(v.x - cx, v.z - cz); if (Math.abs(rr - R) < 1.0) { n++; ex ||= [+(rr - R).toFixed(2), +v.y.toFixed(2), +Math.atan2(v.x - cx, v.z - cz).toFixed(2)]; } } if (n) res.push([o.name || o.parent?.name, o.material?.name, o.count, n, ex, o.geometry.type]); }); return res; }, [dm.x, dm.z, dm.r]);
+    for (const o of out) lap(JSON.stringify(o));
+  }
+  if (want('spikepick')) {
+    const ia = a.angle + 2.2, iu = [Math.sin(ia), Math.cos(ia)], inn = [iu[1], -iu[0]];
+    await pr([dm.x + iu[0] * (R + 2.2) + inn[0] * 1.1, 0.5, dm.z + iu[1] * (R + 2.2) + inn[1] * 1.1], [dm.x + iu[0] * R, 0.3, dm.z + iu[1] * R], 55); await frames(2);
+    const px = (process.env.PICKPX || '830,440;852,428;645,480;1070,375').split(';').map(q => q.split(',').map(Number));
+    lap(JSON.stringify(await page.evaluate(async ([W, H, px]) => { const T = await import('/node_modules/three/build/three.module.js'); const ws = window.__cb.ws, rc = new T.Raycaster(), out = [];
+      for (const [x0, y0] of px) { const seen = {}; for (let dx = -6; dx <= 6; dx += 2) for (let dy = -6; dy <= 6; dy += 2) { rc.setFromCamera(new T.Vector2((x0 + dx) / W * 2 - 1, 1 - (y0 + dy) / H * 2), ws.camera); for (const h of rc.intersectObjects(ws.scene.children, true).slice(0, 2)) { let o = h.object, ch = []; while (o && ch.length < 4) { ch.push(o.name || o.type); o = o.parent; } const k = ch.join('<') + ':' + (h.object.material?.name || ''); const g = h.object.geometry, fi = h.faceIndex; let tri = null; if (g.attributes.position && fi != null) { const ix = g.index, P = g.attributes.position, vs = [0, 1, 2].map(j => new T.Vector3().fromBufferAttribute(P, ix ? ix.getX(fi * 3 + j) : fi * 3 + j).applyMatrix4(h.object.matrixWorld)); const t = new T.Triangle(...vs); tri = [+t.getArea().toFixed(5), vs.map(v => [+v.x.toFixed(2), +v.y.toFixed(2), +v.z.toFixed(2)])]; } seen[k] ||= [0, tri]; seen[k][0]++; } }
+        out.push([x0, y0, Object.entries(seen)]); } return out; }, [W, H, px])));
+  }
+  if (want('spikecast')) {
+    const ia = a.angle + 2.2, iu = [Math.sin(ia), Math.cos(ia)], inn = [iu[1], -iu[0]];
+    await pr([dm.x + iu[0] * (R + 2.2) + inn[0] * 1.1, 0.5, dm.z + iu[1] * (R + 2.2) + inn[1] * 1.1], [dm.x + iu[0] * R, 0.3, dm.z + iu[1] * R], 55);
+    const names = await page.evaluate(() => { const m = {}; window.__cb.ws.scene.traverse(o => { if (o.isMesh && o.castShadow) { const k = o.name || o.material?.name || o.type; m[k] = (m[k] || 0) + 1; } }); return m; }); lap('casters ' + JSON.stringify(names));
+    for (const re of (process.env.CASTRE || '.;^bldg_;^terrain$;plant|vehicle|apron;tree|forest').split(';')) {
+      await page.evaluate(re => { const rx = new RegExp(re); window.__cast = []; window.__cb.ws.scene.traverse(o => { if (o.isMesh && o.castShadow && rx.test(o.name || o.material?.name || o.type)) { o.castShadow = false; window.__cast.push(o); } }); window.__cb.ws.invalidateShadows(); }, re);
+      await frames(3); lap(`nocast ${re}: ${await page.evaluate(() => window.__cast.length)}`); await shot('spike-nocast-' + re.replace(/[^a-z]/g, '').slice(0, 12));
+      await page.evaluate(() => { for (const o of window.__cast) o.castShadow = true; window.__cb.ws.invalidateShadows(); });
+    }
+  }
   if (want('hideopen')) {
     await pr(E(R + 1.5 * S, -0.55 * S, 0.3), E(R - 0.1, 0.15 * S, 0.3), 62);
     const re = process.env.HIDE || 'bldg_openings';
@@ -178,13 +231,11 @@ try {
   if (want('spikehide')) {
     const ia = a.angle + 2.2, iu = [Math.sin(ia), Math.cos(ia)], inn = [iu[1], -iu[0]];
     await pr([dm.x + iu[0] * (R + 2.2) + inn[0] * 1.1, 0.5, dm.z + iu[1] * (R + 2.2) + inn[1] * 1.1], [dm.x + iu[0] * R, 0.3, dm.z + iu[1] * R], 55);
-    for (const re of ['bldg_foundation', 'bldg_frame', 'bldg_walls_steel', 'bldg_walls_panel_dark', 'bldg_walls_lamp|bldg_walls_concrete', 'regional|terrain_skirt|grade']) {
-      await page.evaluate(re => { const rx = new RegExp(re); window.__hide = () => window.__cb.ws.scene.traverse(o => { if (o.isMesh && rx.test(o.name)) o.visible = false; }); if (window.__hi) clearInterval(window.__hi); window.__hi = setInterval(window.__hide, 5); }, re);
-      await page.waitForTimeout(300); await frames(2);
-      const n = await page.evaluate(re => { const rx = new RegExp(re); let c = 0; window.__cb.ws.scene.traverse(o => { if (o.isMesh && rx.test(o.name)) c++; }); return c; }, re);
-      lap(`${re}: ${n} meshes`); await shot('spike-hide-' + re.replace(/[^a-z]/g, '').slice(0, 24));
+    for (const re of (process.env.SPIKERE || '^bldg_foundation;^bldg_walls_panel_dark;^bldg_walls_steel;^terrain$;^bldg_frame;^bldg_openings').split(';')) {
+      const n = await page.evaluate(re => { const rx = new RegExp(re); let c = 0; window.__cb.ws.scene.traverse(o => { if ((o.isMesh || o.isInstancedMesh) && rx.test(o.name)) { o.layers.disable(0); c++; } }); return c; }, re);
+      await frames(2); lap(`${re}: ${n} meshes`); await shot('spike-hide-' + re.replace(/[^a-z]/g, '').slice(0, 24));
+      await page.evaluate(re => { const rx = new RegExp(re); window.__cb.ws.scene.traverse(o => { if ((o.isMesh || o.isInstancedMesh) && rx.test(o.name)) o.layers.enable(0); }); }, re);
     }
-    await page.evaluate(() => { clearInterval(window.__hi); });
   }
   if (want('spikegeo')) {
     lap(JSON.stringify(await page.evaluate(async ([cx, cz]) => { const T = await import('/node_modules/three/build/three.module.js'); const out = [];

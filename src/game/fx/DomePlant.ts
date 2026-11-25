@@ -10,6 +10,7 @@ import { WORK_TILE, workTextures, worldUVs } from './portTextures';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { plantLayout, type PlantLine, type PlantPart } from '../../sim/dome/plant';
+import { yardPoint, type YardGeom } from '../../sim/dome/plantYard';
 import type { PlantCond, PlantKind } from '../../sim/dome/plantUnits';
 import type { WaterLoop } from '../../sim/dome/waterLoop';
 import type { Filtering } from '../../sim/dome/air';
@@ -35,7 +36,28 @@ const tint = (hex: number, cond: PlantCond | undefined): number => {
 /** Height of each tier's stem wall: the shell's base stands this far above the group's origin (game/buildkit/domeBuildings LOOK). */
 const STEM: Partial<Record<DomeTier, number>> = { glass: 0.08, arcology: 0.14 };
 
-function partGeometry(q: PlantPart, ground: (x: number, z: number) => number, stem: number, color = q.color): THREE.BufferGeometry {
+/** The yard's level plane: the highest ground under its footprint (and a margin), so its roof and wall tops are one flat level on sloping land. */
+export function yardLevel(y: YardGeom | null | undefined, ground: (x: number, z: number) => number): number {
+  if (!y) return 0;
+  let m = -Infinity;
+  for (let i = 0; i <= 8; i++) for (let j = 0; j <= 4; j++) { const [x, z] = yardPoint(y, -y.W / 2 - 0.2 + (y.W + 0.4) * i / 8, -0.2 + (y.D + 0.4) * j / 4); m = Math.max(m, ground(x, z)); }
+  return m;
+}
+
+function partGeometry(q: PlantPart, ground: (x: number, z: number) => number, stem: number, color = q.color, level = 0): THREE.BufferGeometry {
+  if (q.wallTop !== undefined && q.shape === 'box') {
+    // a wall run: from the lowest ground under it (less the embed y0) up to the yard's level top, so wall tops are level whatever the slope does
+    const c = Math.cos(q.rot), sn = -Math.sin(q.rot);
+    const gs = [-0.5, 0, 0.5].map(k => ground(q.x + c * q.w * k, q.z + sn * q.w * k)), bot = Math.min(...gs) + q.y0, top = level + q.wallTop;
+    const h = Math.max(0.02, top - bot);
+    let g: THREE.BufferGeometry = new THREE.BoxGeometry(q.w, h, q.d);
+    g.translate(0, h / 2, 0); g.rotateY(q.rot); g.translate(q.x, bot, q.z);
+    g = g.index ? g.toNonIndexed() : g; g.deleteAttribute('uv');
+    const c0 = new THREE.Color(color), n0 = g.attributes.position.count, col0 = new Float32Array(n0 * 3);
+    for (let i = 0; i < n0; i++) { col0[i * 3] = c0.r; col0[i * 3 + 1] = c0.g; col0[i * 3 + 2] = c0.b; }
+    g.setAttribute('color', new THREE.BufferAttribute(col0, 3));
+    return g;
+  }
   let g: THREE.BufferGeometry = q.shape === 'box' ? new THREE.BoxGeometry(q.w, q.h, q.d) : new THREE.CylinderGeometry(q.r2 ?? q.r, q.r, q.h, q.r < 0.03 ? 6 : 10);
   if (q.shape === 'cyl' && !q.onShell && !q.lie && !q.high && q.y0 <= 0.001) noBottom(g as THREE.CylinderGeometry);
   if (q.shape === 'box' && !q.onShell && !q.lie && !q.high && q.y0 <= 0.001) { const idx = g.index!.array as Uint16Array, keep: number[] = []; for (let f = 0; f < 6; f++) if (f !== 3) for (let k = 0; k < 6; k++) keep.push(idx[f * 6 + k]); g.setIndex(keep); }      // (a box standing on the floor: its underside is never seen)
@@ -50,7 +72,7 @@ function partGeometry(q: PlantPart, ground: (x: number, z: number) => number, st
     g.translate(q.x, ground(q.x, q.z) + q.y0, q.z);
   } else {
     g.translate(0, q.h / 2, 0); g.rotateY(q.rot);
-    g.translate(q.x, q.high ? stem + q.y0 : ground(q.x, q.z) + q.y0, q.z);
+    g.translate(q.x, q.lvl ? level + q.y0 : q.high ? stem + q.y0 : ground(q.x, q.z) + q.y0, q.z);
   }
   g = g.index ? g.toNonIndexed() : g;
   g.deleteAttribute('uv');
@@ -73,7 +95,8 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
   const group = new THREE.Group();
   group.name = 'dome_plant';
   const owned: Array<{ dispose(): void }> = [];
-  const geos = plant.parts.map(q => partGeometry(q, ground, stem, tint(q.color, q.unit ? hurt[q.unit] : undefined)));
+  const level = yardLevel(plant.yard, ground);
+  const geos = plant.parts.map(q => partGeometry(q, ground, stem, tint(q.color, q.unit ? hurt[q.unit] : undefined), level));
   // a unit that is out burns and smokes: stylized flames and a plume in the same merged mesh (no extra draw call)
   for (const u of plant.units) {
     const c = hurt[u.id]; if (!c || c === 'ok') continue;

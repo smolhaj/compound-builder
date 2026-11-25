@@ -148,4 +148,18 @@ describe('the hardened yard, reached only from inside', () => {
     expect(yardBill('arcology', 15).hours).toBeGreaterThanOrEqual(yardBill('arcology', 9).hours);
     expect(yardBill('geodesic', 3).hours).toBe(0);
   });
+
+  it('the arcology yard roof is one level plane: every glazed pane, leaf bar and plate is measured from the same plane, and the walls are topped level', () => {
+    for (const roof of ['closed', 'vent', 'open'] as const) {
+      const p = plantLayout('arcology', 9, 'closed', { loop: 'recycle', roof });
+      const panes = p.parts.filter(q => q.color === 0x4c8d96);
+      expect(panes.length).toBeGreaterThan(8);
+      expect(panes.every(q => q.lvl === true)).toBe(true);
+      const levels = new Set(panes.map(q => q.y0.toFixed(3)));
+      expect(levels.size).toBeLessThanOrEqual(2);      // (the outer leaves, and the inner ones one deck up when slid out: never one per pane)
+      const walls = p.parts.filter(q => q.wallTop !== undefined);
+      expect(walls.length).toBeGreaterThan(8);
+      expect(new Set(walls.map(q => q.wallTop)).size).toBeLessThanOrEqual(3);
+    }
+  });
 });
