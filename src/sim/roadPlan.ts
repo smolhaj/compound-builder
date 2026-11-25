@@ -96,7 +96,11 @@ export interface RoadStructure {
 export interface RoadWall { side: 'L' | 'R'; kind: 'cut' | 'fill'; s0: number; s1: number; heightU: number }
 export interface RoadSpan { side: 'L' | 'R'; s0: number; s1: number }
 /** A station: the road's height `y`, and `bank` the superelevation (rise per unit across, left of the heading positive: the outside of a curve is higher). */
-export interface RoadPt { x: number; z: number; y: number; s: number; bank: number }
+export interface RoadPt {
+  x: number; z: number; y: number; s: number; bank: number;
+  /** A graded corridor (the last stretch into a dome's sally port, sim/dome/portRoad): the flat bench's half width, the cut and fill batters (horizontal per vertical) and the bed's reach. Absent: the standard bed (BED). */
+  half?: number; cut?: number; fill?: number; reach?: number;
+}
 /** A hairpin: where it turns, and which side is the outside of the bend (`out`: the road turns away from it). */
 export interface Hairpin { s: number; x: number; z: number; turnDeg: number; out: 'L' | 'R' }
 

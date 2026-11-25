@@ -121,6 +121,26 @@ try {
     { const e = w(Y.eye), l = w(Y.stack); await pr([e[0], 0.5, e[1]], [l[0], 0.15, l[1]], 60); await shot('yard-inside-intake-valve'); }
     { const e = w(Y.mid), l = w(Y.wall); await pr([e[0], 0.55, e[1]], [l[0], 0.15, l[1]], 62); await shot('yard-inside-duct-to-collar'); }
   }
+  if (want('killcut')) { await set(`cb.store.getState().setBuildingView('cutaway')`); await frames(3); await pr([dm.x - u[0] * R * 0.3 + n[0] * 2, R * 4.2, dm.z - u[1] * R * 0.3 + n[1] * 2], E(R + 2.5, 0, 0), 62); await shot('aerial-kill-zone-cutaway'); await set(`cb.store.getState().setBuildingView('full')`); }
+  if (want('killpick')) {
+    await pr([dm.x - u[0] * R * 0.3 + n[0] * 2, R * 4.2, dm.z - u[1] * R * 0.3 + n[1] * 2], E(R + 2.5, 0, 0), 62); await frames(3);
+    lap(JSON.stringify(await page.evaluate(async ([W, H]) => { const T = await import('/node_modules/three/build/three.module.js'); const ws = window.__cb.ws, cam = ws.camera, rc = new T.Raycaster(), out = [];
+      for (const [px, py] of [[1090, 735], [1040, 700], [900, 830], [1060, 760]]) { rc.setFromCamera(new T.Vector2(px / W * 2 - 1, 1 - py / H * 2), cam); const hs = rc.intersectObjects(ws.scene.children, true).slice(0, 5);
+        out.push(hs.map(h => { let o = h.object, chain = []; while (o && chain.length < 4) { chain.push(o.name || o.type); o = o.parent; } return [chain.join('<'), +h.distance.toFixed(2), +h.point.y.toFixed(3), h.object.material?.name || h.object.material?.type]; })); } return out; }, [W, H])));
+  }
+  if (want('killhide')) {
+    await pr([dm.x - u[0] * R * 0.3 + n[0] * 2, R * 4.2, dm.z - u[1] * R * 0.3 + n[1] * 2], E(R + 2.5, 0, 0), 62); await frames(3);
+    lap(JSON.stringify(await page.evaluate(() => { const o = []; window.__cb.ws.scene.traverse(m => { if (m.isMesh && m.parent === window.__cb.ws.scene && !m.name && m.material?.type === 'ShaderMaterial') o.push([m.geometry.type, m.position.y, m.renderOrder, m.frustumCulled, m.material.transparent, m.material.uniforms ? Object.keys(m.material.uniforms).join(',') : '']); }); return o; })));
+    await page.evaluate(() => { window.__cb.ws.scene.traverse(m => { if (m.isMesh && m.parent === window.__cb.ws.scene && !m.name && m.material?.type === 'ShaderMaterial') m.visible = false; }); });
+    await shot('aerial-kill-zone-noshader');
+  }
+  if (want('killshadow')) {
+    await pr([dm.x - u[0] * R * 0.3 + n[0] * 2, R * 4.2, dm.z - u[1] * R * 0.3 + n[1] * 2], E(R + 2.5, 0, 0), 62); await frames(3);
+    for (const [tag, re] of [['all', /^/]]) {
+      await page.evaluate(([src]) => { const rx = new RegExp(src); window.__cb.ws.scene.traverse(m => { if (m.isMesh && m.castShadow && rx.test(m.name || (m.parent && m.parent.name) || '')) { m.userData.__cs = true; m.castShadow = false; } }); window.__cb.ws.invalidateShadows?.(); }, [re.source]);
+      await frames(3); await shot('aerial-noshadow-' + tag);
+    }
+  }
   if (want('killzone')) { await pr([dm.x - u[0] * R * 0.3 + n[0] * 2, R * 4.2, dm.z - u[1] * R * 0.3 + n[1] * 2], E(R + 2.5, 0, 0), 62); await shot('aerial-kill-zone'); }
   if (want('roofstates')) {
     const Y = await page.evaluate(async ([t, r, rot]) => { const m = await import('/src/sim/dome/plantYard.ts'); const g = m.yardGeometry(t, r, rot); const P = (u, v) => m.yardPoint(g, u, v); return { W: g.W, D: g.D, out: P(-0.1 * g.W, g.D + 3.2), outEye: P(0.55 * g.W, g.D + 2.4), mid: P(0, g.D * 0.5), up: P(0.05 * g.W, g.D * 0.5 - 2.0) }; }, [dm.tier, R, ROT]);
@@ -196,8 +216,17 @@ try {
     const c = [Y.c[0] + dm.x, Y.c[1] + dm.z]; await pr([c[0] - 0.01, 9.5, c[1]], [c[0], 0, c[1]], 50); await shot('yard-roof-closed-straight-down');
     await set(`cb.world.setYardRoofLook(null)`);
   }
+  // the road-to-apron join (the road is level with the sally port): views at fixed distances from the gate plane, in units, not scaled by S
+  if (want('joinside')) { await pr(E(R + 3.3, -1.5, 0.1), E(R + 1.4, 0.2, 0.05), 55); await shot('join-low-side-on'); }
+  if (want('joinside2')) { await pr(E(R + 2.6, 2.2, 0.12), E(R + 1.5, -0.1, 0.05), 58); await shot('join-low-side-on-b'); }
+  if (want('joinroad')) { await pr(E(R + 4.6, 0.0, 0.25), E(R + 0.2, 0, 0.3), 58); await shot('road-to-gate-eye-near'); }
+  if (want('joinback')) { await pr(E(R + 0.9, 0.0, 0.3), E(R + 6, 0, 0.05), 62); await shot('apron-looking-back-near'); }
   if (want('roadinfo')) {
     lap(JSON.stringify(await page.evaluate(([x, z, ux, uz, R]) => { const w = window.__cb.world, pts = w.plan.pts.slice(-14).map(p => [+((p.x - x) * ux + (p.z - z) * uz - R).toFixed(2), +p.y.toFixed(3), +w.groundAt(p.x, p.z).toFixed(3)]); return { pts, gate: w.groundAt(x + ux * R, z + uz * R), toe: w.groundAt(x + ux * (R + 1.6), z + uz * (R + 1.6)) }; }, [dm.x, dm.z, u[0], u[1], Rd])));
+  }
+  if (want('probe')) {
+    // heights across the road at stations along it: lam -2..2 (units); rows: rho past the door plane
+    lap(JSON.stringify(await page.evaluate(([x, z, ux, uz, R]) => { const w = window.__cb.world, nx = uz, nz = -ux, rows = {}; for (const r of [-0.5, 0, 0.5, 1, 1.5, 2, 3, 4, 6, 9]) { rows[r] = [-3, -2, -1.2, -0.6, 0, 0.6, 1.2, 2, 3].map(l => +w.groundAt(x + ux * (R + r) + nx * l, z + uz * (R + r) + nz * l).toFixed(2)); } const nat = {}; for (const r of [0, 1, 2, 3, 4, 6]) nat[r] = [-3, -2, -1.2, -0.6, 0, 0.6, 1.2, 2, 3].map(l => +w.parcel.natural(x + ux * (R + r) + nx * l, z + uz * (R + r) + nz * l).h.toFixed(2)); return { rows, nat, pads: w.parcel.pads.map(p => [p.x0, p.z0, p.x1, p.z1, p.y, p.skirt].map(v => +v.toFixed(2))), works: w.parcel.earthworks.length }; }, [dm.x, dm.z, u[0], u[1], Rd])));
   }
   if (want('spikehide')) {
     const ia = a.angle + 2.2, iu = [Math.sin(ia), Math.cos(ia)], inn = [iu[1], -iu[0]];

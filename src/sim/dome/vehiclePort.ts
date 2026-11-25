@@ -468,3 +468,41 @@ export { plantSize };
  * straight on with no step. Pure (tested in vehiclePort.test.ts: the join is flush and the ramp is no steeper than the road's grade).
  */
 export const apronTop = (sillY: number, toeY: number, k: number, n: number): number => sillY + (toeY - sillY) * Math.max(0, Math.min(1, k / n));
+
+// ── the corridor graded for the port: the road, the apron and the land between level, with sloped shoulders ──
+
+/** The apron's span across its axis (units, left positive as `lamOf` in game/fx/VehiclePorts): across the gate, and out to the person airlock beside it. */
+export function apronSpan(f: PortFrame): { lamA: number; lamB: number } {
+  const offP = f.person ? (f.person.outer[0] - f.cx) * f.u[1] - (f.person.outer[1] - f.cz) * f.u[0] : 0;
+  return { lamA: -(f.v.dw / 2 + 0.45), lamB: Math.max(offP, 0) + (f.person ? 0.5 : f.v.dw / 2 + 0.45) };
+}
+
+/** How far from the gate plane the land is graded for the port: 7 units, 140 ft (the apron, the barrier, and the road tapering back to its own bench). */
+export const GRADE_LEN = 7;
+/** The batter of the shoulders of the graded corridor: 3 horizontal to 1 vertical, a bank a truck can stand beside and a mower can cross (the ordinary road bed cuts at 1.2 : 1). */
+export const GRADE_BATTER = 3;
+
+const sstep = (a: number, b: number, x: number): number => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+/**
+ * The bed of the road at `rho` units out from the gate plane (null: the ordinary bed, beyond `GRADE_LEN`): flat the full width of the apron (and the boom barrier past its toe), then
+ * tapering to the road's own bench, with 3 : 1 shoulders easing back to the 1.2 : 1 cut and 1.8 : 1 fill of the ordinary bed by `GRADE_LEN`. `half` is the flat bench's half width.
+ * Pure (tested: the drawn ground and the apron top agree).
+ */
+export function portGrade(rho: number, span: { lamA: number; lamB: number }, bed: { halfW: number; cutRatio: number; fillRatio: number }): { half: number; cut: number; fill: number; reach: number } | null {
+  if (rho > GRADE_LEN) return null;
+  const wide = Math.max(-span.lamA, span.lamB) + 0.15, narrow = bed.halfW + 0.3;
+  const half = wide + (narrow - wide) * sstep(APRON_LEN + 0.45, APRON_LEN + 2.6, rho);
+  const k = sstep(GRADE_LEN - 3, GRADE_LEN, rho);
+  const cut = GRADE_BATTER + (bed.cutRatio - GRADE_BATTER) * k, fill = GRADE_BATTER + (bed.fillRatio - GRADE_BATTER) * k;
+  return { half, cut, fill, reach: half + GRADE_BATTER * 4 };   // (a cut up to 4 units, 80 ft, deep still meets the hill on its batter; where the hill is lower the reach changes nothing)
+}
+
+/** Half the lane the barrier leaves clear for a vehicle: the truck's half width and a margin each side. */
+export const LANE_HALF = TRUCK.WIDTH / 2 + 0.2;
+/** Where the anti-ram bollard line's posts stand across the apron (lateral offsets): evenly spaced from curb to curb, none inside the vehicle lane (only the boom arm crosses it). */
+export function barrierBollards(span: { lamA: number; lamB: number }, n = 7): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) { const lam = span.lamA + 0.05 + (span.lamB - span.lamA - 0.1) * i / (n - 1); if (Math.abs(lam) >= LANE_HALF) out.push(lam); }
+  return out;
+}
