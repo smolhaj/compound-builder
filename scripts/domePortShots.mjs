@@ -130,6 +130,13 @@ try {
     await page.evaluate(() => { window.__cb.ws.scene.traverse(m => { if (m.isMesh && m.parent === window.__cb.ws.scene && !m.name && m.material?.type === 'ShaderMaterial') m.visible = false; }); });
     await shot('aerial-kill-zone-noshader');
   }
+  if (want('killshadow')) {
+    await pr([dm.x - u[0] * R * 0.3 + n[0] * 2, R * 4.2, dm.z - u[1] * R * 0.3 + n[1] * 2], E(R + 2.5, 0, 0), 62); await frames(3);
+    for (const [tag, re] of [['all', /^/]]) {
+      await page.evaluate(([src]) => { const rx = new RegExp(src); window.__cb.ws.scene.traverse(m => { if (m.isMesh && m.castShadow && rx.test(m.name || (m.parent && m.parent.name) || '')) { m.userData.__cs = true; m.castShadow = false; } }); window.__cb.ws.invalidateShadows?.(); }, [re.source]);
+      await frames(3); await shot('aerial-noshadow-' + tag);
+    }
+  }
   if (want('killzone')) { await pr([dm.x - u[0] * R * 0.3 + n[0] * 2, R * 4.2, dm.z - u[1] * R * 0.3 + n[1] * 2], E(R + 2.5, 0, 0), 62); await shot('aerial-kill-zone'); }
   if (want('roofstates')) {
     const Y = await page.evaluate(async ([t, r, rot]) => { const m = await import('/src/sim/dome/plantYard.ts'); const g = m.yardGeometry(t, r, rot); const P = (u, v) => m.yardPoint(g, u, v); return { W: g.W, D: g.D, out: P(-0.1 * g.W, g.D + 3.2), outEye: P(0.55 * g.W, g.D + 2.4), mid: P(0, g.D * 0.5), up: P(0.05 * g.W, g.D * 0.5 - 2.0) }; }, [dm.tier, R, ROT]);
