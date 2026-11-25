@@ -26,6 +26,7 @@ const entrancesFor = (tier: DomeTier, R: number, port: number | undefined): { po
   const p = port ?? choosePortAngle({ tier, r: R, rot: 0 }, DEFAULT_BEARING).angle;
   return { port: p, persons: personAngles(tier, R, p) };
 };
+import { yardGeometry, yardPoint, YARD_GAP } from '../../sim/dome/plantYard';
 import { controlBlockPlan } from '../../sim/dome/controlBlock';
 import { addControlBlock } from './domeControl';
 import { SHELL_INSET, SURROUND_PAD, axisOf, chamberColliders, chamberRho, vestibuleOf, type Vestibule } from '../../sim/dome/vestibule';
@@ -49,11 +50,12 @@ export { airlockAngles };
 const at = (r: number, a: number, y: number): Pt3 => [r * Math.sin(a), y, r * Math.cos(a)];
 
 /** A ring wall (annulus between r0 and r1) from `lo(a)` up to `top`, as one geometry; the bottom follows the ground. */
-function ringWall(r0: number, r1: number, top: number, lo: (a: number) => number, n: number): THREE.BufferGeometry {
+function ringWall(r0: number, r1: number, top: number, lo: (a: number) => number, n: number, skip?: (a0: number, a1: number) => boolean): THREE.BufferGeometry {
   const pos: number[] = [];
   const quad = (a: Pt3, b: Pt3, c: Pt3, d: Pt3) => pos.push(...a, ...b, ...c, ...a, ...c, ...d);
   for (let i = 0; i < n; i++) {
     const a0 = i * TAU / n, a1 = (i + 1) * TAU / n, l0 = lo(a0), l1 = lo(a1);
+    if (skip && skip(a0, a1)) continue;      // (a doorway through the ring: the plant yard's service passage)
     // top (up), outer face (out), inner face (in): wound so the normals face away from the wall
     quad(at(r0, a0, top), at(r1, a0, top), at(r1, a1, top), at(r0, a1, top));
     quad(at(r1, a0, top), at(r1, a0, l0), at(r1, a1, l1), at(r1, a1, top));
@@ -413,12 +415,17 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
   const nWall = Math.max(36, Math.min(detailTier() === 'high' ? 120 : 84, Math.round(R * 14)));
   p.layer = 'stakes';
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.add('trim', box(0.012, 0.09, 0.012, sx * (def.cellsX * CELL / 2 - 0.03), -0.02, sz * (def.cellsZ * CELL / 2 - 0.03)));
+  // the plant yard's service passage runs through the footing and the skirt band: a doorway in the band (a lintel over it) and a gap in the rings at its angle
+  const yg = tier === 'arcology' ? yardGeometry(tier, R, 0) : null;
+  const portalA = yg ? (() => { const sag = R - Math.sqrt(R * R - yg.portal.u * yg.portal.u), q = yardPoint(yg, yg.portal.u, -(YARD_GAP + sag)); return ((Math.atan2(q[0], q[1]) % TAU) + TAU) % TAU; })() : -10, hwA = 0.26 / R;
+  const inWin = (a0: number, a1: number): boolean => portalA >= 0 && a1 > portalA - hwA && a0 < portalA + hwA;
+  const winTop = 0.52;      // (the passage's top, in the group's frame)
   p.layer = 'foundation';
-  p.add('concrete', ringWall(R - 0.05, R + 0.04, y0, a => Math.min(y0 - 0.03, rim(a) - 0.08), nWall));
+  p.add('concrete', ringWall(R - 0.05, R + 0.04, y0, a => Math.min(y0 - 0.03, rim(a) - 0.08), nWall, inWin));
   if (tier === 'geodesic') p.add('earth', berm(R, bermU(tier) - 0.04, 0.12, g, y0 - 0.005, nWall));
   else { const emb = embankment(R + 0.04, g, y0 - 0.005, nWall); if (emb) p.add('earth', emb); }
   if (tier === 'arcology') {      // the anchor flange: a bolted steel ring round the foot, so a sealed air-filled shell reads as anchored to its footing, not floating (a look only; no flood rule)
-    p.add('concrete', ringWall(R + 0.045, R + 0.19, y0 - 0.02, a => Math.min(y0 - 0.06, rim(a) - 0.1), nWall));
+    p.add('concrete', ringWall(R + 0.045, R + 0.19, y0 - 0.02, a => Math.min(y0 - 0.06, rim(a) - 0.1), nWall, inWin));
     for (let k = 0; k < 48; k++) { const a = (k + 0.5) / 48 * TAU, [bx, , bz] = at(R + 0.12, a, 0); p.add('concrete', box(0.035, 0.03, 0.035, bx, y0 - 0.02, bz)); }
   }
   const { rings, tris } = triDome(N);
@@ -440,6 +447,10 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
     const k = ekey(A, B);
     if (seen.has(k)) return; seen.add(k);
     if (doors.cuts(V(...A), V(...B)) && !bound.has(k)) return;
+    if (portalA >= 0) {      // a strut that would cross the plant yard's doorway low down is left out
+      const a = V(...A), b = V(...B);
+      for (let q = 0; q <= 6; q++) { const t = q / 6, x = a[0] + (b[0] - a[0]) * t, y = a[1] + (b[1] - a[1]) * t, z = a[2] + (b[2] - a[2]) * t; let d = Math.atan2(x, z) - portalA; d = Math.atan2(Math.sin(d), Math.cos(d)); if (Math.abs(d) < hwA * 1.2 && y < winTop + 0.04) return; }
+    }
     p.add(frameMat, strut(V(...A), V(...B), L.strut, seg));
   };
   for (const [A, B, C] of tris) { edge(A, B); edge(B, C); edge(C, A); }
@@ -451,12 +462,17 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
     for (let j = 0; j < lowN; j++) {
       const a0 = phi(N, j), a1 = phi(N, j + 1), r = R - 0.02;
       if (doors.takes([at(r, a0, y0), at(r, a1, y0), at(r, a1, y0 + band), at(r, a0, y0 + band)])) continue;     // (the airlock's own surround closes the band there)
-      p.add('steel', quad(at(r + 0.012, a0, y0), at(r + 0.012, a1, y0), at(r + 0.012, a1, y0 + band), at(r + 0.012, a0, y0 + band), centre));
+      if (inWin(a0, a1)) {      // the segment with the doorway: its two sides in full, a lintel over the opening
+        const w0 = Math.max(a0, portalA - hwA), w1 = Math.min(a1, portalA + hwA), rr = r + 0.012;
+        if (w0 - a0 > 1e-4) p.add('steel', quad(at(rr, a0, y0), at(rr, w0, y0), at(rr, w0, y0 + band), at(rr, a0, y0 + band), centre));
+        if (a1 - w1 > 1e-4) p.add('steel', quad(at(rr, w1, y0), at(rr, a1, y0), at(rr, a1, y0 + band), at(rr, w1, y0 + band), centre));
+        p.add('steel', quad(at(rr, w0, winTop), at(rr, w1, winTop), at(rr, w1, y0 + band), at(rr, w0, y0 + band), centre));
+      } else p.add('steel', quad(at(r + 0.012, a0, y0), at(r + 0.012, a1, y0), at(r + 0.012, a1, y0 + band), at(r + 0.012, a0, y0 + band), centre));
       const rl = R + 0.002; p.add('lamp', quad(at(rl + 0.014, a0, y0 + band - 0.07), at(rl + 0.014, a1, y0 + band - 0.07), at(rl + 0.014, a1, y0 + band), at(rl + 0.014, a0, y0 + band), centre));
     }
     // a continuous armored base ring where the band meets the foundation, and a gasket seam along the band's top where the panels meet it: no gap shows between skin and footing
     p.layer = 'walls';
-    p.add('panel_dark', ringWall(R - 0.03, R + 0.016, y0 + 0.06, () => y0 - 0.03, nWall));      // (a narrow ledge: a wide one threw dark shadow slivers up the skirt)
+    p.add('panel_dark', ringWall(R - 0.03, R + 0.016, y0 + 0.06, () => y0 - 0.03, nWall, inWin));      // (a narrow ledge: a wide one threw dark shadow slivers up the skirt)
     p.add('panel_dark', ringWall(R - 0.025, R + 0.018, y0 + band + 0.012, () => y0 + band - 0.012, nWall));
     // the crown spire: a mast with a lit tip
     p.layer = 'frame';

@@ -174,7 +174,7 @@ import { inYard, yardGeometry } from '../sim/dome/plantYard';
 import { isGradedTier } from '../sim/dome/grading';
 import { makeDomePlant, plantKey, type DomePlantFx, type PlantLook } from './fx/DomePlant';
 import { interiorPlan, type Obstacle } from './fx/domeInteriorPlan';
-import { plantLayout } from '../sim/dome/plant';
+import { plantLayout, type AirlockLook } from '../sim/dome/plant';
 import { getDoorLook } from './buildkit/domeBuildings';
 import { makeVehiclePorts, type PortFixtures, type PortInput } from './fx/VehiclePorts';
 import { planToPort, portFrameOf } from '../sim/dome/portRoad';
@@ -599,7 +599,7 @@ export class HomesteadWorld {
     const dst = domeStateOf(game, ref), hurt: Record<string, 'ok' | 'damaged' | 'down'> = {};
     for (const u of plantUnitsOf(game, ref, dst)) if (u.cond !== 'ok') hurt[u.id] = u.cond;
     const dark = plantFxOf(game, ref, dst).power === 'dark', inter = this._interiorFor(b, game, ref, dst.filtering, dark);
-    const plook: PlantLook = { roof: this._roofQA ?? yardRoofOf(game, ref.st.id), loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark, interior: inter.plan, interiorKey: inter.key };
+    const plook: PlantLook = { roof: this._roofQA ?? yardRoofOf(game, ref.st.id), loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark, airlock: this._airlockQA ?? undefined, interior: inter.plan, interiorKey: inter.key };
     const key = plantKey(ref.tier, ref.r, dst.filtering, plook), cur = this._domePlants.get(b.placed.id);
     if (cur) cur.setView(this._view);
     if (!cur || cur.key !== key) {
@@ -889,6 +889,9 @@ export class HomesteadWorld {
   /** Is (x, z) in (or within `m` of) a dome's open crater or the moat round its skirt? Trees and ground cover keep out. */
   /** QA: force the arcology's plant yard roof state for a shot (null: the game's own state, interlocks included). */
   private _roofQA: RoofState | null = null;
+  private _airlockQA: AirlockLook | null = null;
+  /** QA: the yard's service airlock look (doors slid open, cycling lamps); null: sealed. */
+  setYardAirlockLook(s: AirlockLook | null): void { this._airlockQA = s; for (const [, f] of this._domePlants) { this._root.remove(f.group); f.dispose(); } this._domePlants.clear(); }
   setYardRoofLook(s: RoofState | null): void { this._roofQA = s; for (const [, f] of this._domePlants) { this._root.remove(f.group); f.dispose(); } this._domePlants.clear(); }
   /** The kill zone round every dome (owner, 2026-11-21): no tree, shrub or rock within about 40 ft (2 units) of the shell's base or of the apron and the road's end, so the approach is open ground. */
   private _portZones: PortFrame[] = [];

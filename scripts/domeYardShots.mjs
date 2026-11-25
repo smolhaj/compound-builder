@@ -62,12 +62,26 @@ try {
   const y0 = await page.evaluate(id => { const w = window.__cb.world; return [...w._built.values()].find(x => x.placed.id === id).group.position.y; }, info.id);
   lap(JSON.stringify(yg).slice(0, 300));
   const gdy = (x, z) => page.evaluate(([x, z]) => window.__cb.world.groundAt(x, z), [x, z]);
+  const yTop = await page.evaluate(async ([g, dr]) => { const m = await import('/src/sim/dome/plantYard.ts'); let mx = -1e9; for (let i = 0; i <= 8; i++) for (let j = 0; j <= 4; j++) { const p = m.yardPoint(g, -g.W / 2 + g.W * i / 8, g.D * j / 4); mx = Math.max(mx, window.__cb.world.groundAt(dr.x + p[0], dr.z + p[1])); } return mx; }, [{ phi: yg.phi, r: dm.r, er: yg.er, et: yg.et, W: yg.W, D: yg.D }, { x: dm.x, z: dm.z }]);
   const Y = async (u, v, h) => { const p = await page.evaluate(async ([g, u, v]) => (await import('/src/sim/dome/plantYard.ts')).yardPoint(g, u, v), [{ phi: yg.phi, r: dm.r, er: yg.er, et: yg.et }, u, v]); const q = WP(p); return [q[0], (await gdy(q[0], q[1])) + h, q[1]]; };   // a point of the yard (u along the shell, v out from its inner wall) at height h over the yard's ground
   const setRoof = s => page.evaluate(s => window.__cb.world.setYardRoofLook(s), s);
   const lightsOn = () => page.evaluate(() => window.__cb.game.setState(st => { const g = structuredClone(st.game); g.utilities.lit = ['x']; return { game: g }; }));
   const inw = (q, k) => { const d = Math.hypot(q[0], q[1]); return [q[0] * (1 - k / d), q[1] * (1 - k / d)]; };
   const dome = (q, h) => { const w = WP(q); return [w[0], y0 + h, w[1]]; };
   const D = yg.D, Wd = yg.W, pu = yg.u;
+  const back = k => dome([yg.from[0] - yg.er[0] * k, yg.from[1] - yg.er[1] * k], 0);
+  const backH = (k, h) => { const q = back(k); return [q[0], y0 + h, q[2]]; };
+  const airlock = s => page.evaluate(s => window.__cb.world.setYardAirlockLook(s), s);
+  if (want('y13')) { await airlock('both'); await setRoof('closed'); await poseRaw2(backH(1.3, 0.22), await Y(pu, D * 0.6, 0.2), 54); await shot('y13-looking-through-open-airlock-from-dome-into-yard'); }
+  if (want('y14')) { await airlock('both'); await poseRaw2(await Y(pu, D * 0.55, 0.22), backH(4.5, 0.25), 56); await shot('y14-looking-through-open-airlock-from-yard-into-dome'); }
+  if (want('y15')) { await airlock('both'); const cz = -0.45; await poseRaw2(await Y(pu, -0.55, 0.2), await Y(pu, 1.5, 0.2), 70); await shot('y15-inside-airlock-looking-toward-yard'); }
+  if (want('y16')) { await airlock('both'); await poseRaw2(await Y(pu, -0.35, 0.2), backH(3, 0.25), 70); await shot('y16-inside-airlock-looking-toward-dome'); }
+  if (want('y17')) { await airlock('dome'); await poseRaw2(dome(inw(yg.from, 0.9), 0.24), dome(yg.from, 0.2), 58); await shot('y17-dome-side-door-open-inner-shut'); }
+  if (want('y18')) { await airlock('yard'); await poseRaw2(await Y(pu, 1.0, 0.24), await Y(pu, 0.0, 0.2), 58); await shot('y18-yard-side-door-open-dome-shut'); }
+  if (want('y19')) { await airlock('both'); await poseRaw2(await Y(pu, -1.0, 0.2), backH(3, 0.25), 70); await shot('y19-chamber-near-dome-door-looking-out'); await poseRaw2(await Y(pu, -0.5, 0.35), backH(3, 0.05), 80); await shot('y19b-chamber-looking-out-lower'); }
+  if (want('yray')) { await airlock('both'); await poseRaw2(await Y(pu, -0.35, 0.2), backH(3, 0.25), 70); await frames(3);
+    const hits = await page.evaluate(async () => { const THREE = await import('/node_modules/three/build/three.module.js'); const cb = window.__cb, cam = cb.ws.camera, rc = new THREE.Raycaster(); rc.setFromCamera(new THREE.Vector2(0, -0.25), cam); return rc.intersectObjects(cb.ws.scene.children, true).slice(0, 5).map(h => ({ n: h.object.name, d: +h.distance.toFixed(2), p: h.object.parent?.name, mat: h.object.material?.name })); });
+    console.error('RAY ' + JSON.stringify(hits)); }
   if (want('y1')) { await poseRaw2(dome(inw(yg.from, 0.8), 0.24), dome(yg.from, 0.2), 58); await shot('y01-dome-side-door-closed'); }
   if (want('y2')) { await poseRaw2(dome(inw(yg.from, 0.35), 0.2), dome(yg.from, 0.2), 55); await shot('y02-dome-side-door-closeup'); }
   if (want('y3')) { await poseRaw2(dome(inw(yg.from, 1.6), 0.3), dome(yg.from, 0.2), 62); await shot('y03-dome-side-approach'); }

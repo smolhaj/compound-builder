@@ -30,6 +30,7 @@ import { ROOF_SLIDE as ST_SLIDE, type RoofState } from './yardRoof';
 import { CHAMBER_LEN, PORTAL_H, PORTAL_W, plantSize, yardGeometry, yardPoint, YARD_GAP, YARD_H, YARD_T, type YardGeom } from './plantYard';
 
 export type Shape = 'box' | 'cyl';
+export type AirlockLook = 'sealed' | 'dome' | 'yard' | 'both' | 'cycling';
 export interface PlantPart {
   shape: Shape;
   /** Plan position of the part's center (local), and its height above the ground at that spot. */
@@ -55,8 +56,10 @@ export interface PlantPart {
   unit?: string;
   /** Part of the sealed passage (drawn in the cutaway and underground views). */
   passage?: boolean;
+  /** An armored wall or door: drawn with the dome's own panel steel material (the shared kit material, opaque), not the plant's vertex-colored mesh. */
+  steel?: boolean;
 }
-export interface PlantLamp { x: number; z: number; y: number }
+export interface PlantLamp { x: number; z: number; y: number; /** A ceiling lamp (a flat lit disc hanging under a roof, no post): `lvl` measures y from the yard's level plane (under its roof), `gnd` from the ground (inside the sealed passage). */ ceil?: 'lvl' | 'gnd'; /** Pool radius scale (default by kind). */ k?: number }
 /** A buried line: its kind, depth below the ground (world units) and the plan points. The passage is a fat teal tube. */
 export interface PlantLine { kind: 'power' | 'chill' | 'water' | 'feeder' | 'passage'; depth: number; pts: Array<[number, number]> }
 export interface PlantUnitSpot { id: string; kind: PlantKind; place: PlantPlace; x: number; z: number }
@@ -90,7 +93,7 @@ function weather(color: number, x: number, z: number, amt = 0.08): number {
   return (r << 16) | (g << 8) | b;
 }
 
-export interface PlantOpts { loop?: WaterLoop; spares?: readonly PlantKind[]; rot?: number; /** The arcology's plant yard roof (sim/dome/yardRoof.ts); default closed. */ roof?: RoofState }
+export interface PlantOpts { loop?: WaterLoop; spares?: readonly PlantKind[]; rot?: number; /** The arcology's plant yard roof (sim/dome/yardRoof.ts); default closed. */ roof?: RoofState; /** QA look of the yard's service airlock: both doors shut and the lamps red (`sealed`, the default), the dome-side door slid open (`dome`), the yard-side door slid open (`yard`), or cycling (amber, both shut). */ airlock?: AirlockLook }
 
 /** A frame: a point on the ground and a turn; `dx` runs along the shell (tangent), `dz` outward from the dome. */
 interface Fr { x: number; z: number; rot: number }
@@ -98,7 +101,7 @@ const loc = (f: Fr, dx: number, dz: number): [number, number] => [f.x + dx * Mat
 
 /** The plant of a dome of `tier` and shell radius `r` running `filtering`. */
 export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: PlantOpts = {}): Plant {
-  const level = LEVEL[filtering], s = plantSize(r), parts: PlantPart[] = [], lines: PlantLine[] = [];
+  const level = LEVEL[filtering], s = plantSize(r), parts: PlantPart[] = [], lines: PlantLine[] = [], lamps: PlantLamp[] = [];
   const loop = o.loop ?? 'none', spares = o.spares ?? [], rot = o.rot ?? 0;
   const n = FRAME_SPANS[tier], tau = Math.PI * 2, step = tau / n;
   const angles = tier === 'earthen' ? [0] : Array.from({ length: n }, (_, i) => i * step + rot * Math.PI / 2);
@@ -277,13 +280,13 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
     const g = yard, W = g.W, D = g.D, P = (u: number, v: number): [number, number] => yardPoint(g, u, v);
     const o0 = P(0, 0), Fy: Fr = { x: o0[0], z: o0[1], rot: g.phi };
     // slab with a curb all round (it also keeps the field brush out), the walkway strip from the inner door, and the wall
-    B(Fy, 0, D / 2, W - 0.14, 0.045, D - 0.14, C.concDark, 0);
+    B(Fy, 0, D / 2, W - 0.14, 0.3, D - 0.14, C.concDark, -0.255);      // (the slab follows the ground under its middle; its footing is buried so the edge never floats)
     for (const [dx, dz, w, d] of [[0, 0.1, W - 0.14, 0.05], [0, D - 0.1, W - 0.14, 0.05], [-(W - 0.2) / 2, D / 2, 0.05, D - 0.14], [(W - 0.2) / 2, D / 2, 0.05, D - 0.14]] as const) B(Fy, dx, dz, w, 0.075, d, C.cap, 0);
     const pu = g.portal.u;
     B(Fy, pu, 0.5 * D * 0.5, g.portal.w + 0.1, 0.05, D * 0.5, C.conc, 0);                                    // the walkway in from the inner door
     const seg = (ax: number, az: number, bx: number, bz: number, h: number, th: number, color: number, y0: number, top?: number, lvl = false): void => {
       const len = Math.hypot(bx - ax, bz - az); if (len < 1e-4) return;
-      push({ shape: 'box', x: (ax + bx) / 2, z: (az + bz) / 2, y0, w: len, h, d: th, r: 0, rot: Math.atan2(-(bz - az), bx - ax), color, ...(top !== undefined ? { wallTop: top } : {}), ...(lvl ? { lvl: true } : {}) });
+      push({ shape: 'box', x: (ax + bx) / 2, z: (az + bz) / 2, y0, w: len, h, d: th, r: 0, rot: Math.atan2(-(bz - az), bx - ax), color, ...(top !== undefined ? { wallTop: top } : {}), ...(lvl ? { lvl: true } : {}), ...(tier === 'arcology' && color === C.armor ? { steel: true } : {}) });
     };
     // the arcology's yard is ARMORED AND ROOFED (owner, 2026-11-21): armored walls as tall as the plant, a closed roof, no outside gate (it is entered only from inside, through its own airlock)
     const WALL_H = tier === 'arcology' ? Math.max(1.5, 1.6 * Math.min(s, W / 5.4)) : YARD_H, WALL_C = tier === 'arcology' ? C.armor : C.conc;
@@ -317,7 +320,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       const slide = ST_SLIDE[st] * W;
       const leaf = (cu: number, lift: number): void => {
         const yb = y0 + lift;
-        BL(Fy, cu, D / 2, lw + 0.04, 0.02, D + 0.04, 0x244b52, yb - 0.012);                                                      // a solid underlay under every leaf: no ground or sky shows through a pane edge
+        BL(Fy, cu, D / 2, lw + 0.04, 0.02, D + 0.04, 0xb4c6cc, yb - 0.012);                                                      // a solid underlay under every leaf: no ground or sky shows through a pane edge
         for (let a = 0; a < nu; a++) for (let b = 0; b < nv; b++) {
           const px = cu - lw / 2 + (a + 0.5) * cw, pv = (b + 0.5) * cd;
           BL(Fy, px, pv, cw, 0.02, cd, GLASS, yb);                                                                                  // the glazed pane, filling its whole cell
@@ -336,6 +339,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       // when slid back, the centre gap is lined with gasket strips on the leaf edges (a gasketed vent) and the parked leaves stand on spacer blocks over the beam
       if (slide > 0) for (const sd of [-1, 1]) { BL(Fy, sd * (W / 8 + slide - lw / 2), D / 2, 0.05, 0.03, D, GASKET, y0 + lift + 0.02); for (const v of [0.05, D - 0.05]) BL(Fy, sd * (3 * W / 8), v, lw, DECK - 0.005, 0.06, C.armor, y0 + 0.045); }
     }
+    if (tier === 'arcology') for (const u of [-W / 3, 0, W / 3]) for (const v of [D * 0.3, D * 0.7]) { const q = P(u, v); lamps.push({ x: q[0], z: q[1], y: WALL_H + 0.05, ceil: 'lvl', k: 1.5 }); }      // (the roof's underside is lit: pale panels and ceiling lamps, so the closed yard reads as a lit hall)
     // the camera mast at the outer corner (with a lamp), and the pad where a tower can stand
     push({ shape: 'cyl', x: g.camera[0], z: g.camera[1], y0: 0, w: 0, h: 0.95, d: 0, r: 0.016, rot: g.phi, color: C.dark });
     push({ shape: 'box', x: g.camera[0], z: g.camera[1], y0: 0.93, w: 0.07, h: 0.045, d: 0.12, r: 0, rot: g.phi + 0.6, color: C.louver });
@@ -415,6 +419,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       const dx = 0.06 * W, u = id, tw = Math.min(0.55 * kk, W * 0.14), td = Math.min(0.46 * kk, D * 0.3), y = 0.045, th = 0.4 * kk;
       B(Fy, dx, v, tw + 0.1, 0.03, td + 0.1, C.concDark, y, u);                                                   // plinth
       B(Fy, dx, v, tw, th, td, C.xfmr, y + 0.03, u); B(Fy, dx, v, tw + 0.02, 0.02 * kk, td + 0.02, C.xfmr, y + 0.03 + th, u);   // tank and lid
+      for (let i = 0; i < 3; i++) B(Fy, dx - tw / 2 + (i + 0.5) * tw / 3, v - td / 2 - 0.007, 0.014, th * 0.8, 0.016, C.steel, y + 0.05, u);      // vertical stiffener ribs on the tank (panel relief)
       for (let i = 0; i < 7; i++) B(Fy, dx + tw / 2 + 0.03 + (i % 2) * 0.012, v - td * 0.4 + i * td * 0.13, 0.016, th * 0.85, 0.06 * kk, C.xfmr, y + 0.06 * kk, u);    // radiator fins
       Ly(Fy, dx, v + td * 0.1, 0.055 * kk, tw * 0.9, C.xfmr, y + 0.03 + th + 0.1 * kk, 't', u);                    // the conservator
       for (const k of [-1, 0, 1]) {
@@ -441,25 +446,35 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
     for (const k of [-1, 1]) Cy(Fy, -W / 2 + 0.2, D * (k > 0 ? 0.85 : 0.2), 0.012, 0.72, C.dark, 0);
     for (const id of ['chiller', 'chiller2', 'substation', 'substation2']) { const q = parts.filter(p => p.unit === id); if (q.length) noteUnit(id, q.reduce((a, p) => a + p.x, 0) / q.length, q.reduce((a, p) => a + p.z, 0) / q.length); }
 
-    // ── the portal: the service airlock inside the shell, the sealed passage and the inner door ──
+    // ── the portal: the service airlock inside the shell, the sealed passage and the inner door: a real hollow tunnel (steel lining, floor, ceiling lamps) with two sliding leaves ──
     {
       const Pf: Fr = { x: loc(Fy, pu, 0)[0], z: loc(Fy, pu, 0)[1], rot: g.phi };
-      const shellDz = -g.portal.len + 0.12, pw = PORTAL_W, ph = PORTAL_H, cl = CHAMBER_LEN;
+      const shellDz = -g.portal.len + 0.12, pw = PORTAL_W, ph = PORTAL_H, cl = CHAMBER_LEN, look = o.airlock ?? 'sealed';
       const P1 = (extra: Partial<PlantPart> = {}): Partial<PlantPart> => ({ passage: true, ...extra });
-      // the passage: a poured box through the footing and the band, up to the inner door
-      const plen = g.portal.len - 0.0;
-      B(Pf, 0, 0.12 - plen / 2, pw, ph, plen, C.conc, 0, undefined, 0, P1()); B(Pf, 0, 0.12 - plen / 2, pw + 0.06, 0.05, plen, C.cap, ph, undefined, 0, P1());
-      B(Pf, 0, 0.12 - plen / 2, pw * 0.6, 0.006, plen * 0.9, C.concDark, 0.001, undefined, 0, P1());   // its floor strip
-      B(Pf, 0, 0.12 - plen / 2, 0.05, 0.02, 0.05, C.white, ph - 0.02, undefined, 0, P1());                     // a ceiling lamp
-      // the inner door on the yard side: steel, with a hazard stripe and a handle
-      B(Pf, 0, 0.115, pw * 0.8, ph * 0.9, 0.025, C.gate, 0, undefined, 0, P1()); B(Pf, 0, 0.13, pw * 0.8, 0.03, 0.01, C.hazard, ph * 0.55, undefined, 0, P1()); B(Pf, pw * 0.25, 0.135, 0.03, 0.03, 0.012, C.steel, ph * 0.4, undefined, 0, P1());
-      // the airlock chamber on the inside of the shell: armored box, the dome-side door with a wheel, a status lamp and a hazard stripe, jambs, a hood and bollards
-      const cz = shellDz - cl / 2 - 0.03;
-      B(Pf, 0, cz, pw + 0.12, ph + 0.06, cl, C.armor, 0, undefined, 0, P1()); B(Pf, 0, cz, pw + 0.18, 0.05, cl + 0.04, C.roof, ph + 0.06, undefined, 0, P1());
-      const dzC = cz - cl / 2 - 0.012;
+      const S1 = (extra: Partial<PlantPart> = {}): Partial<PlantPart> => ({ passage: true, steel: true, ...extra });      // (an armored wall or leaf: the dome's panel steel)
+      const LIN = 0xb7c1c7, LIN2 = 0x98a3aa, FLR = 0x6c757b, tw = 0.04;
+      const lampCol = (open: boolean): number => (look === 'cycling' ? 0xffb020 : open ? 0x30d070 : 0xd0382a);
+      // the passage: a poured tunnel through the footing and the band, up to the inner door (walls, ceiling and a floor; the lining faces are a lighter steel so the inside reads)
+      const plen = g.portal.len, pz = 0.12 - plen / 2;
+      for (const sd of [-1, 1]) B(Pf, sd * (pw / 2 - tw / 2), pz, tw, ph, plen, LIN, 0, undefined, 0, S1());
+      B(Pf, 0, pz, pw, tw, plen, LIN2, ph - tw, undefined, 0, S1());
+      { const [lx, lz] = loc(Pf, 0, pz); lamps.push({ x: lx, z: lz, y: ph - 0.012, ceil: 'gnd', k: 0.42 }); }
+      // the inner door on the yard side: a steel leaf with a hazard stripe, a handle and its state lamp; it slides aside when open
+      const inOpen = look === 'yard' || look === 'both', ix = inOpen ? pw * 0.82 : 0;
+      B(Pf, ix, 0.115, pw * 0.8, ph * 0.9, 0.025, C.gate, 0, undefined, 0, S1()); B(Pf, ix, 0.13, pw * 0.8, 0.03, 0.01, C.hazard, ph * 0.55, undefined, 0, P1());
+      if (inOpen) B(Pf, pw * 0.5, 0.115, pw * 1.7, 0.03, 0.05, C.cap, ph * 0.92, undefined, 0, P1());       // (its track)
+      B(Pf, -pw * 0.62, 0.135, 0.045, 0.045, 0.014, lampCol(inOpen), ph * 0.75, undefined, 0, P1());
+      // the airlock chamber on the inside of the shell: armored walls, ceiling and floor with a steel lining and a lamp, the dome-side leaf with a wheel and its state lamp, jambs, a hood and bollards
+      const cl2 = cl + 0.03, cz = shellDz - cl / 2 - 0.03 + 0.015, dzC = shellDz - cl - 0.03 - 0.012;
+      for (const sd of [-1, 1]) B(Pf, sd * (pw / 2 + 0.03), cz, 0.06, ph + 0.06, cl2, 0x7b858c, 0, undefined, 0, S1());
+      B(Pf, 0, cz, pw + 0.12, 0.06, cl2, C.armor, ph, undefined, 0, S1());
+      B(Pf, 0, (cz - cl2 / 2 + 0.12) / 2, pw, 0.012, 0.12 - (cz - cl2 / 2), FLR, 0, undefined, 0, P1());      // (one floor for the chamber and the passage)
+      { const [lx, lz] = loc(Pf, 0, cz); lamps.push({ x: lx, z: lz, y: ph - 0.012, ceil: 'gnd', k: 0.42 }); }
       B(Pf, -pw * 0.5, dzC, 0.04, ph, 0.04, C.cap, 0, undefined, 0, P1()); B(Pf, pw * 0.5, dzC, 0.04, ph, 0.04, C.cap, 0, undefined, 0, P1());
-      B(Pf, 0, dzC + 0.004, pw * 0.8, ph * 0.9, 0.025, C.gate, 0, undefined, 0, P1()); B(Pf, 0, dzC - 0.01, pw * 0.8, 0.03, 0.01, C.hazard, ph * 0.5, undefined, 0, P1());
-      Cy(Pf, pw * 0.2, dzC - 0.015, 0.035, 0.012, C.steel, ph * 0.45, undefined); B(Pf, -pw * 0.28, dzC - 0.012, 0.045, 0.045, 0.012, 0x4fa04f, ph * 0.75, undefined, 0, P1());   // wheel and the green lamp
+      const dOpen = look === 'dome' || look === 'both', dx = dOpen ? pw * 0.9 : 0;
+      B(Pf, dx, dzC + 0.004, pw * 0.8, ph * 0.9, 0.025, C.gate, 0, undefined, 0, S1()); B(Pf, dx, dzC - 0.01, pw * 0.8, 0.03, 0.01, C.hazard, ph * 0.5, undefined, 0, P1());
+      B(Pf, -pw * 0.62, dzC - 0.012, 0.045, 0.045, 0.012, lampCol(dOpen), ph * 0.75, undefined, 0, P1());   // wheel and the state lamp
+      if (dOpen) B(Pf, pw * 0.5, dzC, pw * 1.7, 0.03, 0.05, C.cap, ph * 0.92, undefined, 0, P1());
       B(Pf, 0, dzC - 0.04, pw * 0.95, 0.025, 0.08, C.roof, ph * 0.97, undefined, 0, P1());
       bollard(Pf, -pw * 0.8, dzC - 0.12); bollard(Pf, pw * 0.8, dzC - 0.12);
       void shellDz;
@@ -492,7 +507,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
   }
 
   // ── path lamps: along the ways in from each airlock, both sides, warm heads (the renderer lights them with the night); yard lights ──
-  const lamps: PlantLamp[] = [], stepL = 1.15;
+  const stepL = 1.15;
   for (const a of angles) {
     for (let d = r * 0.9, k = 0; d > r * 0.32 && lamps.length < 90; d -= stepL, k++) {
       const side = k % 2 ? 1 : -1, [x, z] = polar(d, a), off = 0.42 * side;

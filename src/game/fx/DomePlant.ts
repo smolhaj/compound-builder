@@ -9,22 +9,25 @@ import type { RoofState } from '../../sim/dome/yardRoof';
 import { WORK_TILE, workTextures, worldUVs } from './portTextures';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { plantLayout, type PlantLine, type PlantPart } from '../../sim/dome/plant';
+import { plantLayout, type AirlockLook, type PlantLine, type PlantPart } from '../../sim/dome/plant';
 import { yardPoint, type YardGeom } from '../../sim/dome/plantYard';
 import type { PlantCond, PlantKind } from '../../sim/dome/plantUnits';
 import type { WaterLoop } from '../../sim/dome/waterLoop';
 import type { Filtering } from '../../sim/dome/air';
 import type { DomeTier } from '../../sim/dome/tiers';
-import { kitMaterial } from '../buildkit/materials';
+import { kitMaterial, type KitMaterialId } from '../buildkit/materials';
+import { worldUV } from '../buildkit/shell';
+/** The material of the plant yard's armored walls and the service airlock: the dome's own armored panel steel (opaque). */
+export const PLANT_STEEL: KitMaterialId = 'panel_steel';
 import type { InteriorPlan } from './domeInteriorPlan';
 import { interiorPieces } from './DomeInterior';
 
 export interface DomePlantFx { group: THREE.Group; key: string; /** Show the buried lines (the underground view). */ setUnder(on: boolean): void; /** The building view: in the cutaway and x-ray views the machinery turns see-through and the sealed passage shows. */ setView(v: 'full' | 'cutaway' | 'xray'): void; dispose(): void }
 
 /** What the renderer needs of the plant's state: the loop, the spares, the dome's turn, which units are hurt, and whether the dome is dark. */
-export interface PlantLook { /** The arcology's plant yard roof state (sim/dome/yardRoof.ts). */ roof?: RoofState; loop?: WaterLoop; spares?: readonly PlantKind[]; rot?: number; hurt?: Readonly<Record<string, PlantCond>>; dark?: boolean; /** The dome floor's dressing (paths, benches, crates, lamps; fx/domeInteriorPlan), merged into the plant's own draw calls, and its signature. */ interior?: InteriorPlan; interiorKey?: string }
+export interface PlantLook { /** QA look of the yard's service airlock (plant.ts `AirlockLook`). */ airlock?: AirlockLook; /** The arcology's plant yard roof state (sim/dome/yardRoof.ts). */ roof?: RoofState; loop?: WaterLoop; spares?: readonly PlantKind[]; rot?: number; hurt?: Readonly<Record<string, PlantCond>>; dark?: boolean; /** The dome floor's dressing (paths, benches, crates, lamps; fx/domeInteriorPlan), merged into the plant's own draw calls, and its signature. */ interior?: InteriorPlan; interiorKey?: string }
 export const plantKey = (tier: DomeTier, r: number, filtering: Filtering, o: PlantLook = {}): string =>
-  `${tier}:${o.roof ?? 'closed'}:${r.toFixed(2)}:${filtering}:${o.loop ?? 'none'}:${(o.spares ?? []).join(',')}:${o.rot ?? 0}:${Object.entries(o.hurt ?? {}).filter(([, c]) => c !== 'ok').map(([k, c]) => k + c).sort().join(',')}:${o.interiorKey ?? ''}:${o.dark ? 1 : 0}`;
+  `${tier}:${o.roof ?? 'closed'}:${o.airlock ?? 's'}:${r.toFixed(2)}:${filtering}:${o.loop ?? 'none'}:${(o.spares ?? []).join(',')}:${o.rot ?? 0}:${Object.entries(o.hurt ?? {}).filter(([, c]) => c !== 'ok').map(([k, c]) => k + c).sort().join(',')}:${o.interiorKey ?? ''}:${o.dark ? 1 : 0}`;
 
 const LINE_COLOR: Record<PlantLine['kind'], number> = { power: 0xd9822b, chill: 0x4f9bd0, water: 0x2f7fb5, feeder: 0xe0a030, passage: 0x35e0c8 };
 const CHAR = 0x1c1a18;
@@ -91,12 +94,14 @@ function noBottom(g: THREE.CylinderGeometry): THREE.CylinderGeometry {
 
 /** `r`: shell radius (world units); `ground(lx, lz)`: terrain height in the dome's local frame. */
 export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, ground: (lx: number, lz: number) => number, look: PlantLook = {}): DomePlantFx {
-  const plant = plantLayout(tier, r, filtering, { loop: look.loop, spares: look.spares, rot: look.rot, roof: look.roof }), stem = STEM[tier] ?? 0.1, hurt = look.hurt ?? {};
+  const plant = plantLayout(tier, r, filtering, { loop: look.loop, spares: look.spares, rot: look.rot, roof: look.roof, airlock: look.airlock }), stem = STEM[tier] ?? 0.1, hurt = look.hurt ?? {};
   const group = new THREE.Group();
   group.name = 'dome_plant';
   const owned: Array<{ dispose(): void }> = [];
   const level = yardLevel(plant.yard, ground);
-  const geos = plant.parts.map(q => partGeometry(q, ground, stem, tint(q.color, q.unit ? hurt[q.unit] : undefined), level));
+  const canvas = typeof document !== 'undefined';      // (no canvas in the node tests: the armored parts then join the machinery mesh)
+  const geos: THREE.BufferGeometry[] = [], steelGeos: THREE.BufferGeometry[] = [];
+  for (const q of plant.parts) (q.steel && canvas ? steelGeos : geos).push(partGeometry(q, ground, stem, tint(q.color, q.unit ? hurt[q.unit] : undefined), level));
   // a unit that is out burns and smokes: stylized flames and a plume in the same merged mesh (no extra draw call)
   for (const u of plant.units) {
     const c = hurt[u.id]; if (!c || c === 'ok') continue;
@@ -106,7 +111,7 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
   }
   // the lamp posts ride the machinery's own merged mesh (thin cylinders, one color)
   // the dome floor's dressing rides along: its pieces in the same merged mesh, its lamps and window-light pools in the same instances (no draw call of their own)
-  const lampList: Array<{ x: number; z: number; y: number; k: number }> = plant.lamps.map(l => ({ x: l.x, z: l.z, y: l.y, k: 1 }));
+  const lampList: Array<{ x: number; z: number; y: number; k: number; ceil?: 'lvl' | 'gnd' }> = plant.lamps.map(l => ({ x: l.x, z: l.z, y: l.y, k: l.k ?? 1, ...(l.ceil ? { ceil: l.ceil } : {}) }));
   if (look.interior) {
     for (const g of interiorPieces(look.interior, ground)) geos.push(g);
     for (const l of look.interior.lamps) lampList.push({ x: l.x, z: l.z, y: 0.62, k: 1.7 });
@@ -118,6 +123,7 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
     ng.setAttribute('color', new THREE.BufferAttribute(col, 3)); return ng;
   };
   for (const l of lampList) {
+    if (l.ceil) continue;      // (a ceiling lamp is just its lit disc, below)
     geos.push(partGeometry({ shape: 'cyl', x: l.x, z: l.z, y0: 0, w: 0, h: l.y, d: 0, r: 0.014, rot: 0, color: 0x30343a }, ground, stem));
     // a real fixture: a flared base collar, a lantern housing (dark frame under the lens), a hooded cap and a ring
     const gy = ground(l.x, l.z);
@@ -143,6 +149,19 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
     mesh.name = 'plant_machinery'; mesh.matrixAutoUpdate = false; mesh.updateMatrix();
     group.add(mesh); owned.push(merged, mat);
   }
+  // the yard's armored walls and the service airlock's walls and leaves: the dome's own panel steel (the shared kit material: same texture, normal map, tint and scale as the dome's
+  // base ring and the sally port), opaque. One more mesh; no new material or texture.
+  let steelMesh: THREE.Mesh | null = null;
+  if (steelGeos.length) {
+    steelGeos.forEach(g => g.deleteAttribute('color'));
+    const sm0 = mergeGeometries(steelGeos, false); steelGeos.forEach(g => g.dispose());
+    if (sm0) {
+      const sm = worldUV(sm0); if (sm !== sm0) sm0.dispose();
+      steelMesh = new THREE.Mesh(sm, kitMaterial(PLANT_STEEL));
+      steelMesh.name = 'plant_steel'; steelMesh.matrixAutoUpdate = false; steelMesh.updateMatrix(); steelMesh.castShadow = false; steelMesh.receiveShadow = false;
+      group.add(steelMesh); owned.push(sm);
+    }
+  }
   const glows = look.interior?.glows ?? [];
   if (lampList.length && !look.dark) {
     const n = lampList.length, ng = glows.length;
@@ -152,8 +171,10 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
     const m4 = new THREE.Matrix4(), sc = new THREE.Vector3(), q0 = new THREE.Quaternion(), pos = new THREE.Vector3();
     lampList.forEach((l, i) => {
       const gy = ground(l.x, l.z);
-      heads.setMatrixAt(i, m4.makeTranslation(l.x, gy + l.y + 0.035, l.z));
-      pools.setMatrixAt(i, m4.compose(pos.set(l.x, gy + 0.012, l.z), q0, sc.set(l.k, 1, l.k)));
+      if (l.ceil) {      // a flat lit disc under the roof (or the tunnel's ceiling), its pool on the floor below
+        heads.setMatrixAt(i, m4.compose(pos.set(l.x, (l.ceil === 'lvl' ? level : gy) + l.y, l.z), q0, l.ceil === 'lvl' ? sc.set(11, 0.25, 11) : sc.set(2.4, 0.3, 2.4)));
+      } else heads.setMatrixAt(i, m4.makeTranslation(l.x, gy + l.y + 0.035, l.z));
+      pools.setMatrixAt(i, m4.compose(pos.set(l.x, gy + 0.012 + (l.ceil === 'lvl' ? 0.047 : 0), l.z), q0, sc.set(l.k, 1, l.k)));
     });
     glows.forEach((o, i) => pools.setMatrixAt(n + i, m4.compose(pos.set(o.x, ground(o.x, o.z) + (o.y ?? 0) + 0.02, o.z), q0, sc.set(o.r / 0.55, 1, o.r / 0.55))));
     for (const m of [heads, pools]) { m.instanceMatrix.needsUpdate = true; m.frustumCulled = false; m.castShadow = false; m.receiveShadow = false; group.add(m); }
@@ -187,6 +208,7 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
   const apply = (): void => {
     if (lines) lines.visible = under;
     if (passage) passage.visible = under || view !== 'full';
+    if (steelMesh) steelMesh.visible = !(view !== 'full' || under);      // (the armored walls hide in the cutaway, x-ray and underground views, as the building's walls do)
     if (machMat) { const see = view !== 'full' || under; machMat.transparent = see; machMat.opacity = see ? 0.5 : 1; machMat.depthWrite = !see; machMat.needsUpdate = true; }
   };
   group.traverse(o => { if ((o as THREE.Mesh).isMesh) { o.castShadow = false; o.receiveShadow = false; } });
