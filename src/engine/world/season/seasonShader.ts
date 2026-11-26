@@ -321,14 +321,18 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD
     // a blade bump on the normal and a roughness that follows the blade height (near the camera only; the mips carry it further out)
     vec2 seQ = seP.xz;
     vec4 seT1 = texture2D( uSeaLawn, seQ * 0.42 ), seT2 = texture2D( uSeaLawn, vec2( seQ.x * 0.8 - seQ.y * 0.6, seQ.x * 0.6 + seQ.y * 0.8 ) * 0.131 + 0.37 );
+    // a finer third layer (a different scale, rotated again, fading out by 14 units) so close up the grass is blades, not texels: it adds fine detail and blends the coarse layer's steps away
+    vec4 seT3 = texture2D( uSeaLawn, vec2( seQ.x * 0.6 + seQ.y * 0.8, - seQ.x * 0.8 + seQ.y * 0.6 ) * 1.9 + 0.21 );
+    float seFine = 1.0 - smoothstep( 2.0, 14.0, length( vViewPosition ) );
     vec3 seLawn = mix( seT1.rgb, seT2.rgb, 0.42 );
+    seLawn = mix( seLawn, seLawn * ( seT3.rgb / max( vec3( 0.04 ), vec3( 0.09, 0.16, 0.045 ) ) ) * 0.7 + seLawn * 0.3, 0.55 * seFine );
     float seMow = smoothstep( 0.4, 0.62, seaNoise( seP.xz * 0.23 + 3.1 ) );
     seLawn *= mix( vec3( 0.84, 0.92, 0.8 ), vec3( 1.08, 1.06, 0.96 ), seMow );
     seLawn *= 1.0 + 0.05 * seMow * ( sin( dot( seP.xz, vec2( 0.8, 0.6 ) ) * 5.2 ) );
     float seDryP = smoothstep( 0.66, 0.8, seaNoise( seP.xz * 0.19 + 9.7 ) * 0.7 + seaNoise( seP.xz * 0.8 + 1.3 ) * 0.3 );
     seLawn = mix( seLawn, vec3( 0.24, 0.17, 0.07 ) * ( 0.8 + 0.4 * seT1.a ), seDryP * 0.4 );
     seLawn = mix( seLawn, vec3( 0.19, 0.17, 0.09 ) * ( 0.9 + 0.2 * seN1 ), seLB.y * 0.55 );   // dormant band: straw
-    float seHL = mix( seT1.a, seT2.a, 0.42 );
+    float seHL = mix( mix( seT1.a, seT2.a, 0.42 ), seT3.a, 0.45 * seFine );
     float seBumpK = 1.0 - smoothstep( 3.0, 20.0, length( vViewPosition ) );
     if ( seBumpK > 0.01 && seUp * seaDomeM > 0.5 ) normal = seaLawnBump( - vViewPosition, normal, seHL, 0.9 * seBumpK );
     roughnessFactor = mix( roughnessFactor, 0.97 - 0.2 * seHL + 0.08 * seDryP, seUp * seaDomeM );
