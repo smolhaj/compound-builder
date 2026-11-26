@@ -5,6 +5,7 @@
  */
 import * as THREE from 'three';
 import { generateNormalMap } from '../../engine/world/materials/normalMapGen';
+import { release } from './plantDecals';
 
 export const PORT_TILE = 0.8;      // world units per repeat (16 ft: one slab of poured concrete)
 
@@ -16,13 +17,13 @@ export function paintPortSheet(): HTMLCanvasElement {
   g.scale(0.5, 0.5);
   g.fillStyle = 'rgb(238,238,238)'; g.fillRect(0, 0, N, N);
   for (let k = 0; k < 5200; k++) { const v = 150 + r() * 105; g.fillStyle = `rgba(${v},${v},${v},${0.18 + r() * 0.3})`; g.fillRect(r() * N, r() * N, 1 + r() * 1.6, 1 + r() * 1.6); }                 // aggregate
-  for (let k = 0; k < 14; k++) { const x = r() * N, y = r() * N, rad = 30 + r() * 70, gr = g.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, 'rgba(120,118,112,0.16)'); gr.addColorStop(1, 'rgba(120,118,112,0)'); g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); }   // blotches
-  for (const x of [N * 0.3, N * 0.62]) { g.fillStyle = 'rgba(70,72,76,0.22)'; g.fillRect(x - 11, 0, 22, N); g.fillStyle = 'rgba(70,72,76,0.18)'; g.fillRect(x + 36, 0, 15, N); }   // tire-wear bands
+  for (let k = 0; k < 20; k++) { const x = r() * N, y = r() * N, rad = 30 + r() * 80, gr = g.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, 'rgba(110,106,98,0.28)'); gr.addColorStop(1, 'rgba(110,106,98,0)'); g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); }   // blotches
+  for (const x of [N * 0.3, N * 0.62]) { g.fillStyle = 'rgba(60,62,66,0.34)'; g.fillRect(x - 11, 0, 22, N); g.fillStyle = 'rgba(60,62,66,0.26)'; g.fillRect(x + 36, 0, 15, N); }   // tire-wear bands
   for (let k = 0; k < 5; k++) { const x = r() * N, y = r() * N, rad = 5 + r() * 10, gr = g.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, 'rgba(18,18,22,0.6)'); gr.addColorStop(0.7, 'rgba(30,28,30,0.25)'); gr.addColorStop(1, 'rgba(30,28,30,0)'); g.fillStyle = gr; g.fillRect(x - rad, y - rad, rad * 2, rad * 2); }   // oil spots
   for (let k = 0; k < 7; k++) { const x = r() * N; g.fillStyle = `rgba(60,64,70,${0.10 + r() * 0.1})`; g.fillRect(x, 0, 2 + r() * 5, N * (0.3 + r() * 0.7)); }                                  // rain streaks
   g.strokeStyle = 'rgba(40,40,44,0.55)'; g.lineWidth = 1.1;
   for (let k = 0; k < 4; k++) { let x = r() * N, y = r() * N; g.beginPath(); g.moveTo(x, y); for (let j = 0; j < 9; j++) { x += (r() - 0.35) * 22; y += (r() - 0.5) * 22; g.lineTo(x, y); } g.stroke(); }   // hairline cracks
-  g.fillStyle = 'rgba(30,32,36,0.85)'; g.fillRect(0, 0, N, 3); g.fillRect(0, 0, 3, N);                                                                                                   // expansion joints
+  g.fillStyle = 'rgba(24,26,30,0.92)'; g.fillRect(0, 0, N, 4); g.fillRect(0, 0, 4, N);                                                                                                   // expansion joints
   g.fillStyle = 'rgba(255,255,255,0.4)'; g.fillRect(0, 3, N, 1.5); g.fillRect(3, 0, 1.5, N);
   return c;
 }
@@ -58,26 +59,40 @@ export const WORK_TILE = 0.4;
 let _work: PortTextures | null = null;
 export function workTextures(): PortTextures {
   if (_work) return _work;
-  const N = 128, c = document.createElement('canvas'); c.width = c.height = N;
-  const g = c.getContext('2d', { willReadFrequently: true })!, r = lcg(9001);
-  g.fillStyle = 'rgb(236,236,236)'; g.fillRect(0, 0, N, N);
-  for (let k = 0; k < 160; k++) { const v = r() < 0.5 ? 255 : 120, a = 0.06 + r() * 0.12; g.fillStyle = `rgba(${v},${v},${v},${a})`; g.fillRect(r() * N, r() * N, 14 + r() * 60, 0.8 + r() * 1.2); }     // grain and brush streaks
-  for (let k = 0; k < 700; k++) { const v = 140 + r() * 110; g.fillStyle = `rgba(${v},${v},${v},${0.2 + r() * 0.3})`; g.fillRect(r() * N, r() * N, 1, 1); }                                         // speckle
-  for (let k = 0; k < 6; k++) { g.fillStyle = 'rgba(40,36,30,0.14)'; g.fillRect(r() * N, r() * N * 0.5, 1.4, 12 + r() * 36); }                                                         // drips
-  g.fillStyle = 'rgba(30,30,34,0.5)'; g.fillRect(0, 0, N, 1.4); g.fillRect(0, 0, 1.4, N);                                                                                                // a seam line
-  g.fillStyle = 'rgba(255,255,255,0.3)'; g.fillRect(0, N - 1.6, N, 1.2);                                                                                                                 // worn edge
-  const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping; map.anisotropy = 2;
-  _work = { map, normalMap: null as unknown as THREE.Texture, dispose: () => { /* shared */ } };       // (colour only: the normal map is not worth its memory at this size)
+  const N = 256, c = document.createElement('canvas'); c.width = c.height = N;
+  const g = c.getContext('2d', { willReadFrequently: true })!, r = lcg(9001), H = N / 2;
+  g.fillStyle = 'rgb(238,238,238)'; g.fillRect(0, 0, N, N);
+  for (let k = 0; k < 300; k++) { const v = r() < 0.5 ? 255 : 120, a = 0.05 + r() * 0.1; g.fillStyle = `rgba(${v},${v},${v},${a})`; g.fillRect(r() * N, r() * N, 20 + r() * 110, 0.8 + r() * 1.3); }     // grain and brush streaks
+  for (let k = 0; k < 1500; k++) { const v = 140 + r() * 110; g.fillStyle = `rgba(${v},${v},${v},${0.2 + r() * 0.3})`; g.fillRect(r() * N, r() * N, 1, 1); }                                         // speckle
+  for (let py = 0; py < 2; py++) for (let px = 0; px < 2; px++) {                                                                                                                       // four panels of 0.2 units (4 ft)
+    const x0 = px * H, y0 = py * H, gr = g.createLinearGradient(0, y0, 0, y0 + H); gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.72, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(36,30,24,0.26)');
+    g.fillStyle = gr; g.fillRect(x0, y0, H, H);                                                                                                                                        // grime at each panel's foot
+    g.fillStyle = 'rgba(14,16,20,0.72)'; g.fillRect(x0, y0, H, 1.8); g.fillRect(x0, y0, 1.8, H);                                                                                        // the seam
+    g.fillStyle = 'rgba(255,255,255,0.4)'; g.fillRect(x0 + 1.8, y0 + 1.8, H - 1.8, 1.1); g.fillRect(x0 + 1.8, y0 + 1.8, 1.1, H - 1.8);                                                  // its bevel
+    for (let i = 0; i < 4; i++) for (const [bx, by] of [[x0 + 10 + i * (H - 20) / 3, y0 + 8], [x0 + 10 + i * (H - 20) / 3, y0 + H - 8]] as const) {
+      g.fillStyle = 'rgba(22,26,32,0.7)'; g.beginPath(); g.arc(bx, by, 2, 0, Math.PI * 2); g.fill(); g.fillStyle = 'rgba(255,255,255,0.5)'; g.beginPath(); g.arc(bx - 0.5, by - 0.6, 0.8, 0, Math.PI * 2); g.fill();   // bolts
+      if (r() < 0.4) { g.fillStyle = 'rgba(46,38,30,0.2)'; g.fillRect(bx - 0.7, by + 2, 1.4, 5 + r() * 14); }
+    }
+  }
+  for (let k = 0; k < 7; k++) { g.fillStyle = 'rgba(40,36,30,0.13)'; g.fillRect(r() * N, r() * N * 0.5, 1.6, 14 + r() * 50); }                                                           // drips
+  for (let k = 0; k < 8; k++) { g.strokeStyle = `rgba(255,255,255,${0.25 + r() * 0.2})`; g.lineWidth = 0.8; g.beginPath(); const sx = r() * N, sy = r() * N; g.moveTo(sx, sy); g.lineTo(sx + 6 + r() * 16, sy + (r() - 0.5) * 7); g.stroke(); }   // scuffs
+  const map = new THREE.CanvasTexture(c); map.colorSpace = THREE.SRGBColorSpace; map.wrapS = map.wrapT = THREE.RepeatWrapping; map.anisotropy = 4;
+  const h2 = document.createElement('canvas'); h2.width = h2.height = N / 2; h2.getContext('2d')!.drawImage(c, 0, 0, N / 2, N / 2);
+  const nm = generateNormalMap(h2, 0.7); nm.wrapS = nm.wrapT = THREE.RepeatWrapping;
+  release(map); release(nm);
+  _work = { map, normalMap: nm, dispose: () => { /* shared */ } };
   return _work;
 }
 
 /** World-scaled UVs for a geometry (any indexing): one repeat per `tile` units, by dominant normal axis. */
-export function worldUVs(g0: THREE.BufferGeometry, tile: number): THREE.BufferGeometry {
+export function worldUVs(g0: THREE.BufferGeometry, tile: number, keepDecal = false): THREE.BufferGeometry {
   const g = g0.index ? g0.toNonIndexed() : g0;
+  const old = keepDecal ? g.getAttribute('uv') : null, dec = keepDecal ? g.getAttribute('aDec') : null;
   if (!g.attributes.normal) g.computeVertexNormals();
   const p = g.attributes.position, n = g.attributes.normal, uv = new Float32Array(p.count * 2), k = 1 / tile;
   for (let i = 0; i < p.count; i++) {
     const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
+    if (old && dec && dec.getX(i) > 0 && dec.getX(i) < 2.5) { uv[i * 2] = old.getX(i); uv[i * 2 + 1] = old.getY(i); continue; }
     const top = ay >= ax && ay >= az;
     uv[i * 2] = (top ? p.getX(i) : ax >= az ? p.getZ(i) : p.getX(i)) * k; uv[i * 2 + 1] = (top ? p.getZ(i) : p.getY(i)) * k;
   }

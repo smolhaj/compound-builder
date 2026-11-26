@@ -326,6 +326,9 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD
     float seFine = 1.0 - smoothstep( 2.0, 14.0, length( vViewPosition ) );
     vec3 seLawn = mix( seT1.rgb, seT2.rgb, 0.42 );
     seLawn = mix( seLawn, seLawn * ( seT3.rgb / max( vec3( 0.04 ), vec3( 0.09, 0.16, 0.045 ) ) ) * 0.7 + seLawn * 0.3, 0.55 * seFine );
+    // right at the camera the sheet's texels would show as blocks: a finer, unaligned grain breaks the grid up (fades out by 6 units), and the green is pulled toward the arcology's olive
+    seLawn *= 1.0 + 0.16 * seFine * ( 1.0 - smoothstep( 2.0, 6.0, length( vViewPosition ) ) ) * ( seaNoise( seP.xz * 173.0 + 5.3 ) - 0.5 ) + 0.06 * seFine * ( seaNoise( seP.xz * 61.0 + 1.7 ) - 0.5 );
+    seLawn = mix( seLawn, vec3( dot( seLawn, vec3( 0.3, 0.55, 0.15 ) ) ) * vec3( 1.06, 1.0, 0.8 ), 0.26 ) * 0.94;
     float seMow = smoothstep( 0.4, 0.62, seaNoise( seP.xz * 0.23 + 3.1 ) );
     seLawn *= mix( vec3( 0.84, 0.92, 0.8 ), vec3( 1.08, 1.06, 0.96 ), seMow );
     seLawn *= 1.0 + 0.05 * seMow * ( sin( dot( seP.xz, vec2( 0.8, 0.6 ) ) * 5.2 ) );

@@ -11,6 +11,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { APRON_LEN, apronSpan, apronTop, barrierBollards, type InsideLane, type PortFrame } from '../../sim/dome/vehiclePort';
 import type { DomeTier } from '../../sim/dome/tiers';
 import { vestibuleOf } from '../../sim/dome/vestibule';
+import { detailTier } from '../buildkit/buildingDetail';
 
 /** The stem wall's height under each dome (buildkit/domeBuildings LOOK): the doors' sill height over the dome's pad. */
 const STEM: Record<DomeTier, number> = { earthen: 0.04, geodesic: 0.06, glass: 0.08, arcology: 0.14 };
@@ -35,7 +36,7 @@ export const portsKey = (ins: readonly PortInput[]): string => ins.map(i => `${i
 /** How far the drawn gravel ribbon lies over the ground (game/region/roadWorks buildRoadWorks: 0.024). */
 const ROAD_LIFT = 0.024;
 const POUR = 0x8a9097, CURB = 0x6b7078, PAINT = 0xeae7da, YELLOW = 0xe3b92a, STEEL = 0x8a929a, DARK = 0x262a2f, GLASS = 0x6fa5b8;
-const CLAD: Record<DomeTier, number> = { earthen: 0x7a6f5d, geodesic: 0x9aa3ab, glass: 0x56606a, arcology: 0x2a3037 };
+const CLAD: Record<DomeTier, number> = { earthen: 0x7a6f5d, geodesic: 0x9aa3ab, glass: 0x56606a, arcology: 0x3a4550 };
 const ACCENT: Record<DomeTier, number> = { earthen: 0xffd070, geodesic: 0xffe9b0, glass: 0xdff3ff, arcology: 0x40e0ff };
 
 function paint(g: THREE.BufferGeometry, color: number): THREE.BufferGeometry {
@@ -48,8 +49,21 @@ function paint(g: THREE.BufferGeometry, color: number): THREE.BufferGeometry {
 function box(w: number, h: number, d: number, x: number, y: number, z: number, yaw: number, color: number): THREE.BufferGeometry {
   const g = new THREE.BoxGeometry(w, h, d); g.rotateY(yaw); g.translate(x, y, z); return paint(g, color);
 }
-function cyl(r: number, h: number, x: number, y: number, z: number, color: number): THREE.BufferGeometry {
-  const g = new THREE.CylinderGeometry(r, r, h, 8); g.translate(x, y, z); return paint(g, color);
+function cyl(r: number, h: number, x: number, y: number, z: number, color: number, sides = 10): THREE.BufferGeometry {
+  const g = new THREE.CylinderGeometry(r, r, h, sides); g.translate(x, y, z); return paint(g, color);
+}
+/** A bollard: a collar, a round body, a white reflective band and a yellow cap (`y` is the ground's height under it, `r` the body's radius). */
+function bollardGeos(x: number, y: number, z: number, r: number, h: number, body: number, cap: number): THREE.BufferGeometry[] {
+  if (detailTier() !== 'high') return [cyl(r, h, x, y + h / 2, z, body, 8), cyl(r * 1.1, 0.026, x, y + h - 0.013, z, cap, 8)];
+  return [cyl(r, h, x, y + h / 2, z, body, 8), cyl(r * 1.1, 0.026, x, y + h - 0.013, z, cap, 8)];
+}
+/** Paving seams and wear on a slab: expansion joints every 0.8 across, two pairs of tire tracks and a few oil patches (flat quads just over the top). */
+function paveWear(f: Fr, rho0: number, rho1: number, lamA: number, lamB: number, top: (rho: number) => number, seed: number): THREE.BufferGeometry[] {
+  const out: THREE.BufferGeometry[] = [], rnd = (k: number): number => { const h = Math.sin(seed * 12.9898 + k * 78.233) * 43758.5453; return h - Math.floor(h); };
+  for (let r = rho0 + 0.8; r < rho1 - 0.1; r += 0.8) out.push(mark(f, r, r + 0.008, lamA + 0.04, lamB - 0.04, top, 0x4c5056, 0.002));
+  for (const l of detailTier() === 'high' ? [-0.07, 0.07, 0.19, -0.19] : [-0.07, 0.07]) out.push(mark(f, rho0 + 0.1, rho1 - 0.1, l - 0.018, l + 0.018, top, 0x5a5e63, 0.0024));
+  for (let k = 0; k < (detailTier() === 'high' ? 6 : 3); k++) { const r = rho0 + 0.3 + rnd(k) * (rho1 - rho0 - 0.6), l = lamA + 0.12 + rnd(k + 9) * (lamB - lamA - 0.24), w = 0.03 + rnd(k + 3) * 0.05; out.push(mark(f, r, r + w * 1.3, l, l + w, top, 0x3d4044, 0.0028)); }
+  return out;
 }
 
 /** Triangles from quads, flat normals computed from the winding the caller keeps facing up (and the double-sided material covers a wrong turn). */
@@ -122,6 +136,7 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     for (const [l0, l1] of [[lamA, lamA + 0.035], [lamB - 0.035, lamB]] as const) geos.push(slab(F, R - 0.02, R + APRON_LEN, l0, l1, r => topA(r) + 0.022, ground, CURB));   // the straight curbs
     // (no curb across the toe: the road drives on over it, flush)
     geos.push(mark(F, R + 0.05, R + APRON_LEN - 0.12, -0.012, 0.012, topA, YELLOW));                                                    // the center line to the gate
+    geos.push(...paveWear(F, R + 0.05, R + APRON_LEN - 0.1, lamA, lamB, topA, 3 + yaw));
     { const k = tier === 'arcology' ? 1.6 : 1, [sx0, sz0] = at(R + 1.1, lamA + 0.12 * k); signPost(sx0, sz0, yaw, k, [0, 1, 2]); }                          // the port's sign: SALLY PORT, VEHICLES ONLY, LOCK CYCLE
     geos.push(mark(F, R + 0.45, R + 0.5, -v.dw / 2, v.dw / 2, topA, PAINT));                                                           // the stop line before the gate
     for (let k = 0; k < 3; k++) geos.push(mark(F, R + 0.12 + k * 0.1, R + 0.2 + k * 0.1, lamA + 0.05, lamA + 0.09, topA, YELLOW, 0.005));   // hazard chevrons along the curb
@@ -130,15 +145,17 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
       const lam = lamOf([bx, bz]);
       if (Math.abs(lam) < v.dw * 0.5 + 0.05 || (f.person && Math.abs(lam - offP) < 0.42)) continue;
       const y = topA(R + APRON_LEN - 0.12);
-      geos.push(cyl(0.02, 0.13, bx, y + 0.065, bz, STEEL), cyl(0.023, 0.03, bx, y + 0.1, bz, YELLOW));
+      geos.push(...bollardGeos(bx, y, bz, 0.02, 0.13, STEEL, YELLOW));
     }
     // ── the vehicle barrier at the road's end (anti-ram): a second bollard line across the road beyond the apron's toe, a crash-rated boom-gate arm lowered across the lane on two
     //    armored posts (striped red and white), and a second camera mast on the far side so two cameras and two floodlights cover the apron ──
     { const re = R + APRON_LEN + 0.16, ye = topA(R + APRON_LEN - 0.02);
-      for (const lam of barrierBollards({ lamA, lamB })) { const [bx, bz] = at(re + 0.12, lam); geos.push(cyl(0.024, 0.2, bx, ye + 0.1, bz, STEEL), cyl(0.027, 0.03, bx, ye + 0.17, bz, YELLOW)); }       // the ram-rated bollard line
-      for (const lam of [lamA + 0.02, lamB - 0.02]) { const [px, pz] = at(re, lam); geos.push(box(0.07, 0.2, 0.07, px, ye + 0.1, pz, yaw, DARK), box(0.08, 0.02, 0.08, px, ye + 0.21, pz, yaw, STEEL)); }   // the armored gate posts
+      for (const lam of barrierBollards({ lamA, lamB })) { const [bx, bz] = at(re + 0.12, lam); geos.push(...bollardGeos(bx, ye, bz, 0.024, 0.2, STEEL, YELLOW)); }       // the ram-rated bollard line
+      for (const lam of [lamA + 0.02, lamB - 0.02]) { const [px, pz] = at(re, lam); geos.push(box(0.07, 0.2, 0.07, px, ye + 0.1, pz, yaw, DARK), box(0.08, 0.02, 0.08, px, ye + 0.21, pz, yaw, STEEL), box(0.075, 0.016, 0.075, px, ye + 0.012, pz, yaw, CURB), box(0.05, 0.05, 0.012, px, ye + 0.15, pz - u[0] * 0.0 + 0.0, yaw, 0xc23a2e)); }   // the armored gate posts, a footing and a red housing plate
+      { const [px, pz] = at(re, lamA + 0.02); geos.push(box(0.05, 0.05, 0.05, px, ye + 0.15, pz, yaw, 0x30343a), cyl(0.014, 0.04, px, ye + 0.15, pz, 0x6b7078)); }   // the arm's pivot housing
       const nA = 6, wA = (lamB - lamA - 0.12) / nA;
-      for (let i = 0; i < nA; i++) { const [ax, az] = at(re, lamA + 0.06 + wA * (i + 0.5)); geos.push(box(wA, 0.03, 0.025, ax, ye + 0.15, az, yaw, i % 2 ? 0xe8e8e8 : 0xc23a2e)); }        // the boom arm, striped
+      for (let i = 0; i < nA; i++) { const [ax, az] = at(re, lamA + 0.06 + wA * (i + 0.5)); geos.push(box(wA, 0.03, 0.025, ax, ye + 0.15, az, yaw, i % 2 ? 0xe8e8e8 : 0xc23a2e)); }
+      { const [ax, az] = at(re, lamB - 0.02 - 0.03); geos.push(box(0.03, 0.04, 0.03, ax, ye + 0.15, az, yaw, 0x30343a)); }     // the arm's end cap on its rest post        // the boom arm, striped
       const [cx2, cz2] = at(R + 0.35, lamB + 0.12); geos.push(cyl(0.012, 0.5, cx2, ground(cx2, cz2) + 0.25, cz2, DARK), box(0.05, 0.035, 0.08, cx2, ground(cx2, cz2) + 0.52, cz2, yaw + 0.5, DARK), cyl(0.008, 0.03, cx2, ground(cx2, cz2) + 0.56, cz2, STEEL));   // the second camera mast
       lamps.push({ x: cx2, y: ground(cx2, cz2) + 0.5, z: cz2, w: 0.018, h: 0.012, d: 0.012, yaw, color: 0xff4a3a });                                                                                           // its red recording lamp
     }
@@ -148,6 +165,9 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
       const [wx, wz] = at(R + 0.62 - 0.115, lamA - 0.3 + 0.0); geos.push(box(0.17, 0.1, 0.012, wx, y + 0.21, wz, yaw, DARK), box(0.15, 0.08, 0.014, wx, y + 0.21, wz - u[1] * 0.0, yaw, GLASS));   // the window toward the gate
       const [sx, sz] = at(R + 0.62 - 0.12, lamA - 0.3 + 0.1); geos.push(box(0.07, 0.07, 0.012, sx, y + 0.1, sz, yaw, YELLOW), box(0.014, 0.07, 0.014, sx, y + 0.1, sz, yaw, DARK));   // the hazard sign
       const [dx, dz] = at(R + 0.62, lamA - 0.3 - 0.115); geos.push(box(0.012, 0.2, 0.09, dx, y + 0.12, dz, yaw, DARK));                                                                 // the door
+      { const [fx2, fz2] = at(R + 0.62 - 0.113, lamA - 0.3); geos.push(box(0.185, 0.012, 0.014, fx2, y + 0.262, fz2, yaw, STEEL), box(0.185, 0.012, 0.014, fx2, y + 0.158, fz2, yaw, STEEL), box(0.012, 0.11, 0.014, fx2 - 0.09 * u[1] * 0, y + 0.21, fz2, yaw, STEEL)); }   // the window's sill and head
+      { const [hx, hz] = at(R + 0.62, lamA - 0.3 - 0.119); geos.push(box(0.012, 0.012, 0.014, hx, y + 0.12, hz + 0.0, yaw, STEEL), box(0.03, 0.01, 0.07, hx, y + 0.008, hz, yaw, CURB)); }   // the door handle and its step
+      if (detailTier() === 'high') { const [ax, az] = at(R + 0.62 + 0.04, lamA - 0.3 + 0.06); geos.push(box(0.07, 0.04, 0.06, ax, y + 0.375, az, yaw, STEEL), cyl(0.014, 0.012, ax, y + 0.4, az, DARK, 10)); }   // a roof air-conditioning unit
       geos.push(cyl(0.006, 0.12, gx + 0.05, y + 0.4, gz, DARK));                                                                                                                         // the antenna
       lamps.push({ x: gx, y: y + 0.36, z: gz, w: 0.05, h: 0.02, d: 0.05, yaw, color: accent });
     }
@@ -155,7 +175,7 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
     { const [x, z] = at(R + APRON_LEN - 0.55, lamA + 0.12), y = topA(R + APRON_LEN - 0.55);
       geos.push(cyl(0.008, 0.2, x, y + 0.1, z, STEEL), box(0.045, 0.07, 0.03, x, y + 0.205, z, yaw, DARK)); lamps.push({ x, y: y + 0.225, z, w: 0.02, h: 0.012, d: 0.012, yaw, color: 0x40ff90 }); lamps.push({ x, y: y + 0.195, z, w: 0.026, h: 0.02, d: 0.012, yaw, color: 0x9fd8ff }); }   // post, panel, status LED, screen
     { const [x, z] = at(R + 0.4, lamA + 0.1), y = topA(R + 0.4); geos.push(cyl(0.01, 0.36, x, y + 0.18, z, DARK), box(0.075, 0.035, 0.05, x, y + 0.37, z, yaw, DARK), box(0.02, 0.02, 0.03, x, y + 0.37, z + u[1] * 0.03, yaw, STEEL)); }
-    for (const lam of [lamA + 0.04, lamB - 0.04]) { const [x, z] = at(R + APRON_LEN - 0.2, lam), y = topA(R + APRON_LEN - 0.2); geos.push(cyl(0.011, 0.48, x, y + 0.24, z, STEEL), box(0.12, 0.02, 0.05, x, y + 0.49, z, yaw, DARK)); lamps.push({ x, y: y + 0.475, z, w: 0.1, h: 0.012, d: 0.04, yaw, color: 0xfff4d8 }); }
+    for (const lam of [lamA + 0.04, lamB - 0.04]) { const [x, z] = at(R + APRON_LEN - 0.2, lam), y = topA(R + APRON_LEN - 0.2); geos.push(cyl(0.011, 0.48, x, y + 0.24, z, STEEL, 8), box(0.12, 0.02, 0.05, x, y + 0.49, z, yaw, DARK)); if (detailTier() === 'high') geos.push(cyl(0.02, 0.02, x, y + 0.01, z, DARK, 10), box(0.13, 0.008, 0.06, x, y + 0.505, z, yaw, STEEL)); lamps.push({ x, y: y + 0.475, z, w: 0.1, h: 0.012, d: 0.04, yaw, color: 0xfff4d8 }); }
     // ── state lamps: the lit window of each door's state panel (red sealed, amber cycling, green open), over the outer face of the port and of every person door ──
     const slot = state === 'open' ? 2 : 0, lampColor = state === 'open' ? 0x30ff80 : 0xff3a2a, bigK = tier === 'arcology' ? 1.6 : 1;
     const panelLamp = (cxp: number, czp: number, pu: [number, number], vv: { dh: number; t: number }, ang: number, lam = 0): void => {
@@ -171,11 +191,12 @@ export function makeVehiclePorts(ins: readonly PortInput[], ground: (x: number, 
       geos.push(slab(F, rP - lane.half, rP + lane.half, -lane.half, lane.half, top, ground, POUR));                                                                                 // the turning pad
       for (const s of [-1, 1] as const) geos.push(slab(F, rP, rI, s * lane.w / 2 - 0.018, s * lane.w / 2 + 0.018, () => top() + 0.022, ground, CURB));                                  // the straight curbs
       for (const s of [-1, 1] as const) geos.push(mark(F, rP, rI, s * (lane.w / 2 - 0.05) - 0.008, s * (lane.w / 2 - 0.05) + 0.008, top, YELLOW));                                       // edge lines
+      geos.push(...paveWear(F, rP, rI, -lane.w / 2, lane.w / 2, top, 7 + yaw));
       const nD = Math.max(2, Math.floor((rI - rP) / 0.16)); for (let k = 0; k < nD; k++) geos.push(mark(F, rP + 0.04 + k * (rI - rP) / nD, rP + 0.04 + k * (rI - rP) / nD + 0.07, -0.01, 0.01, top, PAINT));   // dashed center
       geos.push(mark(F, rI - 0.2, rI - 0.16, -lane.w / 2 + 0.05, lane.w / 2 - 0.05, top, PAINT));                                                                                    // the stop line at the inner gate
       const rg = (rI + rP) / 2; geos.push(mark(F, rg - 0.05, rg + 0.05, -lane.w / 2 + 0.05, lane.w / 2 - 0.05, top, DARK, 0.005));                                                       // the drain grate
       for (let k = 0; k < 3; k++) geos.push(mark(F, rg - 0.045 + k * 0.036, rg - 0.038 + k * 0.018, -lane.w / 2 + 0.05, lane.w / 2 - 0.05, top, STEEL, 0.007));
-      for (const s of [-1, 1] as const) { const [x, z] = at(rI - 0.25, s * (lane.w / 2 + 0.06)); lamps.push({ x, y: yPad + 0.04, z, w: 0.03, h: 0.012, d: 0.03, yaw, color: accent }); }  // lane marker lights
+      for (const s of [-1, 1] as const) { const [x, z] = at(rI - 0.25, s * (lane.w / 2 + 0.06)); geos.push(cyl(0.011, 0.06, x, yPad + 0.03, z, DARK, 8), cyl(0.016, 0.008, x, yPad + 0.078, z, DARK, 8)); lamps.push({ x, y: yPad + 0.066, z, w: 0.022, h: 0.012, d: 0.022, yaw, color: accent }); }  // lane marker lights (a post, a collar and a hood)
     }
     // ── a landing, canopy, sign and bollards at every person airlock (the main one is on the apron; the arcology's second stands alone) ──
     persons.forEach((p, i) => {

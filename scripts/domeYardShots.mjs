@@ -104,6 +104,10 @@ try {
       for (const [x, y] of [[-0.6, -0.3], [-0.3, 0.2], [0, 0], [0.5, -0.6]]) { rc.setFromCamera(new THREE.Vector2(x, y), cam); out[x + ',' + y] = rc.intersectObjects(cb.ws.scene.children, true).slice(0, 3).map(h => h.object.name + '/' + (h.object.material?.name || h.object.material?.type) + '@' + h.distance.toFixed(2) + ' c=' + (h.object.material?.color?.getHexString?.() ?? '')); }
       return out; }), null, 1)); }
   if (want('y20')) { await poseRaw2(await Y(-Wd / 2 - 1.7, D * 0.12, 0.3), await Y(-Wd / 2, 0.0, 0.35), 62); await shot('y20-yard-wall-from-outside-beside-dome-base'); }
+  if (want('y21')) { await poseRaw2(await Y(0.06 * Wd + 0.1, D * 0.4 - 1.05, 0.26), await Y(0.06 * Wd, D * 0.4, 0.2), 58); await shot('y21-transformer-closeup'); }
+  if (want('y22')) { await poseRaw2(await Y(-0.14 * Wd + 0.55, D * 0.4 - 1.1, 0.32), await Y(-0.14 * Wd, D * 0.4, 0.17), 60); await shot('y22-chiller-closeup'); }
+  if (want('y23')) { await poseRaw2(await Y(-0.37 * Wd + 0.15, D * 0.5 - 1.15, 0.3), await Y(-0.37 * Wd, D * 0.5, 0.28), 62); await shot('y23-cooling-tower-closeup'); }
+  if (want('y24')) { await poseRaw2(await Y(0.24 * Wd - 0.4, D * 0.72 - 0.9, 0.22), await Y(0.24 * Wd, D * 0.72, 0.2), 58); await shot('y24-intake-closeup'); }
   if (want('y1')) { await poseRaw2(dome(inw(yg.from, 0.8), 0.24), dome(yg.from, 0.2), 58); await shot('y01-dome-side-door-closed'); }
   if (want('y2')) { await poseRaw2(dome(inw(yg.from, 0.35), 0.2), dome(yg.from, 0.2), 55); await shot('y02-dome-side-door-closeup'); }
   if (want('y3')) { await poseRaw2(dome(inw(yg.from, 1.6), 0.3), dome(yg.from, 0.2), 62); await shot('y03-dome-side-approach'); }

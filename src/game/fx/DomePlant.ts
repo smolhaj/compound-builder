@@ -7,6 +7,7 @@
  */
 import type { RoofState } from '../../sim/dome/yardRoof';
 import { WORK_TILE, workTextures, worldUVs } from './portTextures';
+import { DECAL_CELLS, decalAtlas, decalBox, decalCap, patchDecalMaterial, withDecalAttrs, type DecalCell, type DecalFace } from './plantDecals';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { plantLayout, type AirlockLook, type PlantLine, type PlantPart } from '../../sim/dome/plant';
@@ -64,9 +65,12 @@ function partGeometry(q: PlantPart, ground: (x: number, z: number) => number, st
     g.setAttribute('color', new THREE.BufferAttribute(col0, 3));
     return g;
   }
-  let g: THREE.BufferGeometry = q.shape === 'box' ? new THREE.BoxGeometry(q.w, q.h, q.d) : new THREE.CylinderGeometry(q.r2 ?? q.r, q.r, q.h, q.r < 0.03 ? 6 : 10);
+  let g: THREE.BufferGeometry = q.shape === 'box' ? (q.soft !== undefined ? softFrame(q.w, q.h, q.d) : new THREE.BoxGeometry(q.w, q.h, q.d)) : new THREE.CylinderGeometry(q.r2 ?? q.r, q.r, q.h, q.r < 0.03 ? 6 : q.r > 0.045 ? 12 : 10);
+  if (q.decal && q.shape === 'cyl' && q.decal.face === 'cap' && canvasOk()) decalCap(g as THREE.CylinderGeometry, q.decal.cell as DecalCell);
+  if (q.decal && q.shape === 'box' && canvasOk() && (DECAL_CELLS as readonly string[]).includes(q.decal.cell)) decalBox(g, q.decal.cell as DecalCell, q.decal.face as DecalFace, q.decal.flip);
+  if (q.topOnly && q.shape === 'box' && q.soft === undefined) { const idx = g.index!.array as Uint16Array, keep: number[] = []; for (let k = 0; k < 6; k++) keep.push(idx[2 * 6 + k]); g.setIndex(keep); }
   if (q.shape === 'cyl' && !q.onShell && !q.lie && !q.high && q.y0 <= 0.001) noBottom(g as THREE.CylinderGeometry);
-  if (q.shape === 'box' && !q.onShell && !q.lie && !q.high && q.y0 <= 0.001) { const idx = g.index!.array as Uint16Array, keep: number[] = []; for (let f = 0; f < 6; f++) if (f !== 3) for (let k = 0; k < 6; k++) keep.push(idx[f * 6 + k]); g.setIndex(keep); }      // (a box standing on the floor: its underside is never seen)
+  if (q.shape === 'box' && !q.topOnly && q.soft === undefined && !q.onShell && !q.lie && !q.high && (q.y0 <= 0.001 || q.noBottom)) { const idx = g.index!.array as Uint16Array, keep: number[] = []; for (let f = 0; f < 6; f++) if (f !== 3) for (let k = 0; k < 6; k++) keep.push(idx[f * 6 + k]); g.setIndex(keep); }      // (a box standing on the floor: its underside is never seen)
   if (q.onShell) {
     const { theta, phi } = q.onShell;
     g.translate(0, q.h / 2, 0); g.rotateY(q.rot);
@@ -81,10 +85,34 @@ function partGeometry(q: PlantPart, ground: (x: number, z: number) => number, st
     g.translate(q.x, q.lvl ? level + q.y0 : q.high ? stem + q.y0 : ground(q.x, q.z) + q.y0, q.z);
   }
   g = g.index ? g.toNonIndexed() : g;
-  g.deleteAttribute('uv');
+  if (q.selfLit && canvasOk()) g.setAttribute('aDec', new THREE.BufferAttribute(new Uint8Array(g.getAttribute('position').count).fill(3), 1));
+  if (!g.getAttribute('aDec')) g.deleteAttribute('uv');
   const c = new THREE.Color(color), n = g.attributes.position.count, col = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) { col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
+  const inner = q.soft !== undefined ? new THREE.Color(q.soft) : null;
+  if (inner) { for (let i = 0; i < n; i++) { const k = (g.getAttribute('aSoft') as THREE.BufferAttribute).getX(i), m = c.clone().lerp(inner, k); col[i * 3] = m.r; col[i * 3 + 1] = m.g; col[i * 3 + 2] = m.b; } g.deleteAttribute('aSoft'); }
+  else {
+    // a baked light so a plain box has form: tops lighter, undersides darker, and the foot of an upright face darker (ground grime and occlusion), per part
+    g.computeBoundingBox(); const bb = g.boundingBox!, hy = Math.max(1e-4, bb.max.y - bb.min.y), nm = g.getAttribute('normal');
+    const hh = Math.sin(q.x * 91.7 + q.z * 57.3 + q.y0 * 13.1) * 4375.85, wear = 0.95 + 0.1 * (hh - Math.floor(hh));
+    for (let i = 0; i < n; i++) {
+      const ny = nm ? nm.getY(i) : 0, ty = (g.attributes.position.getY(i) - bb.min.y) / hy;
+      const k = wear * (ny > 0.5 ? 1.1 : ny < -0.5 ? 0.7 : (q.h > 0.12 ? 0.72 + 0.28 * Math.pow(ty, 0.6) : 0.94));
+      col[i * 3] = Math.min(1, c.r * k); col[i * 3 + 1] = Math.min(1, c.g * k); col[i * 3 + 2] = Math.min(1, c.b * k);
+    }
+  }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return g;
+}
+const canvasOk = (): boolean => typeof document !== 'undefined';
+/** A footprint frame (top only): its rim vertices (flag 0) fade to the inner edge (flag 1), which `partGeometry` turns into the part's two colors. */
+function softFrame(w: number, h: number, d: number): THREE.BufferGeometry {
+  const hw = w / 2, hd = d / 2, m = Math.min(w, d) * 0.3, iw = hw - m, id = hd - m, y = h;
+  const P: number[][] = [[-hw, -hd], [hw, -hd], [hw, hd], [-hw, hd], [-iw, -id], [iw, -id], [iw, id], [-iw, id]], pos: number[] = [], soft: number[] = [];
+  const tri = (a: number, b: number, c: number): void => { for (const i of [a, c, b]) { pos.push(P[i][0], y, P[i][1]); soft.push(i >= 4 ? 1 : 0); } };
+  for (let i = 0; i < 4; i++) { const j = (i + 1) % 4; tri(i, j, 4 + j); tri(i, 4 + j, 4 + i); }
+  tri(4, 5, 6); tri(4, 6, 7);
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('aSoft', new THREE.Float32BufferAttribute(soft, 1)); g.computeVertexNormals();
+  g.translate(0, -h / 2, 0);   // (the caller lifts every box by half its height)
   return g;
 }
 
@@ -139,19 +167,22 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
       colorPart(new THREE.CylinderGeometry(0.014, 0.046, 0.026, 8), 0x2d3238, l.x, gy + l.y + 0.074, l.z),
       colorPart(new THREE.CylinderGeometry(0.044, 0.044, 0.006, 8), 0x23272c, l.x, gy + l.y + 0.057, l.z));
   }
+  if (canvas) withDecalAttrs(geos); else geos.forEach(g => { g.deleteAttribute('aDec'); g.deleteAttribute('uv'); });
   const merged0 = geos.length ? mergeGeometries(geos, false) : null;
   geos.forEach(g => g.dispose());
-  const merged = merged0 ? worldUVs(merged0, WORK_TILE) : null;
+  const merged = merged0 ? worldUVs(merged0, WORK_TILE, canvas) : null;
   if (merged && merged0 !== merged) merged0!.dispose();
   if (merged) {
     // heap: the mesh is flat shaded (the shader derives the normals), so the normal attribute is dead weight; the vertex colors are 8-bit normalized, not three floats
     merged.deleteAttribute('normal');
+    { const uv = merged.getAttribute('uv'); if (uv && uv.array instanceof Float32Array) { const h = new THREE.Float16BufferAttribute(uv.count * 2, 2); for (let i = 0; i < uv.count; i++) h.setXY(i, uv.getX(i), uv.getY(i)); merged.setAttribute('uv', h); } }      // (half-float uvs: the tiling and cell coordinates need no more, and the mesh is big)
     const c = merged.getAttribute('color');
     if (c && !(c.array instanceof Uint8Array)) { const a = new Uint8Array(c.count * 3); for (let i = 0; i < a.length; i++) a[i] = Math.round(Math.max(0, Math.min(1, (c.array as Float32Array)[i])) * 255); merged.setAttribute('color', new THREE.BufferAttribute(a, 3, true)); }
   }
   if (merged) {
     const wt = typeof document !== 'undefined' ? workTextures() : null;      // (no canvas in the node tests)
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, ...(wt ? { map: wt.map } : {}), roughness: 0.78, metalness: 0.25, flatShading: true, emissive: 0x23282c });
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, ...(wt ? { map: wt.map, normalMap: wt.normalMap, normalScale: new THREE.Vector2(0.65, 0.65) } : {}), roughness: 0.78, metalness: 0.25, flatShading: true, emissive: 0x23282c });
+    if (wt) patchDecalMaterial(mat, decalAtlas());
     const mesh = new THREE.Mesh(merged, mat);
     mesh.name = 'plant_machinery'; mesh.matrixAutoUpdate = false; mesh.updateMatrix();
     group.add(mesh); owned.push(merged, mat);
@@ -182,7 +213,7 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
     lampList.forEach((l, i) => {
       const onPad = !!plant.yard && inYard(plant.yard, 0, 0, l.x, l.z), gy = l.ceil === 'lvl' || onPad ? level + (l.ceil === 'lvl' ? 0 : 0.045) : ground(l.x, l.z);
       if (l.ceil) {      // a lit strip under the roof (or a disc in the tunnel's ceiling), its pool on the floor below
-        heads.setMatrixAt(i, m4.compose(pos.set(l.x, (l.ceil === 'lvl' ? level + 0.004 : gy) + l.y, l.z), l.ceil === 'lvl' ? qy : q0, l.ceil === 'lvl' ? sc.set(8.4, 0.25, 2.2) : sc.set(2.6, 0.3, 2.6)));
+        heads.setMatrixAt(i, m4.compose(pos.set(l.x, (l.ceil === 'lvl' ? level + 0.004 : gy) + l.y, l.z), l.ceil === 'lvl' ? qy : q0, l.ceil === 'lvl' ? sc.set(0, 0, 0) : sc.set(2.6, 0.3, 2.6)));
       } else heads.setMatrixAt(i, m4.makeTranslation(l.x, gy + l.y + 0.035, l.z));
       pools.setMatrixAt(i, m4.compose(pos.set(l.x, (l.ceil === 'lvl' ? ground(l.x, l.z) + 0.059 : gy + 0.012), l.z), q0, sc.set(l.k, 1, l.k)));
     });

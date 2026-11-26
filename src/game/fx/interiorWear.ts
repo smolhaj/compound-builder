@@ -12,8 +12,12 @@ export function slabMarks(index: number, width: number, len: number, tier: WearT
   const out: SlabMark[] = [], h = (k: number): number => hash(index * 31 + k * 977 + 5);
   const nMoss = tier === 'high' ? (h(1) < 0.4 ? 2 : 1) : tier === 'medium' ? (h(1) < 0.5 ? 1 : 0) : 0;
   for (let i = 0; i < nMoss; i++) {
-    const side = h(2 + i) < 0.5 ? -1 : 1, hl = 0.012 + h(4 + i) * 0.03, hw = 0.006 + h(6 + i) * 0.012;
-    out.push({ u: (h(8 + i) - 0.5) * 0.8, v: side * (0.5 - hw / width * 0.8), hl: Math.min(hl, len * 0.3), hw, kind: 'moss', k: h(10 + i) });
+    // a creeping patch is a few tiny irregular flecks at one edge, not a bar: small, scattered along the seam, each its own size
+    const side = h(2 + i) < 0.5 ? -1 : 1, u0 = (h(8 + i) - 0.5) * 0.8, nf = tier === 'high' ? 3 : 2;
+    for (let f = 0; f < nf; f++) {
+      const hw = 0.003 + h(30 + i * 7 + f) * 0.005, hl = 0.005 + h(40 + i * 7 + f) * 0.012;
+      out.push({ u: u0 + (h(50 + i * 7 + f) - 0.5) * 0.14, v: side * (0.5 - hw / width * 1.2 - h(60 + f) * 0.05), hl: Math.min(hl, len * 0.2), hw, kind: 'moss', k: h(10 + i + f) });
+    }
   }
   if (tier !== 'low' && h(12) < 0.5) out.push({ u: (h(13) - 0.5) * 0.7, v: (h(14) - 0.5) * 0.6, hl: 0.015 + h(15) * 0.025, hw: 0.01 + h(16) * 0.015, kind: 'stain', k: h(17) });
   if (tier === 'high' && h(18) < 0.3) out.push({ u: (h(19) - 0.5) * 0.6, v: (h(20) - 0.5) * 0.5, hl: 0.05 + h(21) * 0.04, hw: 0.002, kind: 'crack', k: h(22) });
