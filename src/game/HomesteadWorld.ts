@@ -185,6 +185,7 @@ const KILL_ZONE = 2.0;
 import { guardCount } from '../sim/guards';
 import { makeLinkFixtures, linksKey, type LinkFixtureInput, type LinkFixtures } from './fx/DomeLinks';
 import { domeFrom, domesOf as standingDomes } from '../sim/dome/standing';
+import { campClashesDome, type CampDome } from './fx/campInDome';
 import { linkState, linksOf } from '../sim/dome/linkGraph';
 import { stateOf as domeStateOf } from '../sim/dome/live';
 import { fxOf as plantFxOf, unitsOf as plantUnitsOf } from '../sim/dome/plantLive';
@@ -302,6 +303,8 @@ export class HomesteadWorld {
   /** The family's camp (until a home stands; it stays as the work yard). */
   readonly camp: { x: number; z: number; rot: number };
   private readonly _campGroup: THREE.Group;
+  /** The camp's own ground level (before a dome's level pad took the ground under it). */
+  private _campY0 = 0;
   /** The chore yard round the camp (sim/daily.ts). */
   private readonly _yard: Yard;
   readonly family: FamilyRenderer;
@@ -419,6 +422,7 @@ export class HomesteadWorld {
     this._campGroup.position.set(this.camp.x, this.parcel.height(this.camp.x, this.camp.z), this.camp.z);
     // on a slope (a hillside or the island's knoll) the tent's uphill wall and the woodpile's tin sheet sink into the ground: raise the camp (and its yard) toward the highest ground under it, by at most about 40 cm (more would float the downhill side)
     { const y0 = this._campGroup.position.y; let up = 0; for (let k = 0; k < 8; k++) up = Math.max(up, this.parcel.height(this.camp.x + Math.cos(k * Math.PI / 4) * 0.9, this.camp.z + Math.sin(k * Math.PI / 4) * 0.9) - y0); this._campGroup.position.y = y0 + Math.min(up, 0.07); }
+    this._campY0 = this._campGroup.position.y;
     this._campGroup.rotation.y = this.camp.rot;
     this._root.add(this._campGroup);
     this._yard = buildYard();
@@ -1900,7 +1904,8 @@ export class HomesteadWorld {
     let y = padLevel;
     // a dome's pad goes under the pads already graded, so the buildings that stand in it keep their own level
     if (pad) this.parcel.setPads(gradedDome ? [pad, ...this.parcel.pads] : [...this.parcel.pads, pad]);
-    if (pad && gradedDome) this._domeLevels.set(p.id, { x0: pad.x0, z0: pad.z0, x1: pad.x1, z1: pad.z1, y: pad.y });
+    if (def.level === 'cover') { const d = domeFrom(p as unknown as Structure); if (d) { this._domeLite.set(p.id, { x: d.x, z: d.z, r: d.r, airlocks: d.airlocks }); this._snapCamp(); } }
+    if (pad && gradedDome) { this._domeLevels.set(p.id, { x0: pad.x0, z0: pad.z0, x1: pad.x1, z1: pad.z1, y: pad.y }); this._snapCamp(); }
     const opts: BuildOpts = {};
     if (climb) opts.rise = climb.rise;
     // a dome meets the hill: its stem wall and berm are draped on the natural ground (no pad), sampled from the group's own frame
@@ -2000,8 +2005,20 @@ export class HomesteadWorld {
   private readonly _digKeys = new Map<string, string>();
   private _pitCircles: Array<[number, number, number, number]> = [];
   private _lastStructures: readonly Structure[] = [];
+  /** Every dome's centre, radius and airlocks (graded or not): the camp is not drawn where it would clip an entrance. */
+  private readonly _domeLite = new Map<string, CampDome>();
   private readonly _domeLevels = new Map<string, { x0: number; z0: number; x1: number; z1: number; y: number }>();
   private readonly _harden = new Map<string, { key: string; tiers: NonNullable<Structure['hardening']> }>();
+
+  /** The camp and its chore yard stand on the ground they were built on; when a dome's level pad takes that ground (the camp lies inside it) they stand on the pad instead, so nothing hovers over, or sinks into, the graded lawn. */
+  private _snapCamp(): void {
+    let y = this._campY0, hide = false;
+    for (const d of this._domeLevels.values()) if (this.camp.x >= d.x0 && this.camp.x <= d.x1 && this.camp.z >= d.z0 && this.camp.z <= d.z1) { y = d.y; break; }
+    for (const d of this._domeLite.values()) if (campClashesDome(this.camp, d)) { hide = true; break; }
+    this._campGroup.position.y = y; this._yard.group.position.y = y;
+    // (a camp that would clip a dome's shell, entrance module or lane is not drawn there)
+    this._campGroup.visible = !hide; this._yard.group.visible = !hide;
+  }
 
   private _underOpts(p: Placed, placed: readonly Placed[], datum: number): BuildOpts {
     const def = KIT[p.kind];
@@ -2413,6 +2430,8 @@ export class HomesteadWorld {
     if (b.smoke) this._ws.scene.remove(b.smoke.points);
     this._built.delete(id);
     this._domeLevels.delete(id);
+    this._domeLite.delete(id);
+    this._snapCamp();
     this._dropDig(id);
     { const bg = this._buried.get(id); if (bg) { this._ws.scene.remove(bg); disposeSite(bg); this._buried.delete(id); } }
     this._interiorCache.delete(id);
