@@ -9,6 +9,8 @@ export interface Obstacle { x: number; z: number; hx: number; hz: number; /** A 
 export interface PathSeg { x: number; z: number; rot: number; len: number; /** Width: a footpath is PATH_W, the vehicle lane LANE_W. */ w?: number }
 export interface Prop { x: number; z: number; rot: number }
 export interface InteriorPlan {
+  /** The arcology's control block (sim/dome/controlBlock.ts) in this frame: its pipes and manifold are drawn with the floor dressing, its paths are among `segs`. */
+  control?: ControlBlockPlan;
   segs: PathSeg[]; benches: Prop[]; crates: Prop[]; planters: Prop[]; signs: Prop[]; lamps: Array<{ x: number; z: number }>;
   plaza: { x: number; z: number; r: number } | null;
   /** Pools of window light round the houses (center, radius). */
@@ -22,8 +24,11 @@ const hash = (n: number): number => { let h = (n | 0) * 374761393 + 668265263; h
 import { vestibuleOf } from '../../sim/dome/vestibule';
 import { portVestibule } from '../../sim/dome/vehiclePort';
 import type { DomeTier } from '../../sim/dome/tiers';
+import { obstaclesOf, type ControlBlockPlan } from '../../sim/dome/controlBlock';
 
-export function interiorPlan(tier: string, r: number, angles: readonly number[], obstacles: readonly Obstacle[], seed = 1, vehicles: readonly number[] = []): InteriorPlan {
+export function interiorPlan(tier: string, r: number, angles: readonly number[], obstacles0: readonly Obstacle[], seed = 1, vehicles: readonly number[] = [], control: ControlBlockPlan | null = null): InteriorPlan {
+  // the control block stands on the floor like any building: nothing else is set on it
+  const obstacles: readonly Obstacle[] = control ? [...obstacles0, ...obstaclesOf(control)] : obstacles0;
   const out: InteriorPlan = { segs: [], benches: [], crates: [], planters: [], signs: [], lamps: [], plaza: null, glows: [] };
   if (tier !== 'glass' && tier !== 'arcology' && tier !== 'geodesic') return out;
   const nearLane = (x: number, z: number): boolean => vehicles.some(a => { const al = x * Math.sin(a) + z * Math.cos(a), ac = Math.abs(x * Math.cos(a) - z * Math.sin(a)); return al > r * 0.4 && ac < LANE_W / 2 + 0.45; });
@@ -105,6 +110,19 @@ export function interiorPlan(tier: string, r: number, angles: readonly number[],
       const x = sx * rho + px * 0.75 * side, z = sz * rho + pz * 0.75 * side;      // (beside the poured lane and its pad, never on them)
       if (Math.hypot(x, z) < r * 0.93 && !obstacles.some(o => Math.abs(x - o.x) < o.hx + 0.05 && Math.abs(z - o.z) < o.hz + 0.05)) out.lamps.push({ x, z });
     }
+  }
+  // the control block: footpaths from the yard's service airlock in to the ring path and from the ring path to its door, lamp posts at the door and the manifold, pools of light
+  if (control) {
+    out.control = control;
+    for (const pl of control.paths) for (let i = 1; i < pl.length; i++) {
+      const [ax, az] = pl[i - 1], [bx, bz] = pl[i], L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(L / STEP));
+      for (let k = 0; k < n; k++) { const t = (k + 0.5) / n, x = ax + (bx - ax) * t, z = az + (bz - az) * t; if (!nearLane(x, z) && !obstacles0.some(o => Math.abs(x - o.x) < o.hx + PATH_W / 2 && Math.abs(z - o.z) < o.hz + PATH_W / 2)) out.segs.push({ x, z, rot: Math.atan2(bx - ax, bz - az), len: L / n + 0.01 }); }
+    }
+    const [dx, dz] = control.landing, ux = Math.sin(control.yaw + Math.PI), uz = Math.cos(control.yaw + Math.PI), lx = Math.cos(control.yaw), lz = -Math.sin(control.yaw);
+    for (const sd of [-1, 1]) out.lamps.push({ x: dx + lx * 0.5 * sd - ux * 0.0, z: dz + lz * 0.5 * sd });
+    out.lamps.push({ x: control.manifold[0] - control.yardDoor[0] * 0.02 + 0, z: control.manifold[1] });
+    out.glows.push({ x: dx - ux * 0.15, z: dz - uz * 0.15, r: 1.5 }, { x: control.manifold[0], z: control.manifold[1], r: 0.9 });
+    void ux; void uz;
   }
   if (out.plaza) {
     const k = 6, pr = out.plaza.r + 0.2;

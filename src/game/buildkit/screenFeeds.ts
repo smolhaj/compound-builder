@@ -22,13 +22,15 @@ import type { GameState } from '../../sim/state';
 import { securityFeeds, type CamFeed, type Feeds } from '../../sim/bunkerLife';
 import { KIT, CELL } from './kit';
 import { isFinished } from '../../sim/construction';
+import { CTL_CELLS, paintDomeControlCells, type CtlCell } from './controlScreens';
 
-export type CellId = 'cams' | 'news' | 'radar' | 'weather' | 'laptop' | 'status' | 'tv';
+export type CellId = 'cams' | 'news' | 'radar' | 'weather' | 'laptop' | 'status' | 'tv' | CtlCell;
 export const ATLAS_W = 1024, ATLAS_H = 1024;
 /** Atlas cells in pixels (x, y, w, h): the three-by-two grid of the wall of screens. */
 export const CELLS: Record<CellId, [number, number, number, number]> = {
   cams: [0, 0, 512, 288], news: [0, 288, 512, 224], radar: [512, 0, 256, 256], weather: [768, 0, 256, 256],
   laptop: [512, 256, 256, 160], status: [768, 256, 256, 160], tv: [0, 512, 256, 144],
+  ...CTL_CELLS,
 };
 
 /** A flat screen face (facing +z, centered at x with its bottom at y) showing one atlas cell, with its own UVs. */
@@ -59,6 +61,7 @@ function atlas() {
   const cv = document.createElement('canvas'); cv.width = ATLAS_W; cv.height = ATLAS_H;
   const g = cv.getContext('2d')!;
   g.fillStyle = '#05070a'; g.fillRect(0, 0, ATLAS_W, ATLAS_H);
+  paintDomeControlCells(g);      // (the dome control block's screens, signs and lamp swatches share the atlas)
   const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
   return (_atlas = { cv, g, tex });
 }
