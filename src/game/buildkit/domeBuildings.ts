@@ -303,6 +303,12 @@ function airlock(p: Parts, tier: DomeTier, R: number, hole: Doorways['holes'][nu
       for (let k = 0; k < nb; k++) put('panel_light', 0.012, gh - 0.06 - plate, 0.016, -w / 2 + 0.03 + k * (w - 0.06) / (nb - 1), 0.03 + plate, 0);
       put('paint_yellow', 0.02, dhb * 0.97 - 0.01, 0.03, -s * (w / 2 - 0.012), 0.005, 0);                                     // hazard band on the leading edge
       put('panel_dark', 0.012, dhb * 0.97 - 0.02, 0.034, -s * (w / 2), 0.01, 0);                                                    // the gasket seam
+      put('panel_light', w * 0.96, 0.05, 0.018, 0, 0.03, 0); put('paint_yellow', w * 0.96, 0.012, 0.019, 0, 0.082, 0);                // a steel kick plate with a worn hazard stripe above it
+      if (detailTier() === 'high') {
+        for (const bx of [-w / 2 + 0.02, w / 2 - 0.02]) for (const by of [0.012, gh - 0.024]) put('panel_light', 0.012, 0.012, 0.034, bx, by, 0);   // bolt heads on the frame rails
+        put('panel_light', 0.06, 0.03, 0.036, 0, gh, 0);                                                                                    // the roller carriage on the track
+      }
+      put('panel_dark', 0.03, 0.06, 0.036, -s * (w / 2 - 0.03), gh * 0.45, 0); put('panel_light', 0.02, 0.012, 0.04, -s * (w / 2 - 0.03), gh * 0.45 + 0.02, 0);   // the lock box and its bar
       for (const [m, g] of geoms) p.add(m, place(g.translate(cx, yb, z)));
     }
     X('panel_dark', v.dw * (shut ? 1 : 1.9) + 0.1, 0.022, 0.04, 0, y0 + v.dh, z);                                          // the track
@@ -421,7 +427,7 @@ function earthen(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): THREE.Group 
 function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number, opts: BuildOpts, N: number, panelMat: 'dome_polycarb' | 'arcology', frameMat: 'aluminum' | 'steel'): THREE.Group {
   const p = new Parts(seed, opts), L = LOOK[tier], R = def.cellsX * CELL / 2 - 0.03 - bermU(tier), y0 = L.stem, g = opts.ground ?? (() => 0);
   const rim = (a: number) => g(R * Math.sin(a), R * Math.cos(a));
-  const nWall = Math.max(36, Math.min(detailTier() === 'high' ? 120 : 60, Math.round(R * 14)));
+  const nWall = Math.max(36, Math.min(detailTier() === 'high' ? 88 : 48, Math.round(R * 14)));
   p.layer = 'stakes';
   for (const sx of [-1, 1]) for (const sz of [-1, 1]) p.add('trim', box(0.012, 0.09, 0.012, sx * (def.cellsX * CELL / 2 - 0.03), -0.02, sz * (def.cellsZ * CELL / 2 - 0.03)));
   // the plant yard's service passage runs through the footing and the skirt band: a doorway in the band (a lintel over it) and a gap in the rings at its angle

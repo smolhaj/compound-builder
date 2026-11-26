@@ -104,6 +104,11 @@ try {
     lap('haze meshes hidden ' + await page.evaluate(() => window.__hazeHidden)); await shot('diag-nohaze');
     await page.evaluate(() => { let n = 0; window.__cb.ws.scene.traverse(o => { if (o.isPointLight || o.isSpotLight) { o.visible = false; n++; } }); window.__nl = n; }); lap('lights off ' + await page.evaluate(() => window.__nl)); await shot('diag-nolights');
   }
+  const AL = await page.evaluate(async () => (await import('/src/sim/dome/vehiclePort.ts')).APRON_LEN);
+  if (want('p1')) { await pr(E(Rd + 0.6, 0.18, 0.22), E(Rd - 0.02, 0.0, 0.2), 64); await shot('p1-gate-leaf-close'); }
+  if (want('p2')) { await pr(E(Rd + 0.4, -0.22, 0.07), E(Rd, -0.1, 0.06), 62); await shot('p2-gate-foot-kickplate-low'); }
+  if (want('p3')) { await pr(E(R + AL - 0.75, 0.95, 0.22), E(R + AL + 0.16, -0.25, 0.14), 62); await shot('p3-boom-gate-arm-and-bollards'); }
+  if (want('p4')) { await pr(E(R + AL * 0.55, 0.45, 0.1), E(R + 0.3, 0, 0.0), 66); await shot('p4-apron-joints-tire-marks-low'); }
   if (want('gateclose')) { await pr(E(R + 1.5 * S, -0.55 * S, 0.3), E(R - 0.1, 0.15 * S, 0.3), 62); await shot('gate-close-eye'); }
   if (want('gatelow')) { await pr(E(R + 1.0 * S, 0.5 * S, 0.1), E(R - 0.1, -0.1, 0.35), 70); await shot('gate-low-angle'); }
   if (want('airlockclose')) { await pr(EP(R + 0.9 * S, -0.3 * S, 0.3), EP(R - 0.1, 0.05, 0.28), 62); await shot('person-airlock-close'); }

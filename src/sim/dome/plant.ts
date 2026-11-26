@@ -58,6 +58,16 @@ export interface PlantPart {
   passage?: boolean;
   /** An armored wall or door: drawn with the dome's own panel steel material (the shared kit material, opaque), not the plant's vertex-colored mesh. */
   steel?: boolean;
+  /** Texture instead of geometry: the box's faces (`x`, `y`, `z` for the big pair, or `px`...`nz`) show a cell of the plant's decal atlas (game/fx/plantDecals.ts): louvers, fins, warning and data plates, a lit lamp panel. */
+  decal?: { cell: string; face: string; flip?: boolean };
+  /** A soft dark frame round a footprint (contact shadow, stain): the box's top only, its vertex colors fading from `color` at the rim to this color at the inner edge. */
+  soft?: number;
+  /** Drawn self-lit (a ceiling that no light reaches): the work sheet with a glow of its own. */
+  selfLit?: boolean;
+  /** Leave out the underside (a roof part whose underside is covered by another part). */
+  noBottom?: boolean;
+  /** Only the top face (a paving joint, a stain). */
+  topOnly?: boolean;
 }
 export interface PlantLamp { x: number; z: number; y: number; /** A ceiling lamp (a flat lit disc hanging under a roof, no post): `lvl` measures y from the yard's level plane (under its roof), `gnd` from the ground (inside the sealed passage). */ ceil?: 'lvl' | 'gnd'; /** Pool radius scale (default by kind). */ k?: number }
 /** A buried line: its kind, depth below the ground (world units) and the plan points. The passage is a fat teal tube. */
@@ -125,16 +135,21 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
   };
   /** A round fan grille: a dark disk, a guard ring, two crossbars and a hub, at height y0 on the top of a unit. */
   const fan = (f: Fr, dx: number, dz: number, rad: number, y0: number, unit?: string): void => {
-    Cy(f, dx, dz, rad, 0.012, C.grille, y0, unit);
-    Cy(f, dx, dz, rad * 1.04, 0.02, C.coil, y0 - 0.008, unit);
-    B(f, dx, dz, rad * 1.9, 0.01, 0.014, C.pipe, y0 + 0.012, unit); B(f, dx, dz, 0.014, 0.01, rad * 1.9, C.pipe, y0 + 0.012, unit);
-    Cy(f, dx, dz, rad * 0.2, 0.025, C.steel, y0 + 0.008, unit);
+    Cy(f, dx, dz, rad * 1.04, 0.02, C.coil, y0 - 0.008, unit);                                             // the guard ring
+    const [x, z] = loc(f, dx, dz); push({ shape: 'cyl', x, z, y0: y0 + 0.004, w: 0, h: 0.01, d: 0, r: rad, rot: f.rot, color: 0xffffff, ...(unit ? { unit } : {}), decal: { cell: 'grille', face: 'cap' } });   // the grille: one textured disc
   };
   /** Louvers: `count` thin slats stacked across a face, each its own thin box. */
   const slatsH = (f: Fr, dx: number, dz: number, w: number, h: number, count: number, color: number, y0: number, unit?: string, d = 0.016): void => {
-    for (let i = 0; i < count; i++) B(f, dx, dz, w, h / count * 0.5, d, color, y0 + (i + 0.5) * h / count, unit);
+    void count; void color; void d;
+    B(f, dx, dz, w, h, 0.012, 0xc4cad0, y0, unit, 0, { decal: { cell: 'louver', face: 'z' } });      // one quad of louver texture (a stack of slat boxes before)
   };
-  const plate = (f: Fr, dx: number, dz: number, y0: number, unit?: string, w = 0.07): void => B(f, dx, dz, w, w * 0.5, 0.008, C.white, y0, unit);   // a nameplate
+  /** A plate of the decal atlas: a warning label, a data plate, a door, a fin bank (box w by h, thin in `face`'s axis). */
+  const DP = (f: Fr, dx: number, dz: number, w: number, h: number, y0: number, cell: string, unit?: string, face = 'z', thick = 0.006, color = 0xffffff, yaw = 0): void => {
+    B(f, dx, dz, face === 'x' ? thick : w, h, face === 'x' ? w : thick, color, y0, unit, yaw, { decal: { cell, face } });
+  };
+  /** A soft contact shadow under a footprint, and paving stains: top-only frames that fade from the slab's color to dark. */
+  const SH = (f: Fr, dx: number, dz: number, w: number, d: number, y0: number, rim: number, core: number, m = 0.06): void => { B(f, dx, dz, w + 2 * m, 0.001, d + 2 * m, rim, y0, undefined, 0, { soft: core, topOnly: true }); };
+  const plate = (f: Fr, dx: number, dz: number, y0: number, unit?: string, w = 0.07): void => DP(f, dx, dz, w, w * 0.5, y0, 'plate', unit, 'z', 0.008);   // a nameplate
   const bollard = (f: Fr, dx: number, dz: number): void => { Cy(f, dx, dz, 0.022, 0.15, C.yellow, 0); Cy(f, dx, dz, 0.026, 0.02, C.hazard, 0.13); };
   const note = new Map<string, { x: number; z: number }>();
   const noteUnit = (id: string, x: number, z: number): void => { if (!note.has(id)) note.set(id, { x, z }); };
@@ -282,6 +297,10 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
     // slab with a curb all round (it also keeps the field brush out), the walkway strip from the inner door, and the wall
     B(Fy, 0, D / 2, W, 0.3, D, C.concDark, -0.255);      // (the slab follows the ground under its middle; its footing is buried so the edge never floats)
     for (const [dx, dz, w, d] of [[0, 0.1, W - 0.14, 0.05], [0, D - 0.1, W - 0.14, 0.05], [-(W - 0.2) / 2, D / 2, 0.05, D - 0.14], [(W - 0.2) / 2, D / 2, 0.05, D - 0.14]] as const) B(Fy, dx, dz, w, 0.075, d, C.cap, 0);
+    // paving: expansion joints across the slab (top-only strips) and a few oil and rain stains (soft frames); equipment plinths get their own contact shadows
+    for (let i = 1; i < 6; i++) B(Fy, -W / 2 + W * i / 6, D / 2, 0.012, 0.001, D - 0.16, 0x4a4c4a, 0.0455, undefined, 0, { topOnly: true });
+    B(Fy, 0, D / 2, W - 0.16, 0.001, 0.012, 0x4a4c4a, 0.0455, undefined, 0, { topOnly: true });
+    for (const [su, sv, sw, sd2] of [[-0.31, 0.24, 0.7, 0.34], [0.12, 0.62, 0.55, 0.3], [0.33, 0.28, 0.4, 0.5], [-0.05, 0.86, 0.6, 0.2]] as const) B(Fy, su * W, sv * D, sw, 0.001, sd2, C.concDark, 0.0458, undefined, 0.3, { soft: 0x55564f, topOnly: true });
     const pu = g.portal.u;
     B(Fy, pu, 0.5 * D * 0.5, g.portal.w + 0.1, 0.05, D * 0.5, C.conc, 0);                                    // the walkway in from the inner door
     const seg = (ax: number, az: number, bx: number, bz: number, h: number, th: number, color: number, y0: number, top?: number, lvl = false): void => {
@@ -310,7 +329,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       // the retractable roof (sim/dome/yardRoof.ts): FOUR identical leaves, each W/4 wide and spanning wall to wall across the yard, on a continuous armored perimeter beam that sits on
       // the wall tops. One regular pane grid; every seam (between leaves and over the wall tops) is covered by a gasketed cover plate, so nothing shows through when it is closed.
       // The two inner leaves slide out over the two outer ones (raised a deck's height, resting on them): vent slides them part way (a gasketed gap), open parks them fully.
-      const BL = (f: Fr, dx: number, dz: number, w: number, h: number, d: number, color: number, y0: number, yaw = 0): void => B(f, dx, dz, w, h, d, color, y0, undefined, yaw, { lvl: true });
+      const BL = (f: Fr, dx: number, dz: number, w: number, h: number, d: number, color: number, y0: number, yaw = 0, ex: Partial<PlantPart> = {}): void => B(f, dx, dz, w, h, d, color, y0, undefined, yaw, { lvl: true, ...ex });
       const st = o.roof ?? 'closed', y0 = WALL_H + 0.07, GLASS = 0x4c8d96, GASKET = 0x16181a, lw = W / 4, DECK = 0.075;
       const nu = Math.max(1, Math.round(lw / 1.0)), nv = Math.max(2, Math.round(D / 1.0)), cw = lw / nu, cd = D / nv;
       // the perimeter beam: a continuous armored ring on the wall tops that the leaves seal against, and its end caps
@@ -320,20 +339,24 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       const slide = ST_SLIDE[st] * W;
       const leaf = (cu: number, lift: number): void => {
         const yb = y0 + lift;
-        B(Fy, cu, D / 2, lw + 0.04, 0.02, D + 0.04, 0xb4c6cc, yb - 0.012, undefined, 0, { lvl: true, steel: true });                                                      // a solid underlay under every leaf: no ground or sky shows through a pane edge
+        B(Fy, cu, D / 2, lw + 0.04, 0.02, D + 0.04, 0xc2ccd2, yb - 0.012, undefined, 0, { lvl: true, selfLit: true });                                                      // a solid underlay under every leaf: no ground or sky shows through a pane edge
         for (let a = 0; a < nu; a++) for (let b = 0; b < nv; b++) {
           const px = cu - lw / 2 + (a + 0.5) * cw, pv = (b + 0.5) * cd;
-          BL(Fy, px, pv, cw, 0.02, cd, GLASS, yb);                                                                                  // the glazed pane, filling its whole cell
-          BL(Fy, px, pv, Math.hypot(cw, cd), 0.022, 0.028, C.steel, yb + 0.02, Math.atan2(cd, cw));                        // its diagonal strut
+          BL(Fy, px, pv, cw, 0.02, cd, GLASS, yb, 0, { noBottom: true });                                                                                  // the glazed pane, filling its whole cell
+          BL(Fy, px, pv, Math.hypot(cw, cd), 0.022, 0.028, C.steel, yb + 0.02, Math.atan2(cd, cw), { noBottom: true });                        // its diagonal strut
         }
-        for (let a = 0; a <= nu; a++) BL(Fy, cu - lw / 2 + a * cw, D / 2, 0.05, 0.045, D, C.armor, yb);                              // the mullions along the leaf (a bar over every pane edge)
-        for (let b = 0; b <= nv; b++) BL(Fy, cu, b * cd, lw, 0.045, 0.05, C.armor, yb);                                               // and across it
+        for (let a = 0; a <= nu; a++) BL(Fy, cu - lw / 2 + a * cw, D / 2, 0.05, 0.045, D, C.armor, yb, 0, { noBottom: true });                              // the mullions along the leaf (a bar over every pane edge)
+        for (let b = 0; b <= nv; b++) BL(Fy, cu, b * cd, lw, 0.045, 0.05, C.armor, yb, 0, { noBottom: true });                                               // and across it
       };
       // inner leaves ride a deck above the outer ones when slid out; the outer leaves stay put over the end bays
       leaf(-3 * W / 8, 0); leaf(3 * W / 8, 0);
       const lift = slide > 0 ? DECK : 0;
       leaf(-W / 8 - slide, lift); leaf(W / 8 + slide, lift);
       // the gasketed cover plates over every seam between leaves: a black gasket under an armored strip, full width of the yard
+      if (st !== 'open') {      // the underside: structural ribs and lit panels (the lit cell glows by day and night)
+        for (let i = 0; i < 6; i++) BL(Fy, -W / 2 + W * (i + 0.5) / 6, D / 2, 0.07, 0.035, D + 0.1, C.armor, y0 - 0.047);
+        for (const u of [-W / 3, 0, W / 3]) for (const v of [D * 0.3, D * 0.7]) { BL(Fy, u, v, 1.0, 0.014, 0.44, C.dark, y0 - 0.026); BL(Fy, u, v, 0.92, 0.006, 0.36, 0xffffff, y0 - 0.032, 0, { decal: { cell: 'light', face: 'ny' } }); }
+      }
       const seams = slide > 0 ? [-W / 4, W / 4] : [-W / 4, 0, W / 4];
       for (const u of seams) { BL(Fy, u, D / 2, 0.07, 0.02, D, GASKET, y0 - 0.005); BL(Fy, u, D / 2, 0.15, 0.03, D + 0.04, C.armor, y0 + 0.045); }
       // when slid back, the centre gap is lined with gasket strips on the leaf edges (a gasketed vent) and the parked leaves stand on spacer blocks over the beam
@@ -352,9 +375,11 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       const dx = -0.14 * W, u = id, bh = 0.42 * s, y = 0.045;
       B(Fy, dx, v, bw + 0.05, 0.03 * s, dd + 0.05, C.skid, y, u);                                               // the skid
       B(Fy, dx, v, bw, bh, dd, C.white, y + 0.03 * s, u);                                                       // the cabinet
-      for (const sd of [-1, 1]) for (let i = 0; i < 6; i++) B(Fy, dx + sd * (bw / 2 + 0.004), v - dd * 0.4 + i * dd * 0.16, 0.012, bh * 0.72, dd * 0.07, C.coil, y + 0.03 * s + bh * 0.1, u);   // coil fins on both ends
+      SH(Fy, dx, v, bw + 0.05, dd + 0.05, y + 0.001, C.concDark, 0x3c3e3b, 0.09);                                  // contact shadow
+      for (const sd of [-1, 1]) DP(Fy, dx + sd * (bw / 2 + 0.006), v, dd * 0.92, bh * 0.72, y + 0.03 * s + bh * 0.1, 'fins', u, 'x', 0.012, 0xaab2b8);   // coil fins on both ends (texture)
+      DP(Fy, dx - 0.3 * bw, v - dd / 2 - 0.006, 0.16 * s, 0.08 * s, y + 0.2 * s, 'danger', u);                          // fan warning label
       for (const fx of [-0.24, 0.24]) fan(Fy, dx + fx * bw, v, Math.min(0.17 * s, bw * 0.2), y + 0.03 * s + bh, u);   // two fan grilles on top
-      B(Fy, dx + 0.1 * bw, v - dd / 2 - 0.006, 0.1 * s, 0.05 * s, 0.01, C.white, y + 0.28 * s, u);              // nameplate
+      DP(Fy, dx + 0.25 * bw, v - dd / 2 - 0.006, 0.1 * s, 0.05 * s, y + 0.3 * s, 'plate', u, 'z', 0.01);              // nameplate
       B(Fy, dx - bw / 2 - 0.035, v + dd * 0.25, 0.05, 0.13 * s, 0.07 * s, C.steel, y + 0.1 * s, u); Ly(Fy, dx - bw / 2 - 0.035, v + dd * 0.25 + 0.05 * s, 0.006, 0.1 * s, C.dark, y + 0.05 * s, 'r', u);   // disconnect and conduit
       Ly(Fy, dx + bw / 2 + 0.06, v - dd * 0.2, 0.014 * s, 0.14, C.copper, y + 0.12 * s, 't', u); Ly(Fy, dx + bw / 2 + 0.06, v + dd * 0.2, 0.014 * s, 0.14, C.pipe, y + 0.12 * s, 't', u);   // refrigerant stubs
     };
@@ -371,7 +396,9 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
         for (const hh of [0.1, 0.32]) Cy(Fy, ix + sd * 0.12 * k, face + 0.05 * k, 0.06 * k, 0.025 * k, C.dark, y + 0.04 + hh * k);   // clamp bands
         Cy(Fy, ix + sd * 0.12 * k, face + 0.05 * k, 0.045 * k, 0.03 * k, C.cap, y + 0.04 + 0.4 * k);               // capped crown
       }
-      B(Fy, ix, face - 0.004, 0.1 * k, 0.14 * k, 0.012, C.white, y + 0.04 + 0.16 * k);                           // the locked service hatch between the canisters
+      DP(Fy, ix, face - 0.004, 0.1 * k, 0.14 * k, y + 0.04 + 0.16 * k, 'door', undefined, 'z', 0.012);                           // the locked service hatch between the canisters
+      DP(Fy, ix, iv - 0.1 * k - 0.004, 0.2 * k, 0.1 * k, y + 0.04 + 0.34 * k, 'airin');                                   // AIR IN label on the housing
+      SH(Fy, ix, iv, 0.5 * k, 0.34 * k, y + 0.001, C.concDark, 0x34363a, 0.08);
       B(Fy, ix, face + 0.004, 0.03 * k, 0.02 * k, 0.016, C.steel, y + 0.04 + 0.14 * k);                          // its lock
       B(Fy, ix, face, 0.04 * k, 0.025 * k, 0.014, 0x4fa04f, y + 0.04 + 0.34 * k);                                 // the status lamp (green: the intake is ready and sealed)
       // the duct run: an armored conduit back along the yard floor to the shell, on three pipe hangers, ending in a flanged collar
@@ -387,7 +414,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       // the exhaust beside it: the same sealed stack, its valve housing and duct to its own collar (nothing opens to the yard)
       const ex = 0.31 * W;
       B(Fy, ex, iv, 0.5 * k, 0.04, 0.34 * k, C.concDark, y); B(Fy, ex, iv, 0.3 * k, 0.4 * k, 0.2 * k, C.armor, y + 0.04); B(Fy, ex, iv, 0.38 * k, 0.04 * k, 0.26 * k, C.roof, y + 0.04 + 0.4 * k);
-      Cy(Fy, ex, face + 0.02 * k, 0.07 * k, 0.34 * k, C.steel, y + 0.04); Cy(Fy, ex, face + 0.02 * k, 0.075 * k, 0.025 * k, C.dark, y + 0.04 + 0.28 * k); B(Fy, ex, face - 0.004, 0.09 * k, 0.12 * k, 0.012, C.white, y + 0.04 + 0.14 * k);
+      Cy(Fy, ex, face + 0.02 * k, 0.07 * k, 0.34 * k, C.steel, y + 0.04); Cy(Fy, ex, face + 0.02 * k, 0.075 * k, 0.025 * k, C.dark, y + 0.04 + 0.28 * k); DP(Fy, ex, face - 0.004, 0.09 * k, 0.12 * k, y + 0.04 + 0.14 * k, 'grille', undefined, 'z', 0.012);
       Ly(Fy, ex, dc, 0.035 * k, dl, C.armor, dy, 'r');
       B(Fy, ex, vz, 0.17 * k, 0.2 * k, 0.17 * k, C.armor, dy - 0.1 * k); B(Fy, ex, vz, 0.19 * k, 0.025, 0.19 * k, C.cap, dy + 0.1 * k); B(Fy, ex, vz + 0.095 * k, 0.1 * k, 0.03 * k, 0.012, C.red, dy - 0.02 * k);
       Cy(Fy, ex, vz, 0.05 * k, 0.012, C.steel, dy + 0.125 * k);
@@ -403,7 +430,9 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       const tx = -0.37 * W, tz = D * 0.5, u = 'chiller', tw = Math.min(0.7 * kk, W * 0.17), td = Math.min(0.62 * kk, D * 0.45), y = 0.045;
       B(Fy, tx, tz, tw + 0.08, 0.15 * kk, td + 0.08, C.concDark, y, u);                                           // basin
       B(Fy, tx, tz, tw, 0.5 * kk, td, C.tower, y + 0.15 * kk, u);                                                  // body
-      for (const sd of [-1, 1]) for (let i = 0; i < 8; i++) B(Fy, tx - tw * 0.4 + i * tw * 0.8 / 7, tz + sd * (td / 2 + 0.005), tw * 0.04, 0.38 * kk, 0.012, C.louver, y + 0.2 * kk, u);   // fill louvers
+      for (const sd of [-1, 1]) DP(Fy, tx, tz + sd * (td / 2 + 0.006), tw * 0.9, 0.38 * kk, y + 0.2 * kk, 'louver', u, 'z', 0.012, 0xc4cad0);   // fill louvers (texture)
+      SH(Fy, tx, tz, tw + 0.08, td + 0.08, y + 0.001, C.concDark, 0x3c3e3b, 0.1);
+      DP(Fy, tx - tw * 0.3, tz - td / 2 - 0.014, 0.1, 0.05, y + 0.09 * kk, 'hot', u);                                    // hot-surface label on the basin side
       Cy(Fy, tx, tz, Math.min(0.24 * kk, tw * 0.4), 0.18 * kk, C.tower, y + 0.65 * kk, u, Math.min(0.28 * kk, tw * 0.46));   // the fan stack
       fan(Fy, tx, tz, Math.min(0.22 * kk, tw * 0.4), y + 0.83 * kk, u);
       B(Fy, tx, tz, tw * 1.05, 0.015, td * 1.05, C.steel, y + 0.65 * kk - 0.01, u);                               // platform
@@ -420,7 +449,9 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       B(Fy, dx, v, tw + 0.1, 0.03, td + 0.1, C.concDark, y, u);                                                   // plinth
       B(Fy, dx, v, tw, th, td, C.xfmr, y + 0.03, u); B(Fy, dx, v, tw + 0.02, 0.02 * kk, td + 0.02, C.xfmr, y + 0.03 + th, u);   // tank and lid
       for (let i = 0; i < 3; i++) B(Fy, dx - tw / 2 + (i + 0.5) * tw / 3, v - td / 2 - 0.007, 0.014, th * 0.8, 0.016, C.steel, y + 0.05, u);      // vertical stiffener ribs on the tank (panel relief)
-      for (let i = 0; i < 7; i++) B(Fy, dx + tw / 2 + 0.03 + (i % 2) * 0.012, v - td * 0.4 + i * td * 0.13, 0.016, th * 0.85, 0.06 * kk, C.xfmr, y + 0.06 * kk, u);    // radiator fins
+      DP(Fy, dx + tw / 2 + 0.03, v, td * 0.82, th * 0.85, y + 0.06 * kk, 'fins', u, 'x', 0.05, 0x9aa4ad);              // radiator bank (fin texture)
+      SH(Fy, dx, v, tw + 0.1, td + 0.1, y + 0.001, C.concDark, 0x34363a, 0.12);
+      DP(Fy, dx - 0.18 * tw, v - td / 2 - 0.012, 0.13 * kk, 0.065 * kk, y + 0.28 * kk, 'hv', u);                         // high-voltage warning
       Ly(Fy, dx, v + td * 0.1, 0.055 * kk, tw * 0.9, C.xfmr, y + 0.03 + th + 0.1 * kk, 't', u);                    // the conservator
       for (const k of [-1, 0, 1]) {
         const bx = dx + k * tw * 0.3;
@@ -429,7 +460,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
         Cy(Fy, bx, v - td * 0.2, 0.012 * kk, 0.03 * kk, C.copper, y + 0.03 + th + 0.28 * kk, u);
       }
       for (const k of [-1.5, -0.5, 0.5, 1.5]) Cy(Fy, dx + k * tw * 0.2, v + td * 0.33, 0.016 * kk, 0.09 * kk, C.porc, y + 0.03 + th + 0.02 * kk, u);   // LV bushings
-      B(Fy, dx, v - td / 2 - 0.006, 0.12 * kk, 0.06 * kk, 0.01, C.white, y + 0.2 * kk, u);                         // nameplate
+      DP(Fy, dx + 0.167 * tw, v - td / 2 - 0.012, 0.085 * kk, 0.042 * kk, y + 0.13 * kk, 'plate', u, 'z', 0.01);                         // nameplate
       for (const sd of [-1, 1]) B(Fy, dx + sd * (tw * 0.65), v - td * 0.2, 0.025, 0.62 * kk, 0.025, C.steel, y + 0.03, u);   // gantry posts
       B(Fy, dx, v - td * 0.2, tw * 1.35, 0.025, 0.03, C.steel, y + 0.03 + 0.6 * kk, u);                             // crossbeam
       for (const k of [-1, 0, 1]) Cy(Fy, dx + k * tw * 0.3, v - td * 0.2, 0.01 * kk, 0.12 * kk, C.porc, y + 0.03 + 0.48 * kk, u);   // insulator strings
@@ -459,6 +490,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       for (const sd of [-1, 1]) B(Pf, sd * (pw / 2 - tw / 2), pz, tw, ph, plen, LIN, 0, undefined, 0, S1());
       B(Pf, 0, pz, pw, tw, plen, LIN2, ph - tw, undefined, 0, S1());
       { const [lx, lz] = loc(Pf, 0, pz); lamps.push({ x: lx, z: lz, y: ph - 0.012, ceil: 'gnd', k: 0.42 }); }
+      B(Pf, 0, pz, pw * 0.5, 0.004, 0.14, 0xffffff, ph - tw - 0.004, undefined, 0, P1({ decal: { cell: 'light', face: 'ny' } }));      // a lit ceiling panel (glows by day too)
       // the inner door on the yard side: a steel leaf with a hazard stripe, a handle and its state lamp; it slides aside when open
       const inOpen = look === 'yard' || look === 'both', ix = inOpen ? pw * 0.82 : 0;
       B(Pf, ix, 0.115, pw * 0.8, ph * 0.9, 0.025, C.gate, 0, undefined, 0, S1()); B(Pf, ix, 0.13, pw * 0.8, 0.03, 0.01, C.hazard, ph * 0.55, undefined, 0, P1());
@@ -470,6 +502,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       B(Pf, 0, cz, pw + 0.12, 0.06, cl2, C.armor, ph, undefined, 0, S1());
       B(Pf, 0, (cz - cl2 / 2 + 0.12) / 2, pw, 0.012, 0.12 - (cz - cl2 / 2), FLR, 0, undefined, 0, P1());      // (one floor for the chamber and the passage)
       { const [lx, lz] = loc(Pf, 0, cz); lamps.push({ x: lx, z: lz, y: ph - 0.012, ceil: 'gnd', k: 0.42 }); }
+      B(Pf, 0, cz, pw * 0.5, 0.004, 0.2, 0xffffff, ph - 0.004, undefined, 0, P1({ decal: { cell: 'light', face: 'ny' } }));
       B(Pf, -pw * 0.5, dzC, 0.04, ph, 0.04, C.cap, 0, undefined, 0, P1()); B(Pf, pw * 0.5, dzC, 0.04, ph, 0.04, C.cap, 0, undefined, 0, P1());
       const dOpen = look === 'dome' || look === 'both', dx = dOpen ? pw * 0.9 : 0;
       B(Pf, dx, dzC + 0.004, pw * 0.8, ph * 0.9, 0.025, C.gate, 0, undefined, 0, S1()); B(Pf, dx, dzC - 0.01, pw * 0.8, 0.03, 0.01, C.hazard, ph * 0.5, undefined, 0, P1());

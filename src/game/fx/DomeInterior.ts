@@ -38,7 +38,7 @@ export function interiorPieces(plan: InteriorPlan, ground: (lx: number, lz: numb
     // worn lawn edge: a darker, packed-earth band just outside each curb (the lawn is textured; this is the contact line where feet cut the corner)
     if (tier === 'high') for (const k of [-1, 1]) pieces.push(box(0.03, 0.002, s.len, s.x, y - 0.0005, s.z, s.rot, 0x2e3420, k * (w / 2 + 0.032), 0, 0, 0.18, i + 40, [0, 1, 3, 4, 5]));
     for (const m of slabMarks(i, w, s.len, tier)) {
-      const hex = m.kind === 'moss' ? 0x3a4a28 : m.kind === 'stain' ? 0x80807a : 0x5a5c60, jit = 0.25;
+      const hex = m.kind === 'moss' ? 0x2e3326 : m.kind === 'stain' ? 0x80807a : 0x5a5c60, jit = 0.25;
       pieces.push(box(m.hw * 2, 0.0015, m.hl * 2, s.x, y + 0.02, s.z, s.rot, hex, m.v * w, m.u * s.len, 0, jit, i * 3 + (m.k * 100 | 0), [0, 1, 3, 4, 5]));
     }
   });
