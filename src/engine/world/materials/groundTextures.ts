@@ -14,52 +14,6 @@ function lcg(seed: number): () => number {
 }
 
 /**
- * Tileable 4-channel value-noise texture (each channel an independent fbm).
- * Sampled at several world scales by the shader for macro variation.
- */
-function makeNoiseTexture(): THREE.DataTexture {
-  const N = 256;
-  const data = new Uint8Array(N * N * 4);
-  const rnd = lcg(1337);
-  const periods = [4, 8, 16, 32];
-  const amps    = [0.5, 0.27, 0.15, 0.08];
-  for (let ch = 0; ch < 4; ch++) {
-    const field = new Float32Array(N * N);
-    for (let o = 0; o < periods.length; o++) {
-      const P = periods[o];
-      const lat = new Float32Array(P * P);
-      for (let k = 0; k < lat.length; k++) lat[k] = rnd();
-      const cell = N / P;
-      for (let y = 0; y < N; y++) {
-        const fy = y / cell;
-        const y0 = Math.floor(fy) % P, y1 = (y0 + 1) % P;
-        let ty = fy - Math.floor(fy); ty = ty * ty * (3 - 2 * ty);
-        for (let x = 0; x < N; x++) {
-          const fx = x / cell;
-          const x0 = Math.floor(fx) % P, x1 = (x0 + 1) % P;
-          let tx = fx - Math.floor(fx); tx = tx * tx * (3 - 2 * tx);
-          const a = lat[y0 * P + x0], b = lat[y0 * P + x1];
-          const c = lat[y1 * P + x0], d = lat[y1 * P + x1];
-          field[y * N + x] += amps[o] * ((a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty);
-        }
-      }
-    }
-    // Normalise to 0..1 (fbm sums cluster around the middle — stretch it)
-    let mn = Infinity, mx = -Infinity;
-    for (let k = 0; k < field.length; k++) { mn = Math.min(mn, field[k]); mx = Math.max(mx, field[k]); }
-    const sc = 1 / Math.max(1e-6, mx - mn);
-    for (let k = 0; k < field.length; k++) data[k * 4 + ch] = Math.round((field[k] - mn) * sc * 255);
-  }
-  const tex = new THREE.DataTexture(data, N, N, THREE.RGBAFormat);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.magFilter = THREE.LinearFilter;
-  tex.minFilter = THREE.LinearMipmapLinearFilter;
-  tex.generateMipmaps = true;
-  tex.needsUpdate = true;
-  return tex;
-}
-
-/**
  * Tileable grass-blade detail texture. RGB is a color modulation centered on
  * 0.5 (the shader multiplies by 2×), A is a pseudo height used for bump.
  * Blades are short, mostly upright strokes of varying tone; later strokes
@@ -108,6 +62,7 @@ function makeGrassDetailTexture(): THREE.DataTexture {
   tex.minFilter = THREE.LinearMipmapLinearFilter;
   tex.generateMipmaps = true;
   tex.anisotropy = 4;
+  tex.onUpdate = () => { (tex.image as { data: unknown }).data = null; tex.onUpdate = null; };   // heap: the GPU holds the image; drop the CPU copy
   tex.needsUpdate = true;
   return tex;
 }
@@ -124,7 +79,6 @@ export function ensureGroundTextures(): void {
   if (_sharedTexturesReady) return;
   _sharedTexturesReady = true;
   groundUniforms.uGDetail.value = makeGrassDetailTexture();
-  groundUniforms.uGNoise.value = makeNoiseTexture();
 }
 
 /**

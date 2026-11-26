@@ -133,6 +133,7 @@ export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, g
     geos.push(partGeometry({ shape: 'cyl', x: l.x, z: l.z, y0: 0, w: 0, h: l.y, d: 0, r: 0.014, rot: 0, color: 0x30343a, ...(onPad ? { lvl: true } : {}) }, ground, stem, undefined, level));
     // a real fixture: a flared base collar, a lantern housing (dark frame under the lens), a hooded cap and a ring
     const gy = onPad ? level + 0.045 : ground(l.x, l.z);
+    if (!onPad) geos.push(colorPart(new THREE.CircleGeometry(0.056, 6).rotateX(-Math.PI / 2), 0x1c2314, l.x, gy + 0.0012, l.z));   // (a dark contact patch round the base)
     geos.push(colorPart(noBottom(new THREE.CylinderGeometry(0.022, 0.03, 0.06, 8)), 0x23272c, l.x, gy + 0.03, l.z),
       colorPart(new THREE.CylinderGeometry(0.03, 0.026, 0.014, 8), 0x23272c, l.x, gy + l.y + 0.006, l.z),
       colorPart(new THREE.CylinderGeometry(0.014, 0.046, 0.026, 8), 0x2d3238, l.x, gy + l.y + 0.074, l.z),

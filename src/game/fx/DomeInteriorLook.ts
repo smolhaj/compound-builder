@@ -13,6 +13,8 @@ import { domesOf as standingDomes } from '../../sim/dome/standing';
 import { domesOf as liveDomes, stateOf } from '../../sim/dome/live';
 import { linkRun, linkState, linksOf } from '../../sim/dome/linkGraph';
 import { easeInterior, interiorDormant, interiorTarget } from '../../sim/dome/interiorClimate';
+import { ensureLawnTexture } from '../../engine/world/materials/lawnTexture';
+import { detailTier } from '../buildkit/buildingDetail';
 import { DOME_MAX, writeDomeMask, type DomeFootprint } from '../../engine/world/season/domeMask';
 
 /** Half width of a walkway tube (world units) and its soft edge. */
@@ -61,6 +63,7 @@ export class DomeInteriorLook {
       }
     }
     this.last = out.filter(f => f.k > 0.002).slice(0, DOME_MAX);
+    if (this.last.length) ensureLawnTexture(detailTier());   // the lawn's grass sheet exists only while a dome stands (its size follows the tier)
     return writeDomeMask(this.last, dormant);
   }
 }

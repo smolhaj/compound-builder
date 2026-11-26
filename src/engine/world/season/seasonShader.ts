@@ -97,6 +97,9 @@ uniform vec4 uSeaP;
 uniform vec4 uSeaD;
 uniform vec4 uSeaX;
 ${DOME_DECL}
+#ifdef SEA_LAWN
+uniform sampler2D uSeaLawn;
+#endif
 `;
 
 /**
@@ -186,6 +189,17 @@ float seaNoise(vec2 p) {
   return mix(mix(seaHash(i), seaHash(i + vec2(1.0, 0.0)), u.x),
              mix(seaHash(i + vec2(0.0, 1.0)), seaHash(i + vec2(1.0, 1.0)), u.x), u.y);
 }
+#ifdef SEA_LAWN
+/** Screen-space bump of a height field (the dome lawn's blade height): the view-space normal tilted by the height's screen derivatives. */
+vec3 seaLawnBump(vec3 pos, vec3 n, float hgt, float k) {
+  vec3 sx = dFdx(pos), sy = dFdy(pos);
+  vec3 r1 = cross(sy, n), r2 = cross(n, sx);
+  float det = dot(sx, r1);
+  if (abs(det) < 1e-12) return n;
+  vec3 g = sign(det) * (dFdx(hgt) * r1 + dFdy(hgt) * r2) * k;
+  return normalize(abs(det) * n - g);
+}
+#endif
 /** Snow multiplier from earlier stages (regional terrain: forest canopy holds less). */
 float seaSnowMul = 1.0;
 /** Fallen-leaf color at a world xz (fine speckle, averaged out with distance). */
@@ -302,9 +316,29 @@ if ( uSeaB.x + uSeaB.y + uSeaB.z + uSeaB.w + uSeaA.z + uSeaC.x + uSeaD.y + uSeaD
     float seBF = 1.0 - smoothstep( 5.0, 28.0, length( vViewPosition ) );
     float seBlade = 1.0 + seBF * ( ( seaNoise( seP.xz * 15.0 ) - 0.5 ) * 0.55 + ( seaNoise( seP.xz * 53.0 + 2.1 ) - 0.5 ) * 0.4 );
     float sePatch = smoothstep( 0.55, 0.85, seaNoise( seP.xz * 0.9 + 11.7 ) );
+#ifdef SEA_LAWN
+    // the textured dome lawn (materials/lawnTexture): two rotated samples of the shared grass sheet, patchy mowed and unmowed areas, faint mowing stripes, dry patches,
+    // a blade bump on the normal and a roughness that follows the blade height (near the camera only; the mips carry it further out)
+    vec2 seQ = seP.xz;
+    vec4 seT1 = texture2D( uSeaLawn, seQ * 0.42 ), seT2 = texture2D( uSeaLawn, vec2( seQ.x * 0.8 - seQ.y * 0.6, seQ.x * 0.6 + seQ.y * 0.8 ) * 0.131 + 0.37 );
+    vec3 seLawn = mix( seT1.rgb, seT2.rgb, 0.42 );
+    float seMow = smoothstep( 0.4, 0.62, seaNoise( seP.xz * 0.23 + 3.1 ) );
+    seLawn *= mix( vec3( 0.84, 0.92, 0.8 ), vec3( 1.08, 1.06, 0.96 ), seMow );
+    seLawn *= 1.0 + 0.05 * seMow * ( sin( dot( seP.xz, vec2( 0.8, 0.6 ) ) * 5.2 ) );
+    float seDryP = smoothstep( 0.66, 0.8, seaNoise( seP.xz * 0.19 + 9.7 ) * 0.7 + seaNoise( seP.xz * 0.8 + 1.3 ) * 0.3 );
+    seLawn = mix( seLawn, vec3( 0.24, 0.17, 0.07 ) * ( 0.8 + 0.4 * seT1.a ), seDryP * 0.4 );
+    seLawn = mix( seLawn, vec3( 0.19, 0.17, 0.09 ) * ( 0.9 + 0.2 * seN1 ), seLB.y * 0.55 );   // dormant band: straw
+    float seHL = mix( seT1.a, seT2.a, 0.42 );
+    float seBumpK = 1.0 - smoothstep( 3.0, 20.0, length( vViewPosition ) );
+    if ( seBumpK > 0.01 && seUp * seaDomeM > 0.5 ) normal = seaLawnBump( - vViewPosition, normal, seHL, 0.9 * seBumpK );
+    roughnessFactor = mix( roughnessFactor, 0.97 - 0.2 * seHL + 0.08 * seDryP, seUp * seaDomeM );
+    diffuseColor.rgb = mix( diffuseColor.rgb, seLawn * ( 1.14 + 0.24 * seN1 ), seUp * seaDomeM * 0.97 );
+    totalEmissiveRadiance += vec3( 0.006, 0.02, 0.003 ) * ( 0.8 + 0.4 * seN1 ) * ( 1.0 - 0.6 * seLB.y ) * seUp * seaDomeM * uSeaDomeI.w;
+#else
     vec3 seLawn = mix( vec3( 0.05, 0.27, 0.02 ), vec3( 0.17, 0.30, 0.06 ), sePatch * 0.7 );
     diffuseColor.rgb = mix( diffuseColor.rgb, seLawn * ( 0.85 + 0.3 * seN1 ) * seBlade * ( 1.0 - 0.6 * seLB.y ), seUp * seaDomeM * 0.95 );
-    totalEmissiveRadiance += vec3( 0.008, 0.05, 0.004 ) * ( 0.8 + 0.4 * seN1 ) * ( 1.0 - 0.6 * seLB.y ) * seUp * seaDomeM * uSeaDomeI.w;   // (by daylight, so a night interior is dark; keeps the grass green under the cold grade)
+    totalEmissiveRadiance += vec3( 0.008, 0.05, 0.004 ) * ( 0.8 + 0.4 * seN1 ) * ( 1.0 - 0.6 * seLB.y ) * seUp * seaDomeM * uSeaDomeI.w;
+#endif   // (by daylight, so a night interior is dark; keeps the grass green under the cold grade)
 #endif
   }
   // Fallen leaves: drifts on lawns, along curbs and in road gutters
