@@ -1019,6 +1019,8 @@ export function setWindowGlow(k: number, time = 0, warmth = 1, fire = 0): void {
   if (g) { g.emissiveIntensity = 1.1 * kk; g.opacity = Math.min(0.9, kk * 1.2); g.visible = kk > 0.02; }
   const l = _cache.get('lamp');
   if (l) l.emissiveIntensity = 0.4 + 2.6 * kk;
+  // the lifted self-light of the painted panel steel (so shaded gates read by day) fades with the daylight: a dim blue-gray at night, never glowing
+  for (const id of ['panel_steel', 'panel_dark', 'panel_light'] as const) { const ps = _cache.get(id) as THREE.MeshStandardMaterial | undefined; if (ps) ps.emissiveIntensity = 0.1 + 0.9 * (1 - Math.max(0, Math.min(1, k))); }
   const ar = _cache.get('arcology');
   if (ar) ar.emissiveIntensity = 0.12 + 0.3 * kk;
   // an oil lamp's flame breathes; electric light holds steady; a blackout curtain lets a glimmer round its edges
