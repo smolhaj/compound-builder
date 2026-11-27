@@ -39,8 +39,8 @@ import { climateCards } from './climateReadout';
 import { ventsIced } from '../snowLoad';
 import { INTAKE, hasFilteredIntake, intakeAir } from './intake';
 import type { PlantKind } from './plantUnits';
-import { damagePlant, fxOf, plantJobs, rushPlant, rushQuote, specOf, unitsOf } from './plantLive';
-import { PLANT_SHORT, plantKinds, spareProblem, spareUsd } from './plantUnits';
+import { damagePlant, fxOf, plantJobs, rawFxOf, rushPlant, rushQuote, specOf, unitsOf } from './plantLive';
+import { PLANT_SHORT, controlCanSeal, plantKinds, spareProblem, spareUsd } from './plantUnits';
 import { billUpkeep } from './upkeep';
 import { effectiveRoof, roofHazard, roofRefusal, type RoofCtx, type RoofState } from './yardRoof';
 import {
@@ -571,6 +571,8 @@ export function lockdownProblem(s: GameState, on: boolean, id?: string): string 
   const st = stateOf(s, d);
   if (on && st.lockdown) return 'already sealed';
   if (!on && !st.lockdown) return 'already open';
+  // the arcology's doors and airlocks are shut from its control block (sim/dome/controlBlock.ts, Doors wing): with the block down nobody can call the seal (opening always works; PROPOSED, owner to confirm)
+  if (on && !controlCanSeal(rawFxOf(s, d, st).control)) return 'the control block is down: the airlocks cannot be shut from the Operations Room until it is repaired';
   return null;
 }
 

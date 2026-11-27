@@ -10,6 +10,7 @@ import type { KitMaterialId } from './materials';
 import { TIER, DOME_TIERS, parseDomeKind, withSizedDomes } from '../../sim/dome/tiers';
 import { rectVsCircle } from '../../sim/dome/siting';
 import { BUNKER_PROBLEM_TEXT } from '../../sim/dome/bunker';
+import { CONTROL_PROBLEM_TEXT } from '../../sim/dome/controlBlock';
 
 const TIER_CELLS = Object.fromEntries(DOME_TIERS.map(t => [t, TIER[t].cells])) as Record<(typeof DOME_TIERS)[number], number>;
 const TIER_BLURB = Object.fromEntries(DOME_TIERS.map(t => [t, TIER[t].blurb])) as Record<(typeof DOME_TIERS)[number], string>;
@@ -669,7 +670,7 @@ export interface SiteQuery {
   rule?(kind: string, x: number, z: number): PlaceProblem | null;
 }
 
-export type PlaceProblem = 'cross_slope' | 'needs_house' | 'needs_slope' | 'no_climb' | 'no_creek' | 'no_head' | 'no_water' | 'not_connected' | 'not_on_bank' | 'not_shore' | 'off_parcel' | 'overlaps' | 'pad_clash' | 'pad_over_road' | 'straddles_dome' | 'straddles_skirt' | 'airlock_lane' | 'utility_lane' | 'skirt_too_shallow' | 'earthen_hut' | 'thin_cover' | 'too_deep' | 'too_much_climb' | 'too_steep' | 'water' | 'water_near_dome';
+export type PlaceProblem = 'cross_slope' | 'needs_house' | 'needs_slope' | 'no_climb' | 'no_creek' | 'no_head' | 'no_water' | 'not_connected' | 'not_on_bank' | 'not_shore' | 'off_parcel' | 'overlaps' | 'pad_clash' | 'pad_over_road' | 'straddles_dome' | 'straddles_skirt' | 'airlock_lane' | 'utility_lane' | 'skirt_too_shallow' | 'earthen_hut' | 'thin_cover' | 'too_deep' | 'too_much_climb' | 'too_steep' | 'water' | 'water_near_dome' | 'control_block' | 'control_path';
 
 const levelOf = (d: KitPieceDef) => d.level ?? 'surface';
 /** Do pieces at these levels compete for the same ground? (Bunker rooms go under the yard and houses.) */
@@ -796,6 +797,7 @@ export const PROBLEM_TEXT: Record<PlaceProblem, string> = {
   cross_slope: 'The ground falls away sideways across it: turn it (R) to run up the hill, not across',
   pad_clash: 'Its graded pad would cut into a neighbor\'s pad at another level',
   ...BUNKER_PROBLEM_TEXT,
+  ...CONTROL_PROBLEM_TEXT,
   straddles_dome: 'The dome\'s wall would cut through a building (or a building would stand across the wall): put it wholly inside or wholly outside',
   pad_over_road: 'Its flat ground (and the wall that holds it) would be graded over the drive, the camp or the road\'s bank: move it clear of the road',
   no_water: 'Your land has no lake or river wide enough for a dock',

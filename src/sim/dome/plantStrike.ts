@@ -26,11 +26,12 @@ import { yardGeometry, YARD_WALL, type YardGeom } from './plantYard';
 import { type PlantKind, type PlantPlace, type PlantUnit } from './plantUnits';
 import { domesOf as liveDomes, stateOf, type DomeRef, type DomeState } from './live';
 import { damagePlant, unitsOf } from './plantLive';
+import { CONTROL_SECURITY } from './plantUnits';
 
 /** The order a crew that means to starve the dome out goes for the units (first is best). */
-export const SIEGE_ORDER: readonly PlantKind[] = ['substation', 'air', 'chiller', 'water', 'battery', 'vents'];
+export const SIEGE_ORDER: readonly PlantKind[] = ['substation', 'air', 'chiller', 'water', 'battery', 'vents', 'control'];      // (the control block last: a crew that got inside goes for the machinery first)
 /** The order for a dome that is not sealed (nobody is breathing its air): the climate and the power first. */
-export const SIEGE_ORDER_OPEN: readonly PlantKind[] = ['substation', 'chiller', 'air', 'water', 'battery', 'vents'];
+export const SIEGE_ORDER_OPEN: readonly PlantKind[] = ['substation', 'chiller', 'air', 'water', 'battery', 'vents', 'control'];
 
 export interface Reach { yardBreached: boolean; shellOpened: boolean; airlockForced: boolean }
 /** Can a crew touch a unit that stands at `place`, given what it opened? (`vents` stand in the shell itself.) */
@@ -110,7 +111,8 @@ export function strikePlant(s: GameState, battle: Battle | null, overrun: boolea
     if (!units.length) continue;
     const yard = yardGeometry(d.tier, d.r, d.st.rot);
     const counters = countersOf(s, yard ? { x: d.st.x + yard.center[0], z: d.st.z + yard.center[1] } : null, home, null);
-    const cover = yard ? yardCover(s, yard, d.st.x, d.st.z) : 0;
+    // the control block's Security wing runs the yard's cameras and tower links: a struck block blinds half the cover, a downed one all of it (monotone: never raises a crew's odds' opposite)
+    const cover = yard ? yardCover(s, yard, d.st.x, d.st.z) * CONTROL_SECURITY[units.find(u => u.kind === 'control')?.cond ?? 'ok'] : 0;
     const breachP = yard ? yardBreachOdds({ truck: crew.means.truck, satchels: crew.means.satchels, difficulty: diff, cover, bollards: counters.bollards, vehicleBlocked: counters.vehicleBlocked }) : 0;
     const base: Reach = { yardBreached: false, shellOpened: shell.opened, airlockForced: shell.airlock };
     const anyReachable = breachP > 0 || units.some(u => reachable(u.place, u.kind, base));

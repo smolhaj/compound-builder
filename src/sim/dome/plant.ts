@@ -106,7 +106,7 @@ function weather(color: number, x: number, z: number, amt = 0.08): number {
   return (r << 16) | (g << 8) | b;
 }
 
-export interface PlantOpts { loop?: WaterLoop; spares?: readonly PlantKind[]; rot?: number; /** The arcology's plant yard roof (sim/dome/yardRoof.ts); default closed. */ roof?: RoofState; /** QA look of the yard's service airlock: both doors shut and the lamps red (`sealed`, the default), the dome-side door slid open (`dome`), the yard-side door slid open (`yard`), or cycling (amber, both shut). */ airlock?: AirlockLook; /** The geothermal purchases drawn in the yard and on the ground outside it (sim/dome/geothermal.ts, save v107): a tower on the pad, the loop's header vault and bore field (`bores`: how many the field has), the deep well's head. */ geo?: GeoLook }
+export interface PlantOpts { loop?: WaterLoop; spares?: readonly PlantKind[]; rot?: number; /** The arcology's plant yard roof (sim/dome/yardRoof.ts); default closed. */ roof?: RoofState; /** QA look of the yard's service airlock: both doors shut and the lamps red (`sealed`, the default), the dome-side door slid open (`dome`), the yard-side door slid open (`yard`), or cycling (amber, both shut). */ airlock?: AirlockLook; /** The geothermal purchases drawn in the yard and on the ground outside it (sim/dome/geothermal.ts, save v107): a tower on the pad, the loop's header vault and bore field (`bores`: how many the field has), the deep well's head. */ geo?: GeoLook; /** Where the arcology's control block stands in the dome's local frame (sim/dome/controlBlock.ts): a struck block burns and smokes there like any unit. */ control?: { x: number; z: number } }
 export interface GeoLook { tower?: boolean; loop?: boolean; bores?: number; well?: boolean; /** Water or creek bank at a point of the dome's local frame (with its margin): no bore cap is placed there. */ wet?: (x: number, z: number) => boolean }
 
 /** A frame: a point on the ground and a turn; `dx` runs along the shell (tangent), `dz` outward from the dome. */
@@ -611,6 +611,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
 
   const unitSpots: PlantUnitSpot[] = [];
   for (const [id, p] of note) { const kind = id.replace(/2$/, '') as PlantKind; unitSpots.push({ id, kind, place: tier === 'arcology' && kind !== 'vents' && kind !== 'chiller' && kind !== 'substation' ? 'gallery' : kind === 'chiller' || kind === 'substation' ? (yard ? 'yard' : 'inside') : 'inside', x: p.x, z: p.z }); }
+  if (tier === 'arcology' && o.control) unitSpots.push({ id: 'control', kind: 'control', place: 'inside', x: o.control.x, z: o.control.z });
   void YARD_GAP; void tau;
   // the yard is a graded pad: its equipment, slab and curbs stand on the one level plane (the walls and roof already do), so the slab never lies under the ground at a corner
   if (yard) for (const q of parts) if (!q.lvl && !q.high && !q.onShell && q.wallTop === undefined && !q.passage && inYard(yard, 0, 0, q.x, q.z)) q.lvl = true;

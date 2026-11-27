@@ -29,9 +29,9 @@ import { detailTier } from '../buildkit/buildingDetail';
 export interface DomePlantFx { group: THREE.Group; key: string; /** Show the buried lines (the underground view). */ setUnder(on: boolean): void; /** The building view: in the cutaway and x-ray views the machinery turns see-through and the sealed passage shows. */ setView(v: 'full' | 'cutaway' | 'xray'): void; dispose(): void }
 
 /** What the renderer needs of the plant's state: the loop, the spares, the dome's turn, which units are hurt, and whether the dome is dark. */
-export interface PlantLook { /** QA look of the yard's service airlock (plant.ts `AirlockLook`). */ airlock?: AirlockLook; /** The arcology's plant yard roof state (sim/dome/yardRoof.ts). */ roof?: RoofState; loop?: WaterLoop; spares?: readonly PlantKind[]; rot?: number; hurt?: Readonly<Record<string, PlantCond>>; dark?: boolean; /** The dome floor's dressing (paths, benches, crates, lamps; fx/domeInteriorPlan), merged into the plant's own draw calls, and its signature. */ interior?: InteriorPlan; interiorKey?: string; /** The geothermal purchases drawn in and outside the yard (plant.ts `GeoLook`). */ geo?: GeoLook }
+export interface PlantLook { /** QA look of the yard's service airlock (plant.ts `AirlockLook`). */ airlock?: AirlockLook; /** The arcology's plant yard roof state (sim/dome/yardRoof.ts). */ roof?: RoofState; loop?: WaterLoop; spares?: readonly PlantKind[]; rot?: number; hurt?: Readonly<Record<string, PlantCond>>; dark?: boolean; /** The dome floor's dressing (paths, benches, crates, lamps; fx/domeInteriorPlan), merged into the plant's own draw calls, and its signature. */ interior?: InteriorPlan; interiorKey?: string; /** The geothermal purchases drawn in and outside the yard (plant.ts `GeoLook`). */ geo?: GeoLook; /** The arcology's control block's centre in the dome's local frame, so a struck block burns there. */ control?: { x: number; z: number } }
 export const plantKey = (tier: DomeTier, r: number, filtering: Filtering, o: PlantLook = {}): string =>
-  `${tier}:${o.roof ?? 'closed'}:${o.airlock ?? 's'}:${r.toFixed(2)}:${filtering}:${o.loop ?? 'none'}:${(o.spares ?? []).join(',')}:${o.rot ?? 0}:${Object.entries(o.hurt ?? {}).filter(([, c]) => c !== 'ok').map(([k, c]) => k + c).sort().join(',')}:${o.interiorKey ?? ''}:${o.dark ? 1 : 0}:${o.geo ? `${o.geo.tower ? 't' : ''}${o.geo.loop ? 'l' + (o.geo.bores ?? 0) : ''}${o.geo.well ? 'w' : ''}` : ''}:${detailTier()}`;
+  `${tier}:${o.roof ?? 'closed'}:${o.airlock ?? 's'}:${r.toFixed(2)}:${filtering}:${o.loop ?? 'none'}:${(o.spares ?? []).join(',')}:${o.rot ?? 0}:${Object.entries(o.hurt ?? {}).filter(([, c]) => c !== 'ok').map(([k, c]) => k + c).sort().join(',')}:${o.interiorKey ?? ''}:${o.dark ? 1 : 0}:${o.control ? 'c' : ''}:${o.geo ? `${o.geo.tower ? 't' : ''}${o.geo.loop ? 'l' + (o.geo.bores ?? 0) : ''}${o.geo.well ? 'w' : ''}` : ''}:${detailTier()}`;
 
 const LINE_COLOR: Record<PlantLine['kind'], number> = { power: 0xd9822b, chill: 0x4f9bd0, water: 0x2f7fb5, feeder: 0xe0a030, passage: 0x35e0c8 };
 const CHAR = 0x1c1a18;
@@ -125,7 +125,7 @@ function noBottom(g: THREE.CylinderGeometry): THREE.CylinderGeometry {
 
 /** `r`: shell radius (world units); `ground(lx, lz)`: terrain height in the dome's local frame. */
 export function makeDomePlant(tier: DomeTier, r: number, filtering: Filtering, ground: (lx: number, lz: number) => number, look: PlantLook = {}): DomePlantFx {
-  const plant = plantLayout(tier, r, filtering, { loop: look.loop, spares: look.spares, rot: look.rot, roof: look.roof, airlock: look.airlock, geo: look.geo }), stem = STEM[tier] ?? 0.1, hurt = look.hurt ?? {};
+  const plant = plantLayout(tier, r, filtering, { loop: look.loop, spares: look.spares, rot: look.rot, roof: look.roof, airlock: look.airlock, geo: look.geo, control: look.control }), stem = STEM[tier] ?? 0.1, hurt = look.hurt ?? {};
   const group = new THREE.Group();
   group.name = 'dome_plant';
   const owned: Array<{ dispose(): void }> = [];

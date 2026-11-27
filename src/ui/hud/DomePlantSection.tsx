@@ -49,6 +49,7 @@ export function DomePlantSection({ v }: { v: DomeView }) {
         </div>;
       })}
     </div>
+    {d.tier === 'arcology' && <Note>The control block runs the dome's doors and airlocks, power transfer, water, climate and security from one armored building inside the shell. It can only be hit if a crew gets through the shell or forces an airlock. Struck, the plant falls back to local controls (derated power, less climate and water, half the yard's camera cover); if it is out, the dome cannot be sealed from the Operations Room until it is repaired. Nothing may be built on it or on its service paths.</Note>}
     {d.tier !== 'earthen' && <Note>The control room, the pumps and the pipe runs stand inside the shell with the units above and are never exposed. Pipes and cables run underground, inside the buried footing, and cross it only in sealed sleeves; the underground view (U) shows them.</Note>}
     {yard
       ? <div data-testid="plant-yard" style={{ marginTop: 6 }}>
