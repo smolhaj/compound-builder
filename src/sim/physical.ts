@@ -5,6 +5,7 @@
  * `disaster.fx.physical` (save v98 `fx`, no save bump).
  */
 import { log } from './economy';
+import { reportPowerLoss } from './powerLoss';
 import { blueprintOf, isFinished, knockBack } from './construction';
 import { addFix } from './improvements';
 import { insuranceClaim, materialsValue } from './paperwork';
@@ -68,7 +69,7 @@ export function applyLevel(s: GameState, st: Structure, level: DamageLevel, haza
     text = `${why} The ${name} is ${LEVEL_NAME[1]}${done ? ': a repair job is in Projects' : ' (the damage is already on the repair list)'}.`;
   } else if (level === 2) {
     const stage = stageFor(st, hazard), stages = blueprintOf(st).stages;
-    knockBack(s, st, stage);
+    knockBack(s, st, stage, `${hazard} damage`);
     if (stages[stage]?.id === 'roof' && isHome(st.kind)) st.kept = true;
     text = `${why} The ${name} is ${LEVEL_NAME[2]}: it goes back to ${stages[stage]?.name.toLowerCase() ?? 'the frame'} and has to be redone.`;
   } else {
@@ -78,6 +79,7 @@ export function applyLevel(s: GameState, st: Structure, level: DamageLevel, haza
     else {
       for (let i = 1; i < Math.min(st.stage, stages.length); i++) for (const [k, n] of Object.entries(stages[i].materials) as Array<[keyof GameState['stock'], number]>) s.stock[k] += n * 0.33;
       st.lost = true; st.stage = 0; st.done = 0; st.supplied = false; st.finishedAt = null; st.roofLost = true; st.roofLostAt = s.clock.t;
+      reportPowerLoss(s, st, `${hazard} damage`);
       text = `${why} The ${name} is ${LEVEL_NAME[3]}: clear the wreck and rebuild from the footing.`;
     }
   }
