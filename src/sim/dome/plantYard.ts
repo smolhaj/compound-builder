@@ -108,3 +108,22 @@ export function inYard(g: YardGeom, ox: number, oz: number, x: number, z: number
 
 /** How deep the passage's sleeve is cast: into the footing, at the skirt's own depth (ft), so the skirt and tunnel rules cover it like the rest of the wall. */
 export const passageDepthFt = (tier: DomeTier): number => TIER[tier].skirtFt;
+
+/**
+ * The service airlock's boxes in the yard's own frame (the frame at the portal's arc offset `u` on the yard's inner wall, z out toward the yard: `fr` then `loc` as in plant.ts): the
+ * passage (z from `pz - plen/2` to `0.12`), the chamber (centered on `cz`, `cl2` long), their clear width `pw` and clear height `ph`, and the dome-side door plane `dzC`.
+ */
+export function airlockDims(g: YardGeom): { fr: { x: number; z: number; rot: number }; pw: number; ph: number; plen: number; pz: number; cz: number; cl2: number; dzC: number } {
+  const plen = g.portal.len, pz = 0.12 - plen / 2, shellDz = -plen + 0.12, cl2 = CHAMBER_LEN + 0.03, cz = shellDz - CHAMBER_LEN / 2 - 0.03 + 0.015, dzC = shellDz - CHAMBER_LEN - 0.03 - 0.012;
+  const p = yardPoint(g, g.portal.u, 0);
+  return { fr: { x: p[0], z: p[1], rot: g.phi }, pw: PORTAL_W, ph: PORTAL_H, plen, pz, cz, cl2, dzC };
+}
+/** A point of the airlock's frame (x across, z along, from `airlockDims().fr`) in the dome's local frame. */
+export const airlockLoc = (fr: { x: number; z: number; rot: number }, dx: number, dz: number): [number, number] => [fr.x + dx * Math.cos(fr.rot) + dz * Math.sin(fr.rot), fr.z - dx * Math.sin(fr.rot) + dz * Math.cos(fr.rot)];
+
+/** Is the world point (x, z) on the service lock's floor: the chamber and passage (plus a margin) or the yard's slab? Nothing grows there (weeds, reeds, ground cover). `ox, oz`: the dome's center. */
+export function inServiceLock(g: YardGeom, ox: number, oz: number, x: number, z: number): boolean {
+  const d = airlockDims(g), dx = x - ox - d.fr.x, dz = z - oz - d.fr.z, c = Math.cos(d.fr.rot), s = Math.sin(d.fr.rot), ax = dx * c - dz * s, az = dx * s + dz * c;
+  if (Math.abs(ax) < d.pw / 2 + 0.12 && az > d.dzC - 0.08 && az < 0.25) return true;
+  return inYard(g, ox, oz, x, z, 0.1);
+}

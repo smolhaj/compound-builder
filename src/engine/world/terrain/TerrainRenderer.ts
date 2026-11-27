@@ -16,6 +16,7 @@ import { CROP_SLOTS, cropSlotsFor } from './cropCalendar';
 import { applyEdgeHaze } from './edgeHaze';
 import { applySnaps, buildAdaptiveMesh, leafSurface, planLeaves, type AdaptiveMesh } from './terrainLod';
 import { HEIGHT_FOG_GLSL } from '../fog/heightFog';
+import { LAWN_UNIFORM } from '../materials/lawnTexture';
 import { applyGroundSkyFill, ensureGroundTextures, groundUniforms } from '../materials/groundTextures';
 import { seasonState } from '../season/seasonState';
 import type { Quality } from '../WorldScene';
@@ -190,10 +191,11 @@ export function makeTerrainMaterial(look: RegionLook, waterY: number | null): { 
   ensureGroundTextures(); // r15: the shared grass-blade texture (sampled near the camera)
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.96, metalness: 0 });
   // the thawed ground goes to mud in mud season (season patch, uSeaD.z)
-  mat.defines = { ...mat.defines, SEA_MUD: '' };
+  mat.defines = { ...mat.defines, SEA_MUD: '', SEA_LAWN: '' };
   mat.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, u);
     sh.uniforms.uGDetail = groundUniforms.uGDetail;
+    sh.uniforms.uSeaLawn = LAWN_UNIFORM;   // the dome lawn's shared grass sheet (null until a dome stands: ensureLawnTexture)
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute float aForest;\nattribute float aField;\nvarying vec3 vRPos;\nvarying vec3 vRNrm;\nvarying float vForest;\nvarying float vField;')
       .replace('#include <project_vertex>', '#include <project_vertex>\nvRPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvRNrm = normalize(mat3(modelMatrix) * objectNormal);\nvForest = aForest;\nvField = aField;');

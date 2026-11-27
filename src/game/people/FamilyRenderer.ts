@@ -50,11 +50,15 @@ export class FamilyRenderer {
   private _lastClock = -1;
 
   constructor(scene: THREE.Scene) {
-    this._layer = new FigureLayer(scene, 16, 'family');
+    this._layer = new FigureLayer(scene, 28, 'family');
   }
 
   /** Ids of the people drawn outdoors this frame (not hidden indoors / asleep). */
   readonly shown = new Set<string>();
+
+  /** Scenery figures that are not the household (the control block's staff, people/DomeStaff): appended after the household each frame; capacity left over from the household's 16. */
+  private _extras: ((t: number) => ReadonlyArray<{ wear: Wear; pose: FigurePose }>) | null = null;
+  setExtras(fn: ((t: number) => ReadonlyArray<{ wear: Wear; pose: FigurePose }>) | null): void { this._extras = fn; }
 
   /** Where someone stands and which way they face (null: never placed). */
   poseOf(id: string): { x: number; z: number; rot: number } | null {
@@ -176,6 +180,7 @@ export class FamilyRenderer {
       this._layer.setPose(n, fp);
       n++;
     });
+    if (this._extras) for (const e of this._extras(this._time)) { if (n >= this._layer.capacity) break; this._layer.setWear(n, e.wear); this._layer.setPose(n, e.pose); n++; }
     this._layer.commit(n, true);
   }
 

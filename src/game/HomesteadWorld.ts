@@ -53,6 +53,7 @@ import { fenceLean } from './atmosphere/aging';
 import { LEANS, leanRun } from './atmosphere/fenceAging';
 import { FamilyRenderer } from './people/FamilyRenderer';
 import { setFigureDetail } from '../engine/world/people/figureKit';
+import { staffAt, type StaffFigure } from './people/DomeStaff';
 import { BunkerFolk, type WorldSpot } from './people/BunkerFolk';
 import { bunkerOccupants, hatchOpen } from '../sim/bunkerLife';
 import { DogRenderer } from './people/DogRenderer';
@@ -169,20 +170,22 @@ import { bedHour, pickHomeLine } from '../sim/domesticLines';
 import { domeOf, domeLook, domesOf as domesLive, yardRoofOf } from '../sim/dome/live';
 import type { RoofState } from '../sim/dome/yardRoof';
 import { TIER, cellsOfKind, shellFt, tierOfKind } from '../sim/dome/tiers';
-import { inYard, yardGeometry } from '../sim/dome/plantYard';
+import { inServiceLock, inYard, yardGeometry } from '../sim/dome/plantYard';
 import { isGradedTier } from '../sim/dome/grading';
 import { makeDomePlant, plantKey, type DomePlantFx, type PlantLook } from './fx/DomePlant';
 import { interiorPlan, type Obstacle } from './fx/domeInteriorPlan';
-import { plantLayout } from '../sim/dome/plant';
+import { plantLayout, type AirlockLook } from '../sim/dome/plant';
 import { getDoorLook } from './buildkit/domeBuildings';
 import { makeVehiclePorts, type PortFixtures, type PortInput } from './fx/VehiclePorts';
 import { planToPort, portFrameOf } from '../sim/dome/portRoad';
+import { controlBlockPlan, turnPlan } from '../sim/dome/controlBlock';
 import { insideLane, onApron, portCycleSeconds, vehicleTail, type PortFrame } from '../sim/dome/vehiclePort';
 /** Clear ground round a dome's shell and apron (world units: 2 = 40 ft). */
 const KILL_ZONE = 2.0;
 import { guardCount } from '../sim/guards';
 import { makeLinkFixtures, linksKey, type LinkFixtureInput, type LinkFixtures } from './fx/DomeLinks';
 import { domeFrom, domesOf as standingDomes } from '../sim/dome/standing';
+import { campClashesDome, type CampDome } from './fx/campInDome';
 import { linkState, linksOf } from '../sim/dome/linkGraph';
 import { stateOf as domeStateOf } from '../sim/dome/live';
 import { fxOf as plantFxOf, unitsOf as plantUnitsOf } from '../sim/dome/plantLive';
@@ -300,6 +303,8 @@ export class HomesteadWorld {
   /** The family's camp (until a home stands; it stays as the work yard). */
   readonly camp: { x: number; z: number; rot: number };
   private readonly _campGroup: THREE.Group;
+  /** The camp's own ground level (before a dome's level pad took the ground under it). */
+  private _campY0 = 0;
   /** The chore yard round the camp (sim/daily.ts). */
   private readonly _yard: Yard;
   readonly family: FamilyRenderer;
@@ -405,6 +410,7 @@ export class HomesteadWorld {
     this.stream = new StreamRenderer(ws.scene);
     this.lakes = new RegionalWaterRenderer(ws.scene);
     this.family = new FamilyRenderer(ws.scene);
+    this.family.setExtras(t => this._staffFigures(t));
     this.bunkerFolk = new BunkerFolk(ws.scene);
     this.dogs = new DogRenderer(ws.scene);
     this.guardPosts = new GuardPostProp(ws.scene);
@@ -416,6 +422,7 @@ export class HomesteadWorld {
     this._campGroup.position.set(this.camp.x, this.parcel.height(this.camp.x, this.camp.z), this.camp.z);
     // on a slope (a hillside or the island's knoll) the tent's uphill wall and the woodpile's tin sheet sink into the ground: raise the camp (and its yard) toward the highest ground under it, by at most about 40 cm (more would float the downhill side)
     { const y0 = this._campGroup.position.y; let up = 0; for (let k = 0; k < 8; k++) up = Math.max(up, this.parcel.height(this.camp.x + Math.cos(k * Math.PI / 4) * 0.9, this.camp.z + Math.sin(k * Math.PI / 4) * 0.9) - y0); this._campGroup.position.y = y0 + Math.min(up, 0.07); }
+    this._campY0 = this._campGroup.position.y;
     this._campGroup.rotation.y = this.camp.rot;
     this._root.add(this._campGroup);
     this._yard = buildYard();
@@ -430,7 +437,8 @@ export class HomesteadWorld {
       scene: ws.scene, groundAt: this.groundAt, camp: this.camp, family: this.family,
       buildings: () => this._atmosBuildings(),
       runs: () => this._runs.flatMap(run => { const g = this._runGroups.get(run.id); return g ? [{ run, group: g.group }] : []; }),
-      blocked: (x, z) => this.onBuilding(x, z, 0.02, false) || this.onAccess(x, z, 0.1) || this.onCamp(x, z, 0.2),
+      blocked: (x, z) => this.onBuilding(x, z, 0.02, false) || this.onAccess(x, z, 0.1) || this.onCamp(x, z, 0.2)
+      , noGrow: (x, z) => this._inServiceLock(x, z),
     });
     this.paths = new PathLayer({
       scene: ws.scene, groundAt: this.groundAt, makeWorld: () => this._pathWorld(), extras: g => this._pathExtras(g),
@@ -596,7 +604,7 @@ export class HomesteadWorld {
     const dst = domeStateOf(game, ref), hurt: Record<string, 'ok' | 'damaged' | 'down'> = {};
     for (const u of plantUnitsOf(game, ref, dst)) if (u.cond !== 'ok') hurt[u.id] = u.cond;
     const dark = plantFxOf(game, ref, dst).power === 'dark', inter = this._interiorFor(b, game, ref, dst.filtering, dark);
-    const plook: PlantLook = { roof: this._roofQA ?? yardRoofOf(game, ref.st.id), loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark, interior: inter.plan, interiorKey: inter.key };
+    const plook: PlantLook = { roof: this._roofQA ?? yardRoofOf(game, ref.st.id), loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark, airlock: this._airlockQA ?? undefined, interior: inter.plan, interiorKey: inter.key };
     const key = plantKey(ref.tier, ref.r, dst.filtering, plook), cur = this._domePlants.get(b.placed.id);
     if (cur) cur.setView(this._view);
     if (!cur || cur.key !== key) {
@@ -628,7 +636,9 @@ export class HomesteadWorld {
       const rr = q.shape === 'box' ? Math.hypot(q.w, q.d) / 2 : q.r;
       if (rr > 0.06) obs.push({ x: q.x, z: q.z, hx: rr, hz: rr });
     }
-    const plan = interiorPlan(ref.tier, ref.r, angles, obs, b.placed.rot + 1, vehicles);
+    // the arcology's control block: planned in the dome's own frame exactly as the builder draws it (buildkit/domeBuildings), then turned with the dome
+    const cb0 = ref.tier === 'arcology' && vehicles.length ? controlBlockPlan(ref.tier, ref.r, vehicles[0] - b.placed.rot * Math.PI / 2) : null, cb = cb0 ? turnPlan(cb0, b.placed.rot * Math.PI / 2) : null;
+    const plan = interiorPlan(ref.tier, ref.r, angles, obs, b.placed.rot + 1, vehicles, cb);
     // the plant's equipment is lit at night: a pool of light round every unit (the yard and gallery read as a working place, not a dark plane)
     { const big = plantLayout(ref.tier, ref.r, filtering, { rot: b.placed.rot }).parts.filter(q => !q.onShell && !q.high && q.shape === 'box' && q.h > 0.12 && Math.max(q.w, q.d) > 0.3 && Math.hypot(q.x, q.z) < ref.r * 1.8).sort((p, q) => Math.max(q.w, q.d) - Math.max(p.w, p.d)).slice(0, 8);
       // (the pool lies on the aisle side of each unit, in front of its doors, where the ground shows)
@@ -638,6 +648,13 @@ export class HomesteadWorld {
     const made = { plan, key };
     this._interiorCache.set(b.placed.id, made);
     return made;
+  }
+
+  /** The control block's staff (people/DomeStaff): scenery figures at the consoles and on the footpaths of every finished arcology. */
+  private _staffFigures(t: number): StaffFigure[] {
+    const out: StaffFigure[] = [];
+    for (const b of this._built.values()) { const cb = b.cover && b.finished ? this._interiorCache.get(b.placed.id)?.plan.control : null; if (cb) out.push(...staffAt({ plan: cb, ox: b.placed.x, oz: b.placed.z, y: b.group.position.y + 0.01 }, t)); }
+    return out;
   }
 
   /** A gravel drive in to the yard (else a two-track, and the truck stops at the gate). */
@@ -877,6 +894,9 @@ export class HomesteadWorld {
   /** Is (x, z) in (or within `m` of) a dome's open crater or the moat round its skirt? Trees and ground cover keep out. */
   /** QA: force the arcology's plant yard roof state for a shot (null: the game's own state, interlocks included). */
   private _roofQA: RoofState | null = null;
+  private _airlockQA: AirlockLook | null = null;
+  /** QA: the yard's service airlock look (doors slid open, cycling lamps); null: sealed. */
+  setYardAirlockLook(s: AirlockLook | null): void { this._airlockQA = s; for (const [, f] of this._domePlants) { this._root.remove(f.group); f.dispose(); } this._domePlants.clear(); }
   setYardRoofLook(s: RoofState | null): void { this._roofQA = s; for (const [, f] of this._domePlants) { this._root.remove(f.group); f.dispose(); } this._domePlants.clear(); }
   /** The kill zone round every dome (owner, 2026-11-21): no tree, shrub or rock within about 40 ft (2 units) of the shell's base or of the apron and the road's end, so the approach is open ground. */
   private _portZones: PortFrame[] = [];
@@ -946,6 +966,7 @@ export class HomesteadWorld {
       const cd = Math.hypot(x - this.camp.x, z - this.camp.z);
       if (cd < 1.7) { density = Math.min(density, cd < 1.2 ? 0 : (cd - 1.2) / 0.5 * 0.6); worn = Math.max(worn, 0.5 * (1 - cd / 1.7)); }
       if (this._pitCircles.length && this._inPit(x, z, 0.5)) density = 0;
+      if (this._inServiceLock(x, z)) density = 0;      // (a steel floor and a slab: no ground cover in the service lock or the plant yard)
       if (this.onAccess(x, z, 0.35)) density = 0;
       else if (this.onAccess(x, z, 0.8)) density = Math.min(density, 0.45);
       if (density > 0) {
@@ -1827,6 +1848,19 @@ export class HomesteadWorld {
     return Math.hypot(x - this.camp.x, z - this.camp.z) < 1.1 + pad;
   }
 
+  /** Is (x, z) in a dome's service airlock (the chamber and its passage): no weeds grow on a steel floor. */
+  private _inServiceLock(x: number, z: number): boolean {
+    for (const b of this._built.values()) {
+      if (!b.cover) continue;
+      const k = `${b.placed.id}|${b.placed.kind}|${b.placed.rot}`;
+      let yg = this._lockGeo.get(k);
+      if (yg === undefined) { const tier = tierOfKind(b.placed.kind); yg = tier ? yardGeometry(tier, shellFt(tier, cellsOfKind(b.placed.kind) ?? TIER[tier].cells) / 40, b.placed.rot) : null; this._lockGeo.set(k, yg); }
+      if (yg && inServiceLock(yg, b.placed.x, b.placed.z, x, z)) return true;
+    }
+    return false;
+  }
+  private readonly _lockGeo = new Map<string, ReturnType<typeof yardGeometry>>();
+
   /** Is (x, z) within `pad` of a built footprint (porch included)? */
   onBuilding(x: number, z: number, pad = 0, withPorch = true, domes = false): boolean {
     for (const b of this._built.values()) {
@@ -1870,7 +1904,8 @@ export class HomesteadWorld {
     let y = padLevel;
     // a dome's pad goes under the pads already graded, so the buildings that stand in it keep their own level
     if (pad) this.parcel.setPads(gradedDome ? [pad, ...this.parcel.pads] : [...this.parcel.pads, pad]);
-    if (pad && gradedDome) this._domeLevels.set(p.id, { x0: pad.x0, z0: pad.z0, x1: pad.x1, z1: pad.z1, y: pad.y });
+    if (def.level === 'cover') { const d = domeFrom(p as unknown as Structure); if (d) { this._domeLite.set(p.id, { x: d.x, z: d.z, r: d.r, airlocks: d.airlocks }); this._snapCamp(); } }
+    if (pad && gradedDome) { this._domeLevels.set(p.id, { x0: pad.x0, z0: pad.z0, x1: pad.x1, z1: pad.z1, y: pad.y }); this._snapCamp(); }
     const opts: BuildOpts = {};
     if (climb) opts.rise = climb.rise;
     // a dome meets the hill: its stem wall and berm are draped on the natural ground (no pad), sampled from the group's own frame
@@ -1970,8 +2005,20 @@ export class HomesteadWorld {
   private readonly _digKeys = new Map<string, string>();
   private _pitCircles: Array<[number, number, number, number]> = [];
   private _lastStructures: readonly Structure[] = [];
+  /** Every dome's centre, radius and airlocks (graded or not): the camp is not drawn where it would clip an entrance. */
+  private readonly _domeLite = new Map<string, CampDome>();
   private readonly _domeLevels = new Map<string, { x0: number; z0: number; x1: number; z1: number; y: number }>();
   private readonly _harden = new Map<string, { key: string; tiers: NonNullable<Structure['hardening']> }>();
+
+  /** The camp and its chore yard stand on the ground they were built on; when a dome's level pad takes that ground (the camp lies inside it) they stand on the pad instead, so nothing hovers over, or sinks into, the graded lawn. */
+  private _snapCamp(): void {
+    let y = this._campY0, hide = false;
+    for (const d of this._domeLevels.values()) if (this.camp.x >= d.x0 && this.camp.x <= d.x1 && this.camp.z >= d.z0 && this.camp.z <= d.z1) { y = d.y; break; }
+    for (const d of this._domeLite.values()) if (campClashesDome(this.camp, d)) { hide = true; break; }
+    this._campGroup.position.y = y; this._yard.group.position.y = y;
+    // (a camp that would clip a dome's shell, entrance module or lane is not drawn there)
+    this._campGroup.visible = !hide; this._yard.group.visible = !hide;
+  }
 
   private _underOpts(p: Placed, placed: readonly Placed[], datum: number): BuildOpts {
     const def = KIT[p.kind];
@@ -2383,6 +2430,8 @@ export class HomesteadWorld {
     if (b.smoke) this._ws.scene.remove(b.smoke.points);
     this._built.delete(id);
     this._domeLevels.delete(id);
+    this._domeLite.delete(id);
+    this._snapCamp();
     this._dropDig(id);
     { const bg = this._buried.get(id); if (bg) { this._ws.scene.remove(bg); disposeSite(bg); this._buried.delete(id); } }
     this._interiorCache.delete(id);
@@ -2666,7 +2715,7 @@ export class HomesteadWorld {
       m.material = see ? xrayOf(ud.baseMat) : ud.baseMat;
       if (this._section?.id === b.placed.id) m.material = this._clipped(m.material, this._section.plane);
       // (a foundation's banked earth and a dome's stem wall, berm and embankment hug the ground: no shadow pass cost)
-      m.castShadow = !see && !['kit_glass', 'kit_dome_glass', 'kit_dome_polycarb', 'kit_string'].includes(ud.baseMat.name) && !ud.baseMat.name.startsWith('kit_glow') && !(layer === 'foundation' && (ud.baseMat.name === 'kit_earth' || b.cover)) && !(b.cover && layer === 'walls');
+      m.castShadow = !see && !['kit_glass', 'kit_dome_glass', 'kit_dome_polycarb', 'kit_string'].includes(ud.baseMat.name) && !ud.baseMat.name.startsWith('kit_glow') && !(layer === 'foundation' && (ud.baseMat.name === 'kit_earth' || b.cover)) && !(b.cover && (layer === 'walls' || layer === 'interior' || layer === 'decor'));
       if (layer === 'cutwalls') m.visible = v === 'cutaway' && b.finished;
       else if (v === 'cutaway' && CUTAWAY_HIDE.includes(layer) && (b.finished || layer !== 'walls')) m.visible = false;
       // seen from far off, the inside of an enclosed building is hidden (no draw, no shadow); only in the plain exterior view

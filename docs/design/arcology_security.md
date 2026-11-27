@@ -13,6 +13,8 @@ game draws and models today, and lists what is NOT modeled in rules so the owner
    The person chamber and the port chamber never connect to each other.
 5. **Inner lane.** A poured lane from the inner gate to a pad, kept clear of props.
 
+6. **Control block.** One armored building inside, between the plant yard's service airlock and the entrance module, runs every dome system (Power, Water, Climate, Doors/Airlocks, Security wings round a glass-walled Operations Room). Its door opens on the ring path; the Doors wing shows the same red/amber/green gate states as the entrance lamps; the yard's power, water and chilled-water lines surface at a manifold beside the yard airlock and run to the utility wings. Visual and layout only: no rule reads it, so it is not yet a point that can be attacked, lose power or be locked down (owner decision needed).
+
 ## Penetrations of the shell and how each is sealed
 
 | Penetration | Where | Sealing (drawn) | In the rules? |

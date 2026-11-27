@@ -93,6 +93,6 @@ describe('dome daylight', () => {
     writeDomeDaylight(NaN); expect(domeDaylightNow()).toBe(1);
     installSeasonShaderPatch();
     const SC = THREE.ShaderChunk as unknown as Record<string, string>;
-    expect(SC.season_surface.match(/seaDomeM \* uSeaDomeI\.w/g)?.length).toBe(2);
+    expect(SC.season_surface.match(/seaDomeM \* uSeaDomeI\.w/g)?.length).toBe(3);   // (the dome greenhouse light, and one lawn emissive term per lawn branch: textured and flat)
   });
 });

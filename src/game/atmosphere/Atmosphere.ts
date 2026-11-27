@@ -66,6 +66,8 @@ export interface AtmosHost {
   family: FamilyRenderer;
   /** Is the spot taken (buildings, access, camp): no weeds there. */
   blocked: (x: number, z: number) => boolean;
+  /** Steel and slab floors where nothing grows even inside a wild area (a dome's service lock, its passage and the plant yard's slab). */
+  noGrow?: (x: number, z: number) => boolean;
 }
 
 /** The frame's sky and weather. */
@@ -406,7 +408,7 @@ export class Atmosphere {
     const key = areas.map(a => `${a.x0.toFixed(2)},${a.z0.toFixed(2)},${a.weeds},${a.saplings}`).join('|');
     const blocked = (x: number, z: number) => this._h.blocked(x, z);
     // weeds in a field grow between the rows too: only the walls and the access block them
-    this._wild.build(key, areas, this._h.groundAt, (x, z) => blocked(x, z) && !areas.some(a => !a.ring && x > a.x0 && x < a.x1 && z > a.z0 && z < a.z1));
+    this._wild.build(key, areas, this._h.groundAt, (x, z) => !!this._h.noGrow?.(x, z) || blocked(x, z) && !areas.some(a => !a.ring && x > a.x0 && x < a.x1 && z > a.z0 && z < a.z1));
   }
 
   get wildCounts(): { weeds: number; saplings: number } { return this._wild.counts; }
