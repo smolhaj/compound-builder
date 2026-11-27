@@ -34,28 +34,30 @@ try {
       if (!sp) return null;
       G.getState().plan(KIND, sp[0], sp[1], 0);
       const st = G.getState().game.structures.at(-1);
-      G.setState(s => { const g = structuredClone(s.game); for (const q of g.structures) { q.stage = 99; q.done = 0; q.finishedAt = 0; q.supplied = true; if (q.id === st.id) q.portAngle = deg * Math.PI / 180; } return { game: g }; });
+      G.setState(s => { const g = structuredClone(s.game); for (const q of g.structures) { q.stage = 99; q.done = 0; q.finishedAt = 0; q.supplied = true; if (q.id === st.id) { q.portAngle = deg * Math.PI / 180; q.id = st.id + 'p'; } } return { game: g }; });   // (a new id: the world rebuilds the dome at the stamped angle, as a dome planned there would be)
       { const live = await import('/src/sim/dome/live.ts'); G.setState(s => { const g = structuredClone(s.game); const ref = live.domeOf(g, st.id); if (ref) { const o = live.ownState(g, ref); o.dust = 0; o.co2ppm = 500; } return { game: g }; }); }
       cb.store.getState().setHudHidden?.(true);
-      return { id: st.id, x: st.x, z: st.z };
+      return { id: st.id + 'p', x: st.x, z: st.z };
     }, [KIND, deg]);
     if (!info) { console.error('no spot'); await page.close(); continue; }
     await frames(4);
-    await set(`const s = cb.store.getState(); s.setTimeOfDay(15.5); s.setBuildingView('cutaway'); s.setSeasonMode?.('summer'); s.setWeatherMode('clear');`);
+    await set(`const s = cb.store.getState(); s.setTimeOfDay(15.5); s.setBuildingView('full'); s.setSeasonMode?.('summer'); s.setWeatherMode('clear');`);
     const cbp = await page.evaluate(id => { const w = window.__cb.world; const c = w._interiorCache.get(id)?.plan.control; return c ? { cx: c.cx, cz: c.cz, angle: c.angle, between: c.between, w: c.w, yardDoor: c.yardDoor, gateDoor: c.gateDoor } : null; }, info.id);
     if (!cbp) { console.error('no control block plan'); await page.close(); continue; }
     lap(JSON.stringify({ deg, ...cbp }));
     const gd = (x, z) => page.evaluate(([x, z]) => window.__cb.world.groundAt(x, z), [x, z]);
     const pose = async (e, l, fov = 58) => page.evaluate(([e, l, fov]) => { window.__cb.qa.pose = { x: e[0], y: e[1], z: e[2], lx: l[0], ly: l[1], lz: l[2], fov }; }, [e, l, fov]);
     const y0 = await gd(info.x, info.z), R = 9, bx = info.x + cbp.cx, bz = info.z + cbp.cz, yd = [info.x + cbp.yardDoor[0], info.z + cbp.yardDoor[1]], ga = [info.x + cbp.gateDoor[0], info.z + cbp.gateDoor[1]];
-    // 1 the whole dome from inside over the gap: block, yard airlock and entrance in one frame (cutaway so the shell does not hide it)
-    await pose([info.x, y0 + R * 2.1, info.z + 0.05], [info.x, y0, info.z], 64); await shot('plan-overhead');
-    // 2 eye level: toward the block from the middle of the floor
-    { const k = 0.45, e = [info.x + cbp.cx * k, y0 + 0.25, info.z + cbp.cz * k], d = Math.hypot(cbp.cx, cbp.cz); await pose(e, [bx, y0 + 0.25, bz], 62); if (first || deg === 94) await shot('eye-toward-block'); void d; }
+    // 1 every port: from inside, over the floor toward the block (its yard-side wing, the entrance and the footpaths in view)
+    { const k = 0.3, e = [info.x + cbp.cx * k, y0 + 0.5, info.z + cbp.cz * k]; await pose(e, [bx, y0 + 0.3, bz], 66); await shot('inside-toward-block'); }
+    // 1b close in front of the block (3 units out), eye level
+    { const d = Math.hypot(cbp.cx, cbp.cz), k = (d - 3.4) / d, e = [info.x + cbp.cx * k, y0 + 0.3, info.z + cbp.cz * k]; await pose(e, [bx, y0 + 0.28, bz], 62); await shot('close-front-of-block'); }
+    // 2 a high oblique from the middle of the floor, the block and both airlocks together
+    { const k = 0.1, e = [info.x + cbp.cx * k, y0 + 3.2, info.z + cbp.cz * k]; await pose(e, [bx * 0.6 + info.x * 0.4, y0 + 0.2, bz * 0.6 + info.z * 0.4], 70); await shot('oblique-block-and-airlocks'); }
     if (first) {
       // 3 the placement rejection: an outhouse ghost on the block, then on the entrance path (the message shows top left with the HUD hidden)
-      await set(`cb.store.getState().setBuildingView('full')`);
-      await pose([bx, y0 + 3.0, bz + 3.2], [bx, y0, bz], 62);
+      await set(`cb.store.getState().setHudHidden?.(false)`);
+      await pose([bx - (bx - info.x) * 0.5, y0 + 2.6, bz - (bz - info.z) * 0.5], [bx, y0, bz], 66);
       await page.evaluate(([x, z]) => { const cb = window.__cb; cb.tool.setKind('outhouse'); cb.tool.hoverAt(x, z); }, [bx, bz]);
       await shot('reject-on-block');
       const mid = [(yd[0] + bx) / 2, (yd[1] + bz) / 2];
@@ -72,10 +74,10 @@ try {
         return m;
       }, info.id);
       lap('lockdown refusal: ' + msg);
-      await set(`cb.store.getState().setBuildingView('cutaway')`);
+      await set(`cb.store.getState().setHudHidden?.(true)`);
       await frames(4);
-      await pose([info.x + cbp.cx * 0.5, y0 + 0.9, info.z + cbp.cz * 0.5], [bx, y0 + 0.3, bz], 60); await shot('struck-block-burning');
-      await pose([info.x, y0 + R * 2.1, info.z + 0.05], [info.x, y0, info.z], 64); await shot('struck-block-overhead');
+      await pose([info.x + cbp.cx * 0.3, y0 + 0.5, info.z + cbp.cz * 0.3], [bx, y0 + 0.3, bz], 66); await shot('struck-block-burning');
+      await pose([info.x + cbp.cx * 0.1, y0 + 3.2, info.z + cbp.cz * 0.1], [bx * 0.6 + info.x * 0.4, y0 + 0.2, bz * 0.6 + info.z * 0.4], 70); await shot('struck-block-oblique');
       // 5 the plant panel with the block's row and the refusal (HUD visible)
       await set(`cb.store.getState().setHudHidden?.(false)`);
       await page.evaluate(() => window.__cb.game.getState().focusHud({ right: 'utilities' })); await page.waitForTimeout(500);
