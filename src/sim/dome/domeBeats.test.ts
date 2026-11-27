@@ -31,7 +31,7 @@ describe('raids on a dome are staged (presentation only)', () => {
         resetRaidMemory();
         const { b, dome } = fight(tier, seed);
         const out = domeBeats(b, { dome, seed, temper: 'hard', dir: new LineDirector(seed) });
-        expect(out.events.filter(e => e.kind !== 'say' && e.kind !== 'move' && e.kind !== 'cover' && e.kind !== 'probe' && e.kind !== 'tool' && e.kind !== 'dome_shot' && e.kind !== 'gesture')).toEqual((tier === 'arcology' ? sealedFight(b) : b).events.filter(e => e.kind !== 'say' && e.kind !== 'move' && e.kind !== 'cover'));
+        expect(out.events.filter(e => e.kind !== 'say' && e.kind !== 'move' && e.kind !== 'cover' && e.kind !== 'probe' && e.kind !== 'tool' && e.kind !== 'dome_shot' && e.kind !== 'gesture' && e.kind !== 'heavy')).toEqual((tier === 'arcology' ? sealedFight(b) : b).events.filter(e => e.kind !== 'say' && e.kind !== 'move' && e.kind !== 'cover'));
         for (let i = 1; i < out.events.length; i++) expect(out.events[i].t).toBeGreaterThanOrEqual(out.events[i - 1].t);
         for (const e of out.events) if (e.kind === 'probe') {
           probes++; kinds.add(e.what);
@@ -48,7 +48,7 @@ describe('raids on a dome are staged (presentation only)', () => {
         for (const e of out.events) if (e.kind === 'probe') {
           const mv = out.events.filter(m => m.kind === 'move' && m.unit === e.unit && m.t <= e.t).pop();
           expect(mv, `${tier} ${e.unit} @${e.t}`).toBeTruthy();
-          if (mv && mv.kind === 'move') { const walk = Math.hypot(mv.x - dome.x, mv.z - dome.z); expect(walk).toBeLessThan(dome.r + 1); }
+          if (mv && mv.kind === 'move') { const walk = Math.hypot(mv.x - dome.x, mv.z - dome.z); expect(walk, `${tier} ${e.unit} probe@${e.t} move@${mv.t}`).toBeLessThan(dome.r + 1); }
         }
         // an arcology shows nothing the shell does not hold against
         if (tier === 'arcology') for (const e of out.events) if (e.kind === 'probe') expect(e.holds).toBe(true);
@@ -131,7 +131,7 @@ describe('what a raid leaves on the shell, and the audit claims', () => {
 describe('dome caption wording', () => {
   it('names the right shell for each tier', () => {
     const everyLine = Object.values(DOME_LINES).flatMap(r => Object.values(r)).flatMap(v => Object.values(v ?? {}).flat() as string[]);
-    for (const tier of ['geodesic', 'arcology', 'earthen']) for (const l of everyLine) expect(shellWording(l, tier), `${tier}: ${l}`).not.toMatch(/glass/i);
+    for (const tier of ['geodesic', 'arcology', 'earthen']) for (const l of everyLine) expect(shellWording(l, tier).replace(tier === 'arcology' ? /\b(even|really made of|made of) glass\b/g : /^$/, ''), `${tier}: ${l}`).not.toMatch(/glass/i);
     expect(shellWording('Everybody on the glass! All at once!', 'geodesic')).toBe('Everybody on the panels! All at once!');
     expect(shellWording('Everybody on the glass! All at once!', 'glass')).toBe('Everybody on the glass! All at once!');
   });

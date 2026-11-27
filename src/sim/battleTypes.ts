@@ -163,6 +163,12 @@ export type BattleEvent =
   | { t: number; kind: 'probe'; unit: string; what: 'rifle' | 'sledge' | 'saw' | 'torch' | 'pry'; x: number; z: number; /** Unit vector pointing out of the dome at the spot. */ ox: number; oz: number; tier: 'earthen' | 'geodesic' | 'glass' | 'arcology'; holds: boolean; secs?: number }
   /** A raider fires at the shell (presentation only, no wound, no hit on anyone: sim/dome/domeBeats.ts). `bounce`: the round glances off, or comes back at the shooter, who is rocked for `down` seconds (never a wound). (x, z) is the point on the shell; (ox, oz) the outward unit vector. */
   | { t: number; kind: 'dome_shot'; unit: string; x: number; z: number; ox: number; oz: number; tier: 'earthen' | 'geodesic' | 'glass' | 'arcology'; bounce: 'glance' | 'back'; down?: number }
+  /**
+   * A heavy weapon is used against a sealed dome (presentation only, sim/dome/heavyFire.ts): `unit` fires `weapon` from (fx, fz) at the shell point (x, z) at height `y`,
+   * (ox, oz) the outward unit vector. It marks nobody and nothing: the shell takes no damage, the household is never hit. `prop`: the tank or truck that is driven up for it
+   * (shown for `hold` seconds, then gone).
+   */
+  | { t: number; kind: 'heavy'; unit: string; weapon: 'rpg' | 'tank' | 'hmg' | 'amr' | 'mortar' | 'thermite' | 'charge' | 'vbied'; x: number; z: number; y: number; ox: number; oz: number; fx: number; fz: number; hold: number }
   /** Someone at the shell makes a sign at the crew (presentation only): a wave-off, a pointing at the gate, a raised fist, facing (x, z). */
   | { t: number; kind: 'gesture'; unit: string; what: 'wave' | 'point' | 'fist'; x: number; z: number; secs: number }
   | { t: number; kind: 'end'; result: 'repelled' | 'fled' | 'breached' | 'overrun' };
