@@ -104,7 +104,7 @@ describe('strikePlant', () => {
   it('an open shell reaches what stands inside it; the gallery needs an airlock forced', () => {
     const g = baseGame('arcology'); const o = ownState(g, domeOf(g)!); o.filtering = 'closed'; o.loop = 'recycle';
     strikePlant(g, crew(9, false, 0), false, always, { opened: true, airlock: false });
-    expect(unitsOf(g, domeOf(g)!, stateOf(g, domeOf(g)!)).filter(u => u.cond !== 'ok').every(u => u.kind === 'vents')).toBe(true);
+    expect(unitsOf(g, domeOf(g)!, stateOf(g, domeOf(g)!)).filter(u => u.cond !== 'ok').every(u => u.kind === 'vents' || u.kind === 'control')).toBe(true);
     const g2 = baseGame('arcology'); const o2 = ownState(g2, domeOf(g2)!); o2.filtering = 'closed'; o2.loop = 'recycle';
     strikePlant(g2, crew(9, false, 0), false, always, { opened: false, airlock: true });
     expect(plantJobs(g2, 'dm').length).toBeGreaterThan(0);

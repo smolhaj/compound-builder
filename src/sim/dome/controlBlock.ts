@@ -1,5 +1,5 @@
 /**
- * The arcology's control block (owner request 2026-11-21, VISUAL + LAYOUT only: no rules read it and nothing is saved): ONE armored building inside the dome that runs every dome
+ * The arcology's control block (owner request 2026-11-21; since 2026-11-27 the placement rule reads its keepouts (below), and it is a plant unit `control` in plantUnits.ts; nothing of it is saved): ONE armored building inside the dome that runs every dome
  * system, set on the level pad against the inner arc between the plant yard's service airlock and the main entrance module (the vehicle sally port and the person airlock).
  * It has five labeled wings (Power, Water, Climate, Doors and airlocks, Security) round a glass-walled Operations Room. The utility wings face the plant yard, so the pipes and
  * conduit that come in through the yard's sealed passage run the short way to them; the Doors and Security wings face the entrance.
@@ -204,4 +204,50 @@ export const obstaclesOf = (p: ControlBlockPlan): Array<{ x: number; z: number; 
 export function inBlock(p: Pick<ControlBlockPlan, 'angle' | 'rho' | 'w' | 'd'>, x: number, z: number, pad = 0): boolean {
   const [lx, lz] = toBlock(p, x, z);
   return Math.abs(lx) <= p.w / 2 + pad && Math.abs(lz) <= p.d / 2 + pad;
+}
+
+// ── protection: what the player may not build over (owner request 2026-11-27) ──────────────────────────────────────────────────────────
+
+/** Why a piece cannot stand where it would cover the control block: on the block itself (its footprint or its nav colliders), or on the footpaths that join it to the yard airlock and to the entrance's inner door. */
+export type ControlProblem = 'control_block' | 'control_path';
+export const CONTROL_PROBLEM_TEXT: Record<ControlProblem, string> = {
+  control_block: 'That is the arcology\'s control block: it runs the doors, power, water, climate and security, and nothing can be built on it or against it',
+  control_path: 'That is the control block\'s service path, the way between the yard airlock, the entrance and the block: keep it clear',
+};
+/** Clear ground kept round the block's colliders, and half the width of a service path kept clear (a footpath is 0.7 wide; a person 0.28 and a hand cart need room beside it). */
+export const CONTROL_PAD = 0.08, CONTROL_PATH_HALF = 0.42;
+
+/** The block's keepouts in a world frame: the collision boxes and the two service paths (yard door to landing, entrance inner door to landing). */
+export interface ControlKeepout { boxes: Rect[]; paths: Pt[][]; half: number; between: boolean }
+
+/**
+ * The keepouts of the control block of an arcology of shell radius `r` centered at (x, z), turned `rot` quarter turns, with its vehicle port at the world angle `port`
+ * (the plan is made in the dome's own frame and carried to the world exactly as the builder and the world do). Null for any other tier. Cached: it is asked on every cursor move.
+ */
+const PLAN_CACHE = new Map<string, ControlBlockPlan | null>();
+export function controlKeepout(tier: DomeTier, r: number, x: number, z: number, rot: number, port: number): ControlKeepout | null {
+  if (tier !== 'arcology') return null;
+  // (the plan is the slow part and depends only on the dome's own frame: it is cached without the dome's place, so a dome dragged across the map costs nothing)
+  const key = `${r.toFixed(3)}|${rot}|${port.toFixed(4)}`, phi = rot * Math.PI / 2;
+  let plan = PLAN_CACHE.get(key);
+  if (plan === undefined) { const p0 = controlBlockPlan(tier, r, port - phi); plan = p0 ? turnPlan(p0, phi) : null; if (PLAN_CACHE.size > 64) PLAN_CACHE.clear(); PLAN_CACHE.set(key, plan); }
+  if (!plan) return null;
+  return {
+    boxes: plan.colliders.map(c => ({ x0: c.x0 + x - CONTROL_PAD, z0: c.z0 + z - CONTROL_PAD, x1: c.x1 + x + CONTROL_PAD, z1: c.z1 + z + CONTROL_PAD })),
+    paths: plan.paths.slice(0, 2).map(l => l.map(q => [q[0] + x, q[1] + z] as Pt)),
+    half: CONTROL_PATH_HALF, between: plan.between,
+  };
+}
+
+/** Distance from a point to a rectangle (0 inside). */
+const distToRect = (px: number, pz: number, r: Rect): number => Math.hypot(Math.max(r.x0 - px, 0, px - r.x1), Math.max(r.z0 - pz, 0, pz - r.z1));
+
+/** Does a rectangle (a building's footprint) cover the block or its service paths? The block is checked first. */
+export function rectControlProblem(k: ControlKeepout, r: Rect): ControlProblem | null {
+  for (const b of k.boxes) if (r.x0 < b.x1 && r.x1 > b.x0 && r.z0 < b.z1 && r.z1 > b.z0) return 'control_block';
+  for (const path of k.paths) for (let i = 1; i < path.length; i++) {
+    const a = path[i - 1], b = path[i], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.08));
+    for (let j = 0; j <= n; j++) if (distToRect(a[0] + (b[0] - a[0]) * j / n, a[1] + (b[1] - a[1]) * j / n, r) < k.half) return 'control_path';
+  }
+  return null;
 }

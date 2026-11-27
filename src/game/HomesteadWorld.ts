@@ -613,7 +613,7 @@ export class HomesteadWorld {
     const dst = domeStateOf(game, ref), hurt: Record<string, 'ok' | 'damaged' | 'down'> = {};
     for (const u of plantUnitsOf(game, ref, dst)) if (u.cond !== 'ok') hurt[u.id] = u.cond;
     const dark = plantFxOf(game, ref, dst).power === 'dark', inter = this._interiorFor(b, game, ref, dst.filtering, dark);
-    const plook: PlantLook = { roof: this._roofQA ?? yardRoofOf(game, ref.st.id), loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark, airlock: this._airlockQA ?? undefined, interior: inter.plan, interiorKey: inter.key, geo: dst.heatRejection === 'tower' || dst.groundLoop || dst.deepWell ? { tower: dst.heatRejection === 'tower', loop: !!dst.groundLoop, bores: dst.groundLoop ? loopField(ref.tier, ref.cells, dst.groundLoop).bores : 0, well: !!dst.deepWell, wet: (lx, lz) => this._wetGround(b.placed.x + lx, b.placed.z + lz) } : undefined };
+    const plook: PlantLook = { roof: this._roofQA ?? yardRoofOf(game, ref.st.id), loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark, airlock: this._airlockQA ?? undefined, interior: inter.plan, interiorKey: inter.key, control: inter.plan.control ? { x: inter.plan.control.cx, z: inter.plan.control.cz } : undefined, geo: dst.heatRejection === 'tower' || dst.groundLoop || dst.deepWell ? { tower: dst.heatRejection === 'tower', loop: !!dst.groundLoop, bores: dst.groundLoop ? loopField(ref.tier, ref.cells, dst.groundLoop).bores : 0, well: !!dst.deepWell, wet: (lx, lz) => this._wetGround(b.placed.x + lx, b.placed.z + lz) } : undefined };
     this._fieldBores.set(b.placed.id, plook.geo?.bores ?? 0);
     const key = plantKey(ref.tier, ref.r, dst.filtering, plook), cur = this._domePlants.get(b.placed.id);
     if (cur) cur.setView(this._view);

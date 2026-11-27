@@ -27,14 +27,14 @@ import { CREW_RATE, billUsd } from './cost';
 import type { MaterialId } from '../materials';
 import { hasYard, plantSize } from './plantYard';
 
-export type PlantKind = 'chiller' | 'air' | 'substation' | 'water' | 'battery' | 'vents';
-export const PLANT_KINDS: readonly PlantKind[] = ['chiller', 'air', 'substation', 'water', 'battery', 'vents'];
+export type PlantKind = 'chiller' | 'air' | 'substation' | 'water' | 'battery' | 'vents' | 'control';
+export const PLANT_KINDS: readonly PlantKind[] = ['chiller', 'air', 'substation', 'water', 'battery', 'vents', 'control'];
 export type PlantPlace = 'inside' | 'gallery' | 'yard';
 export type PlantCond = 'ok' | 'damaged' | 'down';
 export type PlantCause = 'raid' | 'fire' | 'storm' | 'heat' | 'load' | 'cold';
 
-export const PLANT_NAME: Record<PlantKind, string> = { chiller: 'Chillers and heat pumps', air: 'Air-handling and scrubber house', substation: 'Substation and transformers', water: 'Water recycling plant', battery: 'Battery block', vents: 'Roof vent hatches' };
-export const PLANT_SHORT: Record<PlantKind, string> = { chiller: 'chiller', air: 'scrubber house', substation: 'substation', water: 'water plant', battery: 'battery block', vents: 'roof vents' };
+export const PLANT_NAME: Record<PlantKind, string> = { chiller: 'Chillers and heat pumps', air: 'Air-handling and scrubber house', substation: 'Substation and transformers', water: 'Water recycling plant', battery: 'Battery block', vents: 'Roof vent hatches', control: 'Control block' };
+export const PLANT_SHORT: Record<PlantKind, string> = { chiller: 'chiller', air: 'scrubber house', substation: 'substation', water: 'water plant', battery: 'battery block', vents: 'roof vents', control: 'control block' };
 export const PLACE_NAME: Record<PlantPlace, string> = { inside: 'inside the shell', gallery: 'service gallery in the band', yard: 'walled yard outside' };
 
 /** The kinds a second unit can be bought for. */
@@ -51,6 +51,7 @@ export function plantKinds(tier: DomeTier, spec: PlantSpec): PlantKind[] {
   if (FILTERING.indexOf(spec.filtering) >= 1) out.push('air');
   if (spec.loop !== 'none') out.push('water');
   if (spec.filtering === 'closed') out.push('battery');
+  if (tier === 'arcology') out.push('control');      // (the arcology's control block, sim/dome/controlBlock.ts: one armored building inside the shell that runs the doors, power, water, climate and security)
   return PLANT_KINDS.filter(k => out.includes(k));
 }
 
@@ -59,7 +60,7 @@ export { hasYard, plantSize };
 /** Where a kind of unit stands. Heat rejection and the transformers need open air; the rest stays in the shell. */
 export function placeOf(tier: DomeTier, kind: PlantKind): PlantPlace {
   if (hasYard(tier) && (kind === 'chiller' || kind === 'substation')) return 'yard';
-  if (kind === 'vents') return 'inside';
+  if (kind === 'vents' || kind === 'control') return 'inside';      // (the control block stands on the floor inside the armored shell: a crew reaches it only when the shell was opened or an airlock forced)
   return tier === 'arcology' ? 'gallery' : 'inside';
 }
 
@@ -128,7 +129,19 @@ export interface PlantFx {
   rideH: number | null;
   /** The whole plant is whole. */
   whole: boolean;
+  /** The arcology's control block (sim/dome/controlBlock.ts): `ok` for every other tier. A struck block derates the power, takes a quarter (damaged) or half (down) off the climate and water loops, blinds the security wing and, when down, cannot seal the doors. */
+  control: PlantCond;
 }
+
+/**
+ * What a struck control block costs, wing by wing (owner request 2026-11-27; PROPOSED, owner to confirm). The block never switches the plant off: the units keep a local manual control, so each loss
+ * is half of what losing a unit of its own would be. Power: the transfer gear drops to the derated mode while the block is not whole. Climate and Water: this share of the loop still runs. Security: the share
+ * of the yard's camera and tower cover still working. Doors and airlocks: a block that is down cannot shut them from the Operations Room (a lockdown cannot be called until it is mended).
+ */
+export const CONTROL_SHARE: Record<PlantCond, number> = { ok: 1, damaged: 0.75, down: 0.5 };
+export const CONTROL_SECURITY: Record<PlantCond, number> = { ok: 1, damaged: 0.5, down: 0 };
+/** Can the doors and airlocks be sealed from the block (a dome without a control block can always be sealed)? */
+export const controlCanSeal = (c: PlantCond): boolean => c !== 'down';
 
 /** The effects of the plant's units at game time `now` (days). */
 /** `batteryK` (0..1, default 1) is the battery block's capacity at its temperature (sim/dome/plantClimate.ts): only the bank's hours shrink, never the UPS. */
@@ -136,15 +149,17 @@ export function plantFx(units: readonly PlantUnit[], now: number, batteryK = 1):
   const sub = capOf(units, 'substation'), bank = units.some(u => u.kind === 'battery') ? capOf(units, 'battery') : 0;
   const lossAt = Math.max(-1e9, ...units.filter(u => u.kind === 'substation' && u.cap < 1 && u.at !== undefined).map(u => u.at!));
   const rideH = RIDE_UPS_H + RIDE_BANK_H * bank * Math.max(0, Math.min(1, batteryK)), since = Math.max(0, (now - lossAt) * 24);
-  const power: PowerMode = sub >= 1 ? 'grid' : sub > 0 ? 'derated' : since < rideH ? 'battery' : 'dark';
+  const ctl: PlantCond = units.find(u => u.kind === 'control')?.cond ?? 'ok', share = CONTROL_SHARE[ctl];
+  const power: PowerMode = sub >= 1 ? (ctl === 'ok' ? 'grid' : 'derated') : sub > 0 ? 'derated' : since < rideH ? 'battery' : 'dark';
   return {
-    climate: capOf(units, 'chiller') * POWER_CLIMATE[power],
+    climate: capOf(units, 'chiller') * POWER_CLIMATE[power] * share,
     scrub: capOf(units, 'air') * (power === 'dark' ? 0 : 1),
-    water: capOf(units, 'water') * POWER_WATER[power],
+    water: capOf(units, 'water') * POWER_WATER[power] * share,
     vent: capOf(units, 'vents'),
     power,
     rideH: power === 'battery' ? Math.max(0, rideH - since) : null,
     whole: units.every(u => u.cond === 'ok') && power === 'grid',
+    control: ctl,
   };
 }
 
@@ -152,8 +167,8 @@ export function plantFx(units: readonly PlantUnit[], now: number, batteryK = 1):
 
 export interface RepairSpec { bill: Partial<Record<MaterialId, number>>; /** Person-hours of work. */ hours: number; /** Days before the parts arrive (a special order). */ leadDays: number; /** Parts at list plus the crew's wage for the hours. */ usd: number }
 
-const LEAD: Record<PlantKind, number> = { chiller: 14, air: 10, substation: 21, water: 7, battery: 10, vents: 5 };
-const BASE_H: Record<PlantKind, number> = { chiller: 40, air: 32, substation: 28, water: 30, battery: 24, vents: 14 };
+const LEAD: Record<PlantKind, number> = { chiller: 14, air: 10, substation: 21, water: 7, battery: 10, vents: 5, control: 14 };
+const BASE_H: Record<PlantKind, number> = { chiller: 40, air: 32, substation: 28, water: 30, battery: 24, vents: 14, control: 30 };
 
 /** The parts, work and wait to mend one unit: a `damaged` unit costs about 40 percent of a `down` one. Scales with the dome (its air volume and floor). */
 export function repairSpec(tier: DomeTier, cells: number, kind: PlantKind, cond: 'damaged' | 'down'): RepairSpec {
@@ -168,6 +183,7 @@ export function repairSpec(tier: DomeTier, cells: number, kind: PlantKind, cond:
     case 'water': bill.pump = c(Math.max(2, n / 40)); bill.pipe = c(6); bill.hardware = c(2); break;
     case 'battery': bill.battery = c(Math.max(4, n / 6)); bill.cable = c(4); break;
     case 'vents': bill.hardware = c(Math.max(3, 4 * size)); break;
+    case 'control': bill.cable = c(6); bill.inverter = c(2); bill.hardware = c(4); break;      // (PROPOSED, owner to confirm: consoles, relays and door controllers: cable, two inverters, hardware)
   }
   const hours = Math.max(4, Math.round(BASE_H[kind] * size * (cond === 'down' ? 1 : 0.4)));
   const leadDays = Math.round(LEAD[kind] * (cond === 'down' ? 1 : 0.5));
@@ -211,6 +227,7 @@ export function stepLine(kind: PlantKind, cond: PlantCond): string | null {
     case 'water': return half ? 'Half the water plant: less reuse, the rain filter is slow.' : 'No water loop: rain goes in unfiltered and nothing is reused.';
     case 'battery': return half ? 'Half the ride-through if the substation fails.' : 'No ride-through: a lost substation goes dark at once.';
     case 'vents': return half ? 'Half the roof vents open.' : 'The roof vents will not open: no free cooling.';
+    case 'control': return half ? 'Control block struck: the plant runs on local controls (derated power, three quarters of the climate and water loop), the security wing is half blind.' : 'Control block down: the airlocks cannot be shut from the Operations Room, the plant runs derated on manual (half the climate and water loop), the security wing is dark.';
   }
 }
 

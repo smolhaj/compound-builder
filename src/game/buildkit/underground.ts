@@ -17,7 +17,9 @@
 import { CELL, footprint, KIT, placementProblem, rotQ, type KitPieceDef, type Placed, type PlaceProblem, type SiteQuery } from './kit';
 import { WALLLESS, planPad } from '../../sim/retainPlan';
 import { againstSkirt, bunkerProblemUnder, domeAt, floorFt, type BunkerProblem, type DomeAt } from '../../sim/dome/bunker';
-import { parseDomeKind } from '../../sim/dome/tiers';
+import { parseDomeKind, shellFt } from '../../sim/dome/tiers';
+import { controlKeepout, rectControlProblem, type ControlProblem } from '../../sim/dome/controlBlock';
+import { portAngleOf } from '../../sim/dome/standing';
 
 /** Floor of a bunker below the ground at its entrance (world units; ≈ 4.8 m). */
 export const DEPTH = 0.8;
@@ -165,7 +167,44 @@ export function undergroundProblem(def: KitPieceDef, x: number, z: number, rot: 
 
 /** Every placement rule, surface and underground (null = it can go here). */
 export function siteProblem(def: KitPieceDef, x: number, z: number, rot: number, site: SiteQuery, placed: readonly Placed[]): PlaceProblem | null {
-  return placementProblem(def, x, z, rot, site, placed) ?? undergroundProblem(def, x, z, rot, site.height, placed) ?? domeBunkerProblem(def, x, z, rot, site.height, placed) ?? padOverBlocked(def, x, z, rot, site);
+  return placementProblem(def, x, z, rot, site, placed) ?? undergroundProblem(def, x, z, rot, site.height, placed) ?? domeBunkerProblem(def, x, z, rot, site.height, placed) ?? domeControlProblem(def, x, z, rot, placed) ?? padOverBlocked(def, x, z, rot, site);
+}
+
+/**
+ * The arcology's control block is protected (owner request 2026-11-27): a ground piece may not stand on its footprint or its collision boxes, or across the footpaths that join it to the yard airlock
+ * and to the entrance, and an arcology may not be staked where it would cover a piece already standing there. Underground pieces (a bunker below the floor) are not in the way; the dome itself is
+ * judged by the pieces it would cover.
+ */
+export function domeControlProblem(def: KitPieceDef, x: number, z: number, rot: number, placed: readonly Placed[]): ControlProblem | null {
+  if (isUnderground(def)) return null;
+  const dome = parseDomeKind(def.id) ? domeAt(def.id, x, z, rot) : null;
+  const keepOf = (d: DomeAt, portAngle: number | undefined) => {
+    if (d.tier !== 'arcology') return null;
+    const r = shellFt(d.tier, d.cells) / 2 / 20 - 0.03;
+    return { r, k: controlKeepout(d.tier, r, d.x, d.z, d.rot, portAngleOf(d.tier, { rot: d.rot, portAngle }, r)) };
+  };
+  if (dome) {
+    const mine = keepOf(dome, undefined);
+    if (!mine?.k) return null;
+    for (const p of placed) {
+      const od = KIT[p.kind];
+      if (!od || isUnderground(od) || parseDomeKind(p.kind) || Math.hypot(p.x - x, p.z - z) > mine.r) continue;
+      const why = rectControlProblem(mine.k, footprint(od, p.x, p.z, p.rot, true));
+      if (why) return why;
+    }
+    return null;
+  }
+  if (def.level === 'cover') return null;
+  const fp = footprint(def, x, z, rot, true);
+  for (const p of placed) {
+    const pd = parseDomeKind(p.kind) ? domeAt(p.kind, p.x, p.z, p.rot, (p as { portAngle?: number }).portAngle) : null;
+    if (!pd || pd.tier !== 'arcology') continue;
+    const theirs = keepOf(pd, pd.portAngle);
+    if (!theirs?.k || Math.hypot(x - pd.x, z - pd.z) > theirs.r + 3) continue;
+    const why = rectControlProblem(theirs.k, fp);
+    if (why) return why;
+  }
+  return null;
 }
 
 const domesIn = (placed: readonly Placed[]): DomeAt[] => placed.flatMap(p => (parseDomeKind(p.kind) ? [domeAt(p.kind, p.x, p.z, p.rot, (p as { portAngle?: number }).portAngle)!] : []));

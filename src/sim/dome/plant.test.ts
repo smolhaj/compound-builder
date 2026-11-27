@@ -72,7 +72,7 @@ describe('what stands inside the shell and what stands outside', () => {
     for (const tier of ['geodesic', 'glass', 'arcology'] as const) for (const k of PLANT_KINDS) {
       const place = placeOf(tier, k);
       if (place === 'yard') { expect(['glass', 'arcology']).toContain(tier); expect(['chiller', 'substation']).toContain(k); }
-      if (tier === 'arcology' && !['chiller', 'substation', 'vents'].includes(k)) expect(place).toBe('gallery');
+      if (tier === 'arcology' && !['chiller', 'substation', 'vents', 'control'].includes(k)) expect(place).toBe('gallery');
       if (tier === 'geodesic') expect(place).toBe('inside');
     }
     expect(plantKinds('earthen', { filtering: 'closed', loop: 'recycle', spares: [] })).toEqual([]);

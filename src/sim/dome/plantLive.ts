@@ -74,6 +74,7 @@ export function stepWord(kind: PlantKind, cond: 'damaged' | 'down'): string {
     case 'water': return half ? 'less water is reused.' : 'the rain and graywater loop has stopped.';
     case 'battery': return half ? 'half the ride-through is gone.' : 'a power cut will now go dark at once.';
     case 'vents': return half ? 'half the roof vents will not open.' : 'the roof vents will not open.';
+    case 'control': return half ? 'the plant runs on local controls and the security wing is half blind.' : 'the doors cannot be sealed from the Operations Room and the plant runs on manual.';
   }
 }
 
