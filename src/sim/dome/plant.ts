@@ -28,7 +28,7 @@ import type { WaterLoop } from './waterLoop';
 import type { PlantKind, PlantPlace } from './plantUnits';
 import { ROOF_SLIDE as ST_SLIDE, type RoofState } from './yardRoof';
 import { geoField } from './geothermal';
-import { CHAMBER_LEN, PORTAL_H, PORTAL_W, inYard, plantSize, yardGeometry, yardPoint, YARD_GAP, YARD_H, YARD_T, type YardGeom } from './plantYard';
+import { CHAMBER_LEN, PORTAL_H, PORTAL_W, inYard, plantSize, yardGeometry, yardPoint, YARD_GAP, YARD_T, yardWallHeight, type YardGeom } from './plantYard';
 
 export type Shape = 'box' | 'cyl';
 export type AirlockLook = 'sealed' | 'dome' | 'yard' | 'both' | 'cycling';
@@ -312,7 +312,7 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       push({ shape: 'box', x: (ax + bx) / 2, z: (az + bz) / 2, y0, w: len, h, d: th, r: 0, rot: Math.atan2(-(bz - az), bx - ax), color, ...(top !== undefined ? { wallTop: top } : {}), ...(lvl ? { lvl: true } : {}), ...(tier === 'arcology' && color === C.armor ? { steel: true } : {}) });
     };
     // the arcology's yard is ARMORED AND ROOFED (owner, 2026-11-21): armored walls as tall as the plant, a closed roof, no outside gate (it is entered only from inside, through its own airlock)
-    const WALL_H = tier === 'arcology' ? Math.max(1.5, 1.6 * Math.min(s, W / 5.4)) : YARD_H, WALL_C = tier === 'arcology' ? C.armor : C.conc;
+    const WALL_H = yardWallHeight(tier, { size: s, W }), WALL_C = tier === 'arcology' ? C.armor : C.conc;
     const wallRun = (ax: number, az: number, bx: number, bz: number): void => {
       const len = Math.hypot(bx - ax, bz - az), k = Math.max(1, Math.ceil(len / 0.9));
       for (let i = 0; i < k; i++) {

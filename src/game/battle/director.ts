@@ -14,7 +14,7 @@ export type { Box } from './cameraObstacles';
 export interface Actor { id: string; side: 'home' | 'raider'; post?: string; x: number; y: number; z: number; dead: boolean; gone: boolean }
 export interface V3 { x: number; y: number; z: number }
 export type ShotKind = 'establish' | 'wide' | 'wall' | 'house' | 'raiders' | 'close' | 'gate' | 'vigil' | 'strike';
-export interface Shot { /** A beat holds the shot until this time (the death scene's cuts are not cut away from by the next wound). */ pinUntil?: number; kind: ShotKind; subject?: string; eye: V3; look: V3; fov: number; since: number; hold: number; drift: V3; /** Who the shot is about (ids), and how many of them must be in frame. */ subjects?: string[]; need?: number; /** The fewest pixels tall (on a 720-line picture) the subjects must stand in the picture; unset = any. */ minPx?: number; /** The unit the operator pans after (the look eases to it as it moves). */ track?: string }
+export interface Shot { /** Points the picture must show unblocked (a heavy weapon's impact on the shell): a shot where one is out of frame or behind a wall or the plant yard is no shot. */ mustSee?: V3[]; /** A beat holds the shot until this time (the death scene's cuts are not cut away from by the next wound). */ pinUntil?: number; kind: ShotKind; subject?: string; eye: V3; look: V3; fov: number; since: number; hold: number; drift: V3; /** Who the shot is about (ids), and how many of them must be in frame. */ subjects?: string[]; need?: number; /** The fewest pixels tall (on a 720-line picture) the subjects must stand in the picture; unset = any. */ minPx?: number; /** The unit the operator pans after (the look eases to it as it moves). */ track?: string }
 
 const MIN_HOLD = 3.2;
 const ORDER: ShotKind[] = ['wall', 'raiders', 'house', 'wide', 'gate', 'raiders'];
@@ -302,6 +302,14 @@ export function shotProblems(s: Shot, ctx: ShotCtx): string[] {
       if (seen < need) out.push(`only ${seen} of ${subs.length} subjects in frame (need ${need})`);
       else if (big < need) out.push(`only ${big} of ${subs.length} subjects at least ${Math.round(s.minPx ?? 0)} px tall (need ${need})`);
       if (out.length) break;
+    }
+  }
+  // a point the picture is about (the burst on the shell) must be in it, with no wall, building or yard between it and the lens
+  if (!out.length && s.mustSee?.length) {
+    for (const t of span > 0 ? [0, span] : [0]) {
+      const { eye, look } = poseOf(s, t);
+      const bad = s.mustSee.find(p => !inFrame(eye, look, s.fov, p) || blockedBetween(eye, p, ctx.boxes, ctx.ground));
+      if (bad) { out.push(`the mark is ${inFrame(eye, look, s.fov, bad) ? 'hidden' : 'out of the picture'} at t=${t.toFixed(1)}`); break; }
     }
   }
   // the lens: no tree trunk across it, no hillside or wall of trees filling it (last: the dearest check)
@@ -599,7 +607,7 @@ export class Director {
       const who = burn || k.weapon === 'tank' || truck ? [] : [k.unit];
       return this._set(this._search((rot, kk, hb) => {
         const o = rotate({ x: k.ox * B + tx * S, z: k.oz * B + tz * S }, rot, kk);
-        return { ...base, kind: 'strike', subject: k.unit, subjects: who, need: 0.5, eye: at(ax + o.x, az + o.z, (burn ? 0.5 : truck ? 1.7 : 0.7) + hb), look, fov: burn ? 50 : 58, drift: { x: tx * 0.02, y: 0, z: tz * 0.02 } };
+        return { ...base, kind: 'strike', subject: k.unit, subjects: who, mustSee: [at(k.x, k.z, k.y)], need: 0.5, eye: at(ax + o.x, az + o.z, (burn ? 0.5 : truck ? 1.7 : 0.7) + hb), look, fov: burn ? 50 : 58, drift: { x: tx * 0.02, y: 0, z: tz * 0.02 } };
       }, ctx));
     }
     if (kind === 'close' && subject) {
