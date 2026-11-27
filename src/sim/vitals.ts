@@ -86,7 +86,9 @@ export function topChips(s: GameState, b: CompoundBoard): ChipModel[] {
   { const v = vital('food'), r = row('food');
     out.push({ id: 'food', label: 'Food', full: daysWord(v?.n ?? r?.days), compact: `${dayText(v?.n ?? r?.days)} d`, tone: v?.tone ?? 'good', lines: [v?.value ?? '', r ? `${r.value} with nothing grown or bought. ${r.detail}` : ''].filter(Boolean), fix: fixOf(v, r), open: v?.open ?? { type: 'open', right: 'supplies', supplies: 'stores' } }); }
   { const v = vital('water'), r = row('water'), d = r?.days ?? 0;
-    out.push({ id: 'water', label: 'Water', full: daysWord(d), compact: `${dayText(d)} d`, tone: v?.tone ?? 'good', lines: [v?.value ?? '', r ? `${r.value} stored. ${r.detail}` : ''].filter(Boolean), fix: fixOf(v, r), open: v?.open ?? { type: 'open', right: 'utilities' } }); }
+    // a working well with empty tanks is fine (the pump fills them as the family draws): "0 days" next to a good tone read as an emergency
+    const live = d < 1 && v?.tone === 'good' && !!v.value.startsWith('a working source');
+    out.push({ id: 'water', label: 'Water', full: live ? 'Source OK' : daysWord(d), compact: live ? 'OK' : `${dayText(d)} d`, tone: v?.tone ?? 'good', lines: [v?.value ?? '', r ? `${r.value} stored. ${r.detail}` : ''].filter(Boolean), fix: fixOf(v, r), open: v?.open ?? { type: 'open', right: 'utilities' } }); }
   { const v = vital('power'), r = row('power'), on = powerOnPlace(s), ps = powerSummary(s), kw = fmtKw(ps.solarKw + ps.genKw);
     out.push({ id: 'power', label: 'Power', full: on ? `${kw} kW` : 'None', compact: on ? kw : '0', tone: v?.tone ?? 'good', lines: [v?.value ?? '', r ? `${r.value} with no sun and no grid. ${r.detail}` : ''].filter(Boolean), fix: fixOf(v, r), open: v?.open ?? { type: 'open', right: 'utilities' } }); }
 

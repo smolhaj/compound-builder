@@ -28,6 +28,8 @@ export const STALL_DAYS = 3;
 export const ESCALATE_DAYS = 7;
 
 type Miss = Partial<Record<MaterialId, number>>;
+/** "the Timber cabin" for a building, "the wall" for a wall run (its label already starts with "the"): never "the the wall". */
+export const theLabel = (label: string, capital = false): string => { const t = /^the\s/i.test(label) ? label : `the ${label}`; return capital ? t.charAt(0).toUpperCase() + t.slice(1) : t.charAt(0).toLowerCase() + t.slice(1); };
 export interface Waiter { key: string; label: string; home: boolean; miss: Miss; /** The building to select (null: a wall run). */ at: string | null }
 
 const nameOf = (kind: string) => (KIT[kind]?.name ?? kind.replace(/_/g, ' '));
@@ -186,7 +188,7 @@ export function stallsDay(s: GameState): string[] {
     const lines = missLines(s, w.miss, pending);
     if (!lines.length || orderProblem(s, lines)) continue;
     s.stalls![w.key].said = true;
-    out.push(`The ${w.label} has been stuck for ${pluralize(Math.floor(days), 'day')} waiting on ${linesText(lines)}. Order it (${usd(orderCost(lines, prices(s)))}) so work can continue.`);
+    out.push(`${theLabel(w.label, true)} has been stuck for ${pluralize(Math.floor(days), 'day')} waiting on ${linesText(lines)}. Order it (${usd(orderCost(lines, prices(s)))}) so work can continue.`);
   }
   // food, beds and medicine that stay short get the same loud line when they cross the limit
   const NEED_LINE: Record<NeedKey, (d: number) => string> = {
@@ -214,7 +216,7 @@ export function stallsDay(s: GameState): string[] {
     if (days !== ESCALATE_DAYS) continue;
     const lines = missLines(s, w.miss, pending);
     if (!lines.length || orderProblem(s, lines)) continue;
-    out.push(`STILL STUCK: the ${w.label} has waited ${pluralize(days, 'day')} and you have ${usd(s.money)}. Order ${linesText(lines)} (${usd(orderCost(lines, prices(s)))}) or the work cannot go on.`);
+    out.push(`STILL STUCK: ${theLabel(w.label)} has waited ${pluralize(days, 'day')} and you have ${usd(s.money)}. Order ${linesText(lines)} (${usd(orderCost(lines, prices(s)))}) or the work cannot go on.`);
   }
   return out;
 }

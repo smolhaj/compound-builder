@@ -22,7 +22,7 @@ import { countyWorks, needsPermit, permitFee, reviewDays } from './paperwork';
 import { onOrder, orderCost, orderProblem, prices } from './economy';
 import { firewoodOutlook } from './heating';
 import { FIT, UTILITY } from './utilities';
-import { roadWait, stuckProject, stuckAction, linesText, logWait, ESCALATE_DAYS, STALL_DAYS } from './stalls';
+import { theLabel, roadWait, stuckProject, stuckAction, linesText, logWait, ESCALATE_DAYS, STALL_DAYS } from './stalls';
 import { activeNeeds, needDays } from './needsStuck';
 import { rxStatus } from './body';
 import { driveQuote, fixBill, hookupProblem, pendingFixes } from './improvements';
@@ -306,7 +306,7 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
   // a project that has waited days for materials we could pay for: the loudest card on the list (sim/stalls.ts)
   const stuck = stuckProject(s);
   if (stuck) out.push({ id: 'stalled', kind: '', title: stuck.escalated ? `Stuck for ${pluralize(stuck.days, 'day')}: waiting on ${linesText(stuck.lines)}` : `Stuck: waiting on ${linesText(stuck.lines)}`, urgency: stuck.escalated ? 100 : 99, ...(stuck.escalated ? { tone: 'alarm' as const } : {}),
-    why: `The ${stuck.label} has waited ${pluralize(stuck.days, 'day')} for materials, and you have the money (${usd(s.money)}). Work cannot continue until they are ordered${stuck.others > 0 ? `; ${stuck.others} more project${stuck.others > 1 ? 's wait' : ' waits'} too` : ''}.`,
+    why: `${theLabel(stuck.label, true)} has waited ${pluralize(stuck.days, 'day')} for materials, and you have the money (${usd(s.money)}). Work cannot continue until they are ordered${stuck.others > 0 ? `; ${stuck.others} more project${stuck.others > 1 ? 's wait' : ' waits'} too` : ''}.`,
     acts: [{ label: stuckAction(stuck), act: { type: 'order', lines: stuck.lines } }, { label: 'Show me', act: stuck.at ? { type: 'select', id: stuck.at } : { type: 'open', right: 'defense' } }] });
   // a project waits on logs: they cannot be bought, only felled from the family's own trees, so the card says so and marks them (sim/stalls.ts logWait)
   { const lw = logWait(s);

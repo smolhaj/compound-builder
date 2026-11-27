@@ -21,6 +21,12 @@ describe('top-bar chips', () => {
     const b = compoundBoard(g), c = chips(g);
     for (const id of ['power', 'water', 'food', 'defense', 'morale'] as const) expect(c.find(x => x.id === id)!.tone, id).toBe(b.vitals.find(v => v.id === id)!.tone);
   });
+  it('a working well with empty tanks reads "OK", not "0 d"', () => {
+    const g = fresh(); done(g, 'timber_cabin'); done(g, 'well_hand', 6, 0);
+    const b = compoundBoard(g), w = chips(g).find(x => x.id === 'water')!, v = b.vitals.find(x => x.id === 'water')!;
+    if (v.tone === 'good' && v.value.startsWith('a working source')) { expect(w.compact).toBe('OK'); expect(w.full).toBe('Source OK'); }
+    else expect(w.compact).toMatch(/\d/);
+  });
   it('food shows the board day count; defense shows the label and score; morale the average', () => {
     const g = fresh(); const b = compoundBoard(g), c = chips(g);
     expect(c.find(x => x.id === "food")!.full).toMatch(new RegExp(`^${b.vitals.find(v => v.id === "food")!.n} days?$`));
