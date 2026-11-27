@@ -5,12 +5,12 @@ import { useFeelStore } from '../../store/feelStore';
 import { useWorldStore } from '../../store/worldStore';
 import { useHudText } from '../../store/hudTextStore';
 import { toastText } from '../../sim/feedbackDiff';
-import { TOAST_TTL, isRepeat, liveToasts, pushToast, type Toast, type ToastTone } from './toastQueue';
+import { TOAST_TTL, isRepeat, replaceKind, liveToasts, pushToast, type Toast, type ToastTone } from './toastQueue';
 
 interface ToastState { list: Toast[]; add: (id: string, text: string, tone: ToastTone, ttl: number) => void; remove: (id: string) => void; refresh: () => void; sweep: () => void }
 export const useToasts = create<ToastState>((set, get) => ({
   list: [],
-  add: (id, text, tone, ttl) => { if (isRepeat(text, useHudText.getState().onScreen)) return; set({ list: pushToast(get().list, { id, text, tone, ttl, at: performance.now() }) }); },
+  add: (id, text, tone, ttl) => { if (isRepeat(text, useHudText.getState().onScreen)) return; set({ list: pushToast(id.startsWith('f') ? replaceKind(get().list, 'f') : get().list, { id, text, tone, ttl, at: performance.now() }) }); },
   remove: id => set({ list: get().list.filter(t => t.id !== id) }),
   /** Every toast starts its time again (after a decision or a card held them). */
   refresh: () => set({ list: get().list.map(t => ({ ...t, at: performance.now() })) }),

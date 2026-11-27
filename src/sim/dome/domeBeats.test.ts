@@ -4,7 +4,7 @@ import { place, opts } from '../raidTestKit';
 import { planBattle } from '../battle';
 import { LineDirector, resetRaidMemory, LINES } from '../raidDialogue';
 import { DOME_LINES, DOME_RAIDER_CTX, DOME_DEFENDER_CTX, DOME_VARIANT_KEYS } from '../raidLinesDome';
-import { domeBeats, BEAT_CTX_USED, shellWording, mildWording, sealedFight } from './domeBeats';
+import { domeBeats, BEAT_CTX_USED, shellWording, mildWording, sealedFight, settleAfterHeavy, HEAVY_QUIET } from './domeBeats';
 import { domesOf, PANELS } from './standing';
 import { addScars, visibleScars, SCAR_LIFE } from './scars';
 import { blastOdds, ramOdds } from '../breachMeans';
@@ -218,5 +218,26 @@ describe('a sealed dome (the arcology) is a household watching, not a firefight'
   });
   it('the raiders\' bounce lines are about their own round, never a hit by the defenders', () => {
     for (const t of Object.values(DOME_LINES.raider.dome_bounce ?? {}).flat() as string[]) expect(t).not.toMatch(/\bhit\b|shot at|they shot/i);
+  });
+});
+
+describe('work chatter after a heavy strike', () => {
+  const say = (t: number, ctx: string): BattleEvent => ({ t, kind: 'say', text: ctx, who: 'r1', ctx });
+  const hv = (t: number): BattleEvent => ({ t, kind: 'heavy', unit: 'r0', weapon: 'mortar', x: 0, z: 0, y: 0, ox: 0, oz: 1, fx: 0, fz: 5, hold: 0 });
+  it('moves a pry-bar line off the strike and keeps the strike\'s own lines', () => {
+    const ev = [hv(51), say(52, 'dome_airlock'), say(52.6, 'dome_heavy_mortar'), say(40, 'dome_tool')];
+    settleAfterHeavy(ev, 80);
+    const air = ev.find(e => e.kind === 'say' && e.ctx === 'dome_airlock')!;
+    expect(air.t).toBeGreaterThanOrEqual(51 + HEAVY_QUIET);
+    expect(ev.find(e => e.kind === 'say' && e.ctx === 'dome_heavy_mortar')!.t).toBe(52.6);
+    expect(ev.find(e => e.kind === 'say' && e.ctx === 'dome_tool')!.t).toBe(40);
+  });
+  it('drops a line that would land in the next strike\'s window or past the end', () => {
+    const ev = [hv(10), hv(14), say(11, 'dome_tool'), say(78, 'dome_cut'), hv(77.5)];
+    settleAfterHeavy(ev, 80);
+    expect(ev.filter(e => e.kind === 'say')).toHaveLength(0);
+  });
+  it('does nothing without a heavy strike', () => {
+    const ev = [say(5, 'dome_airlock')]; settleAfterHeavy(ev, 80); expect(ev[0].t).toBe(5);
   });
 });

@@ -117,7 +117,7 @@ function embankment(R: number, ground: (x: number, z: number) => number, top: nu
 }
 
 /** Triangulated hemisphere: ring k has n*k vertices (k = 0 is the crown); returns vertices per ring and triangles as ring/index triples. */
-function triDome(N: number, n = 6): { rings: number[][]; tris: Array<[[number, number], [number, number], [number, number]]> } {
+export function triDome(N: number, n = 6): { rings: number[][]; tris: Array<[[number, number], [number, number], [number, number]]> } {
   const rings: number[][] = [];
   for (let k = 0; k <= N; k++) rings.push(Array.from({ length: k === 0 ? 1 : n * k }, (_, j) => j));
   const tris: Array<[[number, number], [number, number], [number, number]]> = [];

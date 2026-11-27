@@ -44,6 +44,29 @@ const MATERIAL: Record<string, { glass: string; panes: string; Glass: string }> 
   earthen: { glass: 'earth', panes: 'patch of dirt', Glass: 'Earth' },
 };
 /** Tier-correct wording for a line written about the glass dome (pure; a test holds it). */
+/** Work chatter (a tool, a saw, a pry bar, a rifle volley) that cannot be said right after a heavy weapon's strike: the crew is looking at the shell, not at the bar. */
+export const WORK_CHATTER: readonly string[] = ['dome_tool', 'dome_cut', 'dome_airlock', 'dome_shots'];
+/** Seconds after a heavy strike in which the crew's talk is about the strike. */
+export const HEAVY_QUIET = 5;
+
+/**
+ * Moves each work-chatter line that falls within HEAVY_QUIET of a heavy strike to just after the window (or drops it when that lands in another window or past the end), in place.
+ * Spoken lines keep their wording and speaker. Pure on its events.
+ */
+export function settleAfterHeavy(out: BattleEvent[], duration: number): void {
+  const hits = out.filter(e => e.kind === 'heavy').map(e => e.t).sort((a, b) => a - b);
+  if (!hits.length) return;
+  const inWindow = (t: number): number | null => { for (const h of hits) if (t >= h - 0.2 && t < h + HEAVY_QUIET) return h; return null; };
+  for (let i = out.length - 1; i >= 0; i--) {
+    const e = out[i];
+    if (e.kind !== 'say' || !WORK_CHATTER.includes(e.ctx as string)) continue;
+    const h = inWindow(e.t);
+    if (h === null) continue;
+    const t = Math.round((h + HEAVY_QUIET + 0.4 + (e.t - h) * 0.3) * 100) / 100;
+    if (t >= duration - 0.3 || inWindow(t) !== null) out.splice(i, 1); else out[i] = { ...e, t };
+  }
+}
+
 export function shellWording(text: string, tier: string): string {
   const m = MATERIAL[tier];
   if (!m || tier === 'glass') return text;
@@ -315,6 +338,7 @@ export function domeBeats(b0: Battle, o: DomeBeatInput): Battle {
   // the rest of the crew mills about near the shell, in sight of it (nobody stands out in the dark where the sim left him)
   [...crewOrder, leader].filter(u => !worked.has(u.id) && !drivers.has(u.id)).forEach((u, i) => goTo(u, 2 + i * 0.7, a0 + (i % 2 ? 1 : -1) * (0.55 + i * 0.12), 1.6 + (i % 3) * 0.5));
   if (!out.length) return b;
+  settleAfterHeavy(out, b.duration);
   const carriers = new Set([...moved.keys()].flatMap(e => (e.kind === 'charge' && e.carrier ? [e.carrier] : [])));
   const dropped = (e: BattleEvent): boolean => {
     if (e.kind !== 'move' && e.kind !== 'cover') return false;

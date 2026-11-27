@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { Note, Row, Section } from './common';
+import { useDomeAct } from './domeAct';
 import { DIM, TONE, btn, usd } from './style';
 import type { DomeView } from '../../sim/dome/live';
 import {
@@ -23,7 +24,7 @@ const CHOICE_TIP: Record<Choice, string> = {
 };
 
 export function DomeLinksSection({ v }: { v: DomeView }) {
-  const game = useGameStore(s => s.game), g = useGameStore();
+  const game = useGameStore(s => s.game);
   const id = v.ref.st.id;
   const others = [
     ...domesOf(game).filter(d => d.id !== id).map(d => ({ id: d.id, label: nodeLabel(game, d.id) })),
@@ -39,10 +40,11 @@ export function DomeLinksSection({ v }: { v: DomeView }) {
   const quotes = partner ? kinds.map(k => ({ k, q: quoteLink(game, id, partner, k, depth) })) : [];
   const problem = quotes.map(x => x.q.problem).find(Boolean) ?? null;
   const total = quotes.reduce((s, x) => s + x.q.totalUsd, 0), fit = quotes.reduce((s, x) => s + x.q.fitUsd, 0);
-  const act = (f: (x: typeof game) => string | null) => { const w = g.money(f); if (w) alert(w); };
+  const { act, note } = useDomeAct();
   const ring = ringOf(game, id), feeders = feederPartners(game, id);
   if (domesOf(game).length < 2 && mine.length === 0) return null;   // one dome alone: nothing to link, nothing shown
   return <Section title="Links to other domes and buildings">
+    {note}
     {mine.length === 0 && <Note>No tunnel or walkway yet. With more than one dome, people cross open ground between them. Build a link and the trip stays under cover, and the two plants can back each other up.</Note>}
     <div data-testid="dome-link-list" style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
       {mine.map(l => <LinkRow key={l.id} l={l} self={id} />)}
@@ -82,12 +84,13 @@ export function DomeLinksSection({ v }: { v: DomeView }) {
 }
 
 function LinkRow({ l, self }: { l: DomeLink; self: string }) {
-  const game = useGameStore(s => s.game), g = useGameStore();
+  const game = useGameStore(s => s.game);
   const state = linkState(game, l), other = l.ends.find(e => e.id !== self) ?? l.ends[1];
   const tone = state === 'open' ? (l.wear > 0.6 ? 'warn' : 'good') : state === 'down' ? 'bad' : 'warn';
-  const act = (f: (x: typeof game) => string | null) => { const w = g.money(f); if (w) alert(w); };
+  const { act, note } = useDomeAct();
   const both = redundant(game, l.ends[0].id, l.ends[1].id);
   return <div data-testid={`dome-link-${l.id}`} style={{ borderLeft: `3px solid ${TONE[tone]}`, paddingLeft: 8 }}>
+    {note}
     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}><b>{l.kind === 'tunnel' ? 'Underground tunnel' : 'Above-ground walkway'} to {nodeLabel(game, other.id)}</b>
       <span style={{ color: TONE[tone] }}>{state === 'open' ? 'open' : state === 'down' ? (l.down?.clearsAt !== null ? 'being repaired' : 'out of service') : `${Math.round(progressOf(game, l) * 100)} percent`}</span></div>
     <div style={{ fontSize: 11.5, color: DIM }}>

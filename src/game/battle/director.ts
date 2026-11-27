@@ -9,6 +9,7 @@
 import type { BattleEvent } from '../../sim/battleTypes';
 import { mulberry32 } from '../../sim/rng';
 import type { Box } from './cameraObstacles';
+import { ribGapAll, RIB_EYE, RIB_VIEW, RIB_LOOK, type Shell } from './domeStruts';
 
 export type { Box } from './cameraObstacles';
 export interface Actor { id: string; side: 'home' | 'raider'; post?: string; x: number; y: number; z: number; dead: boolean; gone: boolean }
@@ -247,7 +248,7 @@ export function lensProblem(eye: V3, look: V3, fov: number, trees: readonly Box[
   return hit / n >= LENS_FILL ? 'trees or a hillside fill the picture' : null;
 }
 
-export interface ShotCtx { boxes: readonly Box[]; ground: Ground; /** A shot already running is being re-checked: the wall rule (a choice made at the cut) is left out. */ live?: boolean; /** Everyone alive, by id. */ actors: ReadonlyMap<string, Actor> }
+export interface ShotCtx { boxes: readonly Box[]; /** The frame ribs of the domes standing: the eye keeps off them and the line of sight does not run along one. */ shells?: readonly Shell[]; ground: Ground; /** A shot already running is being re-checked: the wall rule (a choice made at the cut) is left out. */ live?: boolean; /** Everyone alive, by id. */ actors: ReadonlyMap<string, Actor> }
 
 /** The pose of a shot `t` seconds in. */
 const poseOf = (s: Shot, t: number): { eye: V3; look: V3 } => {
@@ -274,6 +275,16 @@ export function shotProblems(s: Shot, ctx: ShotCtx): string[] {
     if (![eye.x, eye.y, eye.z, look.x, look.y, look.z].every(Number.isFinite)) { out.push('not finite'); break; }
     if (eye.y - ctx.ground(eye.x, eye.z) < EYE_MIN - 1e-6) out.push(`eye on the ground at t=${t.toFixed(1)}`);
     for (const b of ctx.boxes) if (nearBox(eye, b, ctx.ground, CLEAR)) { out.push(`eye ${insideBox(eye, b, ctx.ground) ? 'inside' : 'against'} a ${b.kind} at t=${t.toFixed(1)}`); break; }
+    if (ctx.shells?.length) {
+      if (ribGapAll(eye, ctx.shells, ctx.ground, RIB_EYE) < RIB_EYE) out.push(`eye against a frame strut at t=${t.toFixed(1)}`);
+      else {
+        const rf = norm3(sub(look, eye)), rd = Math.hypot(look.x - eye.x, look.y - eye.y, look.z - eye.z);
+        for (const d of [0.1, 0.2, 0.35, 0.55, 0.8]) {
+          const dd = Math.min(d * RIB_LOOK / 0.8, rd * 0.9), q = { x: eye.x + rf.x * dd, y: eye.y + rf.y * dd, z: eye.z + rf.z * dd };
+          if (ribGapAll(q, ctx.shells, ctx.ground, RIB_VIEW) < RIB_VIEW) { out.push(`a frame strut fills the view at t=${t.toFixed(1)}`); break; }
+        }
+      }
+    }
     { const cov = surfaceCover(eye, look, s.fov, ctx.boxes, ctx.ground); if (cov > MAX_SURFACE_COVER) out.push(`a surface covers ${Math.round(cov * 100)}% of the picture at t=${t.toFixed(1)}`); }
     { const bc = brushCover(eye, look, s.fov, ctx.boxes, ctx.ground); if (bc > MAX_BRUSH_COVER) out.push(`a bush covers ${Math.round(bc * 100)}% of the picture at t=${t.toFixed(1)}`); }
     if (t === 0 && !out.length && !ctx.live) { const wc = wallCover(eye, look, s.fov, ctx.boxes, ctx.ground); if (wc > MAX_WALL_COVER) out.push(`a wall covers ${Math.round(wc * 100)}% of the picture at t=${t.toFixed(1)}`); }
@@ -374,6 +385,7 @@ export class Director {
   private _cycle = 0;
   private _last = new Map<string, number>();
   private _boxes: readonly Box[] = [];
+  private _shells: readonly Shell[] = [];
   private _lastCheck = -99;
   /** The latest heavy-weapon strike on a dome's shell (sim/dome/heavyFire.ts): the next cut is to it. */
   private _strike: Extract<BattleEvent, { kind: 'heavy' }> | null = null;
@@ -403,7 +415,7 @@ export class Director {
   constructor(seed: number) { this._r = mulberry32(seed * 3119 + 11); }
 
   /** The buildings and walls the camera must keep out of. */
-  setObstacles(boxes: readonly Box[]): void { this._boxes = boxes; this._nightBoxes = null; this._quiet = false; }
+  setObstacles(boxes: readonly Box[], shells: readonly Shell[] = []): void { this._shells = shells; this._boxes = boxes; this._nightBoxes = null; this._quiet = false; }
   /** The quiet after the fight: ground cover counts at night too (a bush in front of the people being shown hides them). */
   private _quiet = false;
   private _nightBoxes: { src: readonly Box[]; list: Box[] } | null = null;
@@ -424,7 +436,7 @@ export class Director {
   establish(time: number, house: V3, roadDir: { x: number; z: number }, ground: Ground, focus?: V3, variant = 0): Shot {
     const px = -roadDir.z, pz = roadDir.x;
     const target = focus ?? { x: house.x + roadDir.x * 12, y: 0, z: house.z + roadDir.z * 12 };
-    const ctx: ShotCtx = { boxes: this._shotBoxes(), ground, actors: new Map() };
+    const ctx: ShotCtx = { boxes: this._shotBoxes(), shells: this._shells, ground, actors: new Map() };
     const mk = (rot: number, k: number, hb: number): Shot => {
       // (each scene's establishing pose takes the other side of the road and another height, so two scenes never open on the same frame)
       const side = variant % 2 ? -1.6 : 1.6, reach = 4.2 + (variant % 3) * 0.8, lift = [0.9, 0.45, 1.3][variant % 3];
@@ -495,7 +507,7 @@ export class Director {
     if (cur?.pinUntil !== undefined && time < cur.pinUntil) due = false;
     if (!due && cur && held >= 1.2 && time - this._lastCheck >= 0.5 && !(cur.pinUntil !== undefined && time < cur.pinUntil)) {
       this._lastCheck = time;
-      const ctx: ShotCtx = { boxes: this._shotBoxes(), ground, live: true, actors: new Map(live.map(a => [a.id, a])) };
+      const ctx: ShotCtx = { boxes: this._shotBoxes(), shells: this._shells, ground, live: true, actors: new Map(live.map(a => [a.id, a])) };
       const now: Shot = { ...cur, since: 0, hold: 0, drift: { x: 0, y: 0, z: 0 }, ...poseAt(cur, time), minPx: cur.minPx ? cur.minPx * 0.5 : undefined };
       if (cur.subjects?.length && shotProblems(now, ctx).length) due = true;   // (a subject that fell or left counts: nobody left to show)
     }
@@ -569,7 +581,7 @@ export class Director {
     const px = -road.z, pz = road.x, r = this._r;
     this._g = ground;
     const everyone = [...home, ...raiders];
-    const ctx: ShotCtx = { boxes: this._shotBoxes(), ground, actors: new Map(everyone.map(a => [a.id, a])) };
+    const ctx: ShotCtx = { boxes: this._shotBoxes(), shells: this._shells, ground, actors: new Map(everyone.map(a => [a.id, a])) };
     const at = (x: number, z: number, h: number): V3 => ({ x, y: ground(x, z) + h, z });
     const chest = (a: Actor): V3 => chestOf(a, ground);
     const base = { since: time, hold };

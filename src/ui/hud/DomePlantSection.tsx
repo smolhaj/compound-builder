@@ -1,6 +1,7 @@
 /** The dome's plant on the Dome page: each unit, where it stands (inside the shell, in the service gallery, in the walled yard), its condition, whether a second unit backs it up, what it does when it is out and what the repair costs. (sim/dome/plantUnits.ts) */
 import { useGameStore } from '../../store/gameStore';
 import { Note, Row, Section } from './common';
+import { useDomeAct } from './domeAct';
 import { DIM, TONE, btn, usd } from './style';
 import { PLACE_NAME, SPAREABLE, repairSpec, stepLine, type PlantCond } from '../../sim/dome/plantUnits';
 import { buySpare, rushPlantJob, sparesProblem, spareBill, type DomeView } from '../../sim/dome/live';
@@ -18,15 +19,17 @@ const COND: Record<PlantCond, { word: string; tone: 'good' | 'warn' | 'bad' }> =
 const POWER = { grid: 'on the compound\'s power', derated: 'derated: one transformer out', battery: 'on batteries', dark: 'dark' } as const;
 
 export function DomePlantSection({ v }: { v: DomeView }) {
-  const game = useGameStore(s => s.game), g = useGameStore();
+  const game = useGameStore(s => s.game);
+  const { act, note } = useDomeAct();
   const d = v.ref, st = v.st, id = d.st.id;
   const units = unitsOf(game, d, st);
   if (!units.length) return null;
   const fx = fxOf(game, d, st), yard = hasYard(d.tier) ? yardGeometry(d.tier, d.r, d.st.rot) : null;
-  const act = (f: (x: typeof game) => string | null) => { const w = g.money(f); if (w) alert(w); };
+  
   const day = dayIndex(game.clock.t);
   const towers = yard ? towersBuilt(game).filter(t => Math.hypot(t.st.x - (d.st.x + yard.center[0]), t.st.z - (d.st.z + yard.center[1])) <= t.def.post.reach).length : 0;
   return <Section title="Plant and defense">
+    {note}
     <Row label="Power to the dome" value={`${POWER[fx.power]}${fx.rideH !== null ? `, about ${Math.max(1, Math.round(fx.rideH))} h left` : ''}`} tone={fx.power === 'grid' ? 'good' : fx.power === 'dark' ? 'bad' : 'warn'} title="A lost substation falls back to the dome's batteries (a closed ecology has a battery block), then the fans, lights and pumps stop." />
     <Row label="Climate plant / scrubbing / water loop" value={`${Math.round(fx.climate * 100)} / ${Math.round(fx.scrub * 100)} / ${Math.round(fx.water * 100)} percent`} tone={fx.whole ? 'good' : 'warn'} title="What the plant as it stands lets the dome do. Every loss is a step down, never a switch." />
     <div data-testid="plant-units" style={{ display: 'flex', flexDirection: 'column', gap: 5, marginTop: 4 }}>
