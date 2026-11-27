@@ -10,7 +10,9 @@ import { nightOf } from '../housing';
 import { dayPeakF, isSlowKind, wetBulbNow } from '../slowClimate';
 import type { DomeRef, DomeState } from './live';
 import type { LoadOpts } from './climate';
-import { domeLoad } from './climate';
+import { domeLoad, COP_HEAT } from './climate';
+import { regionFor } from '../climate';
+import { COP_LOOP_COOL, CURTAIN_LEFT, TOWER_GAL_PER_KWH, copHeatWithLoop, copTower, loopField, towerCapacity, wetBulbEstimate } from './geothermal';
 import { chillerCapacity, chillerRatedBtu, copCool, copHeat, evapWbK, plantWear, type HeatRejection } from './plantClimate';
 import { damagePlant, unitsOf, specOf } from './plantLive';
 import { fxOf } from './plantLive';
@@ -19,19 +21,32 @@ type Ref = Pick<DomeRef, 'st' | 'tier' | 'cells' | 'r'>;
 const doyOf = (s: GameState): number => calendarOf(s.clock).doy;
 export const climateOn = (s: Pick<GameState, 'disaster'>): boolean => isSlowKind(s.disaster.kind);
 
-/** The heat rejection a dome has. The high-ambient package is a purchase (PR 9, it persists a dome field); rented chillers are trailer units that carry it. */
-export const rejectionOf = (_st: DomeState, rented: boolean): HeatRejection => (rented ? 'high_ambient' : 'air');
+/** The heat rejection a dome has. The high-ambient package and the tower are purchases (save v107); rented chillers are trailer units that carry the package. A tower wears like the package (its dry-bulb limit is not the one that bites). */
+export const rejectionOf = (st: DomeState, rented: boolean): HeatRejection => (rented || st.heatRejection === 'high_ambient' || st.heatRejection === 'tower' ? 'high_ambient' : 'air');
+const dryOf = (s: GameState): number => Math.max(0.1, Math.min(0.95, 1.15 - regionFor(s.site).rainMm / 900));
 
-/** The limits for one weather sample (`outF`, `sun`), as `domeLoad` options. Empty (the flat model) when no slow climate disaster is on or the dome has no plant. */
+/**
+ * The limits for one weather sample (`outF`, `sun`), as `domeLoad` options. In a slow climate disaster: the chiller's COP, capacity and trip (or the tower's, by wet-bulb);
+ * with a purchase, at any time: the ground loop (COP 4, no derate, and the heat pump's COP 3), the tower's COP and water, and the curtains. Empty (the flat model) with
+ * neither, or when the dome has no plant.
+ */
 export function climateOpts(s: GameState, d: Ref, st: DomeState, outF: number, rented = false): Partial<LoadOpts> {
-  if (!climateOn(s) || d.tier === 'earthen') return {};
-  const pkg = rejectionOf(st, rented);
-  const wb = s.disaster.kind === 'runaway_heat' ? wetBulbNow(s, outF, Math.max(outF, dayPeakF(s, doyOf(s)))) : null;
-  return {
-    copCool: copCool(outF), copHeat: copHeat(outF),
-    chillCapBtu: chillerRatedBtu(d.tier, d.cells, st.mode) * chillerCapacity(outF, pkg),
-    ...(wb !== null ? { evapK: evapWbK(wb) } : {}),
-  };
+  if (d.tier === 'earthen') return {};
+  const on = climateOn(s), tower = st.heatRejection === 'tower' && !rented, pkg = rejectionOf(st, rented);
+  const wb = on && s.disaster.kind === 'runaway_heat' ? wetBulbNow(s, outF, Math.max(outF, dayPeakF(s, doyOf(s)))) : wetBulbEstimate(outF, dryOf(s));
+  const o: Partial<LoadOpts> = {};
+  if (on) {
+    const rated = chillerRatedBtu(d.tier, d.cells, st.mode);
+    Object.assign(o, { copCool: copCool(outF), copHeat: copHeat(outF), chillCapBtu: rated * (tower ? towerCapacity(wb) : chillerCapacity(outF, pkg)) });
+    if (s.disaster.kind === 'runaway_heat') o.evapK = evapWbK(wb);
+  }
+  if (tower) { o.copCool = copTower(wb); o.towerGalPerKwh = TOWER_GAL_PER_KWH; }
+  if (st.groundLoop) {
+    const f = loopField(d.tier, d.cells, st.groundLoop);
+    o.loopCapBtu = f.capBtu; o.copLoop = COP_LOOP_COOL; o.copHeat = copHeatWithLoop(o.copHeat ?? COP_HEAT, f.share);
+  }
+  if (st.thermalCurtain) o.nightLossK = CURTAIN_LEFT;
+  return o;
 }
 
 /** How hard the chillers are asked today against what they can do (0 idle .. 1.5 past the rating) at this peak. */
@@ -40,7 +55,7 @@ export function chillerLoad(d: Ref, st: DomeState, peakF: number, dry: number): 
   if (rated <= 0) return 0;
   const ld = domeLoad(d.tier, d.cells, peakF, 1, st.mode, { sealed: st.lockdown, dry, powered: true });
   const need = Math.max(0, -ld.kwThermal) * 3412;
-  const cap = rated * chillerCapacity(peakF, 'air');
+  const cap = rated * (st.heatRejection === 'tower' ? towerCapacity(wetBulbEstimate(peakF, dry)) : chillerCapacity(peakF, rejectionOf(st, false)));
   return cap <= 0 ? (need > 0 ? 1.5 : 0) : Math.max(0, Math.min(1.5, need / cap));
 }
 
@@ -56,11 +71,11 @@ export function plantWearDay(s: GameState, d: Ref, st: DomeState, r: () => numbe
   for (const u of unitsOf(s, d, st)) {
     if (u.kind !== 'chiller' && u.kind !== 'substation' && u.kind !== 'air') continue;
     const spare = spares.includes(u.kind);
-    const hot = plantWear({ kind: u.kind, outF: peakF, load, spare }), cold = plantWear({ kind: u.kind, outF: lowF, load: 0.5, spare });
+    const hot = plantWear({ kind: u.kind, outF: peakF, load, spare, pkg: rejectionOf(st, false) }), cold = plantWear({ kind: u.kind, outF: lowF, load: 0.5, spare, pkg: rejectionOf(st, false) });
     const w = cold.p > hot.p ? cold : hot;
     if (u.cond === 'ok') {
       if (r() < w.p * scale) { const l = damagePlant(s, d, st, u.id, r() < 0.25 ? 'down' : 'damaged', w.cause); if (l) out.push(l); }
-    } else if (u.cond === 'damaged' && u.kind === 'chiller' && chillerCapacity(peakF, 'air') <= 0 && r() < 0.15 * scale) {
+    } else if (u.cond === 'damaged' && u.kind === 'chiller' && chillerCapacity(peakF, rejectionOf(st, false)) <= 0 && r() < 0.15 * scale) {
       const l = damagePlant(s, d, st, u.id, 'down', 'heat'); if (l) out.push(l);
     }
   }

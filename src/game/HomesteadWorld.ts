@@ -170,7 +170,8 @@ import { bedHour, pickHomeLine } from '../sim/domesticLines';
 import { domeOf, domeLook, domesOf as domesLive, yardRoofOf } from '../sim/dome/live';
 import type { RoofState } from '../sim/dome/yardRoof';
 import { TIER, cellsOfKind, shellFt, tierOfKind } from '../sim/dome/tiers';
-import { inServiceLock, inYard, yardGeometry } from '../sim/dome/plantYard';
+import { inServiceLock, inYard, yardGeometry, YARD_GAP } from '../sim/dome/plantYard';
+import { inField, loopField } from '../sim/dome/geothermal';
 import { isGradedTier } from '../sim/dome/grading';
 import { makeDomePlant, plantKey, type DomePlantFx, type PlantLook } from './fx/DomePlant';
 import { interiorPlan, type Obstacle } from './fx/domeInteriorPlan';
@@ -604,7 +605,8 @@ export class HomesteadWorld {
     const dst = domeStateOf(game, ref), hurt: Record<string, 'ok' | 'damaged' | 'down'> = {};
     for (const u of plantUnitsOf(game, ref, dst)) if (u.cond !== 'ok') hurt[u.id] = u.cond;
     const dark = plantFxOf(game, ref, dst).power === 'dark', inter = this._interiorFor(b, game, ref, dst.filtering, dark);
-    const plook: PlantLook = { roof: this._roofQA ?? yardRoofOf(game, ref.st.id), loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark, airlock: this._airlockQA ?? undefined, interior: inter.plan, interiorKey: inter.key };
+    const plook: PlantLook = { roof: this._roofQA ?? yardRoofOf(game, ref.st.id), loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark, airlock: this._airlockQA ?? undefined, interior: inter.plan, interiorKey: inter.key, geo: dst.heatRejection === 'tower' || dst.groundLoop || dst.deepWell ? { tower: dst.heatRejection === 'tower', loop: !!dst.groundLoop, bores: dst.groundLoop ? loopField(ref.tier, ref.cells, dst.groundLoop).bores : 0, well: !!dst.deepWell } : undefined };
+    this._fieldBores.set(b.placed.id, plook.geo?.bores ?? 0);
     const key = plantKey(ref.tier, ref.r, dst.filtering, plook), cur = this._domePlants.get(b.placed.id);
     if (cur) cur.setView(this._view);
     if (!cur || cur.key !== key) {
@@ -1859,6 +1861,7 @@ export class HomesteadWorld {
     }
     return false;
   }
+  private readonly _fieldBores = new Map<string, number>();
   private readonly _lockGeo = new Map<string, ReturnType<typeof yardGeometry>>();
 
   /** Is (x, z) within `pad` of a built footprint (porch included)? */
@@ -1871,6 +1874,9 @@ export class HomesteadWorld {
           // the plant yard of a big dome stands just outside the shell: brush and trees stay out of it too
           const tier = tierOfKind(b.placed.kind), yg = tier ? yardGeometry(tier, shellFt(tier, cellsOfKind(b.placed.kind) ?? TIER[tier].cells) / 40, b.placed.rot) : null;
           if (yg && inYard(yg, b.placed.x, b.placed.z, x, z, pad + 0.15)) return true;
+          // the ground loop's bore field (sim/dome/geothermal.ts) is kept clear of brush and trees too
+          const bores = this._fieldBores.get(b.placed.id) ?? 0;
+          if (yg && bores > 0) { const dx = x - b.placed.x, dz = z - b.placed.z; if (inField(yg, bores, dx * yg.et[0] + dz * yg.et[1], dx * yg.er[0] + dz * yg.er[1] - yg.r - YARD_GAP, pad + 0.15)) return true; }
         }
         continue;
       }

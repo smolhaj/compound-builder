@@ -48,7 +48,7 @@ import type { Evenings } from './evenings';
 import type { Courses } from './courses';
 import { starterKit, type ToolKit } from './tools';
 import { richFunds } from './richStart';
-export const SAVE_VERSION = 106;
+export const SAVE_VERSION = 107;
 import type { BlackMarket } from './blackMarket';
 import { newRescue, type RescueState } from './rescue';
 import { newBreakins, type Breakins } from './breakins';
