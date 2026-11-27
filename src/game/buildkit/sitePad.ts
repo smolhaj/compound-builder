@@ -14,6 +14,38 @@ import { tierOfKind } from '../../sim/dome/tiers';
 /** A drive or the county road within this margin (u) of a walled pad leaves it with the old gentle skirt: no retaining wall may stand across a way in. */
 export const RW_ACCESS_MARGIN = 0.5;
 
+/** The gentle skirt a pad gets where no retaining wall stands (u), and the widest a big cut or fill may open it to. */
+export const GENTLE_SKIRT = 0.9;
+export const GENTLE_SKIRT_MAX = 3.6;
+/** How many units of skirt a unit of drop gets: the bank's steepest part (a smoothstep, 1.5 times the mean grade) then stays near 1 : 4, a grade the ground shader reads as meadow and not as rock. */
+export const SKIRT_PER_DROP = 6;
+
+/**
+ * The skirt of a pad that has no wall: the old 0.9 u, wider when the ground round the pad differs from its level by more than that can carry.
+ * A dome on a slope (a drive ran to it, so no wall may stand) was cut 0.5 u (10 ft) into a 0.9 u bank: a 35 degree face that the terrain shader painted as dark rock,
+ * a square outline round the pad. `drop` is the largest |ground - pad level| round the pad's edge.
+ */
+export function gentleSkirt(drop: number): number {
+  return Math.min(GENTLE_SKIRT_MAX, Math.max(GENTLE_SKIRT, drop * SKIRT_PER_DROP));
+}
+
+/** The skirt a pad needs on this ground: the bank ends where the skirt does, so the drop is read at its outer edge (a hill keeps falling beyond the pad); three passes settle it. */
+export function skirtFor(r: Rect, level: number, ground: Natural): number {
+  let s = GENTLE_SKIRT;
+  for (let i = 0; i < 3; i++) s = gentleSkirt(edgeDrop({ x0: r.x0 - s, z0: r.z0 - s, x1: r.x1 + s, z1: r.z1 + s }, level, ground));
+  return s;
+}
+
+/** The largest |ground - level| along the edge of a rect (nine points a side), from `ground`. */
+export function edgeDrop(r: Rect, level: number, ground: Natural): number {
+  let m = 0;
+  for (let i = 0; i <= 8; i++) {
+    const x = r.x0 + (r.x1 - r.x0) * i / 8, z = r.z0 + (r.z1 - r.z0) * i / 8;
+    m = Math.max(m, Math.abs(ground(x, r.z0) - level), Math.abs(ground(x, r.z1) - level), Math.abs(ground(r.x0, z) - level), Math.abs(ground(r.x1, z) - level));
+  }
+  return m;
+}
+
 export interface SitePadCtx {
   /** Natural ground (no pads, no road bed). */
   natural: Natural;
@@ -62,6 +94,8 @@ export function sitePad(def: KitPieceDef, p: Placed, ctx: SitePadCtx): SitePad {
     if (wall && wall.runs.length) pad = { x0: wall.rect.x0, z0: wall.rect.z0, x1: wall.rect.x1, z1: wall.rect.z1, y: wall.y, skirt: wall.skirt };
     else wall = null;
   }
+  // a dome with no wall (a way in reaches it) is cut or filled as deep as the hill needs: the bank widens with the drop, so it never stands as a steep dark face
+  if (pad && !wall && def.level === 'cover') pad = { ...pad, skirt: skirtFor(pad, pad.y, ctx.natural) };
   // a stair or a ramp takes no pad: it stands on the hill from its low end and rises with it (game/buildkit/terraceProps.ts)
   const climb = def.climbs ? climbOf(def, p.x, p.z, p.rot, ctx.natural) : null;
   if (climb) { pad = null; wall = null; y = climb.low; }

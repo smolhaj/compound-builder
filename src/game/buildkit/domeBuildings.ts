@@ -466,7 +466,15 @@ function triShell(def: KitPieceDef, tier: 'geodesic' | 'arcology', seed: number,
       const a = V(...A), b = V(...B);
       for (let q = 0; q <= 6; q++) { const t = q / 6, x = a[0] + (b[0] - a[0]) * t, y = a[1] + (b[1] - a[1]) * t, z = a[2] + (b[2] - a[2]) * t; let d = Math.atan2(x, z) - portalA; d = Math.atan2(Math.sin(d), Math.cos(d)); if (Math.abs(d) < hwA * 1.2 && y < winTop + 0.04) return; }
     }
-    p.add(frameMat, strut(V(...A), V(...B), L.strut, seg));
+    // the lattice stops at the top of the armored band: its lowest struts used to run on down inside the opaque skin, and a strut 0.03 wide at a footing 0.02 inside the band's face pokes
+    // through it, a row of dark spikes round the foot that taper out where the strut leans in (a lower strut ends flat on the band's gasket ring instead)
+    let a = V(...A), b = V(...B);
+    if (band) {
+      const top = y0 + band;
+      if (a[1] < top && b[1] < top) return;
+      if (a[1] < top || b[1] < top) { const lo = a[1] < b[1] ? a : b, hi = lo === a ? b : a, t = (top - lo[1]) / (hi[1] - lo[1]), cut: Pt3 = [lo[0] + (hi[0] - lo[0]) * t, top, lo[2] + (hi[2] - lo[2]) * t]; if (lo === a) a = cut; else b = cut; }
+    }
+    p.add(frameMat, strut(a, b, L.strut, seg));
   };
   for (const [A, B, C] of tris) { edge(A, B); edge(B, C); edge(C, A); }
   p.layer = 'roof';
