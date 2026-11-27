@@ -8,7 +8,7 @@ import { plansNeedLines } from './guidance';
 import { suggestions } from './guidance';
 import { compoundBoard } from './compoundBoard';
 import { operational } from './operational';
-import { missLines, noteStalls, stuckRows, stallsDay, stuckProject, stuckShort, waiters, STALL_DAYS, ESCALATE_DAYS } from './stalls';
+import { missLines, noteStalls, stuckRows, stallsDay, stuckProject, stuckShort, theLabel, waiters, STALL_DAYS, ESCALATE_DAYS } from './stalls';
 import { migrate } from './save/migrations';
 import type { Fix } from './improvements';
 
@@ -300,5 +300,14 @@ describe('the Projects tab lists what is stuck', () => {
     g.money = 5; noteStalls(g); g.clock.t += 10;
     expect(stuckProject(g)).toBeNull();
     expect(stuckRows(g)[0].lines).toBeNull();
+  });
+});
+
+describe('stall wording', () => {
+  it('never says "the the" for a wall run', () => {
+    expect(theLabel('the wall')).toBe('the wall');
+    expect(theLabel('the wall', true)).toBe('The wall');
+    expect(theLabel('Timber cabin')).toBe('the Timber cabin');
+    expect(theLabel('Timber cabin', true)).toBe('The Timber cabin');
   });
 });

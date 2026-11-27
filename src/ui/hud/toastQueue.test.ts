@@ -15,6 +15,13 @@ describe('toast queue', () => {
     expect(l.length).toBe(1);
     expect(l[0].at).toBe(3000);
   });
+  it('a growing burst with one id replaces its earlier line (ids stay unique)', () => {
+    let l = pushToast([], t('f2', 'Bought a well', 0));
+    l = pushToast(l, t('f2', 'Bought a well and a pump', 500));
+    expect(l.length).toBe(1);
+    expect(l[0].text).toBe('Bought a well and a pump');
+    expect(new Set(l.map(x => x.id)).size).toBe(l.length);
+  });
   it('expires by time', () => {
     const l = [t('a', 'x', 0, 4000), t('b', 'y', 3000, 4000)];
     expect(liveToasts(l, 4500).map(x => x.id)).toEqual(['b']);

@@ -2,7 +2,7 @@
  * A suggestion's one-click action (a Next-steps button, a goal's primary button, a What-to-do-now row): one place, so the Build tab and the
  * layout A card do exactly the same thing. `showProjects` is how a "select" jump brings the Projects panel up.
  */
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
 import { orderCost, prices } from '../../sim/economy';
@@ -24,6 +24,8 @@ export function useRunAct(showProjects: () => void): { run: (a: SuggestionAct) =
   const g = useGameStore();
   const markTrees = useWorldStore(w => w.markNearestTrees);
   const [note, setNote] = useState<string | null>(null);
+  // a refusal note is a one-time line: it fades, so a stale "Could not hire them" never sits on the card for months
+  useEffect(() => { if (!note) return; const t = setTimeout(() => setNote(null), 8000); return () => clearTimeout(t); }, [note]);
   const { guard, node: guardNode } = useSpendGuard();
   const game = g.game;
   const arm = (tool: string) => g.setTool(g.tool === tool ? null : tool);
