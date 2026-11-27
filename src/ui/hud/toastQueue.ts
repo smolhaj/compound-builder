@@ -12,8 +12,10 @@ const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 /** Add a toast: a repeat refreshes, more than the cap drops the oldest. */
 export function pushToast(list: readonly Toast[], t: Omit<Toast, 'at'> & { at: number }, cap: number = TOAST_CAP): Toast[] {
-  const same = list.findIndex(x => norm(x.text) === norm(t.text));
-  const next = same >= 0 ? list.map((x, i) => (i === same ? { ...x, at: t.at, ttl: Math.max(x.ttl, t.ttl) } : x)) : [...list, t];
+  // a coalesced burst keeps its id while its text grows: it replaces its earlier line (two lines with one id is a duplicate React key)
+  const byId = list.findIndex(x => x.id === t.id);
+  const same = byId >= 0 ? byId : list.findIndex(x => norm(x.text) === norm(t.text));
+  const next = byId >= 0 ? list.map((x, i) => (i === byId ? { ...t, ttl: Math.max(x.ttl, t.ttl) } : x)) : same >= 0 ? list.map((x, i) => (i === same ? { ...x, at: t.at, ttl: Math.max(x.ttl, t.ttl) } : x)) : [...list, t];
   return next.length > cap ? next.slice(next.length - cap) : next;
 }
 /** What is still up at `now`. */
