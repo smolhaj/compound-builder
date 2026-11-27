@@ -163,17 +163,26 @@ export const btuKw = (b: number): number => b / BTU_PER_KWH;
 
 /** Most caps drawn (the field is the same grid beyond them) and columns across. */
 export const FIELD_DRAW_MAX = 96, FIELD_COLS = 12;
-export interface FieldDraw { caps: Array<{ u: number; v: number }>; v0: number; uMid: number; vMid: number; halfU: number; halfV: number }
-/** The bore field in the yard's own frame (`u` along the shell, `v` out from the yard's inner wall; world units, 1 = 20 ft = the bore spacing): out past the tower pad, centered on the yard. */
-export function geoField(yard: { D: number }, bores: number): FieldDraw {
+export interface FieldDraw { caps: Array<{ u: number; v: number }>; v0: number; uMid: number; vMid: number; halfU: number; halfV: number; /** Bores that found dry ground (fewer than asked when the lot has no room: the field is that much smaller). */ placed: number }
+/** Extra rows searched past the plain grid when wet cells are skipped. */
+export const FIELD_SEARCH_ROWS = 8;
+/**
+ * The bore field in the yard's own frame (`u` along the shell, `v` out from the yard's inner wall; world units, 1 = 20 ft = the bore spacing): out past the tower pad, centered on the yard.
+ * `wet(u, v)` says a cell is water or creek bank (with its margin): those cells are skipped and the bore goes to the next dry cell, up to `FIELD_SEARCH_ROWS` extra rows, so no cap sits on water.
+ */
+export function geoField(yard: { D: number }, bores: number, wet?: (u: number, v: number) => boolean): FieldDraw {
   const n = Math.max(0, Math.min(FIELD_DRAW_MAX, Math.floor(bores))), cols = Math.min(FIELD_COLS, Math.max(1, n)), rows = Math.max(1, Math.ceil(n / cols)), v0 = yard.D + 1.6;
-  const caps: FieldDraw['caps'] = [];
-  for (let i = 0; i < n; i++) caps.push({ u: ((i % cols) - (cols - 1) / 2) * BORE_SPACING_FT / 20, v: v0 + Math.floor(i / cols) * BORE_SPACING_FT / 20 });
-  return { caps, v0, uMid: 0, vMid: v0 + (rows - 1) / 2, halfU: cols / 2 + 0.6, halfV: rows / 2 + 0.6 };
+  const caps: FieldDraw['caps'] = [], sp = BORE_SPACING_FT / 20;
+  for (let r = 0, i = 0; r < rows + (wet ? FIELD_SEARCH_ROWS : 0) && caps.length < n; r++) for (let c = 0; c < cols && caps.length < n; c++, i++) {
+    const u = (c - (cols - 1) / 2) * sp, v = v0 + r * sp;
+    if (!wet || !wet(u, v)) caps.push({ u, v });
+  }
+  const last = caps.length ? Math.max(...caps.map(c => c.v)) : v0, vMax = Math.max(v0 + (rows - 1) * sp, last);
+  return { caps, v0, uMid: 0, vMid: (v0 + vMax) / 2, halfU: cols / 2 + 0.6, halfV: (vMax - v0) / 2 + 0.6, placed: caps.length };
 }
-/** Is the yard-frame point (u, v) on the drawn field plus `pad`? (Brush and trees stay off it.) */
+/** Is the yard-frame point (u, v) on the drawn field plus `pad`? (Brush and trees stay off it; the rectangle covers the search rows too.) */
 export function inField(yard: { D: number }, bores: number, u: number, v: number, pad = 0): boolean {
   if (bores <= 0) return false;
-  const f = geoField(yard, bores);
-  return Math.abs(u - f.uMid) <= f.halfU + pad && Math.abs(v - f.vMid) <= f.halfV + pad;
+  const f = geoField(yard, bores), ext = FIELD_SEARCH_ROWS * BORE_SPACING_FT / 20;
+  return Math.abs(u - f.uMid) <= f.halfU + pad && v >= f.v0 - 0.6 - pad && v <= f.vMid + f.halfV + ext + pad;
 }

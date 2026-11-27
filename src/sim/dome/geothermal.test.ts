@@ -184,3 +184,21 @@ describe('plant layout', () => {
     expect(inField({ D: 1.5 }, 0, 0, 3)).toBe(false); expect(inField({ D: 1.5 }, 40, 50, 3)).toBe(false);
   });
 });
+
+describe('bore field on wet ground', () => {
+  const yard = { D: 1.5 };
+  it('no cap lands on a wet cell, and the count is kept by moving bores to dry ground', () => {
+    const wet = (_u: number, v: number): boolean => v > 3.2 && v < 6.5;   // a creek band across the field
+    const f = geoField(yard, 60, wet);
+    expect(f.placed).toBe(60);
+    for (const c of f.caps) expect(wet(c.u, c.v)).toBe(false);
+    expect(Math.max(...f.caps.map(c => c.v))).toBeGreaterThan(6.5);
+    expect(geoField(yard, 60, () => false).caps).toEqual(geoField(yard, 60).caps);
+  });
+  it('a lot with no room shrinks the field (fewer placed) and the clearing box still covers every cap', () => {
+    const f = geoField(yard, 60, (_u, v) => v > 3.2);
+    expect(f.placed).toBeLessThan(60);
+    const all = geoField(yard, 60, (u, v) => v > 5 && u > 0);
+    for (const c of all.caps) expect(inField(yard, 60, c.u, c.v)).toBe(true);
+  });
+});

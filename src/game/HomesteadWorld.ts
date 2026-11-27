@@ -598,6 +598,14 @@ export class HomesteadWorld {
     this._root.add(f.group); this._links = f;
   }
 
+  /** Water or creek bank (with a margin of about 60 ft) at a world point: the ground loop's bore caps keep off it. */
+  private _wetGround(x: number, z: number): boolean {
+    const wy = regionWaterY(this.regionWorld.kind), ly = this.parcel.lakeY;
+    if (this.parcel.hasStream && Math.abs(z - this.parcel.creek.zAt(x)) < 3.4) return true;
+    if (wy !== null && this.parcel.region.height(x, z) < wy + 0.4) return true;
+    return ly !== null && this.parcel.height(x, z) < ly + 0.4;
+  }
+
   /** The plant of one finished big dome (every dome has its own: its machinery, yard, roof hatches and lamps; sim/dome/plant.ts), redrawn when its equipment or damage changes. */
   private _syncPlant(b: Built, game: GameState): void {
     const ref = domesLive(game).find(x => x.st.id === b.placed.id);
@@ -605,7 +613,7 @@ export class HomesteadWorld {
     const dst = domeStateOf(game, ref), hurt: Record<string, 'ok' | 'damaged' | 'down'> = {};
     for (const u of plantUnitsOf(game, ref, dst)) if (u.cond !== 'ok') hurt[u.id] = u.cond;
     const dark = plantFxOf(game, ref, dst).power === 'dark', inter = this._interiorFor(b, game, ref, dst.filtering, dark);
-    const plook: PlantLook = { roof: this._roofQA ?? yardRoofOf(game, ref.st.id), loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark, airlock: this._airlockQA ?? undefined, interior: inter.plan, interiorKey: inter.key, geo: dst.heatRejection === 'tower' || dst.groundLoop || dst.deepWell ? { tower: dst.heatRejection === 'tower', loop: !!dst.groundLoop, bores: dst.groundLoop ? loopField(ref.tier, ref.cells, dst.groundLoop).bores : 0, well: !!dst.deepWell } : undefined };
+    const plook: PlantLook = { roof: this._roofQA ?? yardRoofOf(game, ref.st.id), loop: dst.loop, spares: dst.spares, rot: b.placed.rot, hurt, dark, airlock: this._airlockQA ?? undefined, interior: inter.plan, interiorKey: inter.key, geo: dst.heatRejection === 'tower' || dst.groundLoop || dst.deepWell ? { tower: dst.heatRejection === 'tower', loop: !!dst.groundLoop, bores: dst.groundLoop ? loopField(ref.tier, ref.cells, dst.groundLoop).bores : 0, well: !!dst.deepWell, wet: (lx, lz) => this._wetGround(b.placed.x + lx, b.placed.z + lz) } : undefined };
     this._fieldBores.set(b.placed.id, plook.geo?.bores ?? 0);
     const key = plantKey(ref.tier, ref.r, dst.filtering, plook), cur = this._domePlants.get(b.placed.id);
     if (cur) cur.setView(this._view);

@@ -76,7 +76,7 @@ try {
   await frames(6);
   if (want('wide')) { await poseRaw2(await G0(-Wd * 0.9, D + 3.4, 2.4), await G0(0.1 * Wd, D + 0.5, 0.2), 62); await shot('wide-yard-tower-field-from-outside'); }
   if (want('tower')) { await poseRaw2(await G0(Wd / 2 + 1.4, D + 1.2, 0.5), await G0(Wd / 2 + 0.45, D + 0.45, 0.32), 56); await shot('tower-pad-closeup'); await poseRaw2(await G0(Wd / 2 + 0.3, D + 1.4, 0.25), await G0(Wd / 2 + 0.45, D + 0.45, 0.4), 60); await shot('tower-pad-low-fans'); }
-  if (want('well')) { await poseRaw2(await Y(0.27 * Wd + 0.6, D * 0.5 - 0.15, 0.3), await Y(0.27 * Wd, D * 0.5, 0.12), 58); await shot('well-head-closeup'); }
+  if (want('well')) { const arc = dm.tier === 'arcology'; await poseRaw2(await Y((arc ? 0.32 : 0.27) * Wd + (arc ? 0.5 : 0.6), arc ? D * 0.9 - 0.7 : D * 0.5 - 0.15, arc ? 0.55 : 0.3), await Y((arc ? 0.32 : 0.27) * Wd, arc ? D * 0.9 : D * 0.5, 0.12), arc ? 52 : 58); await shot('well-head-closeup'); }
   if (want('vault')) { await poseRaw2(await Y(0.25 * Wd + 0.62, D * 0.2 + 0.2, 0.3), await Y(0.25 * Wd, D * 0.2, 0.06), 58); await shot('loop-header-vault-closeup'); }
   if (want('field')) { await poseRaw2(await G0(0, D + 1.6, 9), await G0(0, D + 4.2, 0), 55); await shot('bore-field-from-above'); }
   if (want('fieldeye')) {
