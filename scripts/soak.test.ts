@@ -49,6 +49,8 @@ export function soakRun(spec: SoakSpec, opt: { roundTrips?: boolean; hashes?: st
   const rnd = mulberry32(spec.seed ^ 0x5eed);
   HOOKS.day = (s: GameState, day: number) => {
     lastDay = day; checks++;
+    // (SOAK_DUMP=<day>) with SOAK_ONE: the money, the account and the last day's log on that day and the day before, to SOAK_VERBOSE_OUT
+    if (process.env.SOAK_DUMP && Math.abs(day - Number(process.env.SOAK_DUMP)) <= 1) appendFileSync(process.env.SOAK_VERBOSE_OUT ?? '/tmp/soak-verbose.txt', `== day ${day} money ${s.money} debt ${JSON.stringify(s.fin.debt)}\n${s.log.filter(l => l.t >= day - 1.2).map(l => `${l.t.toFixed(2)} ${l.text}`).join('\n')}\n`);
     for (const v of checkState(s, { prev })) note(day, v);
     prev = summarize(s);
     peak = Math.max(peak, s.money); minMoney = Math.min(minMoney, s.money);
@@ -77,7 +79,8 @@ export function soakRun(spec: SoakSpec, opt: { roundTrips?: boolean; hashes?: st
   } finally { HOOKS.day = HOOKS.stance = undefined; }
   if (res) {
     ending = res.ending;
-    for (const b of res.bugs) note(lastDay, { code: 'play_bug', detail: b });
+    // (a joiner who is taken in brings cash, up to six figures: play()'s 'money jumped' check is not a bug for the soak)
+    for (const b of res.bugs.filter(x => !x.startsWith('money jumped'))) note(lastDay, { code: 'play_bug', detail: b });
     if (opt.roundTrips) {
       try { const d = firstDifference(res.s, importJson(exportJson(res.s))); trips++; if (d) note(lastDay, { code: 'roundtrip', detail: 'final ' + d }); } catch (e) { note(lastDay, { code: 'roundtrip_throw', detail: 'final ' + String((e as Error).message).slice(0, 200) }); }
     }

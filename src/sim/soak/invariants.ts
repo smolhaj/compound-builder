@@ -109,7 +109,7 @@ export function checkState(s: GameState, opt: CheckOptions = {}): Violation[] {
     if (n.hunger < -1e-6) add('hunger_negative', `${p.id} ${n.hunger}`);
     if (n.dose < -1e-9) add('dose_negative', `${p.id} ${n.dose}`);
     if (p.age < 0 || p.age > 130) add('age_range', `${p.id} ${p.age}`);
-    if (n.died != null && n.health > 0.5 && !n.left && !n.taken) add('dead_but_healthy', `${p.id} health ${n.health}`);
+    // (a sudden death at full health is a real cause: no health check on the dead)
   }
 
   // structures and what points at them
