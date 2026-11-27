@@ -488,6 +488,27 @@ export function domeWaterFlows(s: GameState, rainMmDay: number, perPersonL: numb
   return f;
 }
 
+/**
+ * Drinking and household water a dome's deep well gives (liters a day). The well is a drilled well, so what the cooling plant
+ * does not draw (see `dayLoad.wellGal`) is the family's water. Counts only domes with the well fitted, wired and not fried,
+ * with a water plant still standing. `fitted` is true when any dome has the well, whatever it gives today.
+ * PROPOSED (owner to confirm, docs/DECISIONS.md 2026-11-27): the pump's extra power for household use is not charged.
+ */
+export function domeWellHousehold(s: GameState): { fitted: boolean; litersPerDay: number } {
+  let fitted = false, liters = 0;
+  for (const d of domesOf(s)) {
+    const st = stateOf(s, d);
+    if (!st.deepWell) continue;
+    fitted = true;
+    if (!wired(s, d.st.id) || s.utilities.fried.includes(d.st.id)) continue;
+    const wk = fxOf(s, d, st).water;
+    if (wk <= 0) continue;
+    const full = wellGalDay(d.tier, wellYield(s, 'well_drilled'), wk);
+    liters += Math.max(0, full - dayLoad(s, d, st).wellGal) * 3.785;
+  }
+  return { fitted, litersPerDay: liters };
+}
+
 /** Hours a hot day pushes the plant over the band before it is a decision for the player. */
 const HOT_H = 3;
 /** What a day of rented chillers costs, per 1,000 sq ft of floor. */
