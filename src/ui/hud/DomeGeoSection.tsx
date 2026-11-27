@@ -1,7 +1,7 @@
 /** Heat rejection and ground on the Dome page (sim/dome/geothermal.ts, save v107): the tower, the high-ambient package, the ground loop, the deep well and thermal curtains, with prices in dollars and the field in acres. */
 import { useGameStore } from '../../store/gameStore';
 import { Note, Row, Section } from './common';
-import { DIM, TONE, btn, usd } from './style';
+import { TONE, btn, usd } from './style';
 import { dryAir, type DomeView, dayLoad } from '../../sim/dome/live';
 import { hasYard } from '../../sim/dome/plantYard';
 import { BORE_FT, GEO_LABEL, geoExposure, geoOptions, loopField, towerCapacity, wetBulbEstimate, wellSpec, type GeoOption } from '../../sim/dome/geothermal';
@@ -17,10 +17,12 @@ export function DomeGeoSection({ v }: { v: DomeView }) {
   const have = geoOf(st), opts = geoOptions(d.tier, d.cells), load = dayLoad(game, d, st);
   const act = (f: (x: typeof game) => string | null) => { const w = g.money(f); if (w) alert(w); };
   const wb = wetBulbEstimate(st.outF, dryAir(game)), field = have.groundLoop ? loopField(d.tier, d.cells, have.groundLoop) : null, well = wellSpec(d.tier), exp = geoExposure(have);
+  // (a loop is held to a 5 acre field: where that is less than the plant needs, the offer says how much of it the loop will carry)
+  const cover = (oid: GeoOption['id']): string => { if (oid !== 'loop_half' && oid !== 'loop_full') return ''; const share = loopField(d.tier, d.cells, oid === 'loop_half' ? 'half' : 'full').share; return share < 0.999 ? ` · covers ${Math.round(share * 100)} percent of the plant` : ''; };
   const buy = (o: GeoOption) => {
     const why = geoBuyProblem(game, o.id, id), has = (o.id === 'high_ambient' && have.rejection === 'high_ambient') || (o.id === 'tower' && have.rejection === 'tower') || (o.id === 'loop_half' && have.groundLoop === 'half') || (o.id === 'loop_full' && have.groundLoop === 'full') || (o.id === 'deep_well' && have.deepWell) || (o.id === 'curtains' && have.curtains);
     if (has) return <div key={o.id} data-testid={`geo-have-${o.id}`} style={{ fontSize: 11.5, color: TONE.good }}>{GEO_LABEL[o.id]}: in place</div>;
-    return <button key={o.id} data-testid={`geo-buy-${o.id}`} style={{ ...btn(), marginTop: 3, marginRight: 5, opacity: why ? 0.55 : 1 }} disabled={!!why} title={why ?? GEO_LABEL[o.id]} onClick={() => act(x => buyGeo(x, o.id, id))}>{GEO_LABEL[o.id]} · {usd(o.usd)}{why && !/needs/.test(why) ? ` · ${why}` : ''}</button>;
+    return <button key={o.id} data-testid={`geo-buy-${o.id}`} style={{ ...btn(), marginTop: 3, marginRight: 5, opacity: why ? 0.55 : 1 }} disabled={!!why} title={why ?? GEO_LABEL[o.id]} onClick={() => act(x => buyGeo(x, o.id, id))}>{GEO_LABEL[o.id]} · {usd(o.usd)}{cover(o.id)}{why && !/needs/.test(why) ? ` · ${why}` : ''}</button>;
   };
   return <Section title="Heat rejection and ground">
     <div data-testid="geo-panel">
@@ -32,7 +34,7 @@ export function DomeGeoSection({ v }: { v: DomeView }) {
       {have.curtains && <Row label="Thermal curtains" value="drawn at night: shell loss cut 40 percent" tone="good" />}
       {exp.map(e => <Note key={e.id} tone="warn">{e.label}: {e.word}.</Note>)}
       <div data-testid="geo-offers" style={{ marginTop: 4 }}>{opts.map(buy)}</div>
-      <Note>Prices are installed, in dollars. The loop is about three times the cost of an air-cooled unit; the tower trades the dry-bulb limit for water. <span style={{ color: DIM }}>(Proposed numbers, owner to confirm.)</span></Note>
+      <Note>Prices are installed, in dollars. The loop is about three times the cost of an air-cooled unit; the tower trades the dry-bulb limit for water.</Note>
     </div>
   </Section>;
 }
