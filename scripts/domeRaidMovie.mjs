@@ -22,7 +22,7 @@ const lowrender = args.includes('--lowrender'), sparse = Number(opt('--sparse', 
 const dr = (opt('--dense', '') || '').split(',').filter(Boolean).map(x => x.split(':').map(Number));
 const afterSecs = Number(opt('--after', 4));
 // --heavy tank,rpg,thermite,vbied : force the heavy weapons a crew brings at a sealed dome (sim/dome/heavyFire.ts heavyOptions.force; QA only)
-// --bt 9.4:tank,12:rpg : capture a frame when the battle clock of the dome fight reaches each time (and write the heavy and spoken events to events.json)
+// --bt 9.4:tank,12:rpg : (battle clock of the SEALED dome fight only, not the scouting scenes before it) capture a frame when the battle clock of the dome fight reaches each time (and write the heavy and spoken events to events.json)
 const btT = (opt('--bt', '') || '').split(',').filter(Boolean).map(x => { const [t, n] = x.split(':'); return { t: Number(t), n: n || 't' + t, done: false }; });
 let lastBt = null, battleDump = false;
 mkdirSync(outDir, { recursive: true });
@@ -122,7 +122,7 @@ try {
     let btName = null;
     for (const T of btT) if (!T.done && lastBt != null && lastBt + 0.5 / FPS >= T.t) { T.done = true; btName = T.n; }
     const grab = btT.length ? !!btName : secs >= fromS && (dense || p % sparse === 0);
-    const st = await page.evaluate(async ([q0, FPS, grab, lowrender, qq]) => {
+    const st = await page.evaluate(async ([q0, FPS, grab, lowrender, qq, onlySealed]) => {
       const cb = window.__cb, gs = cb.game.getState();
       cb.qa.skipDraw = !grab;   // (normal drawing, but a frame nobody captures is not drawn: skipping ahead and time-lapse cost almost nothing)
       const drawn = lowrender && grab ? cb.qa.renderFull(qq) : null;
@@ -132,8 +132,8 @@ try {
       const c = gs.cutscene;
       const b = cb.battle;
       const note = window.__breach?.note;
-      return { note, phase: c?.phase, offer: c?.offer ?? null, bt: b?.playing ? +b.time.toFixed(2) : null, ev: b?.playing ? b.battle.events.filter(e => ['ram', 'charge', 'gap', 'breach', 'end', 'down'].includes(e.kind)).map(e => e.kind + '@' + e.t) : null };
-    }, [q0, FPS, grab, lowrender, quality || 'high']);
+      return { note, phase: c?.phase, offer: c?.offer ?? null, bt: b?.playing && (!onlySealed || b.battle?.sealed) ? +b.time.toFixed(2) : null, ev: b?.playing ? b.battle.events.filter(e => ['ram', 'charge', 'gap', 'breach', 'end', 'down'].includes(e.kind)).map(e => e.kind + '@' + e.t) : null };
+    }, [q0, FPS, grab, lowrender, quality || 'high', btT.length > 0]);
     p++;
     lastBt = st.bt;
     if (st.bt != null && !battleDump && btT.length) { const ok = await page.evaluate(() => { const b = window.__cb.battle; return b.battle?.sealed ? b.battle.events.filter(e => e.kind === 'heavy' || e.kind === 'say').map(e => ({ t: e.t, k: e.kind, w: e.weapon, who: e.who ?? e.unit, ctx: e.ctx, text: e.text })) : null; }); if (ok) { battleDump = true; writeFileSync(`${outDir}/events.json`, JSON.stringify(ok, null, 1)); console.log('sealed fight events', ok.filter(e => e.k === 'heavy').map(e => e.w + '@' + e.t).join(' ')); } }
@@ -144,7 +144,9 @@ try {
       const meta = await page.evaluate(async () => {
         const { useCutsceneView } = await import('/src/store/cutsceneStore.ts');
         const v = useCutsceneView.getState().view, a = window.__cb.player.audit(), b = window.__cb.battle;
-        return { label: v?.sceneLabel, scene: v?.scene, seg: v?.seg, hour: v?.hour, inside: a?.inside, near: a?.nearest, cover: a?.cover, wall: a?.wall, eye: a?.eye, look: a?.look, kind: a?.kind, fb: a?.fallbacks, bt: b?.playing ? +b.time.toFixed(2) : null };
+        const { obstaclesOf } = await import('/src/game/battle/cameraObstacles.ts'), { domesOf } = await import('/src/sim/dome/standing.ts'), gg = window.__cb.game.getState().game, e0 = a?.eye;
+        const near = e0 ? obstaclesOf(gg).map(b => ({ id: b.id ?? b.kind, kind: b.kind, h: +b.h.toFixed(2), d: +Math.hypot(Math.max(b.x0 - e0.x, 0, e0.x - b.x1), Math.max(b.z0 - e0.z, 0, e0.z - b.z1)).toFixed(2) })).sort((x, y) => x.d - y.d).slice(0, 3) : null;
+        return { domes: domesOf(gg).map(d => ({ x: +d.x.toFixed(1), z: +d.z.toFixed(1), r: d.r, rot: d.structure.rot, airlocks: d.airlocks.map(l => ({ a: +l.angle.toFixed(2), role: l.role, w: l.w })) })), nb: near, ctl: obstaclesOf(gg).filter(b => b.id === 'dome_control').map(b => [b.x0, b.z0, b.x1, b.z1].map(v => +v.toFixed(1))), label: v?.sceneLabel, scene: v?.scene, seg: v?.seg, hour: v?.hour, inside: a?.inside, near: a?.nearest, cover: a?.cover, wall: a?.wall, eye: a?.eye, look: a?.look, kind: a?.kind, fb: a?.fallbacks, bt: b?.playing && b.battle?.sealed ? +b.time.toFixed(2) : null };
       });
       // let React flush the overlay
       await page.evaluate(() => new Promise(r => setTimeout(r, 30)));

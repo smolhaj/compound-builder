@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { Director, MAX_SURFACE_COVER, MAX_WALL_COVER, wallCover, STANDOFF, auditPose, bestEye, surfaceCover, brushCover, MAX_BRUSH_COVER, figurePx, lensProblem, poseAt, shotProblems, type Actor, type Box, type Shot } from './director';
-import { obstaclesOf, treeBoxes } from './cameraObstacles';
+import { obstaclesOf, treeBoxes, domeWallBoxes, vestibuleBoxes, SKIRT_H, YARD_ROOF } from './cameraObstacles';
+import { YARD_H, yardGeometry, yardWallHeight } from '../../sim/dome/plantYard';
+import { blockedBetween, nearBox } from './director';
 import { place } from '../../sim/raidTestKit';
 import { domesOf } from '../../sim/dome/standing';
 import { lightLabel } from './lightLabel';
@@ -197,6 +199,103 @@ describe('a dome\'s airlock modules are solid to the camera', () => {
     const dome = domesOf(g)[0], boxes = obstaclesOf(g).filter(b => b.id === 'dome_airlock');
     expect(dome.airlocks.length).toBeGreaterThan(0); expect(boxes.length).toBe(dome.airlocks.length);
     for (const l of dome.airlocks) expect(boxes.some(b => Math.hypot((b.x0 + b.x1) / 2 - Math.sin(l.angle) * dome.r, (b.z0 + b.z1) / 2 - Math.cos(l.angle) * dome.r) < 0.01)).toBe(true);
+  });
+});
+
+describe('a dome\'s opaque walls are solid to the camera and hide name tags', () => {
+  const mk = (kind: string) => { const g = place(3, 'hardcore', 'armed'); g.structures.push({ id: 'dm', kind, x: 0, z: 0, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 } as never); return g; };
+  const flat = () => 0;
+  it('boxes the armored, roofed plant yard of an arcology as one solid block as tall as it is drawn', () => {
+    const g = mk('dome_arcology'), d = domesOf(g)[0], yg = yardGeometry(d.tier, d.r, d.structure.rot)!;
+    const yard = domeWallBoxes(d).filter(b => b.id === 'dome_yard');
+    expect(yard.length).toBeGreaterThanOrEqual(4);
+    const H = yardWallHeight(d.tier, yg) + YARD_ROOF;
+    expect(H).toBeGreaterThanOrEqual(1.7);   // (armor as tall as the plant, 34 ft+, plus the roof: the old 0.58 box left the camera free to sit against a 1.5-unit wall)
+    expect(yard.every(b => b.kind === 'building' && Math.abs(b.h - H) < 1e-9)).toBe(true);
+    const inBox = (x: number, z: number) => yard.some(b => x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1);
+    for (const [cx, cz] of yg.corners) expect(inBox(cx + d.x, cz + d.z)).toBe(true);
+    expect(inBox(yg.center[0] + d.x, yg.center[1] + d.z)).toBe(true);   // (the roof covers the middle too)
+    expect(inBox(yg.center[0] + d.x + yg.er[0] * (yg.D / 2 + 0.5), yg.center[1] + d.z + yg.er[1] * (yg.D / 2 + 0.5))).toBe(false);   // (open ground beyond the outer wall)
+    expect(obstaclesOf(g).filter(b => b.id === 'dome_yard').length).toBe(yard.length);
+  });
+  it('boxes each arcology entrance module (person airlock and vehicle port) from its inner door out past the shell, 1.5+ tall', () => {
+    const g = mk('dome_arcology'), d = domesOf(g)[0], bx = obstaclesOf(g).filter(b => b.id === 'dome_airlock');
+    expect(d.airlocks.length).toBeGreaterThanOrEqual(2);
+    const inBox = (x: number, z: number, h = 0.5) => bx.some(b => x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1 && b.h > h);
+    for (const l of d.airlocks) {
+      for (const f of [0.1, 0.5, 0.9]) expect(inBox(l.inX + (l.outX - l.inX) * f, l.inZ + (l.outZ - l.inZ) * f, 1.5)).toBe(true);
+      // a unit inside its inner door, on the dome floor, is open
+      expect(inBox(l.inX - Math.sin(l.angle) * 1.0, l.inZ - Math.cos(l.angle) * 1.0)).toBe(false);
+    }
+    // the tiles are tight: no tile is wider than a step plus the diagonal of a turned cell
+    const tiles = vestibuleBoxes(d.airlocks[0], 1.55);
+    expect(tiles.every(b => b.x1 - b.x0 < 0.75 && b.z1 - b.z0 < 0.75)).toBe(true);
+  });
+  it('boxes the arcology control block inside the shell, clear of the open middle of the floor', () => {
+    const d = domesOf(mk('dome_arcology'))[0], cb = domeWallBoxes(d).filter(b => b.id === 'dome_control');
+    expect(cb.length).toBeGreaterThanOrEqual(2);
+    expect(cb.every(b => b.kind === 'building' && b.h >= 0.5)).toBe(true);
+    for (const b of cb) expect(Math.hypot((b.x0 + b.x1) / 2 - d.x, (b.z0 + b.z1) / 2 - d.z)).toBeLessThan(d.r);   // (inside the shell)
+    expect(cb.some(b => d.x >= b.x0 && d.x <= b.x1 && d.z >= b.z0 && d.z <= b.z1)).toBe(false);
+    expect(domeWallBoxes(domesOf(mk('dome_glass'))[0]).some(b => b.id === 'dome_control')).toBe(false);
+  });
+  it('boxes a glass dome\'s low concrete yard wall as a ring that leaves the middle open', () => {
+    const d = domesOf(mk('dome_glass'))[0], yg = yardGeometry(d.tier, d.r, d.structure.rot)!, yard = domeWallBoxes(d).filter(b => b.id === 'dome_yard_wall');
+    expect(yard.length).toBeGreaterThanOrEqual(4);
+    expect(yard.every(b => b.kind === 'wall' && Math.abs(b.h - YARD_H) < 1e-9)).toBe(true);
+    for (const [cx, cz] of yg.corners) expect(yard.some(b => cx + d.x >= b.x0 && cx + d.x <= b.x1 && cz + d.z >= b.z0 && cz + d.z <= b.z1)).toBe(true);
+    expect(yard.some(b => yg.center[0] + d.x >= b.x0 && yg.center[0] + d.x <= b.x1 && yg.center[1] + d.z >= b.z0 && yg.center[1] + d.z <= b.z1)).toBe(false);
+  });
+  it('boxes the arcology skirt band all round the shell, and not the glass dome\'s open lawn or the shell\'s inside', () => {
+    const d = domesOf(mk('dome_arcology'))[0], skirt = domeWallBoxes(d).filter(b => b.id === 'dome_skirt');
+    for (let a = 0; a < 6.28; a += 0.2) { const x = Math.sin(a) * d.r, z = Math.cos(a) * d.r; expect(skirt.some(b => x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1 && b.h === SKIRT_H)).toBe(true); }
+    expect(skirt.some(b => 0 >= b.x0 && 0 <= b.x1 && 0 >= b.z0 && 0 <= b.z1)).toBe(false);   // (the middle of the dome is open to a shot)
+    const glass = domeWallBoxes(domesOf(mk('dome_glass'))[0]);
+    expect(glass.some(b => b.id === 'dome_skirt')).toBe(false);
+    expect(glass.some(b => b.id === 'dome_yard_wall')).toBe(true);
+  });
+  it('flags an eye against the yard wall and a name tag behind it', () => {
+    const d = domesOf(mk('dome_arcology'))[0], yg = yardGeometry(d.tier, d.r, d.structure.rot)!, boxes = domeWallBoxes(d);
+    const out = yg.er, mid = [yg.center[0] + d.x, yg.center[1] + d.z], edge = [mid[0] + out[0] * yg.D / 2, mid[1] + out[1] * yg.D / 2];
+    // eye 0.05 off the outer face, low: against the wall
+    const eye = { x: edge[0] + out[0] * 0.05, y: 0.3, z: edge[1] + out[1] * 0.05 };
+    expect(boxes.some(b => nearBox(eye, b, flat, 0.12))).toBe(true);
+    // a person in the yard's middle seen from well outside, through the wall: blocked; from above the wall top: clear
+    // a tag over someone standing past the yard, seen from this side: hidden by the block; a person on the camera's own side of the yard: clear
+    const head = { x: edge[0] - out[0] * (yg.D + 0.6), y: 0.3, z: edge[1] - out[1] * (yg.D + 0.6) };
+    const far = { x: edge[0] + out[0] * 3, y: 0.3, z: edge[1] + out[1] * 3 };
+    expect(blockedBetween(far, head, boxes, flat)).toBe(true);
+    expect(blockedBetween(far, { x: far.x + out[0] * 2, y: 0.3, z: far.z + out[1] * 2 }, boxes, flat)).toBe(false);
+  });
+});
+
+describe('a heavy-weapon strike on a dome shows the burst, not the plant yard in front of it', () => {
+  it('cuts to a pose that sees the impact point with nothing solid between, whichever way the yard faces', () => {
+    for (const rot of [0, 1, 2, 3]) {
+      const g = place(3, 'hardcore', 'armed'); g.structures.push({ id: 'dm', kind: 'dome_arcology', x: 0, z: 0, rot, stage: 99, done: 0, supplied: true, finishedAt: 0 } as never);
+      const d0 = domesOf(g)[0], yg = yardGeometry(d0.tier, d0.r, d0.structure.rot)!, boxes = obstaclesOf(g);
+      // the impact is on the shell 0.5 rad to one side of the yard; the firer stands 9 units out from it
+      const a = yg.phi + 0.5, ox = Math.sin(a), oz = Math.cos(a), hit = { x: ox * d0.r, z: oz * d0.r };
+      const ev = { t: 0, kind: 'heavy', unit: 'r0', weapon: 'rpg', x: hit.x, z: hit.z, y: 0.6, ox, oz, fx: hit.x + ox * 9, fz: hit.z + oz * 9, hold: 3 } as Extract<BattleEvent, { kind: 'heavy' }>;
+      const actors: Actor[] = [{ id: 'r0', side: 'raider', x: ev.fx, y: 0, z: ev.fz, dead: false, gone: false }, { id: 'h0', side: 'home', post: 'open', x: 0, y: 0, z: 0, dead: false, gone: false }];
+      const dir = new Director(5);
+      dir.setObstacles(boxes);
+      const s = dir.update(0, actors, [ev], { x: 0, y: 0, z: 0 }, ground);
+      expect(s.kind).toBe('strike');
+      expect(s.mustSee?.length).toBe(1);
+      const bad = shotProblems(s, { boxes, ground, actors: new Map(actors.map(x => [x.id, x])) }).filter(p => /mark/.test(p));
+      expect(bad).toEqual([]);
+    }
+  });
+  it('refuses a strike pose whose burst is behind the yard block', () => {
+    const g = place(3, 'hardcore', 'armed'); g.structures.push({ id: 'dm', kind: 'dome_arcology', x: 0, z: 0, rot: 0, stage: 99, done: 0, supplied: true, finishedAt: 0 } as never);
+    const d0 = domesOf(g)[0], yg = yardGeometry(d0.tier, d0.r, 0)!, boxes = obstaclesOf(g);
+    const mid = { x: yg.center[0] + yg.er[0] * (yg.D / 2 + 3), y: 0.7, z: yg.center[1] + yg.er[1] * (yg.D / 2 + 3) };
+    const behind = { x: yg.center[0] - yg.er[0] * 1.5, y: 0.6, z: yg.center[1] - yg.er[1] * 1.5 };   // (inside the yard's inner side)
+    const shot = { kind: 'strike', eye: mid, look: behind, fov: 58, since: 0, hold: 3, drift: { x: 0, y: 0, z: 0 }, mustSee: [behind], subjects: [] } as unknown as Shot;
+    expect(shotProblems(shot, { boxes, ground, actors: new Map() }).join()).toMatch(/mark is hidden/);
+    const open = { ...mid, x: mid.x + yg.et[0] * 4, z: mid.z + yg.et[1] * 4 };   // (open ground to the side, in front of the lens)
+    expect(shotProblems({ ...shot, look: open, mustSee: [open] }, { boxes, ground, actors: new Map() }).join()).not.toMatch(/mark/);
   });
 });
 

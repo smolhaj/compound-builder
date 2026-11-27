@@ -6,7 +6,10 @@
 import { KIT, footprint } from '../buildkit/kit';
 import { PERIMETER } from '../../sim/perimeter';
 import type { GameState } from '../../sim/state';
-import { domesOf } from '../../sim/dome/standing';
+import { domesOf, type Airlock, type Dome } from '../../sim/dome/standing';
+import { LOOK } from '../buildkit/domeBuildings';
+import { CB_H, controlBlockPlan, turnPlan } from '../../sim/dome/controlBlock';
+import { yardGeometry, yardRunData, yardWallHeight, yardPoint } from '../../sim/dome/plantYard';
 
 /** An airlock module on a dome's shell: a block about 5 m across and 4 m tall that the camera may not fly into (a shot inside one is black). */
 export const AIRLOCK_HALF = 0.55, AIRLOCK_H = 0.75;
@@ -18,6 +21,76 @@ const buildingHeight = (id: string, floorY: number): number => id.startsWith('wa
 const WALL_THICK = 0.1;
 const PORCH_HEIGHT = 0.3;
 const MAX_BOXES = 700;
+
+/** Height of the arcology's opaque armored skirt band above the ground: the stem wall (0.14) plus the band (0.8) of game/buildkit/domeBuildings, and a little and its half thickness. */
+export const SKIRT_H = 0.96, SKIRT_HALF = 0.1;
+/** Chord length used to approximate the skirt ring with axis-aligned boxes. */
+const SKIRT_CHORD = 0.45;
+/** The closed roof deck and perimeter beam above the armored yard walls. */
+export const YARD_ROOF = 0.2;
+
+/**
+ * The opaque walls of a dome that the camera must keep out of (they are not perimeter runs in the live game, so `obstaclesOf` cannot read them there):
+ * the concrete wall of the glass / arcology plant yard (a closed ring outside the shell) the arcology's control block and its armored skirt band round the foot. The glass
+ * above the band is not boxed: a shot may look through it. Pure (tested in cameraShots.test.ts).
+ */
+export function domeWallBoxes(d: Pick<Dome, 'tier' | 'x' | 'z' | 'r' | 'airlocks'> & { structure: { rot: number } }): Box[] {
+  const out: Box[] = [];
+  // the arcology's control block: one armored building on the floor, planned as the builder draws it (sim/dome/controlBlock.ts), turned with the dome
+  const vehicle = d.airlocks.find(a => a.role === 'vehicle');
+  if (d.tier === 'arcology' && vehicle) {
+    const phi = d.structure.rot * Math.PI / 2, cb0 = controlBlockPlan(d.tier, d.r, vehicle.angle - phi), cb = cb0 ? turnPlan(cb0, phi) : null;
+    for (const c of cb?.colliders ?? []) out.push({ x0: c.x0 + d.x, x1: c.x1 + d.x, z0: c.z0 + d.z, z1: c.z1 + d.z, h: CB_H.tall, kind: 'building', id: 'dome_control' });
+  }
+  const yg = yardGeometry(d.tier, d.r, d.structure.rot);
+  if (yg && d.tier === 'arcology') {
+    // armored walls as tall as the plant under a closed roof: one solid block, tiled in the yard's own frame (u along the shell, v out from it)
+    const h = yardWallHeight(d.tier, yg) + YARD_ROOF, step = 0.5, nu = Math.max(1, Math.ceil(yg.W / step)), nv = Math.max(1, Math.ceil(yg.D / step));
+    for (let i = 0; i < nu; i++) for (let j = 0; j < nv; j++) {
+      const c = [0, 1].flatMap(a => [0, 1].map(b => yardPoint(yg, -yg.W / 2 + (i + a) * yg.W / nu, (j + b) * yg.D / nv)));
+      out.push({ x0: Math.min(...c.map(q => q[0])) + d.x, x1: Math.max(...c.map(q => q[0])) + d.x, z0: Math.min(...c.map(q => q[1])) + d.z, z1: Math.max(...c.map(q => q[1])) + d.z, h, kind: 'building', id: 'dome_yard' });
+    }
+  } else if (yg) {
+    const { pts } = yardRunData(yg, d.x, d.z), h = yardWallHeight(d.tier, yg);
+    for (let i = 1; i < pts.length; i++) {
+      const [ax, az] = pts[i - 1], [bx, bz] = pts[i];
+      const len = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.ceil(len / 0.8));
+      for (let k = 0; k < n; k++) {
+        const x0 = ax + (bx - ax) * k / n, z0 = az + (bz - az) * k / n, x1 = ax + (bx - ax) * (k + 1) / n, z1 = az + (bz - az) * (k + 1) / n;
+        out.push({ x0: Math.min(x0, x1) - WALL_THICK, x1: Math.max(x0, x1) + WALL_THICK, z0: Math.min(z0, z1) - WALL_THICK, z1: Math.max(z0, z1) + WALL_THICK, h, kind: 'wall', id: 'dome_yard_wall' });
+      }
+    }
+  }
+  if (d.tier === 'arcology') {
+    const n = Math.max(12, Math.ceil(2 * Math.PI * d.r / SKIRT_CHORD));
+    for (let k = 0; k < n; k++) {
+      const a0 = k / n * 2 * Math.PI, a1 = (k + 1) / n * 2 * Math.PI;
+      const x0 = d.x + Math.sin(a0) * d.r, z0 = d.z + Math.cos(a0) * d.r, x1 = d.x + Math.sin(a1) * d.r, z1 = d.z + Math.cos(a1) * d.r;
+      out.push({ x0: Math.min(x0, x1) - SKIRT_HALF, x1: Math.max(x0, x1) + SKIRT_HALF, z0: Math.min(z0, z1) - SKIRT_HALF, z1: Math.max(z0, z1) + SKIRT_HALF, h: SKIRT_H, kind: 'wall', id: 'dome_skirt' });
+    }
+  }
+  return out;
+}
+
+/**
+ * An arcology's entrance module (the person airlock or the vehicle port, 1.7 to 2.7 wide, about 2 long and 1.55 tall, armored): the oriented rectangle from its
+ * inner door out past the shell, tiled into small boxes so each stays tight to it whichever way it faces. A single box 0.75 tall at the shell point left the
+ * camera free to sit a hand's breadth from the module's dark wall with the whole picture filled. Pure.
+ */
+export function vestibuleBoxes(l: Pick<Airlock, 'angle' | 'inX' | 'inZ' | 'outX' | 'outZ' | 'w'>, h: number, step = 0.5): Box[] {
+  const ax = Math.sin(l.angle), az = Math.cos(l.angle), lx = az, lz = -ax;      // (along the axis outward, and across it)
+  const t0 = (l.inX - l.outX) * ax + (l.inZ - l.outZ) * az, len = -t0, hw = l.w / 2 + 0.1;
+  const nt = Math.max(1, Math.ceil(len / step)), nu = Math.max(1, Math.ceil(2 * hw / step)), out: Box[] = [];
+  for (let i = 0; i < nt; i++) for (let j = 0; j < nu; j++) {
+    const xs: number[] = [], zs: number[] = [];
+    for (const a of [0, 1]) for (const b of [0, 1]) {
+      const t = t0 + (i + a) * len / nt, u = -hw + (j + b) * 2 * hw / nu;
+      xs.push(l.outX + ax * t + lx * u); zs.push(l.outZ + az * t + lz * u);
+    }
+    out.push({ x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs), h, kind: 'building', id: 'dome_airlock' });
+  }
+  return out;
+}
 
 export function obstaclesOf(g: GameState): Box[] {
   const out: Box[] = [];
@@ -31,10 +104,12 @@ export function obstaclesOf(g: GameState): Box[] {
     if (def.frontCells > 0) out.push({ ...footprint(def, st.x, st.z, st.rot, true), h: PORCH_HEIGHT, kind: 'building' });
   }
   for (const d of domesOf(g)) for (const l of d.airlocks) {
+    if (d.tier === 'arcology') { out.push(...vestibuleBoxes(l, LOOK.arcology.vestH)); continue; }
     const hw = Math.max(AIRLOCK_HALF, (l.w ?? 0) / 2 + 0.1);
     const cx = d.x + Math.sin(l.angle) * d.r, cz = d.z + Math.cos(l.angle) * d.r;
     out.push({ x0: cx - hw, x1: cx + hw, z0: cz - hw, z1: cz + hw, h: AIRLOCK_H, kind: 'building', id: 'dome_airlock' });
   }
+  for (const d of domesOf(g)) out.push(...domeWallBoxes(d));
   for (const run of g.perimeter) {
     const def = PERIMETER[run.kind];
     if (!def || def.blocks.people < 0.5 || def.walkway || def.wallTop || run.pts.length < 2 || def.height < 0.3) continue;

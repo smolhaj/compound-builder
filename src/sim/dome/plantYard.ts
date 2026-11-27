@@ -23,6 +23,8 @@ export const hasYard = (tier: DomeTier): boolean => tier === 'glass' || tier ===
 /** The wall kind of the yard (the same table as every other wall: `PERIMETER.concrete_wall`) and its drawn height, thickness. */
 export const YARD_WALL = 'concrete_wall' as const;
 export const YARD_H = 0.58, YARD_T = 0.08;
+/** The drawn height of the yard's walls: the plain concrete wall (`YARD_H`) of a glass dome, the armored wall of an arcology as tall as its plant (its closed roof and beam stand 0.2 higher). */
+export const yardWallHeight = (tier: DomeTier, g: Pick<YardGeom, 'size' | 'W'>): number => tier === 'arcology' ? Math.max(1.5, 1.6 * Math.min(g.size, g.W / 5.4)) : YARD_H;
 /** How far the yard's inner wall stands from the shell (world units): the armored band, or the ring beam, and a service strip. */
 export const YARD_GAP = 0.35;
 /** Where the passage meets the yard, as a share of the yard's width from its middle (the aisle in from the inner door runs clear of the equipment). */
