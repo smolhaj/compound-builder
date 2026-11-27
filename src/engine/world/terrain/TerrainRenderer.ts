@@ -613,17 +613,18 @@ export class TerrainRenderer {
     const hOut: { out: Float32Array | null } = { out: null };
     const am = buildAdaptiveMesh(xs, zs, planLeaves(xs, zs, focus, LOD_TAU[o.quality], CORE_CELL[o.quality] * 1.01), nodeH, hOut);
     const nv = am.nodeOf.length;
-    const pos = new Float32Array(nv * 3), aF = new Float32Array(nv), aD = new Float32Array(nv);
+    // cover shares are 0..1, so one byte each (normalized) is plenty and saves about 1.6 MB of heap over two float arrays
+    const pos = new Float32Array(nv * 3), aF = new Uint8Array(nv), aD = new Uint8Array(nv);
     for (let v = 0; v < nv; v++) {
       const k = am.nodeOf[v], i = k % NX, j = (k - i) / NX;
       pos[v * 3] = xs[i]; pos[v * 3 + 1] = hOut.out![v]; pos[v * 3 + 2] = zs[j];
-      aF[v] = nodeF[k]; aD[v] = nodeD[k];
+      aF[v] = Math.round(Math.min(1, Math.max(0, nodeF[k])) * 255); aD[v] = Math.round(Math.min(1, Math.max(0, nodeD[k])) * 255);
     }
     this._am = am;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    geo.setAttribute('aForest', new THREE.BufferAttribute(aF, 1));
-    geo.setAttribute('aField', new THREE.BufferAttribute(aD, 1));
+    geo.setAttribute('aForest', new THREE.BufferAttribute(aF, 1, true));
+    geo.setAttribute('aField', new THREE.BufferAttribute(aD, 1, true));
     geo.setIndex(new THREE.BufferAttribute(am.index, 1));
     geo.computeVertexNormals();
     geo.computeBoundingSphere();

@@ -32,6 +32,7 @@ import { dayIndex } from './state';
 import { regionFor } from './climate';
 import type { SuggestionAct } from './guidance';
 import { pluralize } from './words';
+import { domeWellHousehold } from './dome/live';
 import { gallonsText } from './units';
 import { rxStatus } from './body';
 import { joinNames } from './kin';
@@ -79,9 +80,12 @@ function foodRow(s: GameState): RunwayRow {
 }
 
 function waterRow(s: GameState): RunwayRow {
-  const d = waterDaysStored(s), well = fin(s).some(st => st.kind.startsWith('well'));
+  const stored = waterDaysStored(s), dw = domeWellHousehold(s), well = fin(s).some(st => st.kind.startsWith('well')) || dw.fitted;
+  const people = Math.max(1, s.personState.filter(ps => ps.needs.died == null && !ps.needs.left && !ps.needs.taken).length);
+  // a dome well that covers the family's use keeps the taps running with the tanks empty
+  const covers = dw.litersPerDay >= people * WATER_L_PER_DAY, d = covers ? Math.max(stored, 365) : stored;
   const tone: RunwayTone = well ? (d >= RUNWAY.water.bad ? 'good' : 'warn') : toneOf(d, RUNWAY.water);
-  return { id: 'water', label: 'Water', days: Math.floor(d), value: daysText(d) + (well ? ', plus the well' : ''), tone, detail: `Water in the tanks and jugs at ${gallonsText(WATER_L_PER_DAY)} a person a day${well ? '; the well keeps filling the tanks while its pump has power' : ''}.`, fix: tone === 'good' ? { label: 'Utilities', act: { type: 'open', right: 'utilities' } } : { label: 'Water shelf', act: shop('water') } };
+  return { id: 'water', label: 'Water', days: Math.floor(d), value: covers ? 'a year or more, from the dome well' : daysText(d) + (well ? ', plus the well' : ''), tone, detail: `Water in the tanks and jugs at ${gallonsText(WATER_L_PER_DAY)} a person a day${well ? '; the well keeps filling the tanks while its pump has power' : ''}${dw.fitted ? `; the dome's deep well gives the house ${gallonsText(Math.round(dw.litersPerDay))} a day beyond its cooling water` : ''}.`, fix: tone === 'good' ? { label: 'Utilities', act: { type: 'open', right: 'utilities' } } : { label: 'Water shelf', act: shop('water') } };
 }
 
 function powerRow(s: GameState): RunwayRow {

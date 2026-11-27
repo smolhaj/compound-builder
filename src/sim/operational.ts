@@ -15,6 +15,7 @@ import { POWER_BUILDINGS as POWER, needsHookup, powerOnPlace } from './hookups';
 import type { GameState } from './state';
 import { stuckAction, stuckProject } from './stalls';
 import { pluralize } from './words';
+import { domeWellHousehold } from './dome/live';
 import { crewNudge } from './crewNudge';
 import { homeAdvice } from './homeAdvice';
 
@@ -61,7 +62,8 @@ export function operational(s: GameState, drive?: readonly Pt[], report?: Defens
   // a source standing is not water in the house when it was meant to reach it: a pump with no power, or a home with no running water, keeps the tick off (QA run 4: the tick lied)
   const wet = fin(WATER) ? needsHookup(s).find(h => ((h.kind === 'plumb' && h.tool !== null) || h.kind === 'pump_power') &&   // (a hand well or a cistern is water without a pipe: only a drilled well or tower promises running water)
      s.structures.find(x => x.id === h.id && (h.kind === 'pump_power' || isHome(x.kind)))) : undefined;
-  const waterDone = fin(WATER) && !wet;
+  const domeWell = domeWellHousehold(s).fitted;   // a bought dome deep well is a drilled well too
+  const waterDone = (fin(WATER) && !wet) || domeWell;
   out.push({ id: 'water', label: 'Water', done: waterDone, line: waterDone ? 'A working source' : wet ? `${wet.kind === 'plumb' ? 'The home has no running water' : 'Pump has no power'}` : staked(WATER) ? 'Well going in' : 'No water on the place',
     ...(waterDone ? {} : wet ? { act: { label: 'Show me', act: { type: 'select' as const, id: wet.id } } } : staked(WATER) ? {} : { act: stake(s.site.gwDepth > 9 ? 'well_drilled' : 'well_hand', s.site.gwDepth > 9 ? 'Drill a well' : 'Dig a well') }) });
 
