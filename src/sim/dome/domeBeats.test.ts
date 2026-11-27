@@ -223,7 +223,7 @@ describe('a sealed dome (the arcology) is a household watching, not a firefight'
 
 describe('work chatter after a heavy strike', () => {
   const say = (t: number, ctx: string): BattleEvent => ({ t, kind: 'say', text: ctx, who: 'r1', ctx });
-  const hv = (t: number): BattleEvent => ({ t, kind: 'heavy', unit: 'r0', weapon: 'mortar', x: 0, z: 0, y: 0, ox: 0, oz: 1, fx: 0, fz: 5, hold: false } as BattleEvent);
+  const hv = (t: number): BattleEvent => ({ t, kind: 'heavy', unit: 'r0', weapon: 'mortar', x: 0, z: 0, y: 0, ox: 0, oz: 1, fx: 0, fz: 5, hold: 0 });
   it('moves a pry-bar line off the strike and keeps the strike\'s own lines', () => {
     const ev = [hv(51), say(52, 'dome_airlock'), say(52.6, 'dome_heavy_mortar'), say(40, 'dome_tool')];
     settleAfterHeavy(ev, 80);
