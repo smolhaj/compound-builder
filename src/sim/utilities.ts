@@ -36,7 +36,7 @@ import { intakeCare, renewablesDay, type RenewDay } from './renewables';
 import { bestLevel } from './skills';
 import { regionFor } from './climate';
 import { gallonsText } from './units';
-import { domeKwhDay, domeLoadPriority, domeWaterFlows } from './dome/live';
+import { domeKwhDay, domeLoadPriority, domeWaterFlows, domeWellHousehold } from './dome/live';
 import { tierOfKind } from './dome/tiers';
 import { coldBatteryK, dieselGelK, iceColdF } from './slowClimate';
 import { nightOf } from './housing';
@@ -515,6 +515,8 @@ export function balanceDay(s: GameState, p: Plant, rnd: number, roofM2: (kind: s
   // a dome's shell is a roof too (sim/dome/waterLoop.ts): rain and melt to the cistern; a greywater or recycle loop and the beds' condensate give water back, the cooling pads drink some
   const domeMm = rainMm(doy) * regionFor(s.site).rainMm / 400;
   const domeW = domeWaterFlows(s, domeMm, WATER_PLUMBED, id => p.water.has(id) && p.nodes.some(o => p.water.get(o.id) === p.water.get(id) && !!UTILITY[o.kind]?.store));
+  // a dome's deep well gives the household what its cooling plant does not draw (sim/dome/live.ts domeWellHousehold)
+  supply += domeWellHousehold(s).litersPerDay;
   const rainL = roof * rainMm(doy) * regionFor(s.site).rainMm / 400 * 0.8 + toStore + domeW.rainL;
   // the living drink and wash (playtest round 3: the dead and the taken were still counted, doubling a long game's water use)
   const people = s.personState.filter(ps => ps.needs?.died == null).length;
