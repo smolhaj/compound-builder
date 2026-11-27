@@ -515,7 +515,9 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       // the bore field outside the yard: a header trench strip out from the wall and a true 20 ft grid of flush caps (drawn up to a cap; the rest of the field is the same pattern)
       const f = geoField(g, geo.bores!, geo.wet ? (u, v) => { const [wx, wz] = yardPoint(g, u, v); return geo.wet!(wx, wz); } : undefined);
       const hu = (tier === 'arcology' ? 0.2 : 0.25) * W, [tx0, tz0] = yardPoint(g, hu, D + 0.02), [tx1, tz1] = yardPoint(g, hu, f.v0);
-      push({ shape: 'box', x: (tx0 + tx1) / 2, z: (tz0 + tz1) / 2, y0: 0.002, w: 0.07, h: 0.012, d: Math.hypot(tx1 - tx0, tz1 - tz0), r: 0, rot: g.phi, color: 0x5d5646 });
+      // (in short runs: each stands on the ground at its own middle, so the strip follows a slope and does not float or sink as one straight plank)
+      const tlen = Math.hypot(tx1 - tx0, tz1 - tz0), tn = Math.max(1, Math.ceil(tlen / 0.3));
+      for (let i = 0; i < tn; i++) { const a = (i + 0.5) / tn; push({ shape: 'box', x: tx0 + (tx1 - tx0) * a, z: tz0 + (tz1 - tz0) * a, y0: 0.002, w: 0.07, h: 0.012, d: tlen / tn + 0.01, r: 0, rot: g.phi, color: 0x5d5646 }); }
       for (const c of f.caps) {
         const [bx, bz] = yardPoint(g, c.u, c.v);
         push({ shape: 'cyl', x: bx, z: bz, y0: 0.0, w: 0, h: 0.02, d: 0, r: 0.05, rot: 0, color: 0x6e7479 });

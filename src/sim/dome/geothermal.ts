@@ -132,7 +132,7 @@ export function geoProblem(tier: DomeTier, have: GeoSpec, id: GeoOption['id']): 
     case 'high_ambient': return have.rejection === 'high_ambient' ? 'already fitted' : have.rejection === 'tower' ? 'the tower already replaces the air-cooled condenser' : null;
     case 'tower': return have.rejection === 'tower' ? 'already fitted' : null;
     case 'loop_half': return have.groundLoop ? 'a ground loop is already in' : null;
-    case 'loop_full': return have.groundLoop === 'full' ? 'already fitted' : have.groundLoop === 'half' ? 'a half loop is in: the field cannot be re-drilled (PROPOSED)' : null;
+    case 'loop_full': return have.groundLoop === 'full' ? 'already fitted' : have.groundLoop === 'half' ? 'a half loop is in: the field cannot be re-drilled' : null;
     case 'deep_well': return have.deepWell ? 'already drilled' : null;
     case 'curtains': return have.curtains ? 'already hung' : null;
   }

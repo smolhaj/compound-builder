@@ -201,4 +201,15 @@ describe('bore field on wet ground', () => {
     const all = geoField(yard, 60, (u, v) => v > 5 && u > 0);
     for (const c of all.caps) expect(inField(yard, 60, c.u, c.v)).toBe(true);
   });
+
+  it('the header trench is laid in short runs (each stands on the ground at its own middle, so it follows a slope), and no player-facing text carries a design marker', () => {
+    const r = 9, base = plantLayout('arcology', r, 'advanced', {}), all = plantLayout('arcology', r, 'advanced', { geo: { loop: true, bores: 40 } });
+    const trench = all.parts.filter(q => q.shape === 'box' && q.w === 0.07 && q.h === 0.012);
+    expect(base.parts.filter(q => q.shape === 'box' && q.w === 0.07 && q.h === 0.012).length).toBe(0);
+    expect(trench.length).toBeGreaterThan(5);
+    for (const q of trench) expect(q.d).toBeLessThan(0.4);
+    for (const id of ['high_ambient', 'tower', 'loop_half', 'loop_full', 'deep_well', 'curtains'] as const) {
+      for (const have of [{}, { rejection: 'tower' }, { groundLoop: 'half' }, { groundLoop: 'full' }, { deepWell: true }, { curtains: true }] as const) expect(geoProblem('arcology', have, id) ?? '').not.toMatch(/PROPOSED/i);
+    }
+  });
 });

@@ -138,14 +138,14 @@ export function DomePanel() {
       <Row label="Draw" value={`${kwh.toLocaleString('en-US')} kWh a day`} title={`Climate ${Math.round(load.climateKwh)} + house load (fans, pumps, controls) ${Math.round(load.auxKwh)} + water loop ${Math.round(load.loopKwh)} + air plant while sealed ${Math.round(load.airKwh)}. Life support is served before everything else while sealed.`} />
       <Row label="Air plant" value={st.filtering === 'none' ? 'none fitted' : powered ? 'running' : 'no power'} tone={st.filtering === 'none' ? undefined : powered ? 'good' : 'bad'} />
       <Row label="Beds and animals under glass" value={`${v.beds} ${v.beds === 1 ? 'bed' : 'beds'}${stock.share > 0 ? `, ${Math.round(stock.share * 100)} percent of the barns` : ''}`} title="A held climate gives frost-free growing, no hail, steady yields and fewer sick animals (a sealed, powered dome only)." />
-      {st.filtering === 'none' && <Note>Without filtering the shell's leakage is all that freshens the air, and a 60 ft dome with six people is in trouble within about two days.</Note>}
+      {st.filtering === 'none' && (st.hours !== null || !st.lockdown) && <Note>Without filtering the shell's leakage is all that freshens the air: sealed, a small dome with a full household is in trouble within about two days, and a large one takes longer.</Note>}
       {!powered && <Note tone="warn">No power: the vents and roof screens still work by hand, but heating, the pads and the chillers are off.</Note>}
     </Section>
     <Section title="Rain and the water loop">
       <Row label="Rain off the shell" value={st.cistern === false ? 'not kept (no cistern on its line)' : `${gal(st.rainGalDay)} a day`} tone={st.cistern === false ? 'warn' : undefined} title="The shell is a roof: its rain and snowmelt go to the cisterns when the dome is on the water network with one. A fitted loop adds a first-flush diverter and a sand filter." />
       <Row label="Water loop" value={`${LOOP_NAME[loop]}${loopDown ? ' (down)' : ''}`} tone={loopDown ? 'bad' : undefined} />
       <Row label="Water given back" value={`${gal(st.savedGalDay)} a day`} title={`Reuse of the household's water (${Math.round(REUSE[loop] * 100)} percent at this loop) plus condensate from the beds on the cold coils.`} />
-      <Row label="Cooling pads drink" value={`${gal(powered ? load.waterGal : 0)} a day`} title="Evaporative cooling uses water on hot days, most in dry country." />
+      <Row label={st.heatRejection === 'tower' ? 'Cooling pads and tower drink' : 'Cooling pads drink'} value={`${gal(powered ? load.waterGal : 0)} a day`} title="Evaporative cooling uses water on hot days, most in dry country." />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
         {WATER_LOOPS.filter(l => l !== 'none' && WATER_LOOPS.indexOf(l) > WATER_LOOPS.indexOf(loop)).map(l => {
           const why = loopProblem(game, l, id), b = loopBill(game, l, id)!;
