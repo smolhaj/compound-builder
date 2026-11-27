@@ -15,6 +15,7 @@ import type { Dome } from './standing';
 import { isShellKind } from './siege';
 import { entrancesOf } from './standing';
 import { isSealedTier } from './sealed';
+import { planHeavyFire, HEAVY_SPOT } from './heavyFire';
 
 export interface DomeBeatInput {
   dome: Pick<Dome, 'id' | 'tier' | 'x' | 'z' | 'r' | 'airlocks'>;
@@ -249,6 +250,44 @@ export function domeBeats(b0: Battle, o: DomeBeatInput): Battle {
     say(tt + 0.5, u, 'dome_taunt');
     if (sealed) { say(tt + 5.5 + i * 0.9, u, 'dome_spectate'); say(tt + 12 + i * 1.3, u, 'dome_spectate'); }
   });
+  // 10. a sealed shell: the crew brings its heavy weapons (a machine gun to a truck bomb) and none of it leaves a mark. Presentation only (sim/dome/heavyFire.ts)
+  if (sealed) {
+    const plan = planHeavyFire({ seed: o.seed, crew: n, desperate: o.temper === 'desperate', from: at(0.2), to: tEnd - 1.5, duration: b.duration });
+    if (plan) {
+      const pool = [...workers, ...crewOrder.filter(u => !workers.includes(u))].filter(u => u.id !== leader.id);
+      const crewPool = pool.length ? pool : [leader];
+      const young = crewPool.length > 1 ? crewPool[crewPool.length - 1] : undefined, adults = crewPool.filter(u => u !== young);
+      const shooters: Array<BattleUnit | undefined> = [];
+      for (const st of plan.steps) {
+        const sp = HEAVY_SPOT[st.weapon], ang = st.offset === 0 && sp.gate ? front : a0 + st.offset;
+        // (a man who is working the shell with a probe, a tool or a shot is not asked to walk off to a gun and back in the middle of it: he must be done, or have time to walk
+        //  back to his place before his next job, and then he is sent back to it)
+        const work = (c: BattleUnit) => out.filter(e => (e.kind === 'probe' || e.kind === 'tool' || e.kind === 'dome_shot') && e.unit === c.id) as Array<Extract<BattleEvent, { kind: 'probe' | 'tool' | 'dome_shot' }>>;
+        const back = sp.dist + 3, spot = onShell(ang, sp.dist + (sp.hold ? 1.4 : 0.2));
+        const travelTo = (c: BattleUnit): number => { const f = pos.get(c.id) ?? { x: c.x, z: c.z }; return Math.hypot(spot.x - f.x, spot.z - f.z) / WALK_SPEED + 3; };   // (+3: a stand move for a job can be sent well before it)
+        const free = (c: BattleUnit): boolean => alive(c, st.t) && !drivers.has(c.id) && work(c).every(e => e.t + (e.kind === 'tool' ? e.secs : 0.6) < st.t - 0.7 - travelTo(c) || e.t > st.t + back);
+        const order = st.weapon === 'tank' || st.weapon === 'vbied' ? [leader, ...adults] : [...adults.slice(st.slot % Math.max(1, adults.length)), ...adults.slice(0, st.slot % Math.max(1, adults.length)), leader];
+        const u = order.find(free);
+        const next = u ? work(u).filter((e): e is Extract<BattleEvent, { kind: 'probe' | 'dome_shot' }> => e.t > st.t && e.kind !== 'tool').sort((p, q) => p.t - q.t)[0] : undefined;
+        shooters.push(u);
+        const shell = onShell(ang, sp.gate ? 0.6 : 0), from = onShell(ang, sp.dist);
+        if (u && alive(u, st.t)) {
+          // (the man who works it walks to his place, a little behind a tank or a truck)
+          goTo(u, st.t - 0.4, ang, sp.dist + (sp.hold ? 1.4 : 0.2));
+          if (next) { const off = next.kind === 'dome_shot' ? 1.9 : 0.2; out.push({ t: r2(st.t + 1.8), kind: 'move', unit: u.id, x: r2(next.x + next.ox * off), z: r2(next.z + next.oz * off) }); pos.set(u.id, { x: next.x + next.ox * off, z: next.z + next.oz * off }); }
+          out.push({ t: r2(st.t), kind: 'heavy', unit: u.id, weapon: st.weapon, x: r2(shell.x), z: r2(shell.z), y: sp.h, ox: r2(Math.sin(ang)), oz: r2(Math.cos(ang)), fx: r2(from.x), fz: r2(from.z), hold: sp.hold });
+        }
+      }
+      const speak: Record<string, BattleUnit | undefined> = { leader, young, household: undefined };
+      let cursed = 0;
+      for (const l of plan.lines) {
+        if (l.who === 'household') { say(l.t, homeAt(l.of, l.t), l.ctx); continue; }
+        // (a young one never curses: the line goes to a grown man)
+        const u = l.who === 'worker' ? (l.ctx === 'dome_heavy_rpg' || l.ctx === 'dome_heavy_mg' || l.ctx === 'dome_heavy_mortar' || l.ctx === 'dome_heavy_charge' || l.ctx === 'dome_heavy_thermite' ? shooters[l.of] : adults[(l.of + cursed++) % Math.max(1, adults.length)]) ?? leader : speak[l.who] ?? leader;
+        say(l.t, u === young && l.ctx === 'dome_curse' ? leader : u, l.ctx, l.who === 'young' && u === young ? ['young'] : []);
+      }
+    }
+  }
   // 6. what the truck and the satchel did, from the fight's own failed attempts
   for (const e of b.events) {
     if (e.kind === 'ram' && e.ok === false) { const driver = b.units.find(u => u.id === e.driver); say(e.t + e.secs + 1.1, driver, 'dome_ram'); say(e.t + e.secs + 3, homeAt(2, e.t + e.secs + 3), 'dome_holds'); }

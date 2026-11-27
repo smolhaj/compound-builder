@@ -21,6 +21,10 @@ const scan = args.includes('--scan'), wantDay = Number(opt('--day', 0));
 const lowrender = args.includes('--lowrender'), sparse = Number(opt('--sparse', 3)), fromS = Number(opt('--from', 0));
 const dr = (opt('--dense', '') || '').split(',').filter(Boolean).map(x => x.split(':').map(Number));
 const afterSecs = Number(opt('--after', 4));
+// --heavy tank,rpg,thermite,vbied : force the heavy weapons a crew brings at a sealed dome (sim/dome/heavyFire.ts heavyOptions.force; QA only)
+// --bt 9.4:tank,12:rpg : capture a frame when the battle clock of the dome fight reaches each time (and write the heavy and spoken events to events.json)
+const btT = (opt('--bt', '') || '').split(',').filter(Boolean).map(x => { const [t, n] = x.split(':'); return { t: Number(t), n: n || 't' + t, done: false }; });
+let lastBt = null, battleDump = false;
 mkdirSync(outDir, { recursive: true });
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise((ok, fail) => { vite.stdout.on('data', d => { if (/localhost:\d+/.test(String(d).replace(/\x1b\[[0-9;]*m/g, ''))) ok(); }); vite.on('exit', c => fail(new Error('vite exited ' + c))); });
@@ -36,11 +40,12 @@ try {
     window.requestAnimationFrame = cb => { if (!window.__manual) return real(cb); window.__q.push(cb); return window.__q.length; };
     window.__pump = ms => { window.__fakeNow += ms; const q = window.__q; window.__q = []; for (const cb of q) cb(window.__fakeNow); };
   });
-  await page.goto(`http://localhost:${port}/?seed=7${lowrender ? '&lowrender=1&looktier=medium' : ''}`);
+  await page.goto(`http://localhost:${port}/?seed=7${lowrender ? `&lowrender=1&looktier=${quality || 'high'}` : ''}`);
   await page.waitForFunction(() => window.__cb, null, { timeout: 180000 });
   if (lowrender) await page.evaluate(() => { window.__cb.qa.weather = true; });
   if (quality) await page.evaluate(q => window.__cb.store.getState().setQuality(q), quality);
   await page.evaluate(async () => { window.__breach = (await import('/src/sim/breach.ts')).breachOptions; });
+  if (opt('--heavy', null)) await page.evaluate(async w => { (await import('/src/sim/dome/heavyFire.ts')).heavyOptions.force = w.split(','); }, opt('--heavy', null));
   if (opt('--method', null)) await page.evaluate(async m => { (await import('/src/sim/breach.ts')).breachOptions.force = m; }, opt('--method', null));
   console.log('quality', await page.evaluate(() => window.__cb.store.getState().quality));
   const frames = async (k) => { const f0 = await page.evaluate(() => window.__cb.qa.frames); await page.waitForFunction(x => window.__cb.qa.frames >= x, f0 + k, { polling: 200 }); };
@@ -114,11 +119,13 @@ try {
     // dense windows are captured every pump; the rest every `sparse`-th (a time-lapse); before --from nothing is drawn at all
     const secs = p / FPS;
     const dense = dr.length > 0 && dr.some(([a, b]) => secs >= a && secs < b);
-    const grab = secs >= fromS && (dense || p % sparse === 0);
-    const st = await page.evaluate(async ([q0, FPS, grab, lowrender]) => {
+    let btName = null;
+    for (const T of btT) if (!T.done && lastBt != null && lastBt + 0.5 / FPS >= T.t) { T.done = true; btName = T.n; }
+    const grab = btT.length ? !!btName : secs >= fromS && (dense || p % sparse === 0);
+    const st = await page.evaluate(async ([q0, FPS, grab, lowrender, qq]) => {
       const cb = window.__cb, gs = cb.game.getState();
       cb.qa.skipDraw = !grab;   // (normal drawing, but a frame nobody captures is not drawn: skipping ahead and time-lapse cost almost nothing)
-      const drawn = lowrender && grab ? cb.qa.renderFull('medium') : null;
+      const drawn = lowrender && grab ? cb.qa.renderFull(qq) : null;
       window.__pump(1000 / FPS);
       if (drawn) await drawn;
       const w = cb.store.getState(); if (w.quality !== q0) w.setQuality(q0); w.setPerfNotice(null);
@@ -126,8 +133,10 @@ try {
       const b = cb.battle;
       const note = window.__breach?.note;
       return { note, phase: c?.phase, offer: c?.offer ?? null, bt: b?.playing ? +b.time.toFixed(2) : null, ev: b?.playing ? b.battle.events.filter(e => ['ram', 'charge', 'gap', 'breach', 'end', 'down'].includes(e.kind)).map(e => e.kind + '@' + e.t) : null };
-    }, [q0, FPS, grab, lowrender]);
+    }, [q0, FPS, grab, lowrender, quality || 'high']);
     p++;
+    lastBt = st.bt;
+    if (st.bt != null && !battleDump && btT.length) { const ok = await page.evaluate(() => { const b = window.__cb.battle; return b.battle?.sealed ? b.battle.events.filter(e => e.kind === 'heavy' || e.kind === 'say').map(e => ({ t: e.t, k: e.kind, w: e.weapon, who: e.who ?? e.unit, ctx: e.ctx, text: e.text })) : null; }); if (ok) { battleDump = true; writeFileSync(`${outDir}/events.json`, JSON.stringify(ok, null, 1)); console.log('sealed fight events', ok.filter(e => e.k === 'heavy').map(e => e.w + '@' + e.t).join(' ')); } }
     if (st.bt != null && Math.round(st.bt * 10) % 50 === 0) tl.push(`p${p} t${(p / FPS).toFixed(1)} bt${st.bt}`);
     if (st.ev && st.bt < 0.5 && st.note) console.log('breach note:', st.note);
     if (st.ev && st.bt < 0.5 && tl.evAt !== st.ev.join()) { tl.evAt = st.ev.join(); console.log('events', st.ev.join(' ')); }
@@ -141,7 +150,7 @@ try {
       await page.evaluate(() => new Promise(r => setTimeout(r, 30)));
       if (!globalThis.__cdp) globalThis.__cdp = await page.context().newCDPSession(page);
       const shot = await globalThis.__cdp.send('Page.captureScreenshot', { format: 'jpeg', quality: 85 });
-      const file = `f${String(n).padStart(5, '0')}.jpg`;
+      const file = btName ? `${String(n).padStart(2, '0')}-${btName}-bt${st.bt}.jpg` : `f${String(n).padStart(5, '0')}.jpg`;
       writeFileSync(`${outDir}/${file}`, Buffer.from(shot.data, 'base64'));
       if (caps.length) caps[caps.length - 1].pumps = p - 1 - lastCap;
       caps.push({ file, pumps: 1 }); lastCap = p - 1;

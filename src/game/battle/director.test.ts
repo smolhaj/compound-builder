@@ -45,4 +45,19 @@ describe('the cutscene camera operator', () => {
     const sh = a.establish(1, house, { x: 0, z: 1 }, ground);
     expect(sh.kind).toBe('establish');
   });
+
+  it('cuts to a heavy-weapon strike on a sealed shell: low, from the side, the point it lands on in front of the camera, held', () => {
+    for (const weapon of ['rpg', 'tank', 'thermite', 'vbied'] as const) {
+      const d = new Director(3);
+      d.update(0, cast(), [{ t: 0, kind: 'alarm', what: 'watch' }], house, ground);
+      const ev = { t: 4, kind: 'heavy' as const, unit: 'r0', weapon, x: 0, z: 3, y: 1.2, ox: 0, oz: 1, fx: 0, fz: weapon === 'thermite' ? 5 : 11, hold: 0 };
+      const s = d.update(4, cast(), [ev], house, ground);
+      expect(s.kind, weapon).toBe('strike');
+      for (const v of [s.eye.x, s.eye.y, s.eye.z, s.look.x, s.look.y, s.look.z]) expect(Number.isFinite(v)).toBe(true);
+      expect(s.eye.y).toBeGreaterThan(0.1);
+      expect(s.pinUntil ?? 0).toBeGreaterThan(4);
+      // (a say line a moment later does not cut away from it)
+      expect(d.update(5, cast(), [{ t: 5, kind: 'say', text: 'x', who: 'r1' }], house, ground).kind).toBe('strike');
+    }
+  });
 });

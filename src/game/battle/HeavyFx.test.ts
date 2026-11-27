@@ -29,4 +29,30 @@ describe('HeavyFx', () => {
     expect(box.max.z - box.min.z).toBeLessThan(2.4);
     expect(t.userData.muzzle).toBeInstanceOf(THREE.Vector3);
   });
+  it('a temporary prop (tank, truck) is removed and freed on time, and the scene is idle again', () => {
+    const g = new THREE.Group(), { h } = hooks(), fx = new HeavyFx(g, h), t = buildTank();
+    fx.temp(t, 2);
+    expect(fx.active).toBe(true);
+    for (let i = 0; i < 100; i++) fx.update(1 / 60);
+    expect(g.children).toContain(t);
+    for (let i = 0; i < 40; i++) fx.update(1 / 60);
+    expect(g.children).not.toContain(t);
+    expect(fx.active).toBe(false);
+  });
+  it('a thermite cut glares, throws sparks and runs drips for its whole burn, then leaves nothing', () => {
+    const g = new THREE.Group(), { h, log } = hooks(), fx = new HeavyFx(g, h);
+    fx.fire('thermite', new THREE.Vector3(0, 0.2, 2), new THREE.Vector3(0, 0.5, 0), new THREE.Vector3(0, 0, 1));
+    fx.update(1 / 60);
+    const glow = g.children.filter(c => (c as THREE.Mesh).isMesh);
+    expect(glow.length).toBeGreaterThanOrEqual(3);                        // halo, body, white core
+    let mid = 0;
+    for (let i = 0; i < 120; i++) fx.update(1 / 60);
+    const sp = g.children.find(c => (c as THREE.InstancedMesh).isInstancedMesh) as THREE.InstancedMesh;
+    mid = sp.count;
+    expect(mid).toBeGreaterThan(20);                                      // still throwing at two seconds
+    expect(log.flashes).toBeGreaterThan(8);                               // the glare flickers on the light
+    for (let i = 0; i < 60 * 8; i++) fx.update(1 / 60);
+    expect(fx.active).toBe(false);
+    expect(g.children.filter(c => (c as THREE.Mesh).isMesh && !(c as THREE.InstancedMesh).isInstancedMesh).length).toBe(0);
+  });
 });

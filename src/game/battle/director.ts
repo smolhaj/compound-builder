@@ -13,7 +13,7 @@ import type { Box } from './cameraObstacles';
 export type { Box } from './cameraObstacles';
 export interface Actor { id: string; side: 'home' | 'raider'; post?: string; x: number; y: number; z: number; dead: boolean; gone: boolean }
 export interface V3 { x: number; y: number; z: number }
-export type ShotKind = 'establish' | 'wide' | 'wall' | 'house' | 'raiders' | 'close' | 'gate' | 'vigil';
+export type ShotKind = 'establish' | 'wide' | 'wall' | 'house' | 'raiders' | 'close' | 'gate' | 'vigil' | 'strike';
 export interface Shot { /** A beat holds the shot until this time (the death scene's cuts are not cut away from by the next wound). */ pinUntil?: number; kind: ShotKind; subject?: string; eye: V3; look: V3; fov: number; since: number; hold: number; drift: V3; /** Who the shot is about (ids), and how many of them must be in frame. */ subjects?: string[]; need?: number; /** The fewest pixels tall (on a 720-line picture) the subjects must stand in the picture; unset = any. */ minPx?: number; /** The unit the operator pans after (the look eases to it as it moves). */ track?: string }
 
 const MIN_HOLD = 3.2;
@@ -30,7 +30,7 @@ const spanOf = (s: Pick<Shot, 'kind'>): number => (s.kind === 'establish' ? 30 :
 const FIG_H = 0.28, VIEW_H = 720;
 
 /** The least distance (world units, 1 = 6 m) from the camera to what a shot is about, by shot type. */
-export const STANDOFF: Record<ShotKind, number> = { establish: 3, wide: 3, wall: 0.9, house: 2, raiders: 1.6, close: 0.8, gate: 1.2, vigil: 0.6 };
+export const STANDOFF: Record<ShotKind, number> = { establish: 3, wide: 3, wall: 0.9, house: 2, raiders: 1.6, close: 0.8, gate: 1.2, vigil: 0.6, strike: 1.0 };
 /** The farthest a subject may be before it is a speck. */
 export const REACH = 30;
 /** The camera stays this far from every wall and roof (the near plane is 0.02, so nothing clips). */
@@ -367,6 +367,8 @@ export class Director {
   private _last = new Map<string, number>();
   private _boxes: readonly Box[] = [];
   private _lastCheck = -99;
+  /** The latest heavy-weapon strike on a dome's shell (sim/dome/heavyFire.ts): the next cut is to it. */
+  private _strike: Extract<BattleEvent, { kind: 'heavy' }> | null = null;
   /** The latest crew member seen at work on a dome's shell (sim/dome/domeBeats.ts probes): the next cut is to him while the work is on. */
   private _probe: { unit: string; t: number } | null = null;
   private _t = 0;
@@ -457,6 +459,7 @@ export class Director {
       if ((e.kind === 'wound' && !e.stopped) || e.kind === 'death' || e.kind === 'aid') { const u = byId.get(e.unit); if (u && (u.side === 'home' || this._r() < 0.5)) want = { kind: 'close', subject: e.unit, hold: 3.6 }; }
       else if (e.kind === 'breach' || e.kind === 'fallback' || e.kind === 'explosion' || e.kind === 'mine') want = { kind: 'wide', hold: 4.2 };
       else if (e.kind === 'gesture' || (e.kind === 'dome_shot' && (e.bounce === 'back' || this._r() < 0.4))) { this._probe = { unit: e.unit, t: time }; want = { kind: 'close', subject: e.unit, hold: 3.6 }; }
+      else if (e.kind === 'heavy') { this._probe = { unit: e.unit, t: time }; this._strike = e; want = { kind: 'strike', subject: e.unit, hold: e.weapon === 'tank' ? 5.2 : e.weapon === 'thermite' ? 5 : 3.6, force: true }; }
       else if (e.kind === 'probe') { this._probe = { unit: e.unit, t: time }; if (e.what !== 'rifle' && this._r() < 0.85) want = { kind: 'close', subject: e.unit, hold: 3.8 }; }
       else if (e.kind === 'alarm' && !this.shot) want = { kind: 'house', hold: 5 };
       else if (e.kind === 'say' && e.who && !want) {
@@ -584,6 +587,20 @@ export class Director {
         return this._set(this._search(mk, ctx));
       }
       kind = 'wide';
+    }
+    if (kind === 'strike' && this._strike) {
+      // a heavy weapon against the sealed shell: from behind and beside the man (and his tank or truck), low, so the weapon and the spot it lands on are both in frame
+      // and the shell is seen face-on; for a thermite cut, close on the burn, a little to the side
+      const k = this._strike, dist = Math.hypot(k.fx - k.x, k.fz - k.z), tx = -k.oz, tz = k.ox, burn = k.weapon === 'thermite', truck = k.weapon === 'vbied';
+      const B = burn ? 1.4 : truck ? dist * 1.4 + 1.4 : Math.max(1.8, dist * 0.6), S = burn ? 1.1 : truck ? 4.2 : Math.max(1.5, dist * 0.5);
+      const ax = burn ? k.x : k.fx, az = burn ? k.z : k.fz;
+      const f = burn ? 0 : 0.65, lx = ax + (k.x - ax) * f, lz = az + (k.z - az) * f;
+      const look = at(lx, lz, burn ? Math.max(0.2, k.y * 0.8) : k.weapon === 'tank' ? 0.8 : 0.5);
+      const who = burn || k.weapon === 'tank' || truck ? [] : [k.unit];
+      return this._set(this._search((rot, kk, hb) => {
+        const o = rotate({ x: k.ox * B + tx * S, z: k.oz * B + tz * S }, rot, kk);
+        return { ...base, kind: 'strike', subject: k.unit, subjects: who, need: 0.5, eye: at(ax + o.x, az + o.z, (burn ? 0.5 : truck ? 1.7 : 0.7) + hb), look, fov: burn ? 50 : 58, drift: { x: tx * 0.02, y: 0, z: tz * 0.02 } };
+      }, ctx));
     }
     if (kind === 'close' && subject) {
       const u = everyone.find(a => a.id === subject);

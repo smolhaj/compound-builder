@@ -19,10 +19,23 @@ export interface HeavyHooks {
 export type HeavyKind = 'rpg' | 'tank' | 'hmg' | 'amr' | 'mortar' | 'charge' | 'vbied' | 'thermite' | 'drone';
 
 const MAXSPARK = 160;
-interface Spark { p: THREE.Vector3; v: THREE.Vector3; age: number; life: number; len: number }
+interface Spark { p: THREE.Vector3; v: THREE.Vector3; age: number; life: number; len: number; /** gravity (default 6) */ g?: number; /** thickness multiplier */ w?: number }
+/** A thermite cut in progress: it keeps throwing sparks and running molten drips down the face while it burns (transient, ends with it). */
+interface Burn { at: THREE.Vector3; n: THREE.Vector3; age: number; life: number; acc: number; flare: number }
 interface Shot { mesh: THREE.Object3D; a: THREE.Vector3; b: THREE.Vector3; age: number; dur: number; trail: boolean; last: number; then: () => void }
 interface Later { at: number; run: () => void }
 
+/** A soft round falloff (white center to clear edge), made once: the halo of a thermite burn has no hard rim. */
+let SOFT: THREE.CanvasTexture | null = null;
+const soft = (): THREE.CanvasTexture | null => {
+  if (SOFT) return SOFT;
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d')!, g = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,0.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64);
+  return (SOFT = new THREE.CanvasTexture(c));
+};
 const mat = (c: number, r = 0.8, m = 0.1) => new THREE.MeshStandardMaterial({ color: c, roughness: r, metalness: m });
 
 /** A tank, front toward +z, tracks on y = 0 (a modern main battle tank: about 26 ft hull, 12 ft wide). `userData.turret` is the turret group, `userData.muzzle` the gun's tip in turret space. */
@@ -96,10 +109,12 @@ export class HeavyFx {
   private _shots: Shot[] = [];
   private _later: Later[] = [];
   private _props: THREE.Object3D[] = [];
+  private _timed: Array<{ o: THREE.Object3D; until: number }> = [];
   private _ring: Array<{ m: THREE.Mesh; age: number; life: number; r1: number }> = [];
   private _sparks: Spark[] = [];
   private _spark: THREE.InstancedMesh | null = null;
-  private _glow: Array<{ m: THREE.Mesh; age: number; life: number }> = [];
+  private _glow: Array<{ m: THREE.Mesh; age: number; life: number; base: number; pulse: number }> = [];
+  private _burns: Burn[] = [];
   private readonly _m = new THREE.Matrix4();
   private readonly _q = new THREE.Quaternion();
   private readonly _c = new THREE.Color();
@@ -109,20 +124,25 @@ export class HeavyFx {
 
   constructor(group: THREE.Group, hooks: HeavyHooks) { this._group = group; this._h = hooks; }
 
-  get active(): boolean { return this._shots.length > 0 || this._later.length > 0 || this._ring.length > 0 || this._sparks.length > 0 || this._glow.length > 0; }
+  get active(): boolean { return this._shots.length > 0 || this._later.length > 0 || this._ring.length > 0 || this._sparks.length > 0 || this._glow.length > 0 || this._timed.length > 0 || this._burns.length > 0; }
   private _r(): number { this._seed = (Math.imul(this._seed, 1664525) + 1013904223) >>> 0; return this._seed / 4294967296; }
 
   /** A prop that stays until `end` (the tank, the truck, a weapon): the scene owns it, `end` frees it. */
   prop(o: THREE.Object3D): THREE.Object3D { this._group.add(o); this._props.push(o); return o; }
 
+  /** A prop that is there for `ttl` seconds of the scene and then removed and freed (a tank driven up, a truck, a tube). */
+  temp(o: THREE.Object3D, ttl: number): THREE.Object3D { this._group.add(o); this._timed.push({ o, until: this._t + ttl }); return o; }
+
   /** Clears every effect and prop. */
   end(): void {
+    for (const p of this._timed) { this._group.remove(p.o); this._free(p.o); }
+    this._timed = [];
     for (const s of this._shots) { this._group.remove(s.mesh); this._free(s.mesh); }
     for (const p of this._props) { this._group.remove(p); this._free(p); }
     for (const r of this._ring) { this._group.remove(r.m); r.m.geometry.dispose(); (r.m.material as THREE.Material).dispose(); }
     for (const r of this._glow) { this._group.remove(r.m); r.m.geometry.dispose(); (r.m.material as THREE.Material).dispose(); }
     if (this._spark) { this._group.remove(this._spark); this._spark.geometry.dispose(); (this._spark.material as THREE.Material).dispose(); this._spark = null; }
-    this._shots = []; this._props = []; this._ring = []; this._glow = []; this._sparks = []; this._later = []; this._t = 0; this.impacts = 0;
+    this._shots = []; this._props = []; this._ring = []; this._glow = []; this._burns = []; this._sparks = []; this._later = []; this._t = 0; this.impacts = 0;
   }
   /** Effects only (props stay): the scene after the smoke has cleared. */
   clearFx(): void {
@@ -223,14 +243,44 @@ export class HeavyFx {
 
   private _thermite(at: THREE.Vector3, n: THREE.Vector3): void {
     const h = this._h;
-    // a white-hot pool on the plate, a rod of sparks falling, smoke; the plate beneath stays cold
-    const g = new THREE.Mesh(new THREE.CircleGeometry(0.06, 20), new THREE.MeshBasicMaterial({ color: 0xfff0c0, toneMapped: false, transparent: true, opacity: 1, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
-    g.position.copy(at).addScaledVector(n, 0.01); g.lookAt(at.clone().add(n)); g.userData = { noSSAO: true };
-    this._group.add(g); this._glow.push({ m: g, age: 0, life: 4 });
-    h.flash(at.clone().addScaledVector(n, 0.05), 14, 0xffd890);
-    h.puff(at.clone().addScaledVector(n, 0.04), 0.03, 0.09, 4, 0, 0xfff2d0, 1, true);
-    for (let i = 0; i < 6; i++) h.puff(at.clone().addScaledVector(n, 0.05 + i * 0.03).add(new THREE.Vector3(0, i * 0.04, 0)), 0.03, 0.14 + i * 0.03, 4 + i * 0.4, 0.08, 0xd0cbc0, 0.5);
-    for (let i = 0; i < 110; i++) this._emit(at.clone().addScaledVector(n, 0.015), n, 0.5, 1.6, true);
+    // a white-hot glare on the plate (three additive layers: a wide orange halo, a yellow-white body, a blown-out core), a hard flash, smoke, and a burn that keeps
+    // throwing sparks and running molten drips down the face for its whole life; the plate beneath stays cold and nothing is left behind
+    const layer = (r: number, color: number, base: number, pulse: number, lift: number) => {
+      const g = new THREE.Mesh(new THREE.CircleGeometry(r, 24), new THREE.MeshBasicMaterial({ color, map: soft(), toneMapped: false, transparent: true, opacity: base, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+      g.position.copy(at).addScaledVector(n, lift); g.lookAt(at.clone().add(n)); g.userData = { noSSAO: true };
+      this._group.add(g); this._glow.push({ m: g, age: 0, life: 5, base, pulse });
+    };
+    layer(0.2, 0xff7a20, 0.5, 0.25, 0.008); layer(0.11, 0xffc060, 0.85, 0.18, 0.012); layer(0.055, 0xffffff, 1, 0.12, 0.016);
+    h.flash(at.clone().addScaledVector(n, 0.08), 26, 0xfff0d0);
+    h.puff(at.clone().addScaledVector(n, 0.04), 0.05, 0.16, 4.5, 0, 0xffffff, 1, true);
+    for (let i = 0; i < 7; i++) h.puff(at.clone().addScaledVector(n, 0.06 + i * 0.03).add(new THREE.Vector3(0, i * 0.05, 0)), 0.03, 0.14 + i * 0.03, 4.5 + i * 0.4, 0.08, 0xd0cbc0, 0.5);
+    for (let i = 0; i < 60; i++) this._emit(at.clone().addScaledVector(n, 0.015), n, 0.8, 2.4, false);
+    this._burns.push({ at: at.clone(), n: n.clone(), age: 0, life: 4.2, acc: 0, flare: 0 });
+  }
+
+  /** One tick of a burn: sparks thrown off in arcs, and molten drips that run down the face (hugging it, long and bright, slowing toward the end). */
+  private _burn(b: Burn, dt: number): void {
+    b.age += dt; b.acc += dt; b.flare += dt;
+    const k = b.age / b.life, up = new THREE.Vector3(0, 1, 0), tan = new THREE.Vector3().crossVectors(up, b.n).normalize();
+    if (b.flare > 0.14) { b.flare = 0; this._h.flash(b.at.clone().addScaledVector(b.n, 0.07), 6 + this._r() * 7, 0xffe2b0); }
+    const per = 0.012;
+    while (b.acc > per) {
+      b.acc -= per;
+      if (this._sparks.length >= MAXSPARK - 6) break;
+      if (k > 0.85 && this._r() < 0.6) continue;
+      const jit = (this._r() - 0.5) * 0.07;
+      if (this._r() < 0.55) {
+        // a molten drip: starts on the face just below the glare and runs down it
+        const p = b.at.clone().addScaledVector(tan, jit).addScaledVector(up, -0.02 - this._r() * 0.04).addScaledVector(b.n, 0.012);
+        const v = up.clone().multiplyScalar(-(0.12 + this._r() * 0.28)).addScaledVector(b.n, 0.03).addScaledVector(tan, jit * 0.5);
+        this._sparks.push({ p, v, age: 0, life: 0.9 + this._r() * 1.3, len: 0.07 + this._r() * 0.11, g: 0.9, w: 1.8 });
+      } else {
+        // a spark thrown off the burn
+        const p = b.at.clone().addScaledVector(b.n, 0.02);
+        const v = b.n.clone().multiplyScalar(0.25 + this._r() * 0.9).addScaledVector(tan, (this._r() - 0.5) * 1.8).addScaledVector(up, (this._r() - 0.15) * 1.2);
+        this._sparks.push({ p, v, age: 0, life: 0.4 + this._r() * 0.6, len: 0.04 + this._r() * 0.08, g: 4.5, w: 1 });
+      }
+    }
   }
 
   /** The burst: a flash, a fireball, smoke and dust by size, sparks off the plate, a glancing streak. Nothing here is left behind. */
@@ -281,6 +331,7 @@ export class HeavyFx {
   update(dt: number): void {
     if (!this.active) return;
     this._t += dt;
+    for (let i = this._timed.length - 1; i >= 0; i--) if (this._timed[i].until <= this._t) { const p = this._timed.splice(i, 1)[0]; this._group.remove(p.o); this._free(p.o); }
     for (let i = this._later.length - 1; i >= 0; i--) if (this._later[i].at <= this._t) { const l = this._later.splice(i, 1)[0]; l.run(); }
     for (let i = this._shots.length - 1; i >= 0; i--) {
       const s = this._shots[i]; s.age += dt;
@@ -294,20 +345,21 @@ export class HeavyFx {
       r.m.scale.setScalar(Math.max(0.05, r.r1 * Math.sqrt(k))); (r.m.material as THREE.MeshBasicMaterial).opacity = 0.5 * (1 - k);
       if (k >= 1) { this._ring.splice(i, 1); this._group.remove(r.m); r.m.geometry.dispose(); (r.m.material as THREE.Material).dispose(); }
     }
+    for (let i = this._burns.length - 1; i >= 0; i--) { this._burn(this._burns[i], dt); if (this._burns[i].age >= this._burns[i].life) this._burns.splice(i, 1); }
     for (let i = this._glow.length - 1; i >= 0; i--) {
       const g = this._glow[i]; g.age += dt; const k = g.age / g.life;
-      (g.m.material as THREE.MeshBasicMaterial).opacity = Math.max(0, 1 - k * k); g.m.scale.setScalar(1 + 0.4 * Math.sin(g.age * 40));
+      (g.m.material as THREE.MeshBasicMaterial).opacity = g.base * Math.max(0, 1 - k * k * k) * (0.85 + 0.15 * Math.sin(g.age * 53 + g.base * 9)); g.m.scale.setScalar(1 + g.pulse * Math.sin(g.age * 37 + g.base * 5) + 0.15 * Math.min(1, g.age * 4));
       if (k >= 1) { this._glow.splice(i, 1); this._group.remove(g.m); g.m.geometry.dispose(); (g.m.material as THREE.Material).dispose(); }
     }
     const sp = this._spark;
     if (sp) {
       let n = 0;
-      for (let i = this._sparks.length - 1; i >= 0; i--) { const s = this._sparks[i]; s.age += dt; if (s.age >= s.life) this._sparks.splice(i, 1); else { s.v.y -= 6 * dt; s.p.addScaledVector(s.v, dt); } }
+      for (let i = this._sparks.length - 1; i >= 0; i--) { const s = this._sparks[i]; s.age += dt; if (s.age >= s.life) this._sparks.splice(i, 1); else { s.v.y -= (s.g ?? 6) * dt; s.p.addScaledVector(s.v, dt); } }
       for (const s of this._sparks) {
         const fade = 1 - s.age / s.life, vl = Math.max(0.01, s.v.length());
         this._q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), s.v.clone().divideScalar(vl));
-        this._m.compose(s.p, this._q, new THREE.Vector3(0.0035, 0.0035, s.len * (0.4 + 0.6 * fade)));
-        sp.setMatrixAt(n, this._m); sp.setColorAt(n, this._c.setHex(0xffc060).lerp(new THREE.Color(0xff5010), 1 - fade).multiplyScalar(fade + 0.2)); n++;
+        this._m.compose(s.p, this._q, new THREE.Vector3(0.0035 * (s.w ?? 1), 0.0035 * (s.w ?? 1), s.len * (0.4 + 0.6 * fade)));
+        sp.setMatrixAt(n, this._m); sp.setColorAt(n, this._c.setHex(s.w ? 0xffe8b0 : 0xffc060).lerp(new THREE.Color(0xff5010), 1 - fade).multiplyScalar(s.w ? 1.2 * fade + 0.3 : fade + 0.2)); n++;
       }
       sp.count = n; sp.instanceMatrix.needsUpdate = true; if (sp.instanceColor) sp.instanceColor.needsUpdate = true;
     }

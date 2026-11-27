@@ -21,7 +21,7 @@ import { getViolence, poolRadius, spatter, stain, woundSpot } from './bloodFx';
 import { buildVehicle } from '../props/vehicleGeometry';
 import { InvasionFx } from './InvasionFx';
 import { ShellFx } from './ShellFx';
-import { HeavyFx } from './HeavyFx';
+import { HeavyFx, buildTank, buildBombTruck, buildWeapon } from './HeavyFx';
 import { SceneProps } from './SceneProps';
 
 const RUN = 1.1;          // world units / s (≈ 6.5 m/s)
@@ -606,6 +606,20 @@ export class BattleRenderer {
         this.shellFx.onDomeShot(e, p0, chest);
         // the round that comes back rocks him: down on a knee for a moment, then up (no wound: nothing in the fight changes)
         if (e.bounce === 'back') { u.proneUntil = this.time + (e.down ?? 2); this.shake = Math.max(this.shake, 0.06); }
+        break;
+      }
+      case 'heavy': {
+        // a heavy weapon against the sealed shell (sim/dome/heavyFire.ts): a prop driven or set up for it, the shot, the burst on the shell; the shell takes no mark
+        const u = U_(e.unit);
+        if (u && !u.dead) { u.rot = Math.atan2(e.x - u.x, e.z - u.z); u.armed = true; u.aimUntil = this.time + 1.4; u.tx = u.x; u.tz = u.z; u.crouch = false; }
+        const T = THREE, gy = this._ground(e.fx, e.fz), yaw = Math.atan2(-e.ox, -e.oz);
+        const P = new T.Vector3(e.x, this._ground(e.x, e.z) + e.y, e.z), n = new T.Vector3(e.ox, 0, e.oz);
+        let from = new T.Vector3(e.fx, gy + 0.22, e.fz), delay = 0.3;
+        const place = (o: THREE.Object3D, ttl: number, y = 0) => { o.position.set(e.fx, gy + y, e.fz); o.rotation.y = yaw; if (y) o.scale.setScalar(1.8); this.heavy.temp(o, ttl); o.updateMatrixWorld(true); return o; };
+        if (e.weapon === 'tank') { const o = place(buildTank(), e.hold); from = (o.userData.turret as THREE.Object3D).localToWorld((o.userData.muzzle as THREE.Vector3).clone()); delay = 1.0; }
+        else if (e.weapon === 'vbied') { place(buildBombTruck(), e.hold); from = new T.Vector3(e.fx, gy + 0.1, e.fz); delay = Math.max(0.5, e.hold - 0.3); }
+        else if (e.weapon === 'rpg' || e.weapon === 'amr' || e.weapon === 'hmg' || e.weapon === 'mortar') { const o = place(buildWeapon(e.weapon), 6, 0.17); const m = o.userData.muzzle as THREE.Vector3 | undefined; from = m ? o.localToWorld(m.clone()) : o.localToWorld(new T.Vector3(0, 0.02, 0.06)); }
+        this.heavy.fire(e.weapon, from, P, n, delay);
         break;
       }
       case 'gesture': {

@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { useBattleStore } from '../store/battleStore';
 import { useCutsceneView } from '../store/cutsceneStore';
+import { raiderLabel } from '../sim/raidSpeaker';
 import { clockLabel, gapLabel } from '../sim/siege';
 import { afterLabel } from '../sim/aftermathLabel';
 import type { Battle } from '../sim/battleTypes';
@@ -25,7 +26,7 @@ function speaker(b: Battle | null, people: ReadonlyArray<{ id: string; first: st
   if (!who || !b) return null;
   const u = b.units.find(x => x.id === who);
   if (!u) return null;
-  if (u.side === 'raider') return { name: u.id === 'r0' ? 'Their leader' : 'Raider', home: false };
+  if (u.side === 'raider') return { name: raiderLabel(b, u.id), home: false };
   return { name: people.find(p => p.id === u.personId)?.first ?? 'Resident', home: true };
 }
 
