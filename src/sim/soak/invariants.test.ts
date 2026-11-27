@@ -3,6 +3,7 @@ import { newGame } from '../state';
 import { step } from '../engine';
 import { planStructure } from '../construction';
 import { checkState, firstDifference, hashState, nonFinitePaths, summarize, unsavablePaths } from './invariants';
+import { liveDay } from '../needs';
 import { exportJson, importJson } from '../save/migrations';
 
 const fresh = () => newGame(7);
@@ -65,5 +66,16 @@ describe('soak invariants', () => {
     const t = importJson(exportJson(s));
     t.money += 1;
     expect(firstDifference(s, t)).toBe('money: ' + s.money + ' vs ' + t.money);
+  });
+});
+
+describe('soak regressions', () => {
+  it('nobody at home to eat: the food report stays finite and survives a save (was daysLeft = Infinity -> null)', () => {
+    const s = newGame(5);
+    for (const ps of s.personState) ps.needs.died = 0;
+    const r = liveDay(s, 0.5);
+    expect(Number.isFinite(r.daysLeft)).toBe(true);
+    s.food = r;
+    expect(firstDifference(s, importJson(exportJson(s)))).toBeNull();
   });
 });

@@ -390,7 +390,7 @@ export function liveDay(s: GameState, rnd: number): FoodReport {
       s.people.splice(i, 1); s.personState.splice(i, 1);
     }
   }
-  return { needKcal: need, ateKcal: ate, producedKcal: grown - seedKept + meat + stock, spoiledKcal: spoiled, fromStores, kinds, daysLeft: daysOfFood(s) };
+  return { needKcal: need, ateKcal: ate, producedKcal: grown - seedKept + meat + stock, spoiledKcal: spoiled, fromStores, kinds, daysLeft: Math.min(daysOfFood(s), 36_500) };
 }
 
 /** Work rate multiplier from health and morale (the hungry, hurt or hopeless get less done). */
