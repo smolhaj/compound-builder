@@ -21,6 +21,8 @@ import { log } from '../economy';
 import { mulberry32 } from '../rng';
 import { nightOf } from '../housing';
 import { regionFor } from '../climate';
+import { wellYield } from '../effects';
+import { wellGalDay, wellKwhDay } from './geothermal';
 import { solarFogK } from '../fogFx';
 import { powerOnPlace } from '../hookups';
 import { DIFFICULTY } from '../difficulty';
@@ -126,6 +128,11 @@ export interface DomeState {
   spares?: PlantKind[];
   /** Upkeep (maintenance, insurance, staff) the family has not been able to pay, in dollars (save v105, optional; sim/dome/upkeep.ts). */
   upkeepOwed?: number;
+  /** Geothermal and heat-rejection purchases (save v107, optional; sim/dome/geothermal.ts): air (default) / high-ambient package / cooling tower; a ground loop (half or full plant); a deep well; thermal curtains. */
+  heatRejection?: import('./geothermal').Rejection;
+  groundLoop?: import('./geothermal').LoopSize;
+  deepWell?: boolean;
+  thermalCurtain?: boolean;
 }
 
 export const newDomeState = (): DomeState => ({
@@ -273,7 +280,7 @@ function dayProfile(s: GameState): Array<{ f: number; sun: number }> {
   return ([[2, 0], [8, 0.35], [14, 1], [20, 0]] as const).map(([h, sun]) => ({ f: n.lowF + 22 * (0.5 - 0.5 * Math.cos(2 * Math.PI * (h - 5) / 24)) + (n.hot ? 12 : 0) - (n.snowy ? 4 : 0), sun: sun * season * dim }));
 }
 
-export interface DayLoad { kwh: number; climateKwh: number; auxKwh: number; loopKwh: number; airKwh: number; waterGal: number }
+export interface DayLoad { kwh: number; climateKwh: number; auxKwh: number; loopKwh: number; airKwh: number; waterGal: number; /** Cooling water the deep well covers (gallons) and the pump's draw (kWh), save v107. */ wellGal: number; wellKwh: number }
 /** A dome's draw and water for today: the climate plant over the day's weather, the house load, the water loop's pumps and the air plant while sealed. */
 export function dayLoad(s: GameState, d: DomeRef, st: DomeState = stateOf(s, d)): DayLoad {
   let clim = 0, water = 0;
@@ -281,8 +288,11 @@ export function dayLoad(s: GameState, d: DomeRef, st: DomeState = stateOf(s, d))
   for (const p of dayProfile(s)) { const l = domeLoad(d.tier, d.cells, p.f, p.sun, st.mode, { sealed: st.lockdown, dry, ...climateOpts(s, d, st, p.f) }); clim += l.kwhPerDay / 4; water += l.waterGalDay / 4; }
   const air = st.lockdown || st.filtering === 'closed' ? airPlantKw(d.tier, d.cells, st.filtering) * 24 : 0;
   const loopK = loopKw(d.tier, d.cells, st.loop ?? 'none') * 24, aux = auxKwhDay(d.tier, d.cells);
-  clim *= fxOf(s, d, st).climate;
-  return { kwh: Math.max(0.2, clim + aux + loopK + air), climateKwh: clim, auxKwh: aux, loopKwh: loopK, airKwh: air, waterGal: water };
+  const fx = fxOf(s, d, st);
+  clim *= fx.climate;
+  // a deep well makes up the cooling water through the water plant before the cistern is drawn (sim/dome/geothermal.ts)
+  const yk = wellYield(s, 'well_drilled'), wellGal = st.deepWell ? Math.min(water, wellGalDay(d.tier, yk, fx.water)) : 0, wellKwh = wellGal > 0 ? wellKwhDay(d.tier, wellGal, yk) : 0;
+  return { kwh: Math.max(0.2, clim + aux + loopK + air + wellKwh), climateKwh: clim, auxKwh: aux, loopKwh: loopK, airKwh: air, waterGal: water, wellGal, wellKwh };
 }
 
 /** The dome's draw a day (kWh), read by utilities.ts. */
@@ -470,7 +480,7 @@ export function domeWaterFlows(s: GameState, rainMmDay: number, perPersonL: numb
     const wk = fxOf(s, d, st).water;   // the water plant's share (sim/dome/plantUnits.ts): lost, the loop is off and the rain runs in unfiltered
     const rain = link ? rainCatchL(d.tier, d.cells, rainMmDay, wk > 0 ? loop : 'none') : 0;
     const re = loop !== 'none' && up && pw ? reuseL(peopleUnder(s, d), perPersonL, loop) * wk : 0;
-    const cond = d.tier !== 'earthen' ? condensateL(bedsUnder(s, d), pw) : 0, cool = dayLoad(s, d, st).waterGal * 3.785;
+    const cond = d.tier !== 'earthen' ? condensateL(bedsUnder(s, d), pw) : 0, dl = dayLoad(s, d, st), cool = (dl.waterGal - (pw ? dl.wellGal : 0)) * 3.785;
     f.rainL += rain; f.reuseL += re; f.condL += cond; f.coolL += cool;
     const own = s.domes?.[d.st.id];
     if (own) { own.cistern = link; own.rainGalDay = rain * GAL_PER_L; own.savedGalDay = (re + cond) * GAL_PER_L; own.waterGalDay = cool / 3.785; }

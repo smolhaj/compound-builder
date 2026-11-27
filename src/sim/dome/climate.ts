@@ -78,6 +78,11 @@ export interface LoadOpts {
   copHeat?: number;
   chillCapBtu?: number;
   evapK?: number;
+  /** Geothermal purchases (sim/dome/geothermal.ts, save v107; all default to none): Btu an hour a ground loop takes at `copLoop`, gallons of make-up water per kWh of heat the chiller plant moves (a tower), and the share of shell loss left at night (curtains). */
+  loopCapBtu?: number;
+  copLoop?: number;
+  towerGalPerKwh?: number;
+  nightLossK?: number;
 }
 
 const earthK = (tier: DomeTier): number => tier === 'earthen' ? 0.6 : tier === 'geodesic' ? 0.12 : 0;
@@ -103,7 +108,7 @@ export function domeLoad(tier: DomeTier, cells: number, outsideF: number, sun: n
   // cold side: a heat pump holds the floor of the band
   if (free < lo) {
     if (!powered) return { ...base, kwThermal: 0, kwElectric: 0, kwhPerDay: 0, indoorF: free };
-    const loss = SHELL_U[tier] * g.surfaceSf * (lo - ref);
+    const loss = SHELL_U[tier] * g.surfaceSf * (lo - ref) * (clamp01(sun) <= 0.05 ? (o.nightLossK ?? 1) : 1);
     const gain = PEAK_SUN * clamp01(sun) * g.footprintSf * SOLAR_GAIN[tier];
     const net = Math.max(0, loss - gain), kwT = net / BTU_PER_KWH, kwE = kwT / (o.copHeat ?? COP_HEAT);
     return { ...base, kwThermal: kwT, kwElectric: kwE, kwhPerDay: kwE * 24, indoorF: lo, stage: 'heating' };
@@ -131,8 +136,10 @@ export function domeLoad(tier: DomeTier, cells: number, outsideF: number, sun: n
   }
   if (need() > 0 && powered) {
     // the chiller takes what its capacity allows (all of it unless a limit is given); the rest is left to float the air up
-    const ask = need(), take = Math.min(ask, Math.max(0, o.chillCapBtu ?? Infinity));
-    kwE += take / BTU_PER_KWH / (o.copCool ?? COP_COOL); stage = 'chill'; gain -= take;
+    // a ground loop takes its share first (no outdoor derate), the chiller the rest
+    const ask = need(), viaLoop = Math.min(ask, Math.max(0, o.loopCapBtu ?? 0)), take = Math.min(ask - viaLoop, Math.max(0, o.chillCapBtu ?? Infinity));
+    kwE += viaLoop / BTU_PER_KWH / (o.copLoop ?? 4) + take / BTU_PER_KWH / (o.copCool ?? COP_COOL); stage = 'chill'; gain -= take + viaLoop;
+    water += take / BTU_PER_KWH * 24 * (o.towerGalPerKwh ?? 0);
   }
   const left = need();
   const indoor = left > 0 ? Math.min(free, hold + left / (SHELL_U[tier] * g.surfaceSf)) : hold;

@@ -15,6 +15,7 @@ import { advancedFilterUsd, closedEcologyUsd, scrubberUsd } from './air';
 import { domeLoad, nightKwhPerDay } from './climate';
 import { auxKwhDay } from './live';
 import { spareUsd } from './plantUnits';
+import { geoLines, geoOptions, type GeoSpec } from './geothermal';
 import { runningCost, type Running } from './pricing';
 
 export interface CostLine { id: string; label: string; usd: number }
@@ -33,7 +34,8 @@ export interface DomeSummary {
 
 const good = (n: number, g: keyof typeof MATERIALS): number => n * (MATERIALS[g].price ?? 0);
 
-export function domeCostSummary(tier: DomeTier, cells: number = TIER[tier].cells, extras: CostLine[] = []): DomeSummary {
+/** `geo` (save v107): the geothermal and heat-rejection choices the dome has or the card shows; their itemized prices join `extras` and so the grand total. Every offer is also listed in `options` (not in the total). */
+export function domeCostSummary(tier: DomeTier, cells: number = TIER[tier].cells, extras: CostLine[] = [], geo: GeoSpec = {}): DomeSummary {
   const c = domeCost(tier, cells), g = domeGeometry(tier, shellFt(tier, cells)), b = c.bill, ew = c.earthwork;
   const earth = ew.lines.map(l => ({ id: l.id, label: l.label, usd: l.usd }));
   const earthUsd = ew.usd;
@@ -63,7 +65,7 @@ export function domeCostSummary(tier: DomeTier, cells: number = TIER[tier].cells
   // the vehicle sally port (PROPOSED, docs/DECISIONS.md 2026-11-19): its kits, bollards, camera, paving and crew, itemized and counted in the grand total (the blueprint charges the same goods)
   const pb = portBill(tier, g.radiusFt / 20), pv = portVestibule(tier, g.radiusFt / 20);
   const portExtras: CostLine[] = pv ? [{ id: 'vehicle_port', label: `Vehicle sally port (two interlocked gates, ${Math.round(pv.len * 20)} ft lock chamber${vehicleFits(pv) ? '' : ', handcart size'}), bollards, camera, apron${vehicleFits(pv) ? ' and inside lane' : ''}`, usd: billUsd(pb.bill) + Math.round(pb.hours * CREW_RATE / 100) * 100 }] : [];
-  extras = [...portExtras, ...extras];
+  extras = [...portExtras, ...extras, ...geoLines(tier, cells, geo)];
   const opts: CostLine[] = [];
   if (tier !== 'earthen') {
     opts.push({ id: 'spare_chiller', label: 'Second chiller plant (N+1)', usd: spareUsd(tier, cells, 'chiller', 'none') ?? 0 });
@@ -71,6 +73,7 @@ export function domeCostSummary(tier: DomeTier, cells: number = TIER[tier].cells
     opts.push({ id: 'scrubber', label: 'CO2 scrubber bank', usd: scrubberUsd(tier, cells) });
     opts.push({ id: 'advanced', label: 'Advanced filtering (HEPA, carbon)', usd: advancedFilterUsd(tier, cells) });
     opts.push({ id: 'closed', label: 'Closed ecology', usd: closedEcologyUsd(tier, cells) });
+    for (const o of geoOptions(tier, cells)) opts.push({ id: `geo_${o.id}`, label: o.label, usd: o.usd });
   }
   // the design day is the worse of a 20 F night kept frost-free and a 100 F day in full sun held in the temperate band, plus the always-on house load
   const kwh = Math.max(nightKwhPerDay(tier, cells, 20, 'frost'), domeLoad(tier, cells, 100, 1, 'temperate').kwhPerDay) + auxKwhDay(tier, cells);
