@@ -327,7 +327,7 @@ All procedural, no external assets. **No performance budget is raised**: nothing
 | 6 | UI: dome readouts, limit cards, setup and scenario text, collapse chip | M | 4, 5 | 7 |
 | 7 (**done**, [#391](https://github.com/smolhaj/compound-builder/pull/391)) | Rendering: sky profiles, snow cover, frost on the shell, shimmer (optional). Landed: see the PR 7 notes. Cut: true shimmer distortion, icicles and drifts, frost on props | M | 1 | 4, 5, 6 |
 | 8 | Balance and QA: bot playtest, survival table vs targets, tuning, perf census confirms no budget change | S to M | 2 to 7 | none |
-| 9 (optional) | PROPOSED purchases: cooling tower, ground-loop heat pump, thermal curtains; save v104 | M | 4, 6 | none |
+| 9 (**done**, see DECISIONS 2026-11-27) | PROPOSED purchases: cooling tower, ground-loop heat pump, thermal curtains, high-ambient package, deep well; save v107 (the doc's v104 was taken) | M | 4, 6 | none |
 
 Order: 1, then {2, 3} and {4, 5} and 7 in parallel, then 6, then 8, then 9. The only real conflict is 4 versus 5 inside `dome/live.ts`; keep 4 in `plantClimate.ts` and 5 in `snowLoad.ts` and touch `live.ts` in two small, separate hunks.
 

@@ -63,6 +63,8 @@ const STEPS: Record<number, (s: Raw) => Raw> = {
   104: s => ({ ...s, version: 105 }),
   // 105 → 106: optional GameState.shellScars (scorch, chip and dent marks a raid leaves on a dome's shell, sim/dome/scars.ts); nothing to back-fill
   105: s => ({ ...s, version: 106 }),
+  // 106 to 107: optional DomeState geothermal fields (heatRejection, groundLoop, deepWell, thermalCurtain; sim/dome/geothermal.ts): absent means air-cooled with no loop, well or curtains; nothing to back-fill
+  106: s => ({ ...s, version: 107 }),
   97: s => ({ ...s, version: 98 }),
   // 95 → 96: hiding in the bunker (sim/bunkerHide.ts): `Outcome.bunker` on the gate card, optional; no old-save work
   95: s => ({ ...s, version: 96 }),

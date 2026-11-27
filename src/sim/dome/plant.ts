@@ -27,6 +27,7 @@ import { FRAME_SPANS } from './tiers';
 import type { WaterLoop } from './waterLoop';
 import type { PlantKind, PlantPlace } from './plantUnits';
 import { ROOF_SLIDE as ST_SLIDE, type RoofState } from './yardRoof';
+import { geoField } from './geothermal';
 import { CHAMBER_LEN, PORTAL_H, PORTAL_W, inYard, plantSize, yardGeometry, yardPoint, YARD_GAP, YARD_H, YARD_T, type YardGeom } from './plantYard';
 
 export type Shape = 'box' | 'cyl';
@@ -52,6 +53,8 @@ export interface PlantPart {
   lvl?: boolean;
   /** A wall run: its top is `wallTop` above the yard's level plane whatever the ground does (bottom: the lowest ground under the run, y0 below it), so the wall tops are level. */
   wallTop?: number;
+  /** Ground is read at this point instead of the part's own center (a prop made of several parts on a slope stands on one level: the fitted tower). */
+  gat?: [number, number];
   /** The plant unit it belongs to (`chiller`, `chiller2`, `air`...): a damaged unit is drawn burned. */
   unit?: string;
   /** Part of the sealed passage (drawn in the cutaway and underground views). */
@@ -103,7 +106,8 @@ function weather(color: number, x: number, z: number, amt = 0.08): number {
   return (r << 16) | (g << 8) | b;
 }
 
-export interface PlantOpts { loop?: WaterLoop; spares?: readonly PlantKind[]; rot?: number; /** The arcology's plant yard roof (sim/dome/yardRoof.ts); default closed. */ roof?: RoofState; /** QA look of the yard's service airlock: both doors shut and the lamps red (`sealed`, the default), the dome-side door slid open (`dome`), the yard-side door slid open (`yard`), or cycling (amber, both shut). */ airlock?: AirlockLook }
+export interface PlantOpts { loop?: WaterLoop; spares?: readonly PlantKind[]; rot?: number; /** The arcology's plant yard roof (sim/dome/yardRoof.ts); default closed. */ roof?: RoofState; /** QA look of the yard's service airlock: both doors shut and the lamps red (`sealed`, the default), the dome-side door slid open (`dome`), the yard-side door slid open (`yard`), or cycling (amber, both shut). */ airlock?: AirlockLook; /** The geothermal purchases drawn in the yard and on the ground outside it (sim/dome/geothermal.ts, save v107): a tower on the pad, the loop's header vault and bore field (`bores`: how many the field has), the deep well's head. */ geo?: GeoLook }
+export interface GeoLook { tower?: boolean; loop?: boolean; bores?: number; well?: boolean; /** Water or creek bank at a point of the dome's local frame (with its margin): no bore cap is placed there. */ wet?: (x: number, z: number) => boolean }
 
 /** A frame: a point on the ground and a turn; `dx` runs along the shell (tangent), `dz` outward from the dome. */
 interface Fr { x: number; z: number; rot: number }
@@ -470,6 +474,56 @@ export function plantLayout(tier: DomeTier, r: number, filtering: Filtering, o: 
       for (const [px, pz] of [[-1, -1], [1, -1], [1, 1], [-1, 1], [0, -1], [0, 1]]) Cy(Fy, dx + px * fw / 2, v + pz * fd / 2, 0.01, 0.4 * kk, C.steel, y, u);
     };
     xfmr('substation', v1); if (spare('substation')) xfmr('substation2', v2);
+    // ── geothermal purchases (save v107): the header vault and the well head stand in the aisle side of the yard; the tower on its pad; the bore field outside ──
+    const geo = o.geo ?? {};
+    if (geo.loop) {
+      // the loop's header vault: a curbed slab, a flush steel lid, supply (blue) and return (red) headers on stands with isolation valves and a flow plate, and the pipe down into the ground
+      const hx = (tier === 'arcology' ? 0.2 : 0.25) * W, hv = D * (tier === 'arcology' ? 0.9 : 0.2), y = 0.045, u = 'chiller';   // (the arcology's intake and exhaust ducts fill the middle of its yard: the loop and the well go past them at the outer end)
+      B(Fy, hx, hv, 0.5 * kk, 0.03, 0.4 * kk, C.concDark, y, u); SH(Fy, hx, hv, 0.5 * kk, 0.4 * kk, y + 0.001, C.concDark, 0x34363a, 0.08);
+      B(Fy, hx, hv, 0.32 * kk, 0.025, 0.24 * kk, C.steel, y + 0.03, u); DP(Fy, hx, hv - 0.121 * kk - 0.004, 0.1 * kk, 0.05 * kk, y + 0.032, 'plate', u, 'z', 0.008);
+      for (const [off, col] of [[-0.06, 0x2f7fb5], [0.06, C.valve]] as const) {
+        Ly(Fy, hx, hv + off * kk, 0.014 * kk, 0.4 * kk, col, y + 0.09 * kk, 't', u);
+        for (const sx of [-0.15, 0.15]) { Cy(Fy, hx + sx * kk, hv + off * kk, 0.012 * kk, 0.09 * kk, C.steel, y + 0.03, u); Cy(Fy, hx + sx * kk, hv + off * kk, 0.03 * kk, 0.012, C.valve, y + 0.11 * kk, u); }
+      }
+      DP(Fy, hx + 0.26 * kk, hv, 0.18 * kk, 0.09 * kk, y + 0.02, 'pleats', u, 'x', 0.01);                // the buried-header marker plate on the vault's end
+      B(Fy, hx, hv + 0.23 * kk, 0.1 * kk, 0.04 * kk, 0.008, 0x2a7fd0, y + 0.1 * kk, u);                  // a flow-meter band
+      noteUnit('loop', Fy.x, Fy.z);
+    }
+    if (geo.well) {
+      // the deep well's head: a concrete pad, the steel casing and its sanitary cap, the pump control cabinet with a door decal and warning label, a pressure tank on saddles, and the supply line
+      const wx = (tier === 'arcology' ? 0.32 : 0.27) * W, wv = D * (tier === 'arcology' ? 0.9 : 0.5), y = 0.045;
+      B(Fy, wx, wv, 0.46 * kk, 0.03, 0.4 * kk, C.concDark, y); SH(Fy, wx, wv, 0.46 * kk, 0.4 * kk, y + 0.001, C.concDark, 0x34363a, 0.08);
+      Cy(Fy, wx - 0.1 * kk, wv, 0.04 * kk, 0.22 * kk, C.steel, y + 0.03); Cy(Fy, wx - 0.1 * kk, wv, 0.05 * kk, 0.02, C.cap, y + 0.03 + 0.22 * kk); Cy(Fy, wx - 0.1 * kk, wv, 0.012 * kk, 0.05 * kk, C.dark, y + 0.05 + 0.22 * kk);
+      B(Fy, wx + 0.1 * kk, wv - 0.1 * kk, 0.12 * kk, 0.22 * kk, 0.08 * kk, 0xd5d8d8, y + 0.03); DP(Fy, wx + 0.1 * kk, wv - 0.1 * kk - 0.044 * kk, 0.09 * kk, 0.15 * kk, y + 0.06 * kk, 'door', undefined, 'z', 0.008); DP(Fy, wx + 0.1 * kk, wv - 0.1 * kk - 0.046 * kk, 0.06 * kk, 0.03 * kk, y + 0.2 * kk, 'hv', undefined, 'z', 0.008);
+      Ly(Fy, wx + 0.02 * kk, wv + 0.1 * kk, 0.045 * kk, 0.26 * kk, C.tankBlue, y + 0.07 * kk, 't'); for (const sx of [-0.08, 0.08]) B(Fy, wx + 0.02 * kk + sx * kk, wv + 0.1 * kk, 0.02 * kk, 0.05 * kk, 0.06 * kk, C.steel, y + 0.03);
+      Ly(Fy, wx - 0.1 * kk, wv + 0.05 * kk, 0.01 * kk, 0.22 * kk, C.pipe, y + 0.1 * kk, 'r'); Cy(Fy, wx - 0.1 * kk, wv + 0.14 * kk, 0.026 * kk, 0.012, C.valve, y + 0.12 * kk);
+      for (const [px, pz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) Cy(Fy, wx + px * 0.24 * kk, wv + pz * 0.21 * kk, 0.008, 0.12 * kk, C.yellow, y);
+      noteUnit('well', Fy.x, Fy.z);
+    }
+    if (geo.tower) {
+      // the fitted tower on the pad at the yard's outer corner (it is the one unit outside the wall): a fenced basin, a two-cell body with fill louvers, two fan stacks with grilles, a platform and a plume
+      const [tx, tz] = g.towerSlot, tw = 0.5, td = 0.36, y = 0.025, u = 'chiller', Ft: Fr = { x: tx, z: tz, rot: g.phi }, n0 = parts.length;
+      B(Ft, 0, 0, tw + 0.06, 0.12 * kk + 0.1, td + 0.06, C.concDark, y - 0.1, u); B(Ft, 0, 0, tw, 0.4 * kk, td, C.tower, y + 0.12 * kk, u);
+      for (const sd of [-1, 1]) DP(Ft, 0, sd * (td / 2 + 0.006), tw * 0.92, 0.3 * kk, y + 0.16 * kk, 'louver', u, 'z', 0.012, 0xc4cad0);
+      for (const sx of [-1, 1]) { Cy(Ft, sx * tw * 0.24, 0, tw * 0.2, 0.1 * kk, C.tower, y + 0.52 * kk, u, tw * 0.23); fan(Ft, sx * tw * 0.24, 0, tw * 0.19, y + 0.62 * kk, u); Cy(Ft, sx * tw * 0.24 + 0.01, 0, 0.07 * kk, 0.14 * kk, C.plume, y + 0.635 * kk, u, 0.13 * kk); }
+      B(Ft, 0, td / 2 + 0.2, 0.2, 0.012, 0.012, C.pipe, y + 0.05, u); Ly(Ft, -tw / 2 - 0.1, 0, 0.02 * kk, 0.2, C.pipe, y + 0.06, 'r', u);
+      DP(Ft, -tw * 0.3, -td / 2 - 0.014, 0.1, 0.05, y + 0.07 * kk, 'hot', u);
+      for (const sd of [-1, 1]) Cy(Ft, sd * (tw / 2 + 0.05), td / 2 + 0.05, 0.008, 0.14 * kk, C.steel, y, u);
+      for (let i = n0; i < parts.length; i++) parts[i].gat = [tx, tz];
+    }
+    if (geo.loop && (geo.bores ?? 0) > 0) {
+      // the bore field outside the yard: a header trench strip out from the wall and a true 20 ft grid of flush caps (drawn up to a cap; the rest of the field is the same pattern)
+      const f = geoField(g, geo.bores!, geo.wet ? (u, v) => { const [wx, wz] = yardPoint(g, u, v); return geo.wet!(wx, wz); } : undefined);
+      const hu = (tier === 'arcology' ? 0.2 : 0.25) * W, [tx0, tz0] = yardPoint(g, hu, D + 0.02), [tx1, tz1] = yardPoint(g, hu, f.v0);
+      push({ shape: 'box', x: (tx0 + tx1) / 2, z: (tz0 + tz1) / 2, y0: 0.002, w: 0.07, h: 0.012, d: Math.hypot(tx1 - tx0, tz1 - tz0), r: 0, rot: g.phi, color: 0x5d5646 });
+      for (const c of f.caps) {
+        const [bx, bz] = yardPoint(g, c.u, c.v);
+        push({ shape: 'cyl', x: bx, z: bz, y0: 0.0, w: 0, h: 0.02, d: 0, r: 0.05, rot: 0, color: 0x6e7479 });
+        push({ shape: 'cyl', x: bx, z: bz, y0: 0.02, w: 0, h: 0.008, d: 0, r: 0.034, rot: 0, color: 0x2e3338 });
+      }
+      const [fx, fz] = yardPoint(g, f.uMid, f.vMid);
+      lines.push({ kind: 'chill', depth: 0.1, pts: [yardPoint(g, hu, D * (tier === 'arcology' ? 0.9 : 0.2)), yardPoint(g, hu, D + 0.02), [tx1, tz1], [fx, fz]] });
+    }
     // pipe and conduit runs across the slab, bollards by the walkway, a light pole at the outer corner
     Ly(Fy, -0.255 * W, v1, 0.012, 0.22 * W, C.pipe, 0.08, 't', 'chiller');
     Ly(Fy, -0.04 * W, D / 2, 0.01, D * 0.5, C.dark, 0.06, 'r', 'substation');
