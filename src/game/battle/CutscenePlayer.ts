@@ -5,6 +5,7 @@
  * the sim: when the timeline is done it asks the store to commit (the clock
  * advances once, by the plan's length).
  */
+import type { Shell } from './domeStruts';
 import { useGameStore } from '../../store/gameStore';
 import { useBattleStore } from '../../store/battleStore';
 import { useCutsceneView } from '../../store/cutsceneStore';
@@ -28,6 +29,8 @@ export interface PlayerDeps {
   seed: number;
   /** Buildings and walls the camera must keep out of (read once per cutscene; the game stands still). */
   obstacles?: () => Box[];
+  /** The frame ribs of the domes standing (cameraObstacles / domeStruts): the camera keeps off them. */
+  shells?: () => Shell[];
   /** Last-minute cinematic work on a scene's battle before it plays (the invasion's break and house fight: sim/breach.ts, sim/houseAssault.ts); cached per battle. */
   prepare?: (b: Battle) => Battle;
   /** The roofs off (the cutaway view) while the fight is inside the house, and back after. */
@@ -67,7 +70,7 @@ export class CutscenePlayer {
     this._real = 0; this._startedScene = -1; this._done = false; this._time = 0; this._lastKind = '';
     this._dir = new Director(this.d.seed);
     this._boxes = this.d.obstacles?.() ?? [];
-    this._dir.setObstacles(this._boxes);
+    this._dir.setObstacles(this._boxes, this.d.shells?.() ?? []);
     this.active = true;
     liveBreach.clear();
     this._publish(true);

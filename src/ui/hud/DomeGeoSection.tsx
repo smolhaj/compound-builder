@@ -1,6 +1,7 @@
 /** Heat rejection and ground on the Dome page (sim/dome/geothermal.ts, save v107): the tower, the high-ambient package, the ground loop, the deep well and thermal curtains, with prices in dollars and the field in acres. */
 import { useGameStore } from '../../store/gameStore';
 import { Note, Row, Section } from './common';
+import { useDomeAct } from './domeAct';
 import { TONE, btn, usd } from './style';
 import { dryAir, type DomeView, dayLoad } from '../../sim/dome/live';
 import { hasYard } from '../../sim/dome/plantYard';
@@ -11,11 +12,12 @@ const SF_PER_ACRE = 43_560;
 const REJECT_WORD = { air: 'air-cooled condenser (trips at 125 F)', high_ambient: 'high-ambient package (trips at 140 F)', tower: 'cooling tower (limited by wet-bulb, drinks water)' } as const;
 
 export function DomeGeoSection({ v }: { v: DomeView }) {
-  const game = useGameStore(s => s.game), g = useGameStore();
+  const game = useGameStore(s => s.game);
+  const { act, note } = useDomeAct();
   const d = v.ref, st = v.st, id = d.st.id;
   if (!hasYard(d.tier)) return null;
   const have = geoOf(st), opts = geoOptions(d.tier, d.cells), load = dayLoad(game, d, st);
-  const act = (f: (x: typeof game) => string | null) => { const w = g.money(f); if (w) alert(w); };
+  
   const wb = wetBulbEstimate(st.outF, dryAir(game)), field = have.groundLoop ? loopField(d.tier, d.cells, have.groundLoop) : null, well = wellSpec(d.tier), exp = geoExposure(have);
   // (a loop is held to a 5 acre field: where that is less than the plant needs, the offer says how much of it the loop will carry)
   const cover = (oid: GeoOption['id']): string => { if (oid !== 'loop_half' && oid !== 'loop_full') return ''; const share = loopField(d.tier, d.cells, oid === 'loop_half' ? 'half' : 'full').share; return share < 0.999 ? ` · covers ${Math.round(share * 100)} percent of the plant` : ''; };
@@ -25,6 +27,7 @@ export function DomeGeoSection({ v }: { v: DomeView }) {
     return <button key={o.id} data-testid={`geo-buy-${o.id}`} style={{ ...btn(), marginTop: 3, marginRight: 5, opacity: why ? 0.55 : 1 }} disabled={!!why} title={why ?? GEO_LABEL[o.id]} onClick={() => act(x => buyGeo(x, o.id, id))}>{GEO_LABEL[o.id]} · {usd(o.usd)}{cover(o.id)}{why && !/needs/.test(why) ? ` · ${why}` : ''}</button>;
   };
   return <Section title="Heat rejection and ground">
+    {note}
     <div data-testid="geo-panel">
       <Row label="Heat rejection" value={REJECT_WORD[have.rejection ?? 'air']} title="The chiller dumps heat to the air (limited by the dry-bulb) or, with a tower, to evaporating water (limited by the wet-bulb)." />
       <Row label="Wet-bulb now (estimate)" value={`${Math.round(wb)} F, tower at ${Math.round(towerCapacity(wb) * 100)} percent`} tone={towerCapacity(wb) >= 0.99 ? 'good' : towerCapacity(wb) > 0 ? 'warn' : 'bad'} title="A tower gives its full rating to 82 F wet-bulb and nothing at 95 F." />

@@ -287,7 +287,7 @@ export class HeavyFx {
   impact(kind: HeavyKind, at: THREE.Vector3, n: THREE.Vector3): void {
     this.impacts++;
     const h = this._h, P = at.clone().addScaledVector(n, 0.02), up = new THREE.Vector3(0, 1, 0);
-    const SZ: Record<HeavyKind, number> = { rpg: 0.2, tank: 0.34, hmg: 0.02, amr: 0.04, mortar: 0.5, charge: 0.4, vbied: 1.5, thermite: 0.05, drone: 0.22 };
+    const SZ: Record<HeavyKind, number> = { rpg: 0.34, tank: 0.34, hmg: 0.02, amr: 0.04, mortar: 0.5, charge: 0.4, vbied: 1.5, thermite: 0.05, drone: 0.22 };
     const s = SZ[kind] * 1.5;
     const gY = h.ground(at.x, at.z);
     if (kind === 'hmg' || kind === 'amr') {
@@ -310,6 +310,8 @@ export class HeavyFx {
       h.puff(q, s * 0.28, s * (0.9 + this._r() * 0.6), 3.2 + this._r() * 1.5, s * 0.8, i % 2 ? 0x1e1c1a : 0x3a3632, 0.9);
     }
     for (let i = 0; i < 3; i++) h.puff(new THREE.Vector3(at.x + (this._r() - 0.5) * s, gY + 0.02, at.z + (this._r() - 0.5) * s), s * 0.3, s * (1.1 + this._r() * 0.8), 2.6, s * 0.15, 0x9a8668, 0.55);
+    // (the warhead's burst on a dark armored plate: a longer, hotter core so it reads at raid-camera distance; it is a transient puff like the rest)
+    if (kind === 'rpg') { h.puff(L, s * 0.2, s * 1.1, 0.6, 0.02, 0xffe0a0, 0.95, true); h.puff(L.clone().addScaledVector(n, s * 0.2), s * 0.12, s * 0.7, 0.45, 0.03, 0xffffff, 0.9, true); }
     h.shake(Math.min(0.2, 0.05 + s * 0.2));
     const k = Math.min(MAXSPARK - 8, Math.round(26 + s * 60));
     for (let i = 0; i < k; i++) this._emit(P, n, 0.9, 2.0 + s * 3, false);

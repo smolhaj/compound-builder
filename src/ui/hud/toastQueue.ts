@@ -20,3 +20,9 @@ export function pushToast(list: readonly Toast[], t: Omit<Toast, 'at'> & { at: n
 export const liveToasts = (list: readonly Toast[], now: number): Toast[] => list.filter(t => now - t.at < t.ttl);
 /** Is `text` already said by something else on screen? */
 export const isRepeat = (text: string, others: readonly string[]): boolean => { const n = norm(text); return !!n && others.some(o => { const m = norm(o); return m === n || (m.length > 12 && n.includes(m)) || (n.length > 12 && m.includes(n)); }); };
+
+/**
+ * A purchase result replaces the purchase result already up (one purchase line at a time: a run of buys on a page does not pile lines over the view). `prefix` is the id
+ * prefix of that kind of toast; other toasts stay.
+ */
+export const replaceKind = (list: readonly Toast[], prefix: string): Toast[] => list.filter(x => !x.id.startsWith(prefix));

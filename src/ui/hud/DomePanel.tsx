@@ -1,4 +1,5 @@
 /** The Dome page (Utilities drawer): lockdown, the air clock, filtering and the closed ecology, the dome's own climate and power. (sim/dome/live.ts) */
+import { useDomeAct } from './domeAct';
 import { useGameStore } from '../../store/gameStore';
 import { Note, Row, Section } from './common';
 import { DIM, TONE, btn, usd, type Tone } from './style';
@@ -38,20 +39,22 @@ const LOOP_BLURB: Record<WaterLoop, string> = { none: '', grey: 'Sink and shower
 const TIER_NAME = (v: DomeView): string => TIER[v.ref.tier].name;
 
 export function DomePanel() {
-  const game = useGameStore(s => s.game), g = useGameStore();
+  const game = useGameStore(s => s.game);
   const [pick, setPick] = useState<string | null>(null);
+  const { act, note } = useDomeAct();
   const views = domeViews(game);
   if (!views.length) return null;
   const v = views.find(x => x.id === pick) ?? views[0], d = v.ref, id = d.st.id, st = v.st, t = TIER[d.tier];
   const clock = st.lockdown ? domeClock(game, id) : freshClock(game, id);
   const air = st.alarm === 'critical' ? 'bad' : st.alarm === 'low' ? 'warn' : 'good';
-  const act = (f: (x: typeof game) => string | null) => { const w = g.money(f); if (w) alert(w); };
+  
   const clean = domeClean(game, id), out = outside(game), load = dayLoad(game, d, st), kwh = Math.round(load.kwh), indoor = st.indoorF, powered = planPowered(game, d, st);
   const [lo, hi] = BAND[st.mode], inBandNow = indoor >= lo - 0.5 && indoor <= hi + 0.5, stock = stockCover(game);
   const bill = (l: Filtering) => { const b = filteringBill(game, l, id); return b ? `${usd(b.usd)}${b.permitUsd ? ` + ${usd(b.permitUsd)} county life-safety permit` : ''}, about ${pluralize(b.days, 'day')} to fit${b.reviewDays ? ` (${b.reviewDays} of them in review)` : ''}` : ''; };
   const loop = st.loop ?? 'none', loopDown = game.clock.t < (st.loopDownUntil ?? 0);
   const gal = (n: number | undefined) => `${Math.round(n ?? 0).toLocaleString('en-US')} gal`;
   return <div data-testid="dome-panel">
+    {note}
     <Section title={views.length > 1 ? `Your domes (${views.length})` : 'Your dome'}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {views.map(x => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TOAST_CAP, isRepeat, liveToasts, pushToast, type Toast } from './toastQueue';
+import { TOAST_CAP, replaceKind, isRepeat, liveToasts, pushToast, type Toast } from './toastQueue';
 
 const t = (id: string, text: string, at = 0, ttl = 4000): Toast => ({ id, text, tone: 'info', ttl, at });
 describe('toast queue', () => {
@@ -22,5 +22,14 @@ describe('toast queue', () => {
   it('detects a repeat of a card line', () => {
     expect(isRepeat('Out of food in 3 days', ['Out of food in 3 days'])).toBe(true);
     expect(isRepeat('Bought a well', ['Out of food in 3 days'])).toBe(false);
+  });
+});
+
+describe('purchase toasts', () => {
+  it('a new purchase line replaces the one up and leaves other toasts', () => {
+    let l = pushToast([], t('f1', 'Bought a loop field for $9,000.', 0));
+    l = pushToast(l, t('h5', 'Anna: Nice.', 1));
+    l = pushToast(replaceKind(l, 'f'), t('f2', 'Bought a cooling tower for $4,000.', 2));
+    expect(l.map(x => x.id)).toEqual(['h5', 'f2']);
   });
 });
