@@ -136,7 +136,7 @@ function ViolenceSelect() {
   const [v, setV] = useState<Violence>(getViolence());
   return (
     <select value={v} onChange={e => { const x = e.target.value as Violence; setViolence(x); setV(x); }} title="Raid scenes: Graphic shows blood and wounds; Restrained leaves them out (the fall and the grief stay)" aria-label="Violence in raid scenes" data-testid="violence-select">
-      <option value="graphic">Graphic</option><option value="restrained">Restrained</option>
+      <option value="graphic">Raid blood: shown</option><option value="restrained">Raid blood: left out</option>
     </select>
   );
 }
@@ -145,10 +145,10 @@ function NamesSelect() {
   const [n, setN] = useState(getNames()), [p, setP] = useState(getPips());
   return (<>
     <select value={n ? 'on' : 'off'} onChange={e => { const on = e.target.value === 'on'; setNames(on); setN(on); }} title="Raid scenes: show each defender's first name over their head" aria-label="Names in raid scenes" data-testid="names-select">
-      <option value="on">Names on</option><option value="off">Names off</option>
+      <option value="on">Raid names: on</option><option value="off">Raid names: off</option>
     </select>
     <select value={p ? 'on' : 'off'} onChange={e => { const on = e.target.value === 'on'; setPips(on); setP(on); }} title="Raid scenes: a small dot beside each name (green fine, amber wounded, red down, cross dead, gray held)" aria-label="Status pips in raid scenes" data-testid="pips-select">
-      <option value="on">Status pips on</option><option value="off">Status pips off</option>
+      <option value="on">Raid status dots: on</option><option value="off">Raid status dots: off</option>
     </select>
   </>);
 }
@@ -803,19 +803,19 @@ export function Hud() {
           <option value="classic">Layout: Classic</option><option value="a">Layout: New (A)</option>
         </select>
         <select value={w.seasonMode} onChange={e => w.setSeasonMode(e.target.value as SeasonMode)} title="Season look">
-          {SEASON_MODES.map(x => <option key={x}>{x}</option>)}
+          {SEASON_MODES.map(x => <option key={x} value={x}>{`Season: ${x}`}</option>)}
         </select>
         <select value={w.weatherMode} onChange={e => w.setWeatherMode(e.target.value as WeatherMode)} title="Weather">
-          {WEATHER_MODES.map(x => <option key={x}>{x}</option>)}
+          {WEATHER_MODES.map(x => <option key={x} value={x}>{`Weather: ${x}`}</option>)}
         </select>
         <select value={w.quality} onChange={e => { w.setQuality(e.target.value as Quality, true); w.setPerfNotice(null); }} title="Graphics quality (Low: no shadows or post-processing; Medium: soft shadows; High: adds ambient occlusion and a sharper pixel ratio)" aria-label="Graphics quality">
-          {QUALITIES.map(x => <option key={x}>{x}</option>)}
+          {QUALITIES.map(x => <option key={x} value={x}>{`Graphics: ${x}`}</option>)}
         </select>
         <button data-testid="tilt-shift-toggle" style={{ ...btn(w.tiltShift && w.quality === 'high'), opacity: w.quality === 'high' ? 1 : 0.5 }} disabled={w.quality !== 'high'} title={w.quality === 'high' ? 'Diorama look: the middle of the picture stays sharp and the top and bottom blur, like a model on a table. It fades out near eye level.' : 'Diorama look needs High graphics'} onClick={() => w.setTiltShift(!w.tiltShift)}>Diorama</button>
         <ViolenceSelect />
         <NamesSelect />
         <select value={w.frameCap} onChange={e => w.setFrameCap(Number(e.target.value) as FrameCap)} title="Frame-rate cap: 60 is smooth and halves the work on a 120 Hz display" aria-label="Frame-rate cap">
-          <option value={60}>60 fps</option><option value={30}>30 fps</option><option value={0}>uncapped</option>
+          <option value={60}>Frame cap: 60 fps</option><option value={30}>Frame cap: 30 fps</option><option value={0}>Frame cap: none</option>
         </select>
         <button data-testid="skip-hit-toggle" style={btn(skipHit)} title="Skip the short cinematic when a disaster hits (it plays once per hit; any key or click also skips it)" onClick={() => setSkipHit(!skipHit)}>{skipHit ? 'Hit cinematic: skipped' : 'Skip hit cinematic'}</button>
         <button style={btn(w.showPerf)} title="Show frames per second, frame time and draw calls" onClick={() => w.setShowPerf(!w.showPerf)}>FPS</button>

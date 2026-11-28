@@ -27,7 +27,7 @@ export interface DrawerDef {
 /** Order is the action-bar order. */
 export const DRAWERS: readonly DrawerDef[] = [
   { id: 'build', title: 'Build', label: 'Build', code: 'KeyB', key: 'B', host: 'left', blurb: 'Stake out buildings, wells, walls and paths; the starter compound and the goals' },
-  { id: 'family', title: 'Family', label: 'People', code: 'KeyF', key: 'F', host: 'right', blurb: 'Everyone on the place: health, work, kin, dogs, housing' },
+  { id: 'family', title: 'Family', label: 'Family', code: 'KeyF', key: 'F', host: 'right', blurb: 'Everyone on the place: health, work, kin, dogs, housing' },
   { id: 'supplies', title: 'Supplies', label: 'Supplies', code: 'KeyS', key: 'S', host: 'right', blurb: 'Food, stores, orders, the farm' },
   { id: 'utilities', title: 'Utilities', label: 'Utilities', code: 'KeyT', key: 'T', host: 'right', blurb: 'Water, power, fuel and heat' },
   { id: 'land', title: 'Land', label: 'Land', code: 'KeyL', key: 'L', host: 'right', blurb: 'Parcels to buy, boundaries, the lay of the land' },
