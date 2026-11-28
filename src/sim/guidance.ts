@@ -37,6 +37,7 @@ import { wallCrewCard, wallFirstCard } from './wallCrew';
 import { eta } from './pace';
 import { reroofLines, winterRoofRisk, WINTER_ROOF_URGENT_DAYS } from './roofSafety';
 import { idleCash } from './idleCash';
+import { lostPower, rebuildLines } from './powerLoss';
 import { permitWait, permitWaitText } from './permitWait';
 import { bridgeActs, bridgeCards, bridgeSentence } from './bridgeText';
 import { PERIMETER, PERIMETER_ORDER, UPGRADE_NEXT, fenceLive, runBill, runFinished, wallLength, type PerimeterKind, type Pt } from './perimeter';
@@ -151,7 +152,7 @@ export interface BuildAdvice {
 }
 
 const hasKind = (s: GameState, ...kinds: string[]) => s.structures.some(st => kinds.includes(st.kind));
-const hasPower = (s: GameState) => (!!s.site.improvements?.power && s.disaster.tracks.grid > 0.5) || hasKind(s, 'solar_array', 'garage_solar', 'lodge_solar', 'generator_shed', 'battery_shed');
+const hasPower = (s: GameState) => (!!s.site.improvements?.power && s.disaster.tracks.grid > 0.5) || s.structures.some(st => ['solar_array', 'garage_solar', 'lodge_solar', 'generator_shed', 'battery_shed'].includes(st.kind) && !(st.lost && !isFinished(st)));
 
 /** What to order for people who are strained: wearing-thin restocks first, then the evenings' missing goods (a strained child wants toys and picture books). At most three lines. */
 export function moodOrderLines(s: GameState, mood: ReturnType<typeof moodSummary>): OrderLine[] {
@@ -380,6 +381,17 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
           ...(lines.length ? [{ label: `Order the roof materials (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []),
           { label: 'Show me', act: { type: 'select', id: bare.id } }] });
     } }
+  // a power source the weather, fire or a wreck took back to a job: say so and offer the rebuild (sim/powerLoss.ts)
+  for (const st of lostPower(s)) {
+    if (stuck?.key === `s:${st.id}`) continue;
+    const lines = rebuildLines(s, st), nm = st.kind.replace(/_/g, ' ');
+    const canHire = !(s.crews ?? []).some(c => c.target === st.id) && !crewProblem(s, st);
+    out.push({ id: `power_lost_${st.id}`, kind: '', title: `Rebuild the ${nm}`, urgency: 88,
+      why: `The ${nm} was lost and makes no power${lines.length ? `; the rebuild needs ${lines.map(l => materialCount(l.material, l.qty, MATERIALS[l.material].name, String(l.qty))).join(' and ')}` : '; the materials are in and it is waiting on work'}.`,
+      acts: [...(canHire ? [{ label: `${lines.length ? 'Order and hire a crew' : 'Hire a crew'} (~${usd(crewQuote(st).usd + (lines.length ? orderCost(lines, prices(s)) : 0))})`, act: { type: 'crew' as const, id: st.id, ...(lines.length ? { lines } : {}) } }] : []),
+        ...(lines.length ? [{ label: `Order the materials (${usd(orderCost(lines, prices(s)))})`, act: { type: 'order' as const, lines } }] : []),
+        { label: 'Show me', act: { type: 'select' as const, id: st.id } }] });
+  }
   // a home that still has the old roof it came with: a blizzard can bring it down (sim/weatherThreats.ts). Said months ahead, in the cold regions.
   { const risk = winterRoofRisk(s);
     if (risk && !(s.crews ?? []).some(c => c.target === risk.st.id)) {
@@ -400,7 +412,7 @@ export function suggestions(s: GameState, limit = 3, skip?: ReadonlySet<string>)
       acts: [{ label: 'Show me', act: { type: 'select', id: ww.source!.id } }] }); }
   { const f = foodNudge(s);   // a prompt before the warning signs, while there is cash and the trucks run
     if (f) out.push({ id: 'stock_food', kind: '', title: f.days < 1 ? 'No food stored: stock up' : 'Stock some food', urgency: foodUrgency(s, f.days), why: `${f.days < 1 ? 'No food' : Math.floor(f.days) + (Math.floor(f.days) === 1 ? ' day' : ' days') + ' of food'} on hand for ${s.people.length}${foodUrgency(s, f.days) >= 60 ? ', and the warning signs are up' : ''}. A month of staples is about ${usd(f.cost)}.`, acts: [{ label: 'Open the food shelf', act: { type: 'shop', tab: 'food' } }] }); }
-  if (!hasPower(s)) add('power', 'solar_array', 'no power for the pump, lights and the freezer', 40);
+  if (!hasPower(s) && !lostPower(s).length) add('power', 'solar_array', 'no power for the pump, lights and the freezer', 40);
   if (growing && !hasKind(s, 'root_cellar')) add('cellar', 'root_cellar', 'nowhere cool to keep what you grow', 30);
   if (hasMaples(s) && woodsTaps(s) >= 60 && hasKind(s, 'timber_cabin', 'log_house', 'farmhouse', 'lodge', 'lodge_plinth', 'lodge_solar', 'stone_house', 'timber_frame') && !hasKind(s, 'sugar_shack')) add('sugar', 'sugar_shack', `the woods have maples for ${woodsTaps(s)} taps: late-winter syrup`, 14);
   if (hasKind(s, 'field') && hasKind(s, 'root_cellar') && !hasKind(s, 'wood_oven')) add('oven', 'wood_oven', 'the wheat and flour need an oven: bread and roasts without heating the house', 18);

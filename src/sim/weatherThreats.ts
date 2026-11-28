@@ -33,6 +33,7 @@
  * Which storms come where and how often is region data (regions.ts
  * `storms`); the seasons are here.
  */
+import { GROUND_ARRAYS } from './microclimate';
 import { forecastLeadScale } from './forecastLoss';
 import { calendarOf, dayIndex, type GameState, type Structure } from './state';
 import { type RegionId, type StormKind } from './regions';
@@ -183,10 +184,11 @@ function cracksGlass(s: GameState, r: () => number, chance: number, by: string, 
 function damage(s: GameState, st: Structure, share: number, what: string, out: string[], roofOnly = false): void {
   const stages = blueprintOf(st).stages;
   const roof = stages.findIndex(x => x.id === 'roof');
-  knockBack(s, st, roof >= 0 ? roof : stages.length - 1);
+  knockBack(s, st, roof >= 0 ? roof : stages.length - 1, 'storm damage');
   // a snow-load collapse takes the roof, not the rooms under it: a new roof makes the house a home again (construction.ts)
   if (roofOnly && roof >= 0 && isHome(st.kind)) st.kept = true;
-  out.push(`${what} The ${label(st.kind)} has to be ${roof >= 0 ? 're-roofed' : 'redone'}.`);
+  const ground = GROUND_ARRAYS.includes(st.kind);
+  out.push(`${what} The ${label(st.kind)} ${ground ? 'lost its panels: new ones have to be mounted' : `has to be ${roof >= 0 ? 're-roofed' : 'redone'}`}.`);
   const paid = insuranceClaim(s, st, share);
   if (paid) out.push(paid);
 }
