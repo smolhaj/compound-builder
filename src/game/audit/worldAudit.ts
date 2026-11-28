@@ -5,6 +5,12 @@
  */
 import * as THREE from 'three';
 import type { HomesteadWorld } from '../HomesteadWorld';
+import type { GameState } from '../../sim/state';
+import { isBarrierKind, roadGateStatus } from '../../sim/roadGate';
+import { distToLine } from '../region/access';
+import { ROAD_W } from '../region/countyRoad';
+import { CROWN_OVER, crownRadius } from '../parcel/parcelTrees';
+import { KIT, footprint } from '../buildkit/kit';
 
 import { PARCEL_SIZE as PARCEL_SIZE_FOR_AUDIT } from '../parcel/parcelTerrain';
 
@@ -180,4 +186,63 @@ export function countyStats(world: HomesteadWorld, z0 = -40, z1 = PARCEL_SIZE_FO
   }
   const p0 = world.plan.pts[0], join = Math.abs(p0.y - world.groundAt(p0.x, p0.z));
   return { join, earth, bounce, bounceAt, maxGrade, at, across };
+}
+
+/**
+ * Walls and the roads (R1: a road is never cut by a wall without a gate): every barrier run that crosses the drive with no vehicle gate where it
+ * does, every run with a point on the county road, and every gate house that does not stand on the drive (or that overlaps the county road).
+ */
+export function wallsOnRoads(world: HomesteadWorld, g: GameState): Array<{ what: string; detail: string }> {
+  const out: Array<{ what: string; detail: string }> = [];
+  const drive = world.access.drive;
+  const st = roadGateStatus(g, drive);
+  if (st.missing > 0) out.push({ what: 'wall across the drive, no gate', detail: `${st.missing} of ${st.crossing}` });
+  const county: Array<[number, number]> = [];
+  for (let z = -40; z <= PARCEL_SIZE_FOR_AUDIT + 40; z += 0.5) county.push([world.county.x(z), z]);
+  for (const r of g.perimeter) {
+    if (!isBarrierKind(r.kind) || r.hostId) continue;
+    for (let i = 0; i + 1 < r.pts.length; i++) {
+      const a = r.pts[i], b = r.pts[i + 1], n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 0.5));
+      for (let k = 0; k <= n; k++) {
+        const x = a[0] + (b[0] - a[0]) * k / n, z = a[1] + (b[1] - a[1]) * k / n;
+        if (distToLine(county, x, z) < ROAD_W / 2 + 0.15) { out.push({ what: 'wall on the county road', detail: `${r.kind} ${r.id} at ${x.toFixed(1)},${z.toFixed(1)}` }); i = r.pts.length; break; }
+      }
+    }
+  }
+  for (const s of g.structures) {
+    if (s.unplaced || !/^gate_garage|^gatehouse|^gate_house/.test(s.kind)) continue;
+    const d = KIT[s.kind], fp = footprint(d, s.x, s.z, s.rot);
+    const onDrive = distToLine(drive, s.x, s.z) < 1.6;
+    if (!onDrive) out.push({ what: 'gate house off the drive', detail: `${s.kind} ${s.id} ${distToLine(drive, s.x, s.z).toFixed(1)} u from it` });
+    for (const [cx, cz] of [[fp.x0, fp.z0], [fp.x1, fp.z0], [fp.x0, fp.z1], [fp.x1, fp.z1]]) if (distToLine(county, cx, cz) < ROAD_W / 2) { out.push({ what: 'gate house on the county road', detail: `${s.id}` }); break; }
+  }
+  return out;
+}
+
+/**
+ * Woodland clearing: near trees (the forest layer's specs) with the centre inside a building's footprint (porch included), or within `pad` of it,
+ * or inside a drawn wall line's own width. The planting skirts buildings by 0.6 u, so any count here means a replant did not run (or ran with a stale list).
+ */
+export function treesOnBuildings(world: HomesteadWorld, pad = 0.55): Array<{ what: string; x: number; z: number }> {
+  const out: Array<{ what: string; x: number; z: number }> = [];
+  for (const t of world.treeSpecs) {
+    if (world.onBuilding(t.x, t.z, 0, true, true)) out.push({ what: 'tree in a building', x: t.x, z: t.z });
+    else if (world.onBuilding(t.x, t.z, pad, true, true)) out.push({ what: `tree within ${pad} u of a building`, x: t.x, z: t.z });
+    else if (world.onPerimeterLine(t.x, t.z, 0.1)) out.push({ what: 'tree on a wall line', x: t.x, z: t.z });
+  }
+  return out;
+}
+
+/**
+ * Crowns over roofs: near trees whose crown centre lies within `frac` of its radius of a building footprint (porch included), so more than a
+ * third of a crown hangs over the roof or the porch. Trees stand off buildings by trunk clearance only (0.6 u); the big crowns reach 1 to 1.5 u.
+ */
+export function crownsOverBuildings(world: HomesteadWorld, frac = CROWN_OVER): Array<{ x: number; z: number; r: number; d: number }> {
+  const out: Array<{ x: number; z: number; r: number; d: number }> = [];
+  for (const t of world.treeSpecs) {
+    const r = crownRadius(t);
+    if (r < 0.5) continue;
+    if (world.onBuilding(t.x, t.z, frac * r, true, true)) out.push({ x: t.x, z: t.z, r, d: frac * r });
+  }
+  return out;
 }
