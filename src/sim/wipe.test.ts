@@ -24,6 +24,25 @@ describe('the wipe ending: nobody alive on the property', () => {
     expect(g.ending).toBeNull();
   });
 
+  it('is not a wipe while the last of the family is away on a draft and due home (soak: civil war, day 59)', () => {
+    const g = game();
+    killAll(g);
+    const ps = g.personState[0];
+    ps.needs.died = Math.floor(g.clock.t) - 3; ps.needs.left = true;
+    const bag = (g.disaster.fx ??= {});
+    bag.civil_war = { drafted: [{ pid: ps.id, back: 60, why: 'line' }] };
+    expect(isWiped(g)).toBe(false);
+    expect(declareWipe(g)).toBeNull();
+    expect(g.ending).toBeNull();
+    // no return day (gone for good): a wipe after all
+    (bag.civil_war as { drafted: Array<{ back: number | null }> }).drafted[0].back = null;
+    expect(isWiped(g)).toBe(true);
+    // a return day, but the man himself is dead now (not "left"): a wipe
+    (bag.civil_war as { drafted: Array<{ back: number | null }> }).drafted[0].back = 60;
+    ps.needs.left = undefined;
+    expect(isWiped(g)).toBe(true);
+  });
+
   it('ends the run, stops the clock and drops anything waiting at the gate', () => {
     const g = game();
     g.clock.speed = 2;

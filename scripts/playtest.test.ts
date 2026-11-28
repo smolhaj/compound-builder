@@ -55,6 +55,7 @@ import type { Difficulty } from '../src/sim/difficulty';
 import { joinersOf, stayOptions, type StayKind } from '../src/sim/joinerHome';
 import { householdsOf, livingPeople, moveHousehold, setRole } from '../src/sim/quarters';
 import { HOME_BEDS } from '../src/sim/blueprints';
+import type { RichStart } from '../src/sim/richStart';
 
 /** (STAY / ADMIT) bots that take joiners in. STAY: bed | rig | modular | build | tent | mixed (cycles); ADMIT: fraction 0-1 of arrivals / kin admitted (a deterministic roll). Same calls as the gate card + StayPicker. */
 const STAY_MODES: Record<string, StayKind[]> = { bed: ['bed'], rig: ['rig'], modular: ['modular'], build: ['own_build'], tent: ['tent'], mixed: ['bed', 'rig', 'modular', 'own_build', 'tent', 'player_build'] };
@@ -298,8 +299,10 @@ const passiveLog = { placed: 0, orders: 0, crews: 0 };
 export function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' | 'medium', site: Site = CLASSIC, years = 0, afterHit = 0): RunResult & { s: GameState } {
   // (LIFESTYLE=weekend plays the weekender: the family in town on weekdays, the move-in card, the road home; TOWN=rent sells the town house at setup and rents; BELT=1 tightens the belt from day one)
   const life = process.env.LIFESTYLE as Lifestyle | undefined;
+  // (START_MODE=sandbox|god: no scripted collapse; RICH=founder|magnate: the rich starts of sim/richStart.ts)
+  const START_MODE = process.env.START_MODE === 'sandbox' || process.env.START_MODE === 'god' ? process.env.START_MODE : undefined;
   const funds = process.env.FUNDS ? { ...startFunds(generateFamily(seed), life ?? 'fulltime', seed, 0, process.env.TOWN === 'rent' ? 'rent' : 'own'), budget: Number(process.env.FUNDS) } : undefined;
-  let s = newGame(seed, 105, 2027, { site: site === CLASSIC && !life ? undefined : site, lifestyle: life, funds, townPlan: process.env.TOWN === 'rent' ? 'rent' : 'own', mode: 'scenario', peace, kind, dayJobs: true, grid: true, difficulty: process.env.DIFF as Difficulty | undefined });
+  let s = newGame(seed, 105, 2027, { site: site === CLASSIC && !life ? undefined : site, lifestyle: life, funds, townPlan: process.env.TOWN === 'rent' ? 'rent' : 'own', mode: START_MODE ?? 'scenario', peace, kind: START_MODE ? null : kind, dayJobs: true, grid: true, difficulty: process.env.DIFF as Difficulty | undefined, rich: process.env.RICH as RichStart | undefined });
   // the plans are drawn on the 40; squeeze them into the place actually bought
   const h = s.site.home, M0 = (x: number, z: number): [number, number] => [h.x0 + x / 67 * (h.x1 - h.x0), h.z0 + z / 67 * (h.z1 - h.z0)];
   // on a lot with relief a player picks level ground: the nearest spot under a 7 % grade that is not on top of one already picked
