@@ -66,6 +66,32 @@ export function applySnaps(h: Float32Array, snaps: readonly Snap[]): void {
   for (const s of snaps) h[s.v] = h[s.a] * (1 - s.t) + h[s.b] * s.t;
 }
 
+
+/** The two triangles of a leaf (corners a, b = same row, c = next row, d) with the diagonal that follows the lesser height change: the rule `leafSurface` reads. */
+function setLeafTriangles(index: Uint32Array, q: number, a: number, b: number, c: number, d: number, hv: ArrayLike<number>): void {
+  if (Math.abs(hv[a] - hv[d]) <= Math.abs(hv[b] - hv[c])) { index[q] = a; index[q + 1] = c; index[q + 2] = d; index[q + 3] = a; index[q + 4] = d; index[q + 5] = b; }
+  else { index[q] = a; index[q + 1] = c; index[q + 2] = b; index[q + 3] = b; index[q + 4] = c; index[q + 5] = d; }
+}
+
+/**
+ * Choose the diagonals again for the leaves touching grid nodes i0..i1 x j0..j1 (one node of margin) after their vertex heights changed (`hv`, the snapped
+ * heights), writing into `m.index`. The rule picks the diagonal from the corner heights, so a regraded pad corner can flip it: without this the drawn
+ * triangles keep the old diagonal while `leafSurface` reads the new one, and the height function disagrees with the mesh by up to half a cell's rise
+ * (a retaining wall at a pad corner then stands in the air over the drawn ground). Returns whether any leaf changed.
+ */
+export function retriangulate(m: AdaptiveMesh, hv: ArrayLike<number>, i0: number, i1: number, j0: number, j1: number, NX: number): boolean {
+  let changed = false;
+  const was = new Uint32Array(6);
+  m.leaves.forEach((l, k) => {
+    if (l.i1 < i0 - 1 || l.i0 > i1 + 1 || l.j1 < j0 - 1 || l.j0 > j1 + 1) return;
+    const a = m.vertexOf[l.j0 * NX + l.i0], b = m.vertexOf[l.j0 * NX + l.i1], c = m.vertexOf[l.j1 * NX + l.i0], d = m.vertexOf[l.j1 * NX + l.i1];
+    for (let t = 0; t < 6; t++) was[t] = m.index[k * 6 + t];
+    setLeafTriangles(m.index, k * 6, a, b, c, d, hv);
+    for (let t = 0; t < 6; t++) if (was[t] !== m.index[k * 6 + t]) changed = true;
+  });
+  return changed;
+}
+
 /** Build the vertex set, the snaps and the triangles for `leaves`; `h` receives the (snapped) vertex heights from `nodeH` (grid heights). */
 export function buildAdaptiveMesh(xs: ArrayLike<number>, zs: ArrayLike<number>, leaves: Leaf[], nodeH: ArrayLike<number>, h: { out: Float32Array | null }): AdaptiveMesh {
   const NX = xs.length, NZ = zs.length;
@@ -111,8 +137,8 @@ export function buildAdaptiveMesh(xs: ArrayLike<number>, zs: ArrayLike<number>, 
   let q = 0;
   leaves.forEach((l, k) => {
     const a = vertexOf[l.j0 * NX + l.i0], b = vertexOf[l.j0 * NX + l.i1], c = vertexOf[l.j1 * NX + l.i0], d = vertexOf[l.j1 * NX + l.i1];
-    if (Math.abs(hv[a] - hv[d]) <= Math.abs(hv[b] - hv[c])) { index[q++] = a; index[q++] = c; index[q++] = d; index[q++] = a; index[q++] = d; index[q++] = b; }
-    else { index[q++] = a; index[q++] = c; index[q++] = b; index[q++] = b; index[q++] = c; index[q++] = d; }
+    setLeafTriangles(index, q, a, b, c, d, hv);
+    q += 6;
     for (let j = l.j0; j < l.j1; j++) for (let i = l.i0; i < l.i1; i++) cellLeaf[j * (NX - 1) + i] = k;
   });
   return { nodeOf, vertexOf, leaves, cellLeaf, snaps, index };

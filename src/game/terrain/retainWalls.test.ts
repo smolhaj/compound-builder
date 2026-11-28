@@ -283,3 +283,36 @@ describe('no stone, coping slab or tread of a wall hangs over the ground it stan
     }
   }, 60000);
 });
+
+describe('the far wall is a battered slab like the near wall', () => {
+  const steep = (_x: number, z: number) => 10 - 0.5 * z;
+  const p = planPad({ x0: -0.75, z0: -0.75, x1: 0.75, z1: 0.75 }, steep);
+  const g = (x: number, z: number): number => {
+    const d = Math.max(p.rect.x0 - x, x - p.rect.x1, p.rect.z0 - z, z - p.rect.z1, 0);
+    if (d >= p.skirt) return steep(x, z);
+    const t = d / p.skirt, k = 1 - t * t * (3 - 2 * t);
+    return steep(x, z) + (p.y - steep(x, z)) * k;
+  };
+  /** The vertices of a mesh as [x, y, z]. */
+  const verts = (geo: THREE.BufferGeometry): number[][] => { const pos = geo.getAttribute('position'); return Array.from({ length: pos.count }, (_, i) => [pos.getX(i), pos.getY(i), pos.getZ(i)]); };
+  it('the far slab is battered: its coping stands as far out as the near wall\'s, not proud of it', () => {
+    // the south side (normal +z) is the fill side on this hill: the farthest-out point of whatever stands in the top 3 cm of the wall
+    const topOut = (detail: 'near' | 'far'): number => {
+      const v = verts(wallGeometry(p, 1, g, 1, detail)!).filter(q => Math.abs(q[0]) < 0.6 && q[2] > p.rect.z1), top = Math.max(...v.map(q => q[1])) - 0.03;
+      expect(v.length).toBeGreaterThan(20);
+      return Math.max(...v.filter(q => q[1] > top).map(q => q[2] - p.rect.z1));
+    };
+    const near = topOut('near'), far = topOut('far');
+    expect(near).toBeLessThan(RW.SKIRT - 0.02);               // (the near wall does lean in at the top)
+    expect(far).toBeLessThanOrEqual(near + 0.012);
+    expect(far).toBeGreaterThanOrEqual(near - 0.02);
+  });
+  for (const detail of ['near', 'far'] as const) {
+    it(`a finished ${detail} wall stands the same distance from the pad at its foot whichever level of detail is drawn`, () => {
+      const v = verts(wallGeometry(p, 1, g, 1, detail)!).filter(q => Math.abs(q[0]) < 0.6 && q[2] > p.rect.z1), low = Math.min(...v.map(q => q[1])) + 0.04;
+      expect(v.length).toBeGreaterThan(20);
+      const out = Math.max(...v.filter(q => q[1] < low).map(q => q[2] - p.rect.z1));
+      expect(out).toBeGreaterThan(RW.SKIRT - 0.03);
+    });
+  }
+});
