@@ -96,15 +96,20 @@ function stretchNear(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun,
   const [tx, tz] = TAN[run.side], [nx, nz] = NOR[run.side], [ox, oz] = run.pts[0], yaw0 = Math.atan2(-tz, tx);
   const seg = Math.hypot(run.pts[1][0] - run.pts[0][0], run.pts[1][1] - run.pts[0][1]);
   const sA = i0 * seg, sB = i1 * seg;
-  const cut = run.h[Math.round((i0 + i1) / 2)] > 0;
+  /** Signed retained height at s (+ cut, - fill), and whether the wall there is a cut: a stretch can turn from cut to fill where the slope does (no sample between is under the trim), so each stone takes its own. */
+  const signedAt = (s: number): number => {
+    const f = Math.max(i0, Math.min(i1, s / seg)), i = Math.min(i1 - 1, Math.floor(f)), u = f - i;
+    return run.h[i] * (1 - u) + run.h[i + 1] * u;
+  };
+  const cutAt = (s: number): boolean => signedAt(s) > 0;
   /** Wall height (full, u) at s along the side. */
   const Hat = (s: number): number => {
     const f = Math.max(i0, Math.min(i1, s / seg)), i = Math.min(i1 - 1, Math.floor(f)), u = f - i;
     return Math.abs(run.h[i]) * (1 - u) + Math.abs(run.h[i + 1]) * u;
   };
-  const planBot = (H: number): number => (cut ? plan.y : plan.y - H) - EMBED;
+  const planBot = (H: number, cut: boolean): number => (cut ? plan.y : plan.y - H) - EMBED;
   /** The foot of the wall at s: the plan's, or on a fill wall lower where the ground falls away outside it. */
-  const bottomAt = (s: number, H: number, half = 0.05): number => (cut ? planBot(H) : Math.min(planBot(H), fillFootAt(run, ground, s, half, planBot(H) + EMBED) - EMBED));
+  const bottomAt = (s: number, H: number, half = 0.05, cut = cutAt(s)): number => (cut ? planBot(H, true) : Math.min(planBot(H, false), fillFootAt(run, ground, s, half, planBot(H, false) + EMBED) - EMBED));
   // segments between the stairs
   const gaps = stairGaps(run, plan.stairs).filter(g => g[1] > sA && g[0] < sB);
   const spans: Array<[number, number]> = [];
@@ -113,7 +118,7 @@ function stretchNear(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun,
   if (sB - cur > 0.03) spans.push([cur, sB]);
   // the courses sit on one grid for the whole stretch (from its lowest footing), so they run level however the ground falls
   let ref = Infinity;
-  for (let i = i0; i <= i1; i++) ref = Math.min(ref, bottomAt(i * seg, Math.abs(run.h[i]), seg / 2));
+  for (let i = i0; i <= i1; i++) ref = Math.min(ref, bottomAt(i * seg, Math.abs(run.h[i]), seg / 2, run.h[i] > 0));
   for (const [a, b] of spans) {
     for (let j = 0, base = 0; j < 40; j++) {
       const ch = COURSE;                       // every course the same height, so the courses run level along the wall
@@ -126,7 +131,7 @@ function stretchNear(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun,
       for (let q = 0; q < n0; q++) {
         const L = (b - a) * lens[q] / tot, sc = s + L / 2;
         s += L;
-        const H = Hat(sc), bot = bottomAt(sc, H, L / 2), top = bot + (planBot(H) + H + EMBED - bot) * k;
+        const cut = cutAt(sc), H = Hat(sc), bot = bottomAt(sc, H, L / 2, cut), top = bot + (planBot(H, cut) + H + EMBED - bot) * k;
         const y0 = ref + base;
         if (y0 + ch <= bot + 0.01) { any = true; continue; }       // (this course is under the ground here: the next may not be)
         if (y0 > top - ch * 0.55) continue;
@@ -147,7 +152,7 @@ function stretchNear(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun,
     // the coping: flat slabs along the top, a little proud of the face and the back
     const n1 = Math.max(1, Math.round((b - a) / 0.13));
     for (let q = 0; q < n1; q++) {
-      const s0 = a + (b - a) * q / n1, s1 = a + (b - a) * (q + 1) / n1, sc = (s0 + s1) / 2, H = Hat(sc), bot = planBot(H), top = bot + H + EMBED;
+      const s0 = a + (b - a) * q / n1, s1 = a + (b - a) * (q + 1) / n1, sc = (s0 + s1) / 2, cut = cutAt(sc), H = Hat(sc), bot = planBot(H, cut), top = bot + H + EMBED;
       const setback = (top - bot) * BATTER, face = cut ? setback : RW.SKIRT - setback, dd = DEPTH + 0.03;
       const dc = cut ? face + DEPTH / 2 : face - DEPTH / 2;
       box(parts, ox + tx * sc + nx * dc, top + COPING_T / 2 - 0.002, oz + tz * sc + nz * dc, (s1 - s0) - 0.004, COPING_T, dd, yaw0, new THREE.Color().setHSL(0.1, 0.03, 0.17 + 0.06 * r()));
@@ -155,7 +160,7 @@ function stretchNear(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun,
     // weep holes: a dark square low in the face every couple of metres, with a lip of drain pipe
     const nh = Math.floor((b - a) / 0.4);
     for (let q = 0; q < nh && Hat((a + b) / 2) > 0.09; q++) {
-      const sc = a + (b - a) * (q + 0.5) / nh, H = Hat(sc), bot = bottomAt(sc, H, 0.02), setback = 0.05 * BATTER, face = cut ? setback : RW.SKIRT - setback;
+      const sc = a + (b - a) * (q + 0.5) / nh, cut = cutAt(sc), H = Hat(sc), bot = bottomAt(sc, H, 0.02, cut), setback = 0.05 * BATTER, face = cut ? setback : RW.SKIRT - setback;
       const dc = cut ? face - 0.004 : face + 0.004;
       box(parts, ox + tx * sc + nx * dc, bot + EMBED + 0.07, oz + tz * sc + nz * dc, 0.034, 0.022, 0.012, yaw0, new THREE.Color(0.04, 0.04, 0.045));
     }
@@ -165,13 +170,13 @@ function stretchNear(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun,
 /** The far version of one stretch: a battered slab per sample pair and a coping line. */
 function stretchFar(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun, i0: number, i1: number, k: number, ground: Ground): void {
   const [tx, tz] = TAN[run.side], [nx, nz] = NOR[run.side], yaw0 = Math.atan2(-tz, tx);
-  const cut = run.h[Math.round((i0 + i1) / 2)] > 0, c = new THREE.Color().setHSL(0.08, 0.08, 0.12), cc = new THREE.Color().setHSL(0.09, 0.05, 0.19);
+  const c = new THREE.Color().setHSL(0.08, 0.08, 0.12), cc = new THREE.Color().setHSL(0.09, 0.05, 0.19);
   const gaps = stairGaps(run, plan.stairs), [ox, oz] = run.pts[0];
   const seg = Math.hypot(run.pts[1][0] - run.pts[0][0], run.pts[1][1] - run.pts[0][1]);
   for (let i = i0; i < i1; i++) {
     const s0 = i * seg, s1 = (i + 1) * seg, sc = (s0 + s1) / 2;
     if (gaps.some(g => sc > g[0] - seg / 2 && sc < g[1] + seg / 2)) continue;
-    const H = (Math.abs(run.h[i]) + Math.abs(run.h[i + 1])) / 2, pb = (cut ? plan.y : plan.y - H) - EMBED;
+    const cut = run.h[i] + run.h[i + 1] > 0, H = (Math.abs(run.h[i]) + Math.abs(run.h[i + 1])) / 2, pb = (cut ? plan.y : plan.y - H) - EMBED;
     const bot = cut ? pb : Math.min(pb, fillFootAt(run, ground, sc, seg / 2, pb + EMBED) - EMBED), hh = (pb + H + EMBED - bot) * k;
     const dc = cut ? 0.06 : RW.SKIRT - 0.06;
     box(parts, ox + tx * sc + nx * dc, bot + hh / 2, oz + tz * sc + nz * dc, seg * 1.01, hh, 0.12, yaw0, c);

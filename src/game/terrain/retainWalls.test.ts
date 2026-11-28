@@ -160,3 +160,29 @@ describe('a fill wall is footed in the ground that falls away outside it', () =>
     expect(g.boundingBox!.max.y).toBeLessThan(plan.y + plan.maxH + 0.06);
   });
 });
+
+describe('a stretch that turns from cut to fill takes each stone by its own sign', () => {
+  // the south side's ground is above the pad on the west half and below it on the east, the change quick enough that no sample falls between
+  const nat = (x: number, z: number) => 10 - 0.4 * (z - 0.5) * Math.tanh(x * 12);
+  const p2 = planPad(fp, nat);
+  const gr = (x: number, z: number): number => {
+    const d = Math.max(p2.rect.x0 - x, x - p2.rect.x1, p2.rect.z0 - z, z - p2.rect.z1, 0);
+    if (d >= p2.skirt) return nat(x, z);
+    const t = d / p2.skirt, k = 1 - t * t * (3 - 2 * t);
+    return nat(x, z) + (p2.y - nat(x, z)) * k;
+  };
+  it('no stone of the fill half hangs over the ground below it', () => {
+    const run = p2.runs.find(r => r.side === 2)!;
+    expect(run.h.some(v => v > RW.MIN_H) && run.h.some(v => v < -RW.MIN_H)).toBe(true);
+    const g = wallGeometry(p2, 1, gr, 1, 'near')!, pos = g.getAttribute('position');
+    const cols = new Map<number, number>();
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      if (x < 0.3 || x > p2.rect.x1 - 0.2 || z < p2.rect.z1 + 0.03 || z > p2.rect.z1 + RW.SKIRT + 0.01) continue;   // (the fill half of the south side, clear of the turn and the corner)
+      const k = Math.round(x / 0.3);
+      cols.set(k, Math.min(cols.get(k) ?? Infinity, pos.getY(i)));
+    }
+    expect(cols.size).toBeGreaterThan(1);
+    for (const [k, y] of cols) expect(y, `footing at x ${(k * 0.3).toFixed(1)} floats`).toBeLessThanOrEqual(gr(k * 0.3, p2.rect.z1 + RW.SKIRT + 0.04) + 0.04);
+  });
+});

@@ -14,6 +14,7 @@ const port = Number(opt('--port', 5971)), hour0 = Number(opt('--hour', 2.25)), m
 const quality = opt('--quality', null), outDir = resolve(opt('--out', '/tmp/claude-0/movie/night'));
 const FPS = Number(opt('--fps', 12));
 const afterSecs = Number(opt('--after', 4)), wantDay = Number(opt('--day', 0));
+const lowrender = args.includes('--lowrender'), every = Number(opt('--every', 20)), skipN = Number(opt('--skip', 0));   // --lowrender: nothing is drawn between captures (a frame every --every pumps; --skip N scenes at the start)
 mkdirSync(outDir, { recursive: true });
 const vite = spawn('node', ['node_modules/vite/bin/vite.js', '--config', 'scripts/vite.shots.config.ts', '--port', String(port), '--strictPort'], { stdio: ['ignore', 'pipe', 'inherit'] });
 await new Promise((ok, fail) => { vite.stdout.on('data', d => { if (/localhost:\d+/.test(String(d).replace(/\x1b\[[0-9;]*m/g, ''))) ok(); }); vite.on('exit', c => fail(new Error('vite exited ' + c))); });
@@ -29,7 +30,7 @@ try {
     window.requestAnimationFrame = cb => { if (!window.__manual) return real(cb); window.__q.push(cb); return window.__q.length; };
     window.__pump = ms => { window.__fakeNow += ms; const q = window.__q; window.__q = []; for (const cb of q) cb(window.__fakeNow); };
   });
-  await page.goto(`http://localhost:${port}/?seed=7`);
+  await page.goto(`http://localhost:${port}/?seed=7${lowrender ? '&lowrender' : ''}`);
   await page.waitForFunction(() => window.__cb, null, { timeout: 180000 });
   if (quality) await page.evaluate(q => window.__cb.store.getState().setQuality(q), quality);
   console.log('quality', await page.evaluate(() => window.__cb.store.getState().quality));
@@ -72,7 +73,8 @@ try {
   await page.evaluate(() => { window.__fakeNow = performance.now(); window.__pump(16); window.__pump(16); });
   const plan = await page.evaluate(() => window.__cb.game.getState().cutscene.plan.scenes.map(sc => sc.kind));
   console.log('scenes', plan.join(','), 'totalReal', await page.evaluate(() => window.__cb.game.getState().cutscene.plan.totalReal));
-  let n = 0, tAfter = 0, offerHold = 0, lastSceneLabel = '';
+  for (let i = 0; i < skipN; i++) await page.evaluate(async () => { const { useCutsceneView } = await import('/src/store/cutsceneStore.ts'); useCutsceneView.getState().requestSkipScene(); window.__pump(100); window.__pump(100); });
+  let n = 0, tAfter = 0, offerHold = 0, lastSceneLabel = '', pumped = 0;
   const t0 = Date.now();
   while (n < maxF) {
     const st = await page.evaluate(([q0, FPS]) => {
@@ -87,6 +89,9 @@ try {
       const v = useCutsceneView.getState().view, a = window.__cb.player.audit();
       return { label: v?.sceneLabel, scene: v?.scene, seg: v?.seg, hour: v?.hour, inside: a?.inside, near: a?.nearest, kind: a?.kind, fb: a?.fallbacks };
     });
+    pumped++;
+    if (lowrender && pumped % every !== 0 && st.phase === 'playing') continue;
+    if (lowrender) await page.evaluate(() => window.__cb.qa.renderFull('high'));
     // let React flush the overlay
     await page.evaluate(() => new Promise(r => setTimeout(r, 30)));
     if (!globalThis.__cdp) globalThis.__cdp = await page.context().newCDPSession(page);
