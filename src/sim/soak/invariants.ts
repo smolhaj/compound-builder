@@ -7,6 +7,7 @@
 import type { GameState } from '../state';
 import { MATERIAL_IDS } from '../materials';
 import { isFinished } from '../construction';
+import { gallonsText } from '../units';
 
 export interface Violation { code: string; detail: string }
 
@@ -90,10 +91,10 @@ export function checkState(s: GameState, opt: CheckOptions = {}): Violation[] {
     if (n < -1e-6) add('stock_negative', `${m}=${n}`);
   }
   const u = s.utilities;
-  if (u.storedL < -1e-6) add('water_negative', `stored ${u.storedL} L`);
+  if (u.storedL < -1e-6) add('water_negative', `stored ${gallonsText(u.storedL)}`);
   if (u.batteryKwh < -1e-6) add('battery_negative', `${u.batteryKwh} kWh`);
-  if ((u.pondL ?? 0) < -1e-6) add('pond_negative', `${u.pondL} L`);
-  if (u.fuelL < -1e-6) add('fuel_negative', `${u.fuelL} L`);
+  if ((u.pondL ?? 0) < -1e-6) add('pond_negative', gallonsText(u.pondL ?? 0));
+  if (u.fuelL < -1e-6) add('fuel_negative', gallonsText(u.fuelL));
 
   // people: both rosters in step, ids unique and matched
   if (s.people.length !== s.personState.length) add('people_out_of_step', `${s.people.length} people, ${s.personState.length} states`);
