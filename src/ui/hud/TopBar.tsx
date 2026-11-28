@@ -5,6 +5,7 @@
  * The numbers come from sim/vitals.ts (compound board, runway, collapse and wave clocks); nothing is worked out here.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from 'react';
+import { useDrawerStore } from '../../store/drawerStore';
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
 import { boardCache, type BoardItem } from '../../sim/compoundBoard';
@@ -166,6 +167,7 @@ export function TopBar({ barRef, onBoard, onSide }: { barRef: RefObject<HTMLDivE
           style={{ ...btnBase, width: BAR.menu, height: T.size.control.md, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: menuOpen ? tv.color('accent') : tv.color('control'), color: menuOpen ? tv.color('onAccent') : tv.color('text'), border: `1px solid ${T.color.line}` }}><MenuIcon /></button>
         {menuOpen && <div role="menu" data-testid="top-menu-panel" style={{ ...popover, right: 0, width: 264 }}>
           <MenuButton label="Compound board" hint="Power, water, food, defense, threats" onClick={() => { setMenuOpen(false); onBoard(); }} />
+          <MenuButton label="Field Guide" hint="The player manual, searchable (I)" onClick={() => { setMenuOpen(false); useDrawerStore.getState().show('guide'); }} />
           <MenuButton label="Shop & money" hint="Town, the catalog, accounts, gold and silver" onClick={() => { setMenuOpen(false); g.openShop(true); }} />
           <MenuButton label="New game" disabled={over} hint={over ? 'Use the report card to start a new game' : undefined} onClick={() => { setMenuOpen(false); g.openSetup(true, true); }} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ flex: 1 }}>Save, export, import</span><SaveMenu /></div>

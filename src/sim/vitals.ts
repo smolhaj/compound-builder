@@ -84,7 +84,7 @@ export function topChips(s: GameState, b: CompoundBoard): ChipModel[] {
 
   // food, water, power (board vitals; the runway row supplies days and a fallback fix)
   { const v = vital('food'), r = row('food');
-    out.push({ id: 'food', label: 'Food', full: daysWord(v?.n ?? r?.days), compact: `${dayText(v?.n ?? r?.days)} d`, tone: v?.tone ?? 'good', lines: [v?.value ?? '', r ? `${r.value} with nothing grown or bought. ${r.detail}` : ''].filter(Boolean), fix: fixOf(v, r), open: v?.open ?? { type: 'open', right: 'supplies', supplies: 'stores' } }); }
+    out.push({ id: 'food', label: 'Food', full: v?.calm && (v.n ?? 0) < 1 ? 'Nothing put by' : daysWord(v?.n ?? r?.days), compact: `${dayText(v?.n ?? r?.days)} d`, tone: v?.tone ?? 'good', lines: [v?.value ?? '', r ? `${r.value} with nothing grown or bought. ${r.detail}` : ''].filter(Boolean), fix: fixOf(v, r), open: v?.open ?? { type: 'open', right: 'supplies', supplies: 'stores' } }); }
   { const v = vital('water'), r = row('water'), d = r?.days ?? 0;
     // a working well with empty tanks is fine (the pump fills them as the family draws): "0 days" next to a good tone read as an emergency
     const live = d < 1 && v?.tone === 'good' && !!v.value.startsWith('a working source');
