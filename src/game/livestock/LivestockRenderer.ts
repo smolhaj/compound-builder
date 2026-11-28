@@ -66,7 +66,9 @@ const hash = (s: string, k: number): number => { let h = 2166136261 ^ k; for (le
  * Keep the animals apart: the spots they are sent to (a hash in front of the barn) are pushed apart until no two bodies touch, and kept out of the
  * strip in front of the door where the building stands. Only the ones out in the field (not going in, not on the alarm) are moved. Pure (tested).
  */
-export function spreadGoals(herd: ReadonlyArray<{ id: string; kind: StockKind }>, goals: AnimalGoal[], homes: readonly Home[]): void {
+export function spreadGoals(herd: ReadonlyArray<{ id: string; kind: StockKind }>, goals: AnimalGoal[], homes: readonly Home[], free?: (x: number, z: number) => boolean): void {
+  // (a body is only pushed onto ground it may stand on: a herd crowding a shore is not pushed into the water)
+  const to = (g: AnimalGoal, x: number, z: number): void => { if (!free || free(x, z)) { g.x = x; g.z = z; } };
   const idx: number[] = [];
   for (let i = 0; i < goals.length; i++) if (!goals[i].inside && !goals[i].panic) idx.push(i);
   const rad = (i: number): number => LOOK[herd[i].kind].len * 0.5 + 0.09;
@@ -79,13 +81,13 @@ export function spreadGoals(herd: ReadonlyArray<{ id: string; kind: StockKind }>
       if (d >= need) continue;
       if (d < 1e-4) { const t = (p * 7 + q * 3) * 0.9; dx = Math.cos(t); dz = Math.sin(t); d = 1; }
       const push = (need - d) / 2 + 0.002;
-      A.x -= dx / d * push; A.z -= dz / d * push; B.x += dx / d * push; B.z += dz / d * push;
+      to(A, A.x - dx / d * push, A.z - dz / d * push); to(B, B.x + dx / d * push, B.z + dz / d * push);
     }
     for (const i of idx) {
       const g = goals[i], home = g.home ? byId.get(g.home) : undefined;
       if (!home) continue;
       const door = doorOf(home), out = (g.x - door.x) * door.ux + (g.z - door.z) * door.uz, min = 0.3 + LOOK[herd[i].kind].len * 0.5;
-      if (out < min) { g.x += door.ux * (min - out); g.z += door.uz * (min - out); }
+      if (out < min) to(g, g.x + door.ux * (min - out), g.z + door.uz * (min - out));
     }
   }
 }
@@ -194,7 +196,7 @@ export class LivestockRenderer {
     if (this._age > 90) { this._age = 0; for (const a of this._agents.values()) a.noWay.clear(); }     // (the layout may have changed: look again)
     const k = Math.max(1, Math.min(3, speedK));
     const goals = herd.map(h => animalGoal(h, homes, c, this._agents.get(h.id)?.noWay, ctx.free));
-    spreadGoals(herd, goals, homes);
+    spreadGoals(herd, goals, homes, ctx.free);
     restSlots(herd, goals, homes, kind => LOOK[kind].len);
     const byId = new Map(homes.map(h => [h.id, h]));
     this._dt = dt;
