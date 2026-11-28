@@ -103,7 +103,7 @@ export class ForestRenderer {
           geo = kind === 'conifer' ? buildConiferTree(detail, 17, lod, set === 'conifer_stand' ? 1.0 : 0.42)
             : (DESERT_KINDS as readonly string[]).includes(kind) ? buildDesertTree(kind as DesertKind, detail, 23, lod)
             : kind === 'longleaf' ? buildTallCrownTree('longleaf', detail, 31, lod)
-            : buildDeciduousTree(kind === 'broad' ? 0 : 1, detail, kind === 'broad' ? 41 : 63, lod);
+            : buildDeciduousTree(kind === 'broad' ? 0 : 1, detail, kind === 'broad' ? 41 : 63, lod, true);
           this._geos.set(key, geo);
         }
         return { geometry: geo, maxDist: lod === 0 ? NEAR_DIST : lod === 1 ? LOD_DIST : Infinity };

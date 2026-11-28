@@ -31,8 +31,12 @@ export function ridgePlan(q: Quality): { rings: number; seg: number } {
   return q === 'high' ? { rings: 4, seg: 480 } : q === 'medium' ? { rings: 3, seg: 360 } : { rings: 2, seg: 240 };
 }
 
-/** Haze of ring k of n: the nearest is already veiled, the farthest almost sky. */
-export const ringHaze = (k: number, n: number): number => 0.2 + 0.55 * (n <= 1 ? 0 : k / (n - 1));
+/**
+ * Haze of ring k of n: the nearest is already half veiled, the farthest almost sky. (The nearest ring stands ~2 km out, where the terrain
+ * in front of it is already fully faded to the sky color; at the old 0.2 its dark rock showed as a hard-edged brown slab floating over
+ * the mist, so even the first ring takes half its color from the sky.)
+ */
+export const ringHaze = (k: number, n: number): number => 0.5 + 0.4 * (n <= 1 ? 0 : k / (n - 1));
 
 /** Extra relief the regions would carry beyond the square (units): large for the high ranges, tiny for a plains horizon. */
 export function extraRelief(kind: RegionKind): number {
