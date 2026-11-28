@@ -99,7 +99,7 @@ import { FLIGHT_W, hatchPlan } from './buildkit/bunkerHatchPlan';
 import { buildDumpTruck, buildExcavator, buildFormwork, buildTubeSegments, drapeSoil, earthMound, spoilHeap } from './props/digSite';
 import { kitMaterial } from './buildkit/materials';
 import { FRUITS, fruitLook, isOrchard, type Fruit } from '../sim/orchard';
-import { buildLayers, type Seat } from './buildkit/buildings';
+import { buildLayers, footingKeyOf, type Seat } from './buildkit/buildings';
 import { treadHeight } from './buildkit/terraceProps';
 import { farHiddenLayers, isFar } from './buildkit/buildingLod';
 import { LIGHT_BUDGET, pickLights, type LightCandidate } from './lightPool';
@@ -233,6 +233,8 @@ interface Built {
   fpBody: Rect4;
   /** The plan of the retaining wall round its graded pad (sim/retainPlan.ts), null when the pad is gentle. */
   wall: PadPlan | null;
+  /** The footing the ground asked for when it was drawn (buildkit/footing.ts; empty: none): later grading under it (a neighbor's pad, the road's bed) draws it again. */
+  foot?: string;
 }
 interface Rect4 { x0: number; z0: number; x1: number; z1: number }
 
@@ -270,6 +272,9 @@ const ICE_COVER = { open: 0, skim: 0.32, ice: 1 } as const;
 
 /** What a blighted or parched crop looks like (straw yellow, going brown). */
 const CROP_DEAD = new THREE.Color(0x9a8a45);
+/** How deep a lake's water may be (u, about 10 in) before it is no place for a walker. */
+const LAKE_WADE = 0.04;
+
 export class HomesteadWorld {
   readonly center = new THREE.Vector3(PARCEL_SIZE / 2, 0, PARCEL_SIZE / 2);
   readonly parcel: ParcelTerrain;
@@ -736,6 +741,7 @@ export class HomesteadWorld {
     this.parcel.setRoadBed(bed);
     if (this._quality) {
       this.terrain.refresh(this._terrainSource, b[0], b[1], b[2], b[3]);
+      this._refoot({ x0: b[0], z0: b[1], x1: b[2], z1: b[3] });
       this._plant(this._quality);
     }
     this._buildRoads();
@@ -1532,7 +1538,7 @@ export class HomesteadWorld {
       (trees.get(k) ?? trees.set(k, []).get(k)!).push([t.x, t.z, 0.07 * t.scale + 0.07]);
     }
     const boxes = [...this._built.values()].filter(b => !b.under && KIT[b.placed.kind].level !== 'underground' && KIT[b.placed.kind].level !== 'cover').map(b => footprint(KIT[b.placed.kind], b.placed.x, b.placed.z, b.placed.rot, false));
-    const cars = this._cars, yard = this.access.yard, hasCreek = this.parcel.creekHome, half = this.parcel.creek.halfWidth;
+    const cars = this._cars, yard = this.access.yard, hasCreek = this.parcel.creekHome, half = this.parcel.creek.halfWidth, lakeY = this.parcel.lakeY;
     const own = (x: number, z: number) => (x > this.home.x0 && x < this.home.x1 && z > this.home.z0 && z < this.home.z1) || this._inOwned(x, z);
     const g = this.groundAt;
     const slope = (x: number, z: number): number => (Math.abs(g(x + 0.25, z) - g(x - 0.25, z)) + Math.abs(g(x, z + 0.25) - g(x, z - 0.25))) / 0.5;
@@ -1540,6 +1546,8 @@ export class HomesteadWorld {
     const hardFor = (limit: number) => (x: number, z: number): boolean => {
       for (const r of boxes) if (x > r.x0 - 0.14 && x < r.x1 + 0.14 && z > r.z0 - 0.14 && z < r.z1 + 0.14) return true;
       if (hasCreek && Math.abs(z - this.parcel.creek.zAt(x)) < half + 0.25) return true;
+      // a lake (a bluff or an island lot): nobody on foot or hoof walks into open water; the wet rim a few inches deep stays walkable (geometry audit: deer, elk and rabbits stood in the lake)
+      if (lakeY !== null && g(x, z) < lakeY - LAKE_WADE) return true;
       if (this._perimeterBlocked(x, z, 0.08)) return true;
       if (this.walls.blocks(x, z)) return true;     // a retaining wall: over only at its stairs
       return slope(x, z) > limit && !this.walls.atStair(x, z);
@@ -1933,6 +1941,8 @@ export class HomesteadWorld {
       const x0 = p.x, z0 = p.z;
       opts.spurH = (lx, lz) => { const [wx, wz] = rotQ(lx, lz, p.rot); return this.groundAt(x0 + wx, z0 + wz) - y; };
     }
+    // ground that falls away from the floor under a building (one laid on the drive keeps its floor while the road's bed drops away): a stem-wall footing to the ground, so no end hovers
+    if (!below && def.level !== 'cover' && !def.waterside && !def.stilts && !climb) { const gx = p.x, gz = p.z, fy = y; opts.footing = (lx, lz) => { const [wx, wz] = rotQ(lx, lz, p.rot); return this.parcel.height(gx + wx, gz + wz) - fy; }; }
     let under: Built['under'] = null;
     if (below) {
       const placed = [...[...this._built.values()].map(b => b.placed), p];
@@ -1969,7 +1979,7 @@ export class HomesteadWorld {
     }
     // a plan nobody has started is laid out in lime on the ground, so it reads from the air (the stakes alone don't)
     if (!below) group.add(planMark(def, opts.ground));
-    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000', opts, cover: def.level === 'cover', under, lod: below ? [] : this._lodLayers(group), far: false, fpPorch: r, fpBody: footprint(def, p.x, p.z, p.rot, false), wall });
+    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000', opts, cover: def.level === 'cover', under, lod: below ? [] : this._lodLayers(group), far: false, fpPorch: r, fpBody: footprint(def, p.x, p.z, p.rot, false), wall, foot: opts.footing ? footingKeyOf(def, opts.footing) : undefined });
     // a dome's buried works (the skirt ring and the lines under it, sim/dome/dig.ts): drawn as the pit is worked, hidden under the earth once it is filled
     if (def.level === 'cover') {
       const tr = tierOfKind(p.kind);
@@ -1980,11 +1990,24 @@ export class HomesteadWorld {
         this._digKeys.delete(p.id);
       }
     }
-    if (pad) this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1);
+    if (pad) { this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1); this._refoot({ x0: pad.x0 - pad.skirt - 1, z0: pad.z0 - pad.skirt - 1, x1: pad.x1 + pad.skirt + 1, z1: pad.z1 + pad.skirt + 1 }, p.id); }
     if (below) this._syncUnderground();
     if (this._batchDepth > 0) this._plantDirty = true; else if (this._quality) this._plant(this._quality);
     this._applyView(this._built.get(p.id)!);
     this._ws.invalidateShadows();
+  }
+
+  /** New grading near buildings already standing (a neighbor's pad, the road's bed) can leave one with ground falling away under its floor, or take that away: draw again those whose footing changed. */
+  private _refoot(area: Rect4 | null, except = ''): void {
+    for (const b of this._built.values()) {
+      if (b.placed.id === except || b.foot === undefined || !b.opts.footing) continue;
+      const r = b.fpPorch;
+      if (area && (r.x1 < area.x0 || r.x0 > area.x1 || r.z1 < area.z0 || r.z0 > area.z1)) continue;
+      const key = footingKeyOf(KIT[b.placed.kind], b.opts.footing);
+      if (key === b.foot) continue;
+      b.foot = key;
+      this._rebuild(b, b.opts);
+    }
   }
 
   private _batchDepth = 0;
