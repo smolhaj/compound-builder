@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { containerWear, fenceLean, leanAt, NO_WEAR, overgrowth, packWear, structureAge, unpackWear, wearFor, wetnessOf } from './aging';
-import { awakeAtHome, firePitLit, flashlightCarriers, generatorRunning, windowLight, type NightPerson } from './nightLife';
+import { awakeAtHome, awakeByHome, firePitLit, flashlightCarriers, generatorRunning, windowLight, type NightPerson } from './nightLife';
 import { driftDepth, frostAt, mudSeason, sideFor, troughIce } from './seasonCover';
 
 describe('aging', () => {
@@ -143,5 +143,17 @@ describe('season cover', () => {
     expect(troughIce(0, 0)).toBe(0);
     expect(troughIce(1, 0)).toBe(1);
     expect(troughIce(0, 1)).toBe(1);
+  });
+});
+
+describe('awakeByHome', () => {
+  const P = (id: string, task: string, gone = false): NightPerson => ({ id, task, kid: false, gone });
+  it('counts the awake by the house they sleep in, and leaves tents and the asleep out', () => {
+    const where: Record<string, string | null> = { a: 'h1', b: 'h1', c: 'h2', d: 'tent:1', e: 'h2', f: 'h2' };
+    const m = awakeByHome([P('a', 'leisure'), P('b', 'sleep'), P('c', 'idle'), P('d', 'idle'), P('e', 'away'), P('f', 'x', true)], id => where[id] ?? null);
+    expect(m.get('h1')).toBe(1);
+    expect(m.get('h2')).toBe(1);
+    expect(m.get('tent:1')).toBe(1);   // (a tent is not a building id: the caller only reads the buildings)
+    expect(m.size).toBe(3);
   });
 });

@@ -23,6 +23,20 @@ export function awakeAtHome(people: readonly NightPerson[]): number {
   return people.filter(p => !p.gone && p.task !== 'sleep' && !AWAY.has(p.task)).length;
 }
 
+/**
+ * Awake people by the home they sleep in (sim/housing: `whereOf` is a person's bed, bunk or couch, a building id; a tent or nowhere is not a house).
+ * A house is lit by its own household, not only the main house by everyone.
+ */
+export function awakeByHome(people: readonly NightPerson[], whereOf: (id: string) => string | null): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const p of people) {
+    if (p.gone || p.task === 'sleep' || AWAY.has(p.task)) continue;
+    const w = whereOf(p.id);
+    if (w) out.set(w, (out.get(w) ?? 0) + 1);
+  }
+  return out;
+}
+
 /** Is it dark enough that a lamp goes on (dusk to dawn)? `night` 0–1 from the sky. */
 export const isDark = (night: number) => night > 0.25;
 

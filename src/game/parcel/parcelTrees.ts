@@ -45,6 +45,13 @@ export interface PlantOptions {
 /** A parcel tree: a forest spec plus a stable id (its grid cell), so marks and stumps survive replanting. */
 export type ParcelTree = ForestTreeSpec & { id: number };
 
+/** Crown radius of a woodland tree at scale 1 (u; measured on the forest geometry: oak 1.05, maple 0.88, conifer 0.72). */
+export const CROWN_R: Record<string, number> = { broad: 1.0, oval: 0.85, conifer: 0.72, longleaf: 0.6, juniper: 0.6, mesquite: 0.9, paloverde: 0.9, saguaro: 0.3 };
+/** A tree's crown radius as drawn (the kind's radius at scale 1, times the instance's scale and horizontal stretch). */
+export const crownRadius = (t: Pick<ForestTreeSpec, 'kind' | 'scale' | 'sx'>): number => (CROWN_R[t.kind] ?? 0.9) * t.scale * Math.max(1, t.sx);
+/** How far a crown may reach over a building before the tree is not planted: its centre stands at least this fraction of the radius off the footprint. */
+export const CROWN_OVER = 0.65;
+
 export function planParcelTrees(t: ParcelTerrain, o: PlantOptions): ParcelTree[] {
   const rnd = mulberry32(t.seed * 7919 + 17 + (o.idBase ?? 0));
   const out: ParcelTree[] = [];

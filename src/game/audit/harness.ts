@@ -36,7 +36,10 @@ function stubScene(): { ws: unknown; scene: THREE.Scene } {
 }
 
 /** Stake, fortify and finish a compound the way the mountain showcase does, on any site. */
-function buildOut(g0: GameState, rings: number): { g: GameState; drive: Pt[]; camp: Pt; report: ShowcaseReport | null } {
+/** The late-game kinds the visual sweep stakes round the camp (offset x, z), for audits of a full homestead. */
+export const LATE_KINDS: Array<[string, number, number]> = [['stone_house', -14, 6], ['guest_house', -12, -10], ['workshop', 10, 12], ['metal_garage', 18, 4], ['greenhouse', -4, 14], ['sheep_barn', -18, -2], ['root_cellar', 6, -12], ['water_tower', -22, 12], ['barn', 14, -8], ['chicken_coop', -7, 4], ['cottage', -26, -12], ['equipment_yard', 22, 14], ['apiary', 12, -16]];
+
+function buildOut(g0: GameState, rings: number, late: boolean): { g: GameState; drive: Pt[]; camp: Pt; report: ShowcaseReport | null } {
   const g = g0;
   const parcel = parcelFor(g.site, g.seed), plan = roadPlanFor(g.site, g.seed, parcel), access = accessFromPlan(plan), camp = pickCamp(parcel, g.site.home);
   const q: SiteQuery = {
@@ -66,14 +69,18 @@ function buildOut(g0: GameState, rings: number): { g: GameState; drive: Pt[]; ca
   };
   let report: ShowcaseReport | null = null;
   try { report = runMountainShowcase(io, { rings, wall: 'stone' }); } catch { report = null; io.finishAll(); }
+  if (late) { 
+    for (const [k, dx, dz] of LATE_KINDS) { const sp = io.findSpot(k, camp.x + dx, camp.z + dz, 0, 10); const ok = sp ? io.stake(k, sp[0], sp[1], 0) : null; void ok; }
+    io.finishAll();
+  }
   return { g, drive: access.drive, camp: [camp.x, camp.z], report };
 }
 
-export function buildAuditWorld(site0: Site, seed: number, mode: 'bare' | 'built' = 'built', rings = 1, quality: 'low' | 'medium' | 'high' = 'medium'): AuditWorld {
+export function buildAuditWorld(site0: Site, seed: number, mode: 'bare' | 'built' = 'built', rings = 1, quality: 'low' | 'medium' | 'high' = 'medium', late = false): AuditWorld {
   const site: Site = { ...site0, improvements: { ...site0.improvements, drive: true } };   // (a built-up place has its drive: the road bed is benched into the ground)
   let g = newGame(seed, undefined, undefined, { site });
   let drive: Pt[] = [], camp: Pt = [0, 0], report: ShowcaseReport | null = null;
-  if (mode === 'built') { const r = buildOut(g, rings); g = r.g; drive = r.drive; camp = r.camp; report = r.report; }
+  if (mode === 'built') { const r = buildOut(g, rings, late); g = r.g; drive = r.drive; camp = r.camp; report = r.report; }
   const { ws, scene } = stubScene();
   const world = new HomesteadWorld(ws as never, g.seed, g.site);
   world.setQuality(quality);
