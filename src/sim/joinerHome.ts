@@ -241,11 +241,11 @@ export function modularQuote(s: GameState): { lines: OrderLine[]; cost: number; 
 }
 
 /** The same for a cabin the family builds. */
-export function ownBuildQuote(s: GameState, kind: string, workers: number): { lines: OrderLine[]; cost: number; hours: number; days: number; permit: number } {
+export function ownBuildQuote(s: GameState, kind: string, workers: number): { lines: OrderLine[]; cost: number; list: number; hours: number; days: number; permit: number } {
   const lines = purchasable(kind);
   const hours = totalHours(BLUEPRINTS[kind]);
   const permit = needsPermit(kind) && s.paper.permits && countyWorks(s) ? permitFee(s, kind) : 0;
-  return { lines, cost: orderCost(lines, prices(s)), hours, days: Math.ceil(hours / (Math.max(1, workers) * 6.5)), permit };
+  return { lines, cost: orderCost(lines, prices(s)), list: orderCost(lines), hours, days: Math.ceil(hours / (Math.max(1, workers) * 6.5)), permit };
 }
 
 const adultsOf = (people: readonly Person[]) => people.filter(p => !p.kid);
@@ -316,7 +316,7 @@ export function stayOptions(s: GameState, e: Pick<Encounter, 'people' | 'extras'
     else {
       const q = ownBuildQuote(s, k, handsFor(s, people)), builder = Math.max(0, ...adultsOf(people).map(p => p.skills.builder));
       out.push({ kind: 'own_build', label: `They build a ${kindName(k)}`, off: null,
-        line: `${usd(q.cost + q.permit)} of materials${cash >= q.cost ? ', paid from their money' : cash > 0 ? `, ${usd(cash)} from theirs` : ', from your supplies'} · about ${pluralize(Math.max(1, Math.round(q.days / 7)), 'week')} · tents till then`,
+        line: `${usd(q.cost + q.permit)} of materials at today's prices${q.cost > q.list * 1.05 ? ` (list ${usd(q.list + q.permit)})` : ''}${cash >= q.cost ? ', paid from their money' : cash > 0 ? `, ${usd(cash)} from theirs` : ', from your supplies'} · about ${pluralize(Math.max(1, Math.round(q.days / 7)), 'week')} · tents till then`,
         tip: `A ${kindName(k)} (sleeps ${HOME_BEDS[k]}): ${Math.round(q.hours)} person-hours through the usual stages, with everyone pitching in. Their own hands count${builder >= 5 ? ` (the best builder of them is at ${builder})` : ''}. Their savings buy the materials where they can; the stockpile covers the rest. Until it is finished they sleep in tents.` });
     }
   }

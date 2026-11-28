@@ -23,6 +23,7 @@ import { StayPicker } from './StayPicker';
 import { defaultStay, kitDetail, kitLine } from '../sim/joinerHome';
 import { pluralize } from '../sim/words';
 import { defaultStance } from '../sim/raidDefault';
+import { takeInFood } from '../sim/takeInFood';
 import { isTalk, talkOffer } from '../sim/negotiation';
 import { ORDERS, ORDER_HINT, ORDER_NAME } from '../sim/raidOrders';
 import { homeUnderSealedDome } from '../sim/dome/sealed';
@@ -112,6 +113,7 @@ export function GateCard() {
     const extraLabels = fxStanceLabels(g.game, e);   // (an extra kind's buttons with odds and costs, sim/disasters/<kind>.ts)
     const label = (st: Stance) => (extraLabels?.[st]) || (e.kind === 'kin' && st === 'take_in' && defaultStay(g.game, e) === 'player_build' && STANCE.build_first) || (e.ransom && RANSOM[st]) || (e.kind === 'trial_end' && TRIAL_END[st]) || (e.kind === 'shelter' && SHELTER[st]) || (e.kind === 'guard_stay' && GUARD_STAY[st]) || (e.kind === 'insider' && INSIDER_CARD[st]) || STANCE[st];
     const picked = cut ? cut.stance ?? defaultStance(e.stances, p) : null;
+    const feed = cut ? null : takeInFood(g.game, e);   // never default to the harmful choice: thin food lights no button
     return (
       <div style={cut ? raidBox : box}>
         <div data-testid={cut ? 'raid-card-scroll' : undefined} style={cut ? { flex: '1 1 auto', minHeight: 0, overflowY: 'auto', paddingRight: 4 } : undefined}>
@@ -202,9 +204,10 @@ export function GateCard() {
         {cut && (picked === 'defend' || picked === 'warn') && e.opener?.kind === 'scouts' && e.opener.spotted && <ScoutChoices />}
         {cut && picked === 'defend' && <RaidOrders />}
         </div>
+        {feed?.risky && <div data-testid="take-in-cost" style={{ marginTop: 10, padding: '7px 10px', borderRadius: 7, border: '1px solid #c0584a', background: 'rgba(192,88,74,0.16)', fontSize: 13, fontWeight: 600 }}>{feed.line}</div>}
         <div data-testid={cut ? 'stance-buttons' : undefined} style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 10, ...(cut ? { flex: '0 0 auto', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 5 } : {}) }}>
           {e.stances.filter(st => !(e.kind === 'kin' && st === 'build_first')).map((st, i) => (
-            <button key={st} disabled={st === 'hide' && p.bunker && !hidePreview(g.game, e, 0).viable} data-testid={`stance-${st}`} style={cut ? { ...button(st === picked), outline: st === picked ? '2px solid #d8c9a0' : undefined, background: st === picked ? '#4a4a3c' : '#2e302a', color: '#eee' } : button(i === 0)} title={label(st)[1]} onClick={() => (cut ? g.chooseStance(st) : g.answer(st))}>
+            <button key={st} disabled={st === 'hide' && p.bunker && !hidePreview(g.game, e, 0).viable} data-testid={`stance-${st}`} style={cut ? { ...button(st === picked), outline: st === picked ? '2px solid #d8c9a0' : undefined, background: st === picked ? '#4a4a3c' : '#2e302a', color: '#eee' } : button(i === 0 && !feed?.risky)} title={label(st)[1]} onClick={() => (cut ? g.chooseStance(st) : g.answer(st))}>
               <div style={{ fontWeight: 600 }}>{label(st)[0]}</div>
               <div style={{ fontSize: 11.5, opacity: 0.75, ...CLAMP2 }}>{label(st)[1]}</div>
             </button>

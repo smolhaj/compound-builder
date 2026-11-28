@@ -8,6 +8,7 @@ import { Fragment, useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useWorldStore } from '../../store/worldStore';
 import { orderProblem } from '../../sim/economy';
+import { listAndMarket, timesText } from '../../sim/homeAdvice';
 import { housingSummary } from '../../sim/housing';
 import { BLUEPRINTS, totalBill, totalHours } from '../../sim/blueprints';
 import { MATERIALS, billText, type MaterialId } from '../../sim/materials';
@@ -87,8 +88,9 @@ export function BuildMenu({ showProjects = () => undefined, toolsOnly = false }:
     const a = buildAdvice(game, kind), own = ownNeeds(kind), extra = kind === 'well_drilled' ? drillExtra(game.site) : 0;
     const permit = needsPermit(kind) && game.paper.permits && countyWorks(game) ? ` · permit ${usd(permitFee(game, kind))}` : '';
     const et = moveInEta(game, kind, totalHours(BLUEPRINTS[kind]), !!permit);
-    return <Item key={kind} flashKey={`kit:${kind}`} name={KIT[kind].name} cost={`~${usd(costOf(kind) + extra)}`}
-      sub={`${totalHours(BLUEPRINTS[kind])} h · crew adds ~${usd(Math.round(totalHours(BLUEPRINTS[kind]) * CREW_RATE / 100) * 100)}${kind === 'well_drilled' ? ` · water at ${lengthText(game.site.gwDepth)}` : ''}${permit}${et.home ? ` · ${et.line.replace('Family moves in after about', 'move in ~')}` : ''}`}
+    const pm = listAndMarket(game, kind);   // the order is charged at the market price; the list price is shown beside it when they differ
+    return <Item key={kind} flashKey={`kit:${kind}`} name={KIT[kind].name} cost={`~${usd((pm.marked ? pm.market : costOf(kind)) + extra)}`}
+      sub={`${pm.marked ? `list ${usd(pm.list)}, market ${timesText(pm.times)} · ` : ''}${totalHours(BLUEPRINTS[kind])} h · crew adds ~${usd(Math.round(totalHours(BLUEPRINTS[kind]) * CREW_RATE / 100) * 100)}${kind === 'well_drilled' ? ` · water at ${lengthText(game.site.gwDepth)}` : ''}${permit}${et.home ? ` · ${et.line.replace('Family moves in after about', 'move in ~')}` : ''}`}
       on={g.tool === kind} off={a.off} next={a.next ? a.note : null} title={`${KIT[kind].blurb} ${et.line}. ${et.meanwhile}${own ? ` Needs from your own land: ${own}.` : ''}`} click={() => arm(kind)} />;
   };
 

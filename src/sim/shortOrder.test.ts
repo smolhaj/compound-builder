@@ -98,6 +98,7 @@ describe('a thin pantry on day 0 is a calm first step, not an alarm', () => {
     // the days of food are the same, and from day 1 the card is red again
     expect(daysOfFood(g)).toBeLessThan(BOARD.foodBad);
     g.clock.t = 2;
+    g.disaster.phase = 'warning';   // (in peacetime it is calm yellow, see playtestFixes2.test.ts)
     const f2 = compoundBoard(g).vitals.find(v => v.id === 'food')!;
     expect(f2.first).toBeUndefined();
     expect(f2.tone).toBe('bad');

@@ -33,6 +33,7 @@ describe('whatToDo', () => {
   it('a red food vital leads with "Out of food in 3 days" and an Open food shelf click', () => {
     const g = newGame(5);
     g.clock.t = 2;   // past day 0
+    g.disaster.phase = 'warning';
     const b = compoundBoard(g);
     b.vitals = b.vitals.map(v => (v.id === 'food' ? { ...v, tone: 'bad' as const, n: 3 } : v));
     const w = whatToDo(g, { board: b });
