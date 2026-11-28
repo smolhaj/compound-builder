@@ -103,3 +103,24 @@ export function flickerCampfire(time: number, lit: number): void {
   m.opacity = 0.9 * lit;
   m.visible = lit > 0.02;
 }
+
+/**
+ * The level pad under the camp and its chore yard (local x from -1.05 to 1.0, z from -0.85 to 0.9, turned by a quarter turn at most): a
+ * square of about 44 ft with a skirt that eases back to the hill. Its level is the mean ground over it, drawn toward the level the drive
+ * ends at (`roadY`, the drive's own height beside the yard) by at most `PAD_TOWARD`: the drive's bench ends beside the yard,
+ * and a pad far from that level would have the road's cut bank bite a step into the yard.
+ */
+export const CAMP_PAD_HALF = 1.12, CAMP_PAD_SKIRT = 0.7, PAD_TOWARD = 0.3;
+export function campPadFor(camp: { x: number; z: number }, padHeight: (r: { x0: number; z0: number; x1: number; z1: number }) => number, roadY?: number): { x0: number; z0: number; x1: number; z1: number; y: number; skirt: number } {
+  const r = { x0: camp.x - CAMP_PAD_HALF, z0: camp.z - CAMP_PAD_HALF, x1: camp.x + CAMP_PAD_HALF, z1: camp.z + CAMP_PAD_HALF };
+  const mean = padHeight(r);
+  return { ...r, y: roadY === undefined ? mean : mean + Math.max(-PAD_TOWARD, Math.min(PAD_TOWARD, roadY - mean)), skirt: CAMP_PAD_SKIRT };
+}
+
+/** The mean height of the drive's stations within `r` of the camp (the stretch that ends beside its yard); the last station's when none is that near; undefined with no drive. */
+export function roadLevelNear(pts: ReadonlyArray<{ x: number; z: number; y: number }>, camp: { x: number; z: number }, r: number): number | undefined {
+  if (!pts.length) return undefined;
+  let a = 0, n = 0;
+  for (const q of pts) if (Math.hypot(q.x - camp.x, q.z - camp.z) < r) { a += q.y; n++; }
+  return n ? a / n : pts[pts.length - 1].y;
+}

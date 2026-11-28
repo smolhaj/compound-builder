@@ -6,6 +6,8 @@
 import * as THREE from 'three';
 import type { HomesteadWorld } from '../HomesteadWorld';
 
+import { PARCEL_SIZE as PARCEL_SIZE_FOR_AUDIT } from '../parcel/parcelTerrain';
+
 export interface Obj { kind: string; id: string; group: THREE.Object3D }
 export interface Viol { check: string; kind: string; id: string; detail: string; amount: number }
 
@@ -21,6 +23,7 @@ export function objectsOf(world: HomesteadWorld): Obj[] {
   for (const [id, b] of w._built) out.push({ kind: b.placed.kind, id, group: b.group });
   for (const [id, r] of w._runGroups) out.push({ kind: 'run', id, group: r.group });
   out.push({ kind: 'camp', id: 'camp', group: w._campGroup });
+  out.push({ kind: 'camp', id: 'yard', group: w._yard.group });
   return out;
 }
 
@@ -149,4 +152,32 @@ export function strayThings(world: HomesteadWorld, size: number): Spawn[] {
     else if (deep(p.x, p.z)) out.push({ what: 'person in deep water', id: p.id, x: p.x, z: p.z });
   }
   return out;
+}
+
+export interface CountyStats { /** the drive's first station against the county road's drawn surface at its edge (u) */ join: number; /** the tallest cut (+) or fill (-) of the road bed against the natural ground on the centre line (u) */ earth: number; bounceAt: number; /** the most the centre line strays from its own running mean (u), outside the bridges */ bounce: number; /** the steepest local grade at 0.25 u (rise over run) */ maxGrade: number; at: number; /** the most the surface stands above (+) or below (-) the drawn ground across the whole road width */ across: number }
+/**
+ * The county road's drawn centre line along z from `z0` to `z1` (the stretch a player sees): how much it bounces about its own running mean
+ * (a 6 u window) and its steepest local grade at 0.25 u sampling. Spans on bridges are left out (their deck is a straight line on purpose).
+ */
+export function countyStats(world: HomesteadWorld, z0 = -40, z1 = PARCEL_SIZE_FOR_AUDIT + 40): CountyStats {
+  const step = 0.25, n = Math.floor((z1 - z0) / step) + 1;
+  const zs: number[] = [], ys: number[] = [], ok: boolean[] = [];
+  for (let i = 0; i < n; i++) {
+    const z = z0 + i * step, x = world.county.x(z);
+    zs.push(z); ys.push(world.countyY(x, z));
+    ok.push(!world.countyGaps.some(g => z >= g.z0 - 1.5 && z <= g.z1 + 1.5));
+  }
+  let earth = 0, bounce = 0, bounceAt = z0, maxGrade = 0, at = z0, across = 0;
+  const W = Math.round(3 / step);
+  for (let i = 0; i < n; i++) {
+    if (!ok[i]) continue;
+    let a = 0, c = 0;
+    for (let k = -W; k <= W; k++) { const q = i + k; if (q < 0 || q >= n || !ok[q]) continue; a += ys[q]; c++; }
+    if (c === 2 * W + 1 && Math.abs(ys[i] - a / c) > bounce) { bounce = Math.abs(ys[i] - a / c); bounceAt = zs[i]; }
+    if (i > 0 && ok[i - 1]) { const gr = Math.abs(ys[i] - ys[i - 1]) / step; if (gr > maxGrade) { maxGrade = gr; at = zs[i]; } }
+    if (ok[i] && i % 4 === 0) { const e = world.parcel.natural(world.county.x(zs[i]), zs[i]).h - ys[i]; if (Math.abs(e) > Math.abs(earth)) earth = e; }
+    if (ok[i] && i % 4 === 0) for (const o of [-0.5, 0, 0.5]) { const d = ys[i] - world.groundAt(world.county.x(zs[i]) + o, zs[i]); if (Math.abs(d) > Math.abs(across)) across = d; }
+  }
+  const p0 = world.plan.pts[0], join = Math.abs(p0.y - world.groundAt(p0.x, p0.z));
+  return { join, earth, bounce, bounceAt, maxGrade, at, across };
 }

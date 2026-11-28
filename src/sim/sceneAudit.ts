@@ -13,7 +13,7 @@ import { REGION_IDS, type RegionId } from './regions';
 import { ParcelTerrain, PARCEL_SIZE } from '../game/parcel/parcelTerrain';
 import { pickCamp, type CampSpot } from '../game/parcel/campSpot';
 import { pinSeed } from './lotSeed';
-import { roadPlanFor } from './roadState';
+import { roadPlanFor, attachCountyBed } from './roadState';
 import { roadBedOf } from './roadPlan';
 import { bedMoves, type RoadBed } from './roadBed';
 import { accessFromPlan, distToLine, DRIVE_W, type Access } from '../game/region/access';
@@ -65,6 +65,7 @@ export function makeScene(site: Site, seed: number, label: string): Scene {
   const g = newGame(seed, undefined, undefined, { site });
   const ps = pinSeed(site, seed);
   const parcel = new ParcelTerrain(ps, { creek: site.creek, timber: site.timber, region: site.region, lot: site.lot ?? null, home: site.home });
+  attachCountyBed(parcel);
   const plan = roadPlanFor(site, seed, parcel);
   const access = accessFromPlan(plan), camp = pickCamp(parcel, site.home);
   const bed = roadBedOf(plan);

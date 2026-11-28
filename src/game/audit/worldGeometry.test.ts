@@ -32,6 +32,8 @@ const CORPUS: Array<[string, Site, number]> = FULL
 
 /** What counts as hovering: the lowest part of a building more than this above the drawn ground under it (u; 0.1 is 2 ft). */
 const HOVER = 0.1;
+/** The camp's low points above the drawn ground (u; 0.07 is under 17 inches). */
+const CAMP_HOVER = 0.07;
 
 describe('footing: a stem wall down to ground that falls away under a floor', () => {
   it('draws nothing on level ground and a wall to the ground where it falls away', () => {
@@ -54,8 +56,10 @@ function violations(a: ReturnType<typeof buildAuditWorld>): Array<[string, strin
   for (const m of nonFiniteMeshes(a.scene)) out.push(['non-finite', m]);
   // buildings stand on the drawn ground: no floor hovers over it (a wall-walk deck rides its wall; bunkers and the camp are their own cases)
   for (const o of objectsOf(world)) {
-    if (o.kind === 'camp' || o.kind === 'run' || o.kind.startsWith('bunker')) continue;
+    if (o.kind === 'run' || o.kind.startsWith('bunker')) continue;
     const c = clearance(o.group, world.groundAt);
+    // (the camp and its yard sit on their own level pad: the tent and the woodpile are on the ground, not up to 4 ft over it; a camp a dome has hidden is not drawn)
+    if (o.kind === 'camp') { if (o.group.visible && c.lowMax > CAMP_HOVER) out.push(['camp hover', `${o.id} ${c.lowMax.toFixed(2)} u at ${c.at.map(v => v.toFixed(1))}`]); continue; }
     if (c.nonFinite > 0 || c.lowMax > HOVER) out.push(['hover', `${o.kind} ${o.id} ${c.lowMax.toFixed(2)} u at ${c.at.map(v => v.toFixed(1))}`]);
   }
   // the terrain: no mesh normal points down, and the drawn surface is the parcel's own height function

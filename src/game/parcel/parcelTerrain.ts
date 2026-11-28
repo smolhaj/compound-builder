@@ -506,9 +506,24 @@ export class ParcelTerrain {
   /** The road's bench, cut banks and fill slopes (sim/roadBed.ts); null: no road built yet. */
   setRoadBed(bed: RoadBed | null): void { this._bed = bed && !bed.empty ? bed : null; }
   get roadBed(): RoadBed | null { return this._bed; }
+  private _county: RoadBed | null = null;
+  private _countyY: ((z: number) => number | null) | null = null;
+  /** The county road's own bench (sim/countyBed.ts), cut into the ground before the pads and the drive's bed; `profile` gives its height along z. */
+  setCountyBed(bed: RoadBed | null, profile?: { z0: number; step: number; y: Float64Array }): void {
+    this._county = bed && !bed.empty ? bed : null;
+    this._countyY = profile ? (z: number) => { const f = (z - profile.z0) / profile.step; if (f < 0 || f > profile.y.length - 1) return null; const i = Math.min(profile.y.length - 2, Math.floor(f)); return profile.y[i] + (profile.y[i + 1] - profile.y[i]) * (f - i); } : null;
+  }
+  get county(): RoadBed | null { return this._county; }
+  /** The county road's designed surface height at z (null beyond the graded stretch). */
+  countyProfileY(z: number): number | null { return this._countyY ? this._countyY(z) : null; }
 
   sample(x: number, z: number): ParcelSample {
     const s = this.natural(x, z);
+    const cb = this._county;
+    if (cb) {
+      const b = cb.bbox;
+      if (x >= b[0] && x <= b[2] && z >= b[1] && z <= b[3]) { const r = cb.apply(x, z, s.h); s.h = r.h; if (r.cleared) s.forest = 0; }
+    }
     for (const p of this._pads) {
       const d = Math.max(p.x0 - x, x - p.x1, p.z0 - z, z - p.z1, 0);
       if (d >= p.skirt) continue;
