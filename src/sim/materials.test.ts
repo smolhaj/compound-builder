@@ -18,3 +18,13 @@ describe('quantities for people', () => {
     expect(waitingFor({ seed: 0.001 })).toBe('Waiting for a little more material');
   });
 });
+
+describe('shortText', () => {
+  it('rounds piece goods up to a whole piece and leaves bulk goods alone', async () => {
+    const { shortText, billText } = await import('./materials');
+    expect(billText({ hardware: 0.08 })).toBe('0.08 door and window kits');
+    expect(shortText({ hardware: 0.08, rebar: 4 })).toBe('1 door and window kit, 4 rebar');
+    expect(shortText({ hardware: 1.2 })).toMatch(/^2 /);
+    expect(shortText({ seed: 0.5 })).toBe(billText({ seed: 0.5 }));
+  });
+});

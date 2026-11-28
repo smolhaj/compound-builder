@@ -55,6 +55,8 @@ export function WhatToDoCard() {
   useEffect(() => { useHudText.getState().set([...todo.rows.map(r => r.title), ...(feedText ? [feedText] : [])]); return () => useHudText.getState().set([]); }, [todo, feedText]);
   // a decision card is centered and wide: on a narrow window it would sit on top of this card, so the card steps aside for it
   const { vw } = useWindowSize(), plan = useOverlayPlan();
+  // the run is over (the report card is up): "Out of food in 999 days" behind it helps nobody
+  if (game.ending && !game.ending.continued) return null;
   if (!todo.rows.length || (topTier(plan) === 'blocking' && vw / scale < 1240)) return null;
   const toggle = () => setCollapsed(c => { const n = !c; try { localStorage.setItem(KEY, n ? '1' : '0'); } catch { /* private mode */ } return n; });
   const [main, ...rest] = todo.rows;

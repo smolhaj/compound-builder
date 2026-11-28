@@ -315,5 +315,14 @@ export function billText(bill: Partial<Stock>): string {
     .filter(Boolean).join(', ');
 }
 
+/** Goods that come in whole pieces: "waiting for 0.08 door and window kits" is read as "waiting for 1" (you cannot order a sliver of a kit). */
+const WHOLE_PIECES: ReadonlySet<MaterialId> = new Set<MaterialId>(['hardware', 'roofing', 'pipe', 'cable', 'rebar', 'membrane', 'fixtures', 'wire', 'tank', 'pump', 'septic_tank', 'solar_panel', 'battery', 'inverter', 'generator']);
+/** A shortfall as text: the piece goods rounded up to whole pieces, the rest as billText. */
+export function shortText(miss: Partial<Stock>): string {
+  const up: Partial<Stock> = {};
+  for (const [k, n] of Object.entries(miss) as Array<[MaterialId, number]>) up[k] = WHOLE_PIECES.has(k) && n > 0.005 ? Math.ceil(n - 1e-6) : n;
+  return billText(up);
+}
+
 /** "Waiting for ..." for a shortfall; a sliver that rounds to nothing still says so. */
-export const waitingFor = (miss: Partial<Stock>): string => `Waiting for ${billText(miss) || 'a little more material'}`;
+export const waitingFor = (miss: Partial<Stock>): string => `Waiting for ${shortText(miss) || 'a little more material'}`;

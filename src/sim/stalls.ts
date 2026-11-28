@@ -7,7 +7,7 @@
  * Pure. `waiters` is also the test oracle for `guidance.plansNeedLines` (the order button must cover every
  * material any waiting project lacks). The only saved state is `GameState.stalls` (project key -> first day seen waiting).
  */
-import { shortfall, MATERIALS, MATERIAL_IDS, billText, type MaterialId, type Stock } from './materials';
+import { shortfall, MATERIALS, MATERIAL_IDS, shortText, type MaterialId, type Stock } from './materials';
 import { onOrder, orderCost, orderProblem, prices } from './economy';
 import { blueprintOf, isFinished, roadWaiting } from './construction';
 import { runFinished, runBill, wallLength } from './perimeter';
@@ -133,7 +133,7 @@ export function stuckRows(s: GameState): StuckRow[] {
     .sort((a, b) => Number(b.w.home) - Number(a.w.home) || b.days - a.days)
     .map(({ w, days }) => {
       const lines = missLines(s, w.miss, pending), ok = lines.length > 0 && !orderProblem(s, lines);
-      return { key: w.key, at: w.at, label: w.label, days, what: billText(w.miss), lines: ok ? lines : null, cost: ok ? orderCost(lines, prices(s)) : 0 };
+      return { key: w.key, at: w.at, label: w.label, days, what: shortText(w.miss), lines: ok ? lines : null, cost: ok ? orderCost(lines, prices(s)) : 0 };
     });
 }
 
@@ -170,12 +170,12 @@ export function roadWait(s: GameState): { label: string; at: string | null; days
   const c = waiters(s).filter(w => roadWaiting(s, w.miss))
     .map(w => ({ w, days: Math.max(0, s.clock.t - (marks[w.key]?.since ?? s.clock.t)) }))
     .sort((a, b) => Number(b.w.home) - Number(a.w.home) || b.days - a.days)[0];
-  return c ? { label: c.w.label, at: c.w.at, days: Math.floor(c.days), what: billText(c.w.miss) } : null;
+  return c ? { label: c.w.label, at: c.w.at, days: Math.floor(c.days), what: shortText(c.w.miss) } : null;
 }
 
 const usd = (n: number) => '$' + Math.round(n).toLocaleString('en-US');
 /** "1 metal roofing" for order lines. */
-export const linesText = (lines: readonly OrderLine[]): string => billText(Object.fromEntries(lines.map(l => [l.material, l.qty])));
+export const linesText = (lines: readonly OrderLine[]): string => shortText(Object.fromEntries(lines.map(l => [l.material, l.qty])));
 /** "Order 1 metal roofing, $525". */
 export const stuckAction = (x: Stuck): string => `Order ${linesText(x.lines)}, ${usd(x.cost)}`;
 /** The same on a narrow button: "Order it, $525". */

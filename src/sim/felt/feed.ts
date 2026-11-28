@@ -182,7 +182,8 @@ export function feltFeed(s: GameState, ctx: FxCtx, spec: FeltSpec): string[] {
   for (const l of status) if (!oldStatus.has(l.id) && !seen.has(l.id)) { lines.push(l); seen.add(l.id); }
   const said = new Set((old?.lines ?? []).map(l => l.text));
   const news = d.news.filter(n => n.t >= (old?.at ?? d.hitAt) && n.t >= d.hitAt && !isRadioNews(n.text) && !said.has(n.text) && !lines.some(l => l.text === n.text)).slice(-2);
-  for (const n of news) lines.push({ id: `news.${n.t.toFixed(2)}`, text: n.text, tone: n.tone });
+  // (two items can share a time, and the id is a React key: the index keeps it unique)
+  news.forEach((n, i) => lines.push({ id: `news.${n.t.toFixed(2)}.${i}`, text: n.text, tone: n.tone }));
   const worse = lines.some(l => l.tone >= 2);
   lines = lines.map((l, i) => ({ l, i })).sort((a, b) => b.l.tone - a.l.tone || a.i - b.i).map(x => x.l).slice(0, FEED_CAP);
   if (!lines.length) {

@@ -46,8 +46,8 @@ export async function play(A) {
 
   let shopLogged = false, lastGoal = '', sameGoal = 0, maxSame = 0, shotsGate = 0, deathsSeen = 0, walled = false, rtDone = 0;
   const pol = style === 'careful'
-    ? { stance: c => c.pendKind === 'arrival' || c.pendKind === 'refugees' || c.pendKind === 'kin' || c.pendKind === 'shelter' ? [/^Take them in/, /^Open the house/] : c.pendKind === 'trader' ? [/^Trade/, /^Parley/] : [/^Defend/, /^Hold/, /^Parley/, /^Hide(?! panels)/, /^Warn off/] }
-    : { stance: c => [/^Turn them away/, /^Warn off/, /^Hide(?! panels)/, /^Pay/, /^Defend/] };
+    ? { stance: c => c.pendKind === 'arrival' || c.pendKind === 'refugees' || c.pendKind === 'kin' || c.pendKind === 'shelter' ? [/^Take them in/, /^Open the house/] : c.pendKind === 'trader' ? [/^Trade/, /^Parley/] : [/^Defend/, /^Accept the tithe/, /^Hold/, /^Parley/, /^Hide(?! panels)/, /^Warn off/] }
+    : { stance: c => [/^Turn them away/, /^Refuse/, /^Warn off/, /^Hide(?! panels)/, /^Pay/, /^Defend/] };
   const t0 = Date.now();
   const hook = async (s, i) => {
     const g = await goal(); trace(`d${s.day} $${s.money} alive${s.alive}/${s.total} b${s.built}/${s.planned} ${s.dphase} :: ${g.slice(0, 160)}`);
