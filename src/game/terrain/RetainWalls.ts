@@ -22,6 +22,10 @@ const COURSE = 0.055;       // 33 cm
 const EMBED = 0.03;         // the footing is bedded below the ground
 const BATTER = 0.14;        // the face leans back 1 : 7
 const COPING_T = 0.014;
+/** Where the back of a fill wall's stones ends (u out from the pad's edge): behind the leaning top course, so every upper course sits on the one below and none hangs behind it over the pad's edge (which the ground mesh rounds off). */
+const fillBack = (hMax: number): number => RW.SKIRT - DEPTH - (hMax + 0.3) * BATTER - 0.005;
+/** The same for a cut wall: its stones end behind the leaning top course, in the hill (u into it from the pad's edge). */
+const cutBack = (hMax: number): number => DEPTH + (hMax + 0.3) * BATTER + 0.005;
 const FOOT_OUT = 0.08;      // the footing reaches this far past the face (u, 48 cm): the ground there sets how low a fill wall is footed
 
 /** A coloured box, merged into the wall mesh. */
@@ -67,7 +71,9 @@ function stairParts(parts: THREE.BufferGeometry[], s: WallStair, ground: Ground,
   for (let k = 1; k <= n; k++) {
     const d0 = k === n ? 0 : RW.SKIRT + (n - k) * RW.RUN, d1 = RW.SKIRT + (n - k + 1) * RW.RUN, dm = (d0 + d1) / 2, ld = d1 - d0;
     const T = s.topY - (n - k) * rise, cx = s.x + s.dx * dm, cz = s.z + s.dz * dm;
-    const gy = Math.min(ground(cx, cz), ground(cx + px * W / 2, cz + pz * W / 2), ground(cx - px * W / 2, cz - pz * W / 2), ground(s.x + s.dx * d1, s.z + s.dz * d1));
+    // the lowest ground under the block, its cheeks and the step's whole run (a slope can drop away between the middle and either end or side)
+    let gy = Infinity;
+    for (const dd of [d0, dm, d1]) for (const lat of [-W / 2 - RW.CHEEK, -W / 2, 0, W / 2, W / 2 + RW.CHEEK]) gy = Math.min(gy, ground(s.x + s.dx * dd + px * lat, s.z + s.dz * dd + pz * lat));
     const low = Math.min(gy, T - 0.03) - 0.03;
     // riser block, the tread slab on it, a cheek stone at each side stepping up with the flight
     box(parts, cx, (low + T - 0.016) / 2, cz, ld, T - 0.016 - low, W - 0.012, yaw, stone(r, 0.6));
@@ -81,10 +87,10 @@ function stairParts(parts: THREE.BufferGeometry[], s: WallStair, ground: Ground,
  * a hill keeps falling there). It reads the world's own ground and not the plan's sample, because the ground can change after the wall is planned (the pad of
  * a building staked later grades the slope away under it). Returns the ground level (u), never above the plan's; `s` is the place along the side. Pure.
  */
-export function footAt(run: WallRun, ground: Ground, s: number, halfLen: number, planFoot: number, cut: boolean): number {
+export function footAt(run: WallRun, ground: Ground, s: number, halfLen: number, planFoot: number, cut: boolean, hMax = 0): number {
   const [tx, tz] = TAN[run.side], [nx, nz] = NOR[run.side], [ox, oz] = run.pts[0];
   let low = planFoot;
-  const outs = cut ? [0, DEPTH / 2, DEPTH, DEPTH + BATTER * 0.45] : [RW.SKIRT - DEPTH, RW.SKIRT, RW.SKIRT + FOOT_OUT];
+  const outs = cut ? [0, DEPTH / 2, DEPTH, DEPTH + BATTER * 0.45, cutBack(hMax)] : [fillBack(hMax), RW.SKIRT - DEPTH, RW.SKIRT, RW.SKIRT + FOOT_OUT];
   for (const ds of [-halfLen, 0, halfLen]) for (const out of outs) {
     const sc = s + ds;
     low = Math.min(low, ground(ox + tx * sc + nx * out, oz + tz * sc + nz * out));
@@ -109,8 +115,11 @@ function stretchNear(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun,
     return Math.abs(run.h[i]) * (1 - u) + Math.abs(run.h[i + 1]) * u;
   };
   const planBot = (H: number, cut: boolean): number => (cut ? plan.y : plan.y - H) - EMBED;
+  let hMax = 0;
+  for (let i = i0; i <= i1; i++) hMax = Math.max(hMax, Math.abs(run.h[i]));
+  const backFill = fillBack(hMax), backCut = cutBack(hMax);
   /** The foot of the wall at s: the plan's, or lower where the ground is lower than it was planned (falling away outside a fill wall, or graded away since). */
-  const bottomAt = (s: number, H: number, half = 0.05, cut = cutAt(s)): number => Math.min(planBot(H, cut), footAt(run, ground, s, half, planBot(H, cut) + EMBED, cut) - EMBED);
+  const bottomAt = (s: number, H: number, half = 0.05, cut = cutAt(s)): number => Math.min(planBot(H, cut), footAt(run, ground, s, half, planBot(H, cut) + EMBED, cut, hMax) - EMBED);
   // segments between the stairs
   const gaps = stairGaps(run, plan.stairs).filter(g => g[1] > sA && g[0] < sB);
   const spans: Array<[number, number]> = [];
@@ -141,7 +150,8 @@ function stretchNear(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun,
         any = true;
         // the face leans back with the batter; a stone may sit a little in from it, never proud of it
         const setback = (y0 - ref) * BATTER, face = cut ? setback : RW.SKIRT - setback;
-        const jit = r() * 0.008, dep = DEPTH, dc = cut ? face + jit + dep / 2 : face - jit - dep / 2;
+        const jit = r() * 0.008, front = cut ? face + jit : face - jit, back0 = cut ? backCut : backFill;
+        const dep = Math.abs(back0 - front), dc = (front + back0) / 2;
         const wx = ox + tx * sc + nx * dc, wz = oz + tz * sc + nz * dc;
         const low = Math.max(0, 1 - (y0 - bot) / 0.12);
         box(parts, wx, yb + hh / 2, wz, L - 0.004, hh, dep, yaw0, stone(r, low));
@@ -153,9 +163,11 @@ function stretchNear(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun,
     // the coping: flat slabs along the top, a little proud of the face and the back
     const n1 = Math.max(1, Math.round((b - a) / 0.13));
     for (let q = 0; q < n1; q++) {
-      const s0 = a + (b - a) * q / n1, s1 = a + (b - a) * (q + 1) / n1, sc = (s0 + s1) / 2, cut = cutAt(sc), H = Hat(sc), bot = planBot(H, cut), top = bot + H + EMBED;
-      const setback = (top - bot) * BATTER, face = cut ? setback : RW.SKIRT - setback, dd = DEPTH + 0.03;
-      const dc = cut ? face + DEPTH / 2 : face - DEPTH / 2;
+      const s0 = a + (b - a) * q / n1, s1 = a + (b - a) * (q + 1) / n1, sc = (s0 + s1) / 2, cut = cutAt(sc), H = Hat(sc), top = planBot(H, cut) + H + EMBED;
+      const setback = (top - ref) * BATTER, face = cut ? setback : RW.SKIRT - setback;
+      let dd = 0;   // (leaning back from the same base as the courses: from the plan's foot it would stand proud of them wherever the footing went deeper)
+      const dc = cut ? (face - 0.015 + backCut) / 2 : (face + 0.015 + backFill) / 2;
+      dd = cut ? backCut - face + 0.015 : face + 0.015 - backFill;
       box(parts, ox + tx * sc + nx * dc, top + COPING_T / 2 - 0.002, oz + tz * sc + nz * dc, (s1 - s0) - 0.004, COPING_T, dd, yaw0, new THREE.Color().setHSL(0.1, 0.03, 0.17 + 0.06 * r()));
     }
     // weep holes: a dark square low in the face every couple of metres, with a lip of drain pipe
@@ -202,7 +214,25 @@ export function wallGeometry(plan: PadPlan, k: number, ground: Ground, seed: num
 
 const DIST: Record<Quality, number> = { high: 24, medium: 17, low: 10 };
 
-interface WallEntry { plan: PadPlan; k: number; seed: number; built: string; near: THREE.Mesh | null; far: THREE.Mesh | null; isFar: boolean }
+/**
+ * A fingerprint of the ground a wall is footed in (what `footAt` reads under every sample of every run, to the half-centimeter). A wall is drawn from the
+ * ground as it was when it was built; when the ground there changes afterward (the pad of a building staked later grades the slope away beside it) the
+ * fingerprint changes and the wall is footed again. Pure.
+ */
+export function wallGroundSig(plan: PadPlan, ground: Ground): string {
+  let h = 0, n = 0;
+  for (const run of plan.runs) {
+    const seg = Math.hypot(run.pts[1][0] - run.pts[0][0], run.pts[1][1] - run.pts[0][1]);
+    for (let i = 0; i < run.h.length; i++) {
+      const cut = run.h[i] > 0;
+      h = (h * 31 + Math.round(footAt(run, ground, i * seg, seg / 2, 1e3, cut, plan.maxH) * 200)) | 0;
+      n++;
+    }
+  }
+  return `${n}:${h}`;
+}
+
+interface WallEntry { plan: PadPlan; k: number; seed: number; built: string; gsig: string; near: THREE.Mesh | null; far: THREE.Mesh | null; isFar: boolean }
 
 /** All the walls on the place: builds and swaps their meshes, answers what a walker may cross. */
 export class RetainWallLayer {
@@ -212,6 +242,7 @@ export class RetainWallLayer {
   /** Counts up when a wall is added, removed or finishes (the people's routes and the trails plan again). */
   version = 0;
   private _clock = 0;
+  private _sigClock = 0;
 
   constructor() { this.group.name = 'retaining_walls'; }
 
@@ -226,7 +257,7 @@ export class RetainWallLayer {
       have.plan = plan; have.k = kq;
       if (changed) this.version++;
     } else {
-      this._walls.set(id, { plan, k: kq, seed, built: '', near: null, far: null, isFar: false });
+      this._walls.set(id, { plan, k: kq, seed, built: '', gsig: '', near: null, far: null, isFar: false });
       this.version++;
     }
   }
@@ -243,6 +274,7 @@ export class RetainWallLayer {
     for (const m of [w.near, w.far]) if (m) { this.group.remove(m); m.geometry.dispose(); }
     w.near = w.far = null;
     w.built = '';
+    w.gsig = '';
   }
 
   /** Walls this far along (> 0.5): the ones that stop a walk. */
@@ -268,12 +300,18 @@ export class RetainWallLayer {
   /** Rebuild what changed (a couple of walls a frame) and swap near / far by the camera's distance. */
   update(cam: THREE.Vector3, tier: Quality, ground: Ground, dt: number, budget = 2): void {
     this._clock -= dt;
+    this._sigClock -= dt;
     let built = 0;
+    // the ground may have been regraded since a wall was drawn: look again twice a second and foot the walls whose ground moved
+    const probe = this._sigClock <= 0;
+    if (probe) this._sigClock = 0.5;
     for (const [id, w] of this._walls) {
+      if (probe && w.built) { const g = wallGroundSig(w.plan, ground); if (w.gsig && g !== w.gsig) w.built = ''; else w.gsig = g; }
       const key = `${w.k}|${w.plan.y.toFixed(3)}|${w.plan.rect.x0.toFixed(2)},${w.plan.rect.z0.toFixed(2)}`;
       if (key !== w.built && built < budget) {
         this._dispose(w);
         w.built = key;
+        w.gsig = wallGroundSig(w.plan, ground);
         built++;
         const mk = (detail: 'near' | 'far'): THREE.Mesh | null => {
           const g = wallGeometry(w.plan, w.k, ground, w.seed, detail);

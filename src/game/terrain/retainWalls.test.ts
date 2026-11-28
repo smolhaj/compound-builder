@@ -203,3 +203,83 @@ describe('a wall follows ground that was graded away after it was planned', () =
     expect(now.hi).toBeCloseTo(was.hi, 2);
   });
 });
+
+describe('the wall layer foots a standing wall again when its ground is regraded', () => {
+  // a wall is built; later a neighbour's pad takes 0.35 u off the slope in front of the north (cut) side and drops the ground past the south (fill) side
+  let lowered = false;
+  const g2 = (x: number, z: number): number => ground(x, z) - (lowered ? 0.6 * Math.max(0, Math.min(1, (plan.rect.z0 - z) / 0.3)) + 0.6 * Math.max(0, Math.min(1, (z - plan.rect.z1) / 0.3)) : 0);
+  const gaps = (layer: RetainWallLayer): number => {
+    const m = layer.group.children.find(c => c.name.endsWith('_near')) as THREE.Mesh, pos = m.geometry.attributes.position;
+    const cells = new Map<string, number>();
+    for (let i = 0; i < pos.count; i++) { const k = `${Math.round(pos.getX(i) / 0.1)},${Math.round(pos.getZ(i) / 0.1)}`; cells.set(k, Math.min(cells.get(k) ?? Infinity, pos.getY(i))); }
+    let worst = -Infinity;
+    for (const [k, y] of cells) { const [cx, cz] = k.split(',').map(Number); if (Math.abs(cx * 0.1) > 0.6 || cz * 0.1 < plan.rect.z0 - 0.07 || cz * 0.1 > plan.rect.z1 + RW.SKIRT) continue;   /* the face and foot of the north and south walls, not the coping's lip past a cut wall's back */ worst = Math.max(worst, y - g2(cx * 0.1, cz * 0.1)); }
+    return worst;
+  };
+  it('no stone hangs in the air after the ground under it moved, and the unchanged ground is left alone', () => {
+    const layer = new RetainWallLayer(), cam = new THREE.Vector3(0, 5, 0);
+    layer.set('a', plan, 1, 1);
+    layer.update(cam, 'high', g2, 0.1);
+    const before = (layer.group.children.find(c => c.name.endsWith('_near')) as THREE.Mesh).geometry;
+    layer.update(cam, 'high', g2, 1);
+    expect((layer.group.children.find(c => c.name.endsWith('_near')) as THREE.Mesh).geometry).toBe(before);   // (nothing moved: not rebuilt)
+    lowered = true;
+    expect(gaps(layer)).toBeGreaterThan(0.1);                        // the wall as built now hangs over the dug slope
+    layer.update(cam, 'high', g2, 1);
+    layer.update(cam, 'high', g2, 1);
+    expect(gaps(layer)).toBeLessThanOrEqual(0.07);
+    lowered = false;
+    layer.dispose();
+  });
+});
+
+describe('no stone, coping slab or tread of a wall hangs over the ground it stands on', () => {
+  /** Every downward-facing face of every box (weep-hole squares aside): a point of it 6 cm in from the edge must have the ground within 3 cm, or another box of the wall right below it. Returns the worst gap in the air (u). */
+  const worstHover = (plan: ReturnType<typeof planPad>, gr: (x: number, z: number) => number, seed: number): number => {
+    const g = wallGeometry(plan, 1, gr, seed, 'near')!, pos = g.getAttribute('position'), nor = g.getAttribute('normal');
+    const mesh = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    mesh.updateMatrixWorld(true);
+    const ray = new THREE.Raycaster(), dn = new THREE.Vector3(0, -1, 0);
+    let worst = 0;
+    for (let b = 0; b < pos.count / 36; b++) {
+      const box = new THREE.Box3();
+      for (let v = b * 36; v < b * 36 + 36; v++) box.expandByPoint(new THREE.Vector3(pos.getX(v), pos.getY(v), pos.getZ(v)));
+      if (box.max.x - box.min.x < 0.045 && box.max.z - box.min.z < 0.045) continue;   // (a weep hole is a dark square set in the face, not a stone)
+      for (let t = b * 36; t < b * 36 + 36; t += 3) {
+        if (nor.getY(t) > -0.9) continue;
+        const cx = (pos.getX(t) + pos.getX(t + 1) + pos.getX(t + 2)) / 3, cz = (pos.getZ(t) + pos.getZ(t + 1) + pos.getZ(t + 2)) / 3, y = pos.getY(t);
+        const tri = [0, 1, 2].map(i => [pos.getX(t + i), pos.getZ(t + i)]);
+        for (const [x, z] of [[cx, cz], ...tri.map(([px, pz]) => { const d = Math.hypot(cx - px, cz - pz) || 1, k = Math.min(0.06, 0.9 * d) / d; return [px + (cx - px) * k, pz + (cz - pz) * k]; })]) {
+          const gap = y - gr(x, z);
+          if (gap <= 0.03) continue;
+          ray.set(new THREE.Vector3(x, y - 0.004, z), dn); ray.far = 3;
+          if (ray.intersectObject(mesh).length) continue;
+          worst = Math.max(worst, gap);
+        }
+      }
+    }
+    g.dispose();
+    return worst;
+  };
+  it('on eight different hillsides, drawn on the ground mesh as it is (cells 0.35 u on High, 0.8 u on Low, which round off the pad\'s edge)', () => {
+    for (const cell of [0.35, 0.8]) for (let seed = 1; seed <= 8; seed++) {
+      const a = 0.1 + (seed % 7) * 0.08, b = ((seed * 13) % 11 - 5) * 0.08, c = (seed % 5) * 0.02;
+      const nat = (x: number, z: number) => 10 + a * z + b * x + c * Math.sin(x * 7 + seed) * Math.cos(z * 5);
+      const p = planPad({ x0: -0.55, z0: -0.9, x1: 0.55, z1: 0.9 }, nat);
+      const exact = (x: number, z: number): number => {
+        const d = Math.max(p.rect.x0 - x, x - p.rect.x1, p.rect.z0 - z, z - p.rect.z1, 0);
+        if (d >= p.skirt) return nat(x, z);
+        const t = d / p.skirt, k = 1 - t * t * (3 - 2 * t);
+        return nat(x, z) + (p.y - nat(x, z)) * k;
+      };
+      // the terrain mesh: the exact ground at the grid's corners, two triangles per cell between them
+      const ph = ((seed * 0.37) % 1) * cell;
+      const mesh = (x: number, z: number): number => {
+        const fx = (x - ph) / cell, fz = (z - ph) / cell, i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
+        const g = (ii: number, jj: number): number => exact(ii * cell + ph, jj * cell + ph);
+        return u + v < 1 ? g(i, j) + u * (g(i + 1, j) - g(i, j)) + v * (g(i, j + 1) - g(i, j)) : g(i + 1, j + 1) + (1 - u) * (g(i, j + 1) - g(i + 1, j + 1)) + (1 - v) * (g(i + 1, j) - g(i + 1, j + 1));
+      };
+      expect(worstHover(p, mesh, seed), `hillside ${seed} on ${cell} u cells has a stone in the air`).toBeLessThanOrEqual(0.03);
+    }
+  }, 60000);
+});
