@@ -264,6 +264,15 @@ export function dwellingFor(s: GameState, n: number): { id: string; name: string
   return null;
 }
 
+/** The one line under "a spare bed" / "the cottage": never "only 0 beds free" (no bed at all reads as couches and floor). */
+export function bedLine(free: number, n: number, dwelling: boolean): string {
+  const beds = (k: number) => `${k} bed${k === 1 ? '' : 's'}`;
+  if (dwelling) return free <= 0 ? 'Free, today · a door of their own, no beds free: couches and the floor' : `Free, today · a door of their own, ${beds(free)} free in all`;
+  if (free >= n) return `Free, today · ${beds(free)} free`;
+  if (free <= 0) return 'Free, today · no bed free: they sleep on couches and the floor';
+  return `Free, today · only ${beds(free)} free: the rest on couches and the floor`;
+}
+
 /** The options on the join card for this party, best first. */
 export function stayOptions(s: GameState, e: Pick<Encounter, 'people' | 'extras' | 'brings' | 'kind' | 'kin'>): StayOption[] {
   const people = e.people ?? [];
@@ -280,7 +289,7 @@ export function stayOptions(s: GameState, e: Pick<Encounter, 'people' | 'extras'
   const free = plan.bedsFree;
   const dw = dwellingFor(s, n);
   out.push({ kind: 'bed', label: dw ? `The ${dw.name}` : 'A spare bed', off: null,
-    line: dw ? `Free, today · a door of their own, ${free} bed${free === 1 ? '' : 's'} free in all` : free >= n ? `Free, today · ${free} bed${free === 1 ? '' : 's'} free` : `Free, today · only ${free} bed${free === 1 ? '' : 's'} free: the rest on couches and the floor`,
+    line: bedLine(free, n, !!dw),
     tip: `They sleep wherever the housing plan finds room: beds first, then couches, floor bags, tents. A guest house or cottage with beds left is used first for relatives and elders. ${free >= n ? 'There is room.' : 'Crowding wears on sleep and morale.'}` });
 
   // 2. their own rig

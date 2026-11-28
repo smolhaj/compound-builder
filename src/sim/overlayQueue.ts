@@ -13,6 +13,8 @@ export interface OverlayInputs {
   ending: boolean;
   /** A raid cutscene is on: it owns the screen, except for its own stance prompt. */
   cutscene: 'none' | 'prompt' | 'playing';
+  /** The raid cutscene is showing its aftermath report: a run that just ended waits behind it (both on screen at once covered the report card's buttons). */
+  aftermath?: boolean;
   /** A decision card is waiting (someone at the gate, an event). */
   decision: boolean;
   /** "The day it happened" is waiting. */
@@ -57,7 +59,7 @@ export interface OverlayPlan {
 export function overlayPlan(i: OverlayInputs): OverlayPlan {
   const off = { gate: false, ending: false, hitMoment: false, dayCard: false, feltCard: false, recap: false, milestone: false, decisionWaiting: i.decision, welcome: false };
   if (i.title) return off;
-  if (i.ending) return { ...off, ending: true };
+  if (i.ending && !(i.aftermath && i.cutscene !== 'none')) return { ...off, ending: true };
   if (i.cutscene !== 'none') return { ...off, gate: true };
   const gate = i.decision;
   const hitMoment = !gate && !!i.hitMoment;
