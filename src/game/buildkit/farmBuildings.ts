@@ -197,7 +197,7 @@ function solarFarm(def: KitPieceDef, seed = 1): THREE.Group {
   // openings: the inverter pad at the corner (three 6 kW units on a rack), combiner box, conduit run, the disconnect and a grounding rod
   p.layer = 'openings';
   const ix = half + 0.5 * M, iz = D / 2 - 1.0 * M;
-  p.add('concrete', box(1.8 * M, 0.06 * M, 1.0 * M, ix + 0.5 * M, -0.01, iz));
+  p.add('concrete', box(1.8 * M, 0.4 * M, 1.0 * M, ix + 0.5 * M, -0.005 - 0.2 * M, iz));   // (the inverter slab: a block 0.4 m deep with its top where the thin slab's was, so on a slope its downhill edge reaches the ground and the uphill one is buried; geometry audit: the thin slab hovered 0.08 u)
   for (let k = 0; k < 3; k++) {
     p.add('enamel', box(0.5 * M, 0.7 * M, 0.2 * M, ix + (0.1 + k * 0.55) * M, 0.06 * M, iz - 0.2 * M));
     p.add('paint_green', box(0.08 * M, 0.04 * M, 0.01 * M, ix + (0.1 + k * 0.55) * M, 0.5 * M, iz - 0.09 * M));

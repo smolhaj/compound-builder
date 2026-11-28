@@ -28,7 +28,7 @@ import { buildFarmstead, type FarmTree } from '../engine/world/houses/regionalFa
 import { onFarmstead, type Farmstead } from '../engine/world/houses/farmstead';
 import { planNeighbors } from './region/neighbors';
 import type { PlaceHost } from './felt/markPlacement';
-import { buildCamp } from './props/campGeometry';
+import { buildCamp, campPadFor, roadLevelNear } from './props/campGeometry';
 import { Atmosphere, type AtmosBuilding, type AtmosFrame } from './atmosphere/Atmosphere';
 import { PathLayer } from './paths/PathLayer';
 import { LivedLayer } from './lived/LivedLayer';
@@ -130,8 +130,8 @@ import { pickCamp } from './parcel/campSpot';
 import { DRIVE_W, accessFromPlan, distToLine, type Access } from './region/access';
 import { ROAD_W, countyRoad, roadLine, type CountyRoad } from './region/countyRoad';
 import { buildRoadWorks, buildCountyBridges } from './region/roadWorks';
-import { deckY, onGap, type CountyGap } from '../sim/countyCrossings';
-import { countyGapsFor, roadPlanFor } from '../sim/roadState';
+import { onGap, type CountyGap } from '../sim/countyCrossings';
+import { attachCountyBed, countyDeckY, countyGapsFor, roadPlanFor } from '../sim/roadState';
 import { pinSeed } from '../sim/lotSeed';
 import { PlowRun } from './fx/PlowRun';
 import { plowRig } from '../sim/plowing';
@@ -311,6 +311,8 @@ export class HomesteadWorld {
   private readonly _campGroup: THREE.Group;
   /** The camp's own ground level (before a dome's level pad took the ground under it). */
   private _campY0 = 0;
+  /** The camp's level pad: always the last of the parcel's pads, so a neighbor's grading (a building's pad, a dome's) never takes the ground out from under the tent. */
+  private _campPad: Pad | null = null;
   /** The chore yard round the camp (sim/daily.ts). */
   private readonly _yard: Yard;
   readonly family: FamilyRenderer;
@@ -393,6 +395,7 @@ export class HomesteadWorld {
     ws.setSite({ x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE });
     this.home = { ...site.home };
     this.parcel = new ParcelTerrain(seed, { creek: site.creek, timber: site.timber, region: site.region, lot: site.lot ?? null, home: site.home });
+    attachCountyBed(this.parcel);   // the county road is graded into the ground (sim/countyBed.ts) before anything reads the ground
     setGroundProbe((x, z) => this.parcel.natural(x, z).h);
     setRoadSightProbe(() => this._roadSightK());
     this.regionWorld = this.parcel.world;
@@ -425,9 +428,13 @@ export class HomesteadWorld {
     this.contact = new ContactShadows(ws.scene);
     this.livestock = new LivestockRenderer(ws.scene, this.contact);
     this._campGroup = buildCamp({ fire: false });
-    this._campGroup.position.set(this.camp.x, this.parcel.height(this.camp.x, this.camp.z), this.camp.z);
-    // on a slope (a hillside or the island's knoll) the tent's uphill wall and the woodpile's tin sheet sink into the ground: raise the camp (and its yard) toward the highest ground under it, by at most about 40 cm (more would float the downhill side)
-    { const y0 = this._campGroup.position.y; let up = 0; for (let k = 0; k < 8; k++) up = Math.max(up, this.parcel.height(this.camp.x + Math.cos(k * Math.PI / 4) * 0.9, this.camp.z + Math.sin(k * Math.PI / 4) * 0.9) - y0); this._campGroup.position.y = y0 + Math.min(up, 0.07); }
+    // the camp stands on a small level pad (a graded yard with its skirt, like a building's), so on a slope neither the tent's downhill wall nor the woodpile's end hovers and the uphill side does not sink into the hill (geometry audit: they hovered up to 0.22 u, about 4 ft)
+    {
+      const campPad = campPadFor(this.camp, c => this.parcel.padHeight(c.x0, c.z0, c.x1, c.z1), roadLevelNear(this.plan.pts, this.camp, 2.2));
+      this._campPad = campPad;
+      this.parcel.setPads([...this.parcel.pads, campPad]);
+      this._campGroup.position.set(this.camp.x, campPad.y, this.camp.z);
+    }
     this._campY0 = this._campGroup.position.y;
     this._campGroup.rotation.y = this.camp.rot;
     this._root.add(this._campGroup);
@@ -786,9 +793,7 @@ export class HomesteadWorld {
   /** The county road's own bridges: where it crosses water or a cut, found from the ground and the creek. */
   private _findCountyGaps(): CountyGap[] { return countyGapsFor(this.parcel, this.county); }
   private _deckY(g: CountyGap, z: number): number {
-    const cz = this.parcel.hasStream ? this.parcel.creek : null, ly = this.parcel.lakeY;
-    const water = Math.max(cz ? cz.waterY(this.county.x(z)) : -Infinity, ly ?? -Infinity);
-    return deckY(g, z, g.wet ? water + 0.35 : -Infinity);
+    return countyDeckY(this.parcel, this.county, g, z);
   }
   /** Height of the county road's surface at (x, z): the deck over a gap, else the ground. */
   countyY(x: number, z: number): number {
@@ -1925,7 +1930,7 @@ export class HomesteadWorld {
     });
     let y = padLevel;
     // a dome's pad goes under the pads already graded, so the buildings that stand in it keep their own level
-    if (pad) this.parcel.setPads(gradedDome ? [pad, ...this.parcel.pads] : [...this.parcel.pads, pad]);
+    if (pad) { const rest = this.parcel.pads.filter(q => q !== this._campPad), cp = this._campPad ? [this._campPad] : []; this.parcel.setPads(gradedDome ? [pad, ...rest, ...cp] : [...rest, pad, ...cp]); }
     if (def.level === 'cover') { const d = domeFrom(p as unknown as Structure); if (d) { this._domeLite.set(p.id, { x: d.x, z: d.z, r: d.r, airlocks: d.airlocks }); this._snapCamp(); } }
     if (pad && gradedDome) { this._domeLevels.set(p.id, { x0: pad.x0, z0: pad.z0, x1: pad.x1, z1: pad.z1, y: pad.y }); this._snapCamp(); }
     const opts: BuildOpts = {};
@@ -2047,10 +2052,10 @@ export class HomesteadWorld {
   private readonly _domeLevels = new Map<string, { x0: number; z0: number; x1: number; z1: number; y: number }>();
   private readonly _harden = new Map<string, { key: string; tiers: NonNullable<Structure['hardening']> }>();
 
-  /** The camp and its chore yard stand on the ground they were built on; when a dome's level pad takes that ground (the camp lies inside it) they stand on the pad instead, so nothing hovers over, or sinks into, the graded lawn. */
+  /** The camp and its chore yard stand on their own level pad (the last pad, over a dome's); a camp that would clip a dome is not drawn. */
   private _snapCamp(): void {
-    let y = this._campY0, hide = false;
-    for (const d of this._domeLevels.values()) if (this.camp.x >= d.x0 && this.camp.x <= d.x1 && this.camp.z >= d.z0 && this.camp.z <= d.z1) { y = d.y; break; }
+    const y = this._campY0;   // (the camp's own level pad is the top of the ground there, over a dome's pad)
+    let hide = false;
     for (const d of this._domeLite.values()) if (campClashesDome(this.camp, d)) { hide = true; break; }
     this._campGroup.position.y = y; this._yard.group.position.y = y;
     // (a camp that would clip a dome's shell, entrance module or lane is not drawn there)

@@ -642,6 +642,12 @@ function finish(inp: RoadInput, style: RoadStyle, grid: GridData, found: Search 
     else if (sx.kind === 'culvert' || sx.kind === 'arch_culvert') { for (let i = i0; i <= i1; i++) y0[i] = Math.max(y0[i], (creek ? creek.waterY(st[i][0]) : y0[i]) + 0.55); }
   }
   anchor[0] = 0;
+  // the drive leaves the county road at the road's own height (the county bench is in the ground): the first stations ease from the edge's level into the averaged profile, so the join has no step or bump
+  if (!kindAt[0]) {
+    const e0 = gz[0];
+    for (let i = 0; i < n && s[i] < 2.5; i++) if (!anchor[i]) y0[i] = e0 + (y0[i] - e0) * sst(0, 2.5, s[i]);
+    anchor[0] = 1;
+  }
   // hairpins from the heading change
   const head = new Float64Array(n);
   for (let i = 0; i < n; i++) head[i] = rotAt(i);
