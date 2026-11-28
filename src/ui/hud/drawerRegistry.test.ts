@@ -8,7 +8,7 @@ describe('drawer registry', () => {
     expect(new Set(DRAWER_IDS).size).toBe(DRAWER_IDS.length);
     for (const t of RIGHT_TABS) expect(DRAWER_IDS).toContain(t);
     for (const t of ['build', 'projects', 'log', 'board']) expect(DRAWER_IDS).toContain(t);
-    expect(DRAWERS.length).toBe(RIGHT_TABS.length + 4);   // + the Board drawer, and Log as its page
+    expect(DRAWERS.length).toBe(RIGHT_TABS.length + 5);   // + the Board drawer, Log as its page, and the Field Guide
   });
   it('hosts left tabs in the left panel body and right tabs in the right one', () => {
     for (const t of RIGHT_TABS) expect(hostOf(t)).toBe('right');
@@ -21,6 +21,11 @@ describe('drawer registry', () => {
     for (const c of ['KeyV', 'KeyU', 'KeyH', 'KeyR', 'KeyW', 'KeyA', 'KeyQ', 'KeyE', 'KeyC']) expect(codes).not.toContain(c);
     for (const d of DRAWERS) expect(d.code).toBe('Key' + d.key);
     expect(drawerForCode('KeyB')).toBe('build'); expect(drawerForCode('KeyH')).toBeNull();
+  });
+  it('the Field Guide opens with I, has no action-bar button (the bar widths are measured without it) and is a drawer like the rest', () => {
+    expect(drawerDef('guide')).toMatchObject({ key: 'I', code: 'KeyI', label: 'Field Guide', title: 'Field Guide', host: 'guide', bar: false });
+    expect(drawerForCode('KeyI')).toBe('guide');
+    expect(DRAWERS.filter(d => d.bar === false).map(d => d.id)).toEqual(['guide']);
   });
   it('knows ids', () => { expect(isDrawerId('land')).toBe(true); expect(isDrawerId('board')).toBe(true); expect(isDrawerId('nope')).toBe(false); expect(resolveDrawer('log')).toEqual({ id: 'board', page: 'log' }); expect(resolveDrawer('land')).toEqual({ id: 'land' }); expect(drawerDef('chronicle').title).toBe('Years'); });
 });

@@ -29,7 +29,9 @@ const YEARS = [5, 6, 7, 8, 10, 12, 15];
 const REGIONS = REGION_IDS.filter(r => PLAYABLE.has(r)) as RegionId[];
 export const KINDS = Object.keys(DISASTERS) as DisasterKind[];
 
-export interface SoakSpec { kind: DisasterKind; j: number; seed: number; region: RegionId; diff: (typeof DIFFS)[number]; life: (typeof LIVES)[number]; strat: Strategy; peace: 'short' | 'medium'; years: number }
+export interface SoakSpec { kind: DisasterKind; j: number; seed: number; region: RegionId; diff: (typeof DIFFS)[number]; life: (typeof LIVES)[number]; strat: Strategy; peace: 'short' | 'medium'; years: number; start?: StartKind }
+export type StartKind = 'ordinary' | 'founder' | 'magnate' | 'sandbox' | 'god'
+export const STARTS: StartKind[] = ['founder', 'magnate', 'sandbox', 'god']
 export function specFor(kind: DisasterKind, j: number, years?: number): SoakSpec {
   const k = KINDS.indexOf(kind);
   return { kind, j, seed: 20_000 + j * 131 + k * 7, region: REGIONS[(j + k) % REGIONS.length], diff: DIFFS[j % 3], life: LIVES[(j + k) % LIVES.length], strat: STRATS[(j + 2 * k) % STRATS.length], peace: (j + k) % 2 ? 'short' : 'medium', years: years ?? YEARS[(j * 3 + k) % YEARS.length] };
@@ -43,6 +45,9 @@ const roll = (a: number, b: number) => { let h = (a * 73856093) ^ (b * 19349663)
 /** One game, checked every day. `hashes` collects a state hash every 60 days (for the determinism comparison). */
 export function soakRun(spec: SoakSpec, opt: { roundTrips?: boolean; hashes?: string[]; verbose?: boolean } = {}): SoakRecord {
   process.env.DIFF = spec.diff; process.env.LIFESTYLE = spec.life;
+  const st = spec.start ?? 'ordinary';
+  if (st === 'founder' || st === 'magnate') process.env.RICH = st; else delete process.env.RICH;
+  if (st === 'sandbox' || st === 'god') process.env.START_MODE = st; else delete process.env.START_MODE;
   const fails = new Map<string, { code: string; day: number; detail: string; count: number }>();
   const note = (day: number, v: Violation) => { const f = fails.get(v.code); if (f) f.count++; else fails.set(v.code, { code: v.code, day, detail: v.detail.slice(0, 300), count: 1 }); if (opt.verbose) appendFileSync(process.env.SOAK_VERBOSE_OUT ?? '/tmp/soak-verbose.txt', `d${day} ${v.code}: ${v.detail}\n`); };
   let prev: Summary | undefined, checks = 0, trips = 0, peak = 0, minMoney = 1e12, foodMin = 1e9, lastDay = 0, ending = 'running', error: string | null = null;
@@ -76,7 +81,7 @@ export function soakRun(spec: SoakSpec, opt: { roundTrips?: boolean; hashes?: st
   } catch (e) {
     error = `${(e as Error).message}\n${String((e as Error).stack ?? '').split('\n').slice(1, 5).join('\n')}`.slice(0, 700);
     note(lastDay, { code: 'exception', detail: error });
-  } finally { HOOKS.day = HOOKS.stance = undefined; }
+  } finally { HOOKS.day = HOOKS.stance = undefined; delete process.env.RICH; delete process.env.START_MODE; }
   if (res) {
     ending = res.ending;
     // (a joiner who is taken in brings cash, up to six figures: play()'s 'money jumped' check is not a bug for the soak)
@@ -129,6 +134,22 @@ describe.skipIf(!SOAK)('soak: every scenario x many seeds, invariants after ever
   }, 24 * 3_600_000);
 });
 
+// Rich starts (Founder / Magnate) and the unscripted modes (Free build, God Mode): a few years each, every invariant, round trips, determinism.
+describe.skipIf(!process.env.SOAK_STARTS)('soak: rich, sandbox and God Mode starts', () => {
+  it('plays them', () => {
+    const out = process.env.SOAK_OUT ?? '/tmp/soak-starts.jsonl', seeds = Number(process.env.SOAK_STARTS), [sh, shn] = (process.env.SOAK_SHARD ?? '0/1').split('/').map(Number);
+    const kinds = (process.env.SOAK_KINDS?.split(',') ?? ['grid_down', 'lawless', 'pandemic', 'nuclear']) as DisasterKind[];
+    let idx = 0;
+    for (const start of STARTS) for (const kind of kinds) for (let j = 0; j < seeds; j++, idx++) {
+      if (idx % shn !== sh) continue;
+      const spec = { ...specFor(kind, j, process.env.SOAK_YEARS ? Number(process.env.SOAK_YEARS) : 3), start };
+      const rec = soakRun(spec, { roundTrips: true });
+      if (j % 2 === 0 && !rec.error) { const d = determinismBreak(spec); rec.deterministic = d === null; if (d) rec.failures.push({ code: 'nondeterministic', day: 0, detail: d, count: 1 }); }
+      appendFileSync(out, JSON.stringify(rec) + '\n');
+    }
+  }, 24 * 3_600_000);
+});
+
 // The fast subset (ordinary `npm test`): a handful of scenarios x a seed, a few simulated months each, every invariant, one save round trip, one determinism pair.
 describe.skipIf(!!SOAK)('soak (fast subset)', () => {
   const FAST: DisasterKind[] = ['grid_down', 'water_war', 'crop_blight', 'pandemic'];
@@ -142,4 +163,14 @@ describe.skipIf(!!SOAK)('soak (fast subset)', () => {
   it('the same seed hashes the same (determinism)', () => {
     expect(determinismBreak(specFor('grid_down', 3, 0.3))).toBeNull();
   }, 60_000);
+  // same seed + same inputs => the same state hash at every checkpoint, for the scenarios the owner named and a few that stress other systems
+  for (const kind of ['pandemic', 'civil_war', 'mass_exodus', 'nuclear', 'lawless', 'zombies'] as DisasterKind[]) {
+    it(`${kind}: the same seed hashes the same (determinism)`, () => {
+      expect(determinismBreak(specFor(kind, 5, 0.35))).toBeNull();
+    }, 90_000);
+  }
+  it('a rich (Founder) and a God Mode start hash the same twice', () => {
+    expect(determinismBreak({ ...specFor('grid_down', 2, 0.3), start: 'founder' })).toBeNull();
+    expect(determinismBreak({ ...specFor('grid_down', 2, 0.3), start: 'god' })).toBeNull();
+  }, 90_000);
 });

@@ -28,7 +28,7 @@ import { buildFarmstead, type FarmTree } from '../engine/world/houses/regionalFa
 import { onFarmstead, type Farmstead } from '../engine/world/houses/farmstead';
 import { planNeighbors } from './region/neighbors';
 import type { PlaceHost } from './felt/markPlacement';
-import { buildCamp } from './props/campGeometry';
+import { buildCamp, campPadFor, roadLevelNear } from './props/campGeometry';
 import { Atmosphere, type AtmosBuilding, type AtmosFrame } from './atmosphere/Atmosphere';
 import { PathLayer } from './paths/PathLayer';
 import { LivedLayer } from './lived/LivedLayer';
@@ -99,7 +99,7 @@ import { FLIGHT_W, hatchPlan } from './buildkit/bunkerHatchPlan';
 import { buildDumpTruck, buildExcavator, buildFormwork, buildTubeSegments, drapeSoil, earthMound, spoilHeap } from './props/digSite';
 import { kitMaterial } from './buildkit/materials';
 import { FRUITS, fruitLook, isOrchard, type Fruit } from '../sim/orchard';
-import { buildLayers, type Seat } from './buildkit/buildings';
+import { buildLayers, footingKeyOf, type Seat } from './buildkit/buildings';
 import { treadHeight } from './buildkit/terraceProps';
 import { farHiddenLayers, isFar } from './buildkit/buildingLod';
 import { LIGHT_BUDGET, pickLights, type LightCandidate } from './lightPool';
@@ -130,8 +130,8 @@ import { pickCamp } from './parcel/campSpot';
 import { DRIVE_W, accessFromPlan, distToLine, type Access } from './region/access';
 import { ROAD_W, countyRoad, roadLine, type CountyRoad } from './region/countyRoad';
 import { buildRoadWorks, buildCountyBridges } from './region/roadWorks';
-import { deckY, onGap, type CountyGap } from '../sim/countyCrossings';
-import { countyGapsFor, roadPlanFor } from '../sim/roadState';
+import { onGap, type CountyGap } from '../sim/countyCrossings';
+import { attachCountyBed, countyDeckY, countyGapsFor, roadPlanFor } from '../sim/roadState';
 import { pinSeed } from '../sim/lotSeed';
 import { PlowRun } from './fx/PlowRun';
 import { plowRig } from '../sim/plowing';
@@ -233,6 +233,8 @@ interface Built {
   fpBody: Rect4;
   /** The plan of the retaining wall round its graded pad (sim/retainPlan.ts), null when the pad is gentle. */
   wall: PadPlan | null;
+  /** The footing the ground asked for when it was drawn (buildkit/footing.ts; empty: none): later grading under it (a neighbor's pad, the road's bed) draws it again. */
+  foot?: string;
 }
 interface Rect4 { x0: number; z0: number; x1: number; z1: number }
 
@@ -270,6 +272,9 @@ const ICE_COVER = { open: 0, skim: 0.32, ice: 1 } as const;
 
 /** What a blighted or parched crop looks like (straw yellow, going brown). */
 const CROP_DEAD = new THREE.Color(0x9a8a45);
+/** How deep a lake's water may be (u, about 10 in) before it is no place for a walker. */
+const LAKE_WADE = 0.04;
+
 export class HomesteadWorld {
   readonly center = new THREE.Vector3(PARCEL_SIZE / 2, 0, PARCEL_SIZE / 2);
   readonly parcel: ParcelTerrain;
@@ -306,6 +311,8 @@ export class HomesteadWorld {
   private readonly _campGroup: THREE.Group;
   /** The camp's own ground level (before a dome's level pad took the ground under it). */
   private _campY0 = 0;
+  /** The camp's level pad: always the last of the parcel's pads, so a neighbor's grading (a building's pad, a dome's) never takes the ground out from under the tent. */
+  private _campPad: Pad | null = null;
   /** The chore yard round the camp (sim/daily.ts). */
   private readonly _yard: Yard;
   readonly family: FamilyRenderer;
@@ -388,6 +395,7 @@ export class HomesteadWorld {
     ws.setSite({ x0: 0, z0: 0, x1: PARCEL_SIZE, z1: PARCEL_SIZE });
     this.home = { ...site.home };
     this.parcel = new ParcelTerrain(seed, { creek: site.creek, timber: site.timber, region: site.region, lot: site.lot ?? null, home: site.home });
+    attachCountyBed(this.parcel);   // the county road is graded into the ground (sim/countyBed.ts) before anything reads the ground
     setGroundProbe((x, z) => this.parcel.natural(x, z).h);
     setRoadSightProbe(() => this._roadSightK());
     this.regionWorld = this.parcel.world;
@@ -420,9 +428,13 @@ export class HomesteadWorld {
     this.contact = new ContactShadows(ws.scene);
     this.livestock = new LivestockRenderer(ws.scene, this.contact);
     this._campGroup = buildCamp({ fire: false });
-    this._campGroup.position.set(this.camp.x, this.parcel.height(this.camp.x, this.camp.z), this.camp.z);
-    // on a slope (a hillside or the island's knoll) the tent's uphill wall and the woodpile's tin sheet sink into the ground: raise the camp (and its yard) toward the highest ground under it, by at most about 40 cm (more would float the downhill side)
-    { const y0 = this._campGroup.position.y; let up = 0; for (let k = 0; k < 8; k++) up = Math.max(up, this.parcel.height(this.camp.x + Math.cos(k * Math.PI / 4) * 0.9, this.camp.z + Math.sin(k * Math.PI / 4) * 0.9) - y0); this._campGroup.position.y = y0 + Math.min(up, 0.07); }
+    // the camp stands on a small level pad (a graded yard with its skirt, like a building's), so on a slope neither the tent's downhill wall nor the woodpile's end hovers and the uphill side does not sink into the hill (geometry audit: they hovered up to 0.22 u, about 4 ft)
+    {
+      const campPad = campPadFor(this.camp, c => this.parcel.padHeight(c.x0, c.z0, c.x1, c.z1), roadLevelNear(this.plan.pts, this.camp, 2.2));
+      this._campPad = campPad;
+      this.parcel.setPads([...this.parcel.pads, campPad]);
+      this._campGroup.position.set(this.camp.x, campPad.y, this.camp.z);
+    }
     this._campY0 = this._campGroup.position.y;
     this._campGroup.rotation.y = this.camp.rot;
     this._root.add(this._campGroup);
@@ -736,6 +748,7 @@ export class HomesteadWorld {
     this.parcel.setRoadBed(bed);
     if (this._quality) {
       this.terrain.refresh(this._terrainSource, b[0], b[1], b[2], b[3]);
+      this._refoot({ x0: b[0], z0: b[1], x1: b[2], z1: b[3] });
       this._plant(this._quality);
     }
     this._buildRoads();
@@ -780,9 +793,7 @@ export class HomesteadWorld {
   /** The county road's own bridges: where it crosses water or a cut, found from the ground and the creek. */
   private _findCountyGaps(): CountyGap[] { return countyGapsFor(this.parcel, this.county); }
   private _deckY(g: CountyGap, z: number): number {
-    const cz = this.parcel.hasStream ? this.parcel.creek : null, ly = this.parcel.lakeY;
-    const water = Math.max(cz ? cz.waterY(this.county.x(z)) : -Infinity, ly ?? -Infinity);
-    return deckY(g, z, g.wet ? water + 0.35 : -Infinity);
+    return countyDeckY(this.parcel, this.county, g, z);
   }
   /** Height of the county road's surface at (x, z): the deck over a gap, else the ground. */
   countyY(x: number, z: number): number {
@@ -1532,7 +1543,7 @@ export class HomesteadWorld {
       (trees.get(k) ?? trees.set(k, []).get(k)!).push([t.x, t.z, 0.07 * t.scale + 0.07]);
     }
     const boxes = [...this._built.values()].filter(b => !b.under && KIT[b.placed.kind].level !== 'underground' && KIT[b.placed.kind].level !== 'cover').map(b => footprint(KIT[b.placed.kind], b.placed.x, b.placed.z, b.placed.rot, false));
-    const cars = this._cars, yard = this.access.yard, hasCreek = this.parcel.creekHome, half = this.parcel.creek.halfWidth;
+    const cars = this._cars, yard = this.access.yard, hasCreek = this.parcel.creekHome, half = this.parcel.creek.halfWidth, lakeY = this.parcel.lakeY;
     const own = (x: number, z: number) => (x > this.home.x0 && x < this.home.x1 && z > this.home.z0 && z < this.home.z1) || this._inOwned(x, z);
     const g = this.groundAt;
     const slope = (x: number, z: number): number => (Math.abs(g(x + 0.25, z) - g(x - 0.25, z)) + Math.abs(g(x, z + 0.25) - g(x, z - 0.25))) / 0.5;
@@ -1540,6 +1551,8 @@ export class HomesteadWorld {
     const hardFor = (limit: number) => (x: number, z: number): boolean => {
       for (const r of boxes) if (x > r.x0 - 0.14 && x < r.x1 + 0.14 && z > r.z0 - 0.14 && z < r.z1 + 0.14) return true;
       if (hasCreek && Math.abs(z - this.parcel.creek.zAt(x)) < half + 0.25) return true;
+      // a lake (a bluff or an island lot): nobody on foot or hoof walks into open water; the wet rim a few inches deep stays walkable (geometry audit: deer, elk and rabbits stood in the lake)
+      if (lakeY !== null && g(x, z) < lakeY - LAKE_WADE) return true;
       if (this._perimeterBlocked(x, z, 0.08)) return true;
       if (this.walls.blocks(x, z)) return true;     // a retaining wall: over only at its stairs
       return slope(x, z) > limit && !this.walls.atStair(x, z);
@@ -1917,7 +1930,7 @@ export class HomesteadWorld {
     });
     let y = padLevel;
     // a dome's pad goes under the pads already graded, so the buildings that stand in it keep their own level
-    if (pad) this.parcel.setPads(gradedDome ? [pad, ...this.parcel.pads] : [...this.parcel.pads, pad]);
+    if (pad) { const rest = this.parcel.pads.filter(q => q !== this._campPad), cp = this._campPad ? [this._campPad] : []; this.parcel.setPads(gradedDome ? [pad, ...rest, ...cp] : [...rest, pad, ...cp]); }
     if (def.level === 'cover') { const d = domeFrom(p as unknown as Structure); if (d) { this._domeLite.set(p.id, { x: d.x, z: d.z, r: d.r, airlocks: d.airlocks }); this._snapCamp(); } }
     if (pad && gradedDome) { this._domeLevels.set(p.id, { x0: pad.x0, z0: pad.z0, x1: pad.x1, z1: pad.z1, y: pad.y }); this._snapCamp(); }
     const opts: BuildOpts = {};
@@ -1933,6 +1946,8 @@ export class HomesteadWorld {
       const x0 = p.x, z0 = p.z;
       opts.spurH = (lx, lz) => { const [wx, wz] = rotQ(lx, lz, p.rot); return this.groundAt(x0 + wx, z0 + wz) - y; };
     }
+    // ground that falls away from the floor under a building (one laid on the drive keeps its floor while the road's bed drops away): a stem-wall footing to the ground, so no end hovers
+    if (!below && def.level !== 'cover' && !def.waterside && !def.stilts && !climb) { const gx = p.x, gz = p.z, fy = y; opts.footing = (lx, lz) => { const [wx, wz] = rotQ(lx, lz, p.rot); return this.parcel.height(gx + wx, gz + wz) - fy; }; }
     let under: Built['under'] = null;
     if (below) {
       const placed = [...[...this._built.values()].map(b => b.placed), p];
@@ -1969,7 +1984,7 @@ export class HomesteadWorld {
     }
     // a plan nobody has started is laid out in lime on the ground, so it reads from the air (the stakes alone don't)
     if (!below) group.add(planMark(def, opts.ground));
-    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000', opts, cover: def.level === 'cover', under, lod: below ? [] : this._lodLayers(group), far: false, fpPorch: r, fpBody: footprint(def, p.x, p.z, p.rot, false), wall });
+    this._built.set(p.id, { placed: p, group, smoke, key: '', finished: false, padY: y, light, services: '000', opts, cover: def.level === 'cover', under, lod: below ? [] : this._lodLayers(group), far: false, fpPorch: r, fpBody: footprint(def, p.x, p.z, p.rot, false), wall, foot: opts.footing ? footingKeyOf(def, opts.footing) : undefined });
     // a dome's buried works (the skirt ring and the lines under it, sim/dome/dig.ts): drawn as the pit is worked, hidden under the earth once it is filled
     if (def.level === 'cover') {
       const tr = tierOfKind(p.kind);
@@ -1980,11 +1995,24 @@ export class HomesteadWorld {
         this._digKeys.delete(p.id);
       }
     }
-    if (pad) this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1);
+    if (pad) { this.terrain.refresh(this._terrainSource, pad.x0 - pad.skirt - 1, pad.z0 - pad.skirt - 1, pad.x1 + pad.skirt + 1, pad.z1 + pad.skirt + 1); this._refoot({ x0: pad.x0 - pad.skirt - 1, z0: pad.z0 - pad.skirt - 1, x1: pad.x1 + pad.skirt + 1, z1: pad.z1 + pad.skirt + 1 }, p.id); }
     if (below) this._syncUnderground();
     if (this._batchDepth > 0) this._plantDirty = true; else if (this._quality) this._plant(this._quality);
     this._applyView(this._built.get(p.id)!);
     this._ws.invalidateShadows();
+  }
+
+  /** New grading near buildings already standing (a neighbor's pad, the road's bed) can leave one with ground falling away under its floor, or take that away: draw again those whose footing changed. */
+  private _refoot(area: Rect4 | null, except = ''): void {
+    for (const b of this._built.values()) {
+      if (b.placed.id === except || b.foot === undefined || !b.opts.footing) continue;
+      const r = b.fpPorch;
+      if (area && (r.x1 < area.x0 || r.x0 > area.x1 || r.z1 < area.z0 || r.z0 > area.z1)) continue;
+      const key = footingKeyOf(KIT[b.placed.kind], b.opts.footing);
+      if (key === b.foot) continue;
+      b.foot = key;
+      this._rebuild(b, b.opts);
+    }
   }
 
   private _batchDepth = 0;
@@ -2024,10 +2052,10 @@ export class HomesteadWorld {
   private readonly _domeLevels = new Map<string, { x0: number; z0: number; x1: number; z1: number; y: number }>();
   private readonly _harden = new Map<string, { key: string; tiers: NonNullable<Structure['hardening']> }>();
 
-  /** The camp and its chore yard stand on the ground they were built on; when a dome's level pad takes that ground (the camp lies inside it) they stand on the pad instead, so nothing hovers over, or sinks into, the graded lawn. */
+  /** The camp and its chore yard stand on their own level pad (the last pad, over a dome's); a camp that would clip a dome is not drawn. */
   private _snapCamp(): void {
-    let y = this._campY0, hide = false;
-    for (const d of this._domeLevels.values()) if (this.camp.x >= d.x0 && this.camp.x <= d.x1 && this.camp.z >= d.z0 && this.camp.z <= d.z1) { y = d.y; break; }
+    const y = this._campY0;   // (the camp's own level pad is the top of the ground there, over a dome's pad)
+    let hide = false;
     for (const d of this._domeLite.values()) if (campClashesDome(this.camp, d)) { hide = true; break; }
     this._campGroup.position.y = y; this._yard.group.position.y = y;
     // (a camp that would clip a dome's shell, entrance module or lane is not drawn there)

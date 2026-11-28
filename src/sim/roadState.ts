@@ -10,7 +10,8 @@ import { pickCamp } from '../game/parcel/campSpot';
 import { countyRoad, ROAD_W } from '../game/region/countyRoad';
 import { mulberry32 } from './rng';
 import { pinSeed } from './lotSeed';
-import { findCountyGaps, type CountyGap } from './countyCrossings';
+import { findCountyGaps, deckY, onGap, type CountyGap } from './countyCrossings';
+import { countyProfile, countyBedOf, COUNTY_Z0, COUNTY_Z1 } from './countyBed';
 import { planRoad, type RoadGround, type RoadPlan } from './roadPlan';
 import type { Site } from './site';
 import type { GameState } from './state';
@@ -33,6 +34,7 @@ export function parcelFor(site: SiteKey, gameSeed: number): ParcelTerrain {
   if (!p) {
     if (parcels.size > 12) parcels.clear();
     p = new ParcelTerrain(seed, { creek: site.creek, timber: site.timber, region: site.region, lot: site.lot ?? null, home: site.home });
+    attachCountyBed(p);
     parcels.set(k, p);
   }
   return p;
@@ -46,8 +48,9 @@ export function roadGroundOf(p: ParcelTerrain): RoadGround {
     ? { zAt: p.wash, waterY: (x: number) => p.natural(x, p.wash!(x)).h - 0.02, halfWidth: 1.0 }
     : p.creek;
   return {
-    h: (x, z) => p.natural(x, z).h,
-    sample: (x, z) => { const n = p.natural(x, z); return { h: n.h, forest: n.forest }; },
+    // (the ground with the county road's bench in it: the way in meets the road at the road's own level)
+    h: (x, z) => p.county ? p.county.apply(x, z, p.natural(x, z).h).h : p.natural(x, z).h,
+    sample: (x, z) => { const n = p.natural(x, z); return { h: p.county ? p.county.apply(x, z, n.h).h : n.h, forest: n.forest }; },
     creek,
     lakeY: p.lakeY,
     rock: lot ? (x, z) => lot.rock(x, z) : undefined,
@@ -115,4 +118,22 @@ export function countyGapsFor(p: ParcelTerrain, county: { x(z: number): number }
   const h = (z: number) => p.natural(county.x(z), z).h;
   const wet = (z: number) => (!!cz && Math.abs(cz.zAt(county.x(z)) - z) < cz.halfWidth + 0.5) || (ly !== null && h(z) < ly + 0.05);
   return findCountyGaps(h, wet, -250, PARCEL_SIZE + 250);
+}
+
+
+/** The height of a county-road deck over `g` at z (the water's surface plus clearance where it spans water). */
+export function countyDeckY(p: ParcelTerrain, county: { x(z: number): number }, g: CountyGap, z: number): number {
+  const cz = p.hasStream ? p.creek : null, ly = p.lakeY;
+  const water = Math.max(cz ? cz.waterY(county.x(z)) : -Infinity, ly ?? -Infinity);
+  return deckY(g, z, g.wet ? water + 0.35 : -Infinity);
+}
+
+/**
+ * Grade the county road into this ground (sim/countyBed.ts): a smooth profile within the road grade, its bench and banks cut into the
+ * terrain the parcel returns. Everything that builds a ParcelTerrain for a place calls this before it reads the ground.
+ */
+export function attachCountyBed(p: ParcelTerrain): void {
+  const county = countyRoad(p.regionId, p.seed), gaps = countyGapsFor(p, county);
+  const profile = countyProfile(z => p.natural(county.x(z), z).h, z => { const g = onGap(gaps, z); return g ? countyDeckY(p, county, g, z) : null; }, COUNTY_Z0, COUNTY_Z1);
+  p.setCountyBed(countyBedOf(profile, county.x, gaps), profile);
 }

@@ -93,6 +93,8 @@ export interface BuildOpts {
   port?: number;
   /** A dome (cover level, no pad): the natural ground's height over the group's origin at a point of its own frame, so its stem wall and berm meet the hill. */
   ground?: (lx: number, lz: number) => number;
+  /** The ground's height against the floor at a point of the building's own frame (x across, z along): a building that stands over ground falling away from its floor gets a stem-wall footing down to it (buildkit/footing.ts). Absent: none. */
+  footing?: (lx: number, lz: number) => number;
   /** Underground pieces: doorways by local side (position along that wall) and the ground's height above the floor. */
   doors?: Partial<Record<'front' | 'back' | 'left' | 'right', number>>;
   depth?: number;

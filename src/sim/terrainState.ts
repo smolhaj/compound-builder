@@ -8,6 +8,7 @@
  */
 import { pinSeed } from './lotSeed';
 import { ParcelTerrain } from '../game/parcel/parcelTerrain';
+import { attachCountyBed } from './roadState';
 import { analyzeTerrain, approachLanes, boreProblem, findBore, siteCandidates, type BoreStats, type Corridor, type GroundSource, type Lane, type SiteCandidate, type Terrain } from './terrain';
 import { PERIMETER, runFinished } from './perimeter';
 import type { GameState } from './state';
@@ -30,6 +31,7 @@ export function groundOf(s: GameState): GroundSource | null {
   let g = sources.get(k);
   if (!g) {
     const pt = new ParcelTerrain(pinSeed(s.site, s.seed), { creek: s.site.creek, timber: s.site.timber, region: s.site.region, lot: s.site.lot ?? null, home: s.site.home });
+    attachCountyBed(pt);
     g = { h: (x, z) => pt.natural(x, z).h, creek: pt.creek };
     sources.set(k, g);
   }

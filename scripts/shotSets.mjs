@@ -872,3 +872,10 @@ SETS.defenseExtras = [
   { name: 'moat-meets-creek-aerial', time: 12, season: 'summer', setup: moatBridge + "{ const c = cb.world.camp; cb.cam.target.set(c.x + 6, 0, c.z - 12); cb.cam.radius = 12; cb.cam.pitch = 0.75; cb.cam.yaw = 0.3; }", cam: D, frames: 24 },
   { name: 'moat-meets-creek-eye-level', time: 15, season: 'summer', setup: moatBridge + personAt(1.5, -9.5) + eyeAt(-3.5, -4.5, 6, -12.5, 0.3), cam: D, frames: 24 },
 ];
+
+// the county road's graded bed, where the drive meets it, and the camp on its level pad (docs/DECISIONS.md "County road bed")
+SETS.roadbed = [
+  { name: 'county-road-eye', time: 10, season: 'summer', cam: street, setup: "const z = 18, x = cb.world.county.x(z); cb.cam.target.set(x, 0, z); cb.cam.yaw = Math.PI; cb.cam.pitch = 0.1; cb.cam.radius = 7;" },
+  { name: 'county-road-aerial', time: 11, season: 'summer', cam: aerial, setup: "const z = cb.world.access.gate.z, x = cb.world.county.x(z); cb.cam.target.set(x - 4, 0, z); cb.cam.yaw = 1.2; cb.cam.pitch = 0.5; cb.cam.radius = 24;" },
+  { name: 'camp-eye', time: 10, season: 'summer', cam: street, setup: "const c = cb.world.camp; cb.cam.target.set(c.x, 0, c.z); cb.cam.yaw = 0.7; cb.cam.pitch = 0.14; cb.cam.radius = 3.6;" },
+];

@@ -6,6 +6,8 @@
  */
 import * as THREE from 'three';
 import { CELL, KIT, type KitPieceDef } from './kit';
+import { footingGeometry, footingKey } from './footing';
+import { kitMaterial } from './materials';
 import { foodSlot, Furniture, M, wallRun, sickSlot } from './interior';
 import { buildCabinLayers } from './cabinGeometry';
 import { box, buildGabled, CUT_H, Parts, showStage, type BuildOpts, type FurnishCtx } from './shell';
@@ -547,7 +549,27 @@ export function buildLayers(def: KitPieceDef, seed = 1, opts: BuildOpts = {}): T
   g.userData.seats ??= SEATS[def.id] ?? [];
   if (SEAT_ROLES[def.id]) g.userData.seatRoles ??= SEAT_ROLES[def.id];
   g.userData.chimneyTop ??= null;
+  if (opts.footing) addFooting(g, def, opts.footing);
   return g;
+}
+
+/** A stem wall down to ground that falls away under the floor (see footing.ts); a new 'foundation' layer mesh, whole triangles counted like any other layer. */
+/** The footing's reach past the front wall: the porch, and the steps and the mat a hand's breadth beyond it. */
+const footReach = (def: KitPieceDef): number => def.cellsZ * CELL / 2 + def.frontCells * CELL + 0.2;
+
+/** Which footing the ground asks for under this piece (empty: none); a change means the building is drawn again. */
+export function footingKeyOf(def: KitPieceDef, ground: (lx: number, lz: number) => number): string {
+  return footingKey(def.cellsX * CELL / 2, def.cellsZ * CELL / 2, ground, footReach(def));
+}
+
+function addFooting(g: THREE.Group, def: KitPieceDef, ground: (lx: number, lz: number) => number): void {
+  const geo = footingGeometry(def.cellsX * CELL / 2, def.cellsZ * CELL / 2, ground, footReach(def));
+  if (!geo) return;
+  const mesh = new THREE.Mesh(geo, kitMaterial('concrete'));
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  mesh.name = 'bldg_foundation_footing';
+  mesh.userData = { layer: 'foundation', mat: 'concrete', vertexCount: geo.getAttribute('position').count };
+  g.add(mesh);
 }
 
 /** The finished piece as a placement ghost (shell only, no interior). */
