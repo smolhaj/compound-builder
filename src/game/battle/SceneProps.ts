@@ -114,7 +114,9 @@ export class SceneProps {
     const hz = new THREE.Vector3(d.x, 0, d.z).normalize(), x = new THREE.Vector3(-hz.z, 0, hz.x);
     // tipping over sideways: the top swings from the wall to the side (the foot stays); the ladder ends lying along the wall's line, flat on its side
     const up = new THREE.Vector3(0, 1, 0), y0 = d.clone().normalize();
-    const y = y0.clone().lerp(x, tip).normalize();
+    // (lying, it follows the slope: the far end rests on the ground there and does not hang in the air)
+    const slope = h.ground(foot.x + x.x * L, foot.z + x.z * L) - foot.y, flat = x.clone().multiplyScalar(L).addScaledVector(up, slope).normalize();
+    const y = y0.clone().lerp(flat, tip).normalize();
     const xw = x.clone().lerp(hz, tip);
     xw.addScaledVector(y, -xw.dot(y)).normalize();
     const z = new THREE.Vector3().crossVectors(xw, y).normalize();

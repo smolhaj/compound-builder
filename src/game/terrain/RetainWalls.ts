@@ -84,7 +84,7 @@ function stairParts(parts: THREE.BufferGeometry[], s: WallStair, ground: Ground,
 export function footAt(run: WallRun, ground: Ground, s: number, halfLen: number, planFoot: number, cut: boolean): number {
   const [tx, tz] = TAN[run.side], [nx, nz] = NOR[run.side], [ox, oz] = run.pts[0];
   let low = planFoot;
-  const outs = cut ? [0, DEPTH / 2, DEPTH] : [RW.SKIRT - DEPTH, RW.SKIRT, RW.SKIRT + FOOT_OUT];
+  const outs = cut ? [0, DEPTH / 2, DEPTH, DEPTH + BATTER * 0.45] : [RW.SKIRT - DEPTH, RW.SKIRT, RW.SKIRT + FOOT_OUT];
   for (const ds of [-halfLen, 0, halfLen]) for (const out of outs) {
     const sc = s + ds;
     low = Math.min(low, ground(ox + tx * sc + nx * out, oz + tz * sc + nz * out));

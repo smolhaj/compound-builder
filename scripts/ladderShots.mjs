@@ -39,7 +39,7 @@ try {
   }, [spot.x, spot.z]);
   const step = async (secs, owner) => page.evaluate(([secs, owner]) => { const L = window.__lad; const o = { ...L.owner, ...owner }; for (let i = 0; i < Math.round(secs / 0.1); i++) window.__cb.battle.props.update(0.1, () => o); }, [secs, owner]);
   await step(0.2, {}); await page.waitForTimeout(300); await shot('standing-at-foot');
-  await step(0.3, { y: 0.4 }); await step(0.1, { x: window.__lad?.x });   // (up the rungs)
+  await step(0.4, { y: 0.4 });   // (up the rungs)
   await step(2.0, { x: 99, z: 99 });   // the raider is far off, retreating
   await page.waitForTimeout(300); await shot('after-retreat-lying');
   await step(4.0, { x: 99, z: 99 });

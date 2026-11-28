@@ -45,7 +45,7 @@ try {
   });
   console.log('walls', walls.length, JSON.stringify(walls.map(w => [w.id, w.runs.map(r => [r.side, +r.fill.toFixed(2), +r.cut.toFixed(2)])])));
   // numbers: for every wall, the lowest point of the drawn stone in each 0.1 u cell against the ground the world draws there (a positive gap is a stone in the air)
-  const audit = await page.evaluate(() => {   /* (all near meshes, seen or not) */
+  const auditFn = () => page.evaluate(() => {   /* (all near meshes, seen or not) */
     const cb = window.__cb, W = cb.world.walls, res = [];
     for (const m of W.group.children) {
       if (!/_near$/.test(m.name)) continue;
@@ -59,7 +59,11 @@ try {
     }
     return res;
   });
-  console.log('AUDIT', JSON.stringify(audit));
+  console.log('AUDIT', JSON.stringify(await auditFn()));
+  if (process.env.REBUILD) {
+    await page.evaluate(() => { const cb = window.__cb, W = cb.world.walls; for (const w of W._walls.values()) w.built = ''; W.update(cb.ws.camera.position, 'high', cb.world.groundAt, 0.1, 50); });
+    console.log('AUDIT-REBUILT', JSON.stringify(await auditFn()));
+  }
   if (process.env.AUDIT_ONLY) process.exit(0);
   let n = 0;
   const shot = async name => {
