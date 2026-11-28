@@ -69,10 +69,10 @@ export function countyProfile(ground: (z: number) => number, deck: (z: number) =
   const n = Math.floor((z1 - z0) / STEP) + 1;
   const g = new Float64Array(n), pin = new Uint8Array(n);
   for (let i = 0; i < n; i++) { const z = z0 + i * STEP, d = deck(z); if (d !== null) { g[i] = d; pin[i] = 1; } else g[i] = ground(z); }
-  let y = g;
+  let y: Float64Array = g;
   for (let pass = 0; pass < 2; pass++) y = average(y, pin, SMOOTH);
   // (the limit leaves a sharp V at a sag and a ridge at a crest: averaging rounds it and cannot steepen a grade)
-  let f = limitGrade(y, pin, COUNTY_GRADE, COUNTY_DEV, y);
+  let f: Float64Array = limitGrade(y, pin, COUNTY_GRADE, COUNTY_DEV, y);
   for (let pass = 0; pass < 2; pass++) f = average(f, pin, SMOOTH);
   return { z0, step: STEP, y: limitGrade(f, pin, COUNTY_GRADE, COUNTY_DEV, y) };
 }
