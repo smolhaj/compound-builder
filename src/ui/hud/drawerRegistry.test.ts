@@ -83,3 +83,12 @@ describe('drawer and bar geometry', () => {
     expect(hintBottom(1.25, false)).toBeGreaterThan(hintBottom(1, false));
   });
 });
+
+describe('drawer names agree everywhere', () => {
+  it('the action-bar label is the drawer title, so the button, the hover card and the drawer header never disagree', () => {
+    for (const d of DRAWERS) expect(d.label, d.id).toBe(d.title);
+  });
+  it('the Family drawer says Family (hotkey F), not People', () => {
+    expect(drawerDef('family')).toMatchObject({ label: 'Family', key: 'F' });
+  });
+});
