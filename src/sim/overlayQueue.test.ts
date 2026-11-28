@@ -26,6 +26,12 @@ describe('overlay queue', () => {
   it('the day card waits for a decision and outranks the recap', () => {
     expect(up(overlayPlan({ ...none, dayCard: true, recap: true }))).toEqual(['dayCard']);
   });
+  it('a run that ends inside the raid aftermath report waits behind that report, then shows', () => {
+    expect(up(overlayPlan({ ...none, ending: true, cutscene: 'playing', aftermath: true }))).toEqual(['gate']);
+    expect(up(overlayPlan({ ...none, ending: true, cutscene: 'none', aftermath: false }))).toEqual(['ending']);
+    expect(up(overlayPlan({ ...none, ending: true, cutscene: 'playing', aftermath: false }))).toEqual(['ending']);
+  });
+
   it('the ending report outranks everything but the title', () => {
     expect(up(overlayPlan({ ...none, ending: true, decision: true, recap: true, milestones: 1 }))).toEqual(['ending']);
   });

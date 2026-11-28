@@ -117,6 +117,17 @@ describe('celebrations', () => {
     expect(celebrations(a, pending)).toEqual([]);
   });
 
+  it('the first wave card does not say the place held cleanly when people died', () => {
+    const a = base(); a.gate.waves = { n: 0 };
+    const b = clone(a); b.gate.waves = { n: 1 };
+    expect(celebrations(a, b)[0].line).toMatch(/place held/);
+    expect(celebrations(a, b)[0].line).not.toMatch(/gone/);
+    const c = clone(b); c.personState[0].needs.died = 570;
+    expect(celebrations(a, c)[0].line).toMatch(/one of yours is gone/);
+    c.personState[1].needs.died = 571;
+    expect(celebrations(a, c)[0].line).toMatch(/2 of yours are gone/);
+  });
+
   it('first harvest needs growing ground and food from it', () => {
     const a = base(), b = clone(a);
     b.food.producedKcal = 9000;

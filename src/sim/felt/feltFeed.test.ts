@@ -18,6 +18,14 @@ const run = (g: GameState) => feltFeed(g, fxCtxFor(g, 3), feltSpec(g.disaster.ki
 const texts = (g: GameState) => feedOf(g)!.lines.map(l => l.text);
 
 describe('the daily feed', () => {
+  it('two ticker items at the same time get different line ids (the id is a React key)', () => {
+    const g = after('grid_down', 1);
+    for (const t of TRACKS) g.disaster.tracks[t] = 1;
+    g.disaster.news.push({ t: g.clock.t, text: 'A truck went by twice.', tone: 0 }, { t: g.clock.t, text: 'Smoke over the ridge.', tone: 1 });
+    run(g);
+    const ids = feedOf(g)!.lines.map(l => l.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
   it('bands: out under a quarter, patchy under two thirds, working after', () => {
     expect([0, 0.24, 0.25, 0.64, 0.65, 1].map(bandOf)).toEqual([0, 0, 1, 1, 2, 2]);
   });

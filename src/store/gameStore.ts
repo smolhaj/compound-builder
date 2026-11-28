@@ -18,6 +18,7 @@ import { setFocus } from '../sim/priority';
 import { orderHookup, placeImprovements } from '../sim/improvements';
 import { claimForWaiting, claimWaitingRig, isRig, type StayKind } from '../sim/joinerHome';
 import { kinOf } from '../sim/kin';
+import { fxChoose } from '../sim/disasterFx';
 import { setEntrance as chooseEntrance } from '../sim/roadEntrance';
 import { applyForPermit } from '../sim/paperwork';
 import { callVote, voteProblem } from '../sim/rules';
@@ -370,6 +371,8 @@ export interface GameStore {
   openSchedule: (open: boolean) => void;
   /** Run a daily-life change (roster, templates, gatherings) on a draft; returns why not, or null. */
   daily: (op: (g: GameState) => string | null) => string | null;
+  /** Answer a disaster decision card (`fx` act): the choice is always applied, and the returned line is the note for the player (not a refusal, so `daily` would have thrown the change away). */
+  fxChoice: (choice: string) => string | null;
   /** Run a money operation on a draft (transfer, buy / sell / move metal); returns why not, or null. */
   money: (op: (g: GameState) => string | null) => string | null;
   /** The setup screen offers "Back to my game" (opened from the New button, not at boot). */
@@ -1047,6 +1050,12 @@ export const useGameStore = create<GameStore>()(subscribeWithSelector((set, get)
     const why = op(g);
     if (!why) set({ game: g });
     return why;
+  },
+  fxChoice: (choice) => {
+    const g = structuredClone(get().game);
+    const note = fxChoose(g, choice);
+    set({ game: g });
+    return note;
   },
   money: (op) => {
     if (locked()) return LOCKED_WHY;

@@ -195,6 +195,15 @@ const FIRSTS: Array<{ id: string; title: string; line: string; test: (s: GameSta
     test: s => (s.gate.waves?.n ?? 0) >= 1 && !s.gate.pending && !s.gate.aftermath && s.people.length > 0 },
 ];
 
+/** People who died on the place (not guests who moved on, not anyone taken): the toll a "survived" card has to be honest about. */
+export function deadCount(s: GameState): number { return s.personState.filter(p => p.needs.died != null && !p.needs.left && !p.needs.taken).length; }
+
+/** The first-wave card's line: "the place held" is only the whole story when nobody was lost. */
+export function firstWaveLine(s: GameState): string {
+  const n = deadCount(s);
+  return n === 0 ? 'They came, and the place held. The next wave will be bigger.' : `The place held, but ${n === 1 ? 'one of yours is' : `${n} of yours are`} gone. The next wave will be bigger.`;
+}
+
 /** Celebrations the change from `prev` to `next` brought: new lineage milestones and first-of-a-kind moments. `done` is what was already shown. */
 export function celebrations(prev: GameState, next: GameState, done: ReadonlySet<string> = new Set()): Celebration[] {
   if (prev === next || prev.seed !== next.seed) return [];
@@ -204,6 +213,6 @@ export function celebrations(prev: GameState, next: GameState, done: ReadonlySet
     const pts = MILESTONE_POINTS[id] ?? 0;
     out.push({ id, title: MILESTONE_NAME[id], line: MILESTONE_LINE[id] ?? 'Another chapter for the family.', points: pts, flash: ['tab:chronicle'] });
   }
-  for (const f of FIRSTS) if (!done.has(f.id) && !f.test(prev) && f.test(next)) out.push({ id: f.id, title: f.title, line: f.line, points: 0, flash: ['tab:chronicle'] });
+  for (const f of FIRSTS) if (!done.has(f.id) && !f.test(prev) && f.test(next)) out.push({ id: f.id, title: f.title, line: f.id === 'first_wave' ? firstWaveLine(next) : f.line, points: 0, flash: ['tab:chronicle'] });
   return out;
 }
