@@ -60,6 +60,37 @@ export function orderProblem(s: GameState, lines: readonly OrderLine[]): OrderPr
   return null;
 }
 
+/** What is left to spend on an order today (the bank, or the safe's cash when the banks are shut); 0 when nobody delivers. */
+export function orderBudget(s: GameState): number {
+  const how = payWith(s);
+  return how === 'bank' ? s.money : how === 'cash' ? s.fin.cash : 0;
+}
+
+/** How much more cash the whole order wants than there is (0 when it can be paid). */
+export function orderShortfall(s: GameState, lines: readonly OrderLine[]): number {
+  return Math.max(0, orderCost(lines.filter(isReal), prices(s)) - orderBudget(s));
+}
+
+/**
+ * The first step of an order that is more than the cash on hand: the lines in their order, each cut to the whole units the money still covers (the
+ * delivery fee is kept back). Empty when not even one unit fits. Pure (tested).
+ */
+export function affordableFirstStep(s: GameState, lines: readonly OrderLine[]): OrderLine[] {
+  const f = prices(s);
+  let left = orderBudget(s) - DELIVERY_FEE;
+  const out: OrderLine[] = [];
+  for (const l of lines.filter(isReal)) {
+    if (l.food) continue;   // (a named food is bought from the shelf, not cut down here)
+    const unit = (MATERIALS[l.material].price ?? 0) * f;
+    if (unit <= 0 || left < unit) continue;
+    const qty = Math.min(l.qty, Math.floor(left / unit));
+    if (qty <= 0) continue;
+    out.push({ ...l, qty });
+    left -= qty * unit;
+  }
+  return out;
+}
+
 /** How an order gets paid: from the bank, or (banks shut, trucks still running, the law mostly holding) cash from the safe. */
 export function payWith(s: GameState): 'bank' | 'cash' | null {
   const t = s.disaster.tracks;

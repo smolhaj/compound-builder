@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Director, MAX_SURFACE_COVER, MAX_WALL_COVER, wallCover, STANDOFF, auditPose, bestEye, surfaceCover, brushCover, MAX_BRUSH_COVER, figurePx, lensProblem, poseAt, shotProblems, type Actor, type Box, type Shot } from './director';
-import { obstaclesOf, treeBoxes, domeWallBoxes, vestibuleBoxes, SKIRT_H, YARD_ROOF } from './cameraObstacles';
+import { eyeOutOfTrees, obstaclesOf, treeBoxes, domeWallBoxes, vestibuleBoxes, SKIRT_H, YARD_ROOF } from './cameraObstacles';
 import { YARD_H, yardGeometry, yardWallHeight } from '../../sim/dome/plantYard';
 import { blockedBetween, nearBox } from './director';
 import { place } from '../../sim/raidTestKit';
@@ -540,5 +540,31 @@ describe('a house wall a few metres off may not fill a third of the picture (the
     expect(shotProblems(shot, { boxes: [gable], ground, actors: new Map() }).some(p => p.includes('a wall covers'))).toBe(true);
     const away = { x: 0.2, y: 0.5, z: -8 };
     expect(bestEye([eye, away], aim, 50, [gable], ground, 0.1)).toEqual(away);
+  });
+});
+
+describe('eyeOutOfTrees: the glide back and the raid prompt never put the eye inside a tree', () => {
+  const ground = () => 0;
+  const trunk: Box = { x0: -0.1, x1: 0.1, z0: -0.1, z1: 0.1, h: 3, kind: 'tree' };
+  const crown: Box = { x0: -1, x1: 1, z0: -1, z1: 1, h: 3, y0: 0.25, kind: 'tree' };
+  const inBox = (p: { x: number; y: number; z: number }, b: Box) => p.x > b.x0 && p.x < b.x1 && p.z > b.z0 && p.z < b.z1 && p.y < b.h && p.y > (b.y0 ?? 0);
+
+  it('an eye in a crown is moved to its nearest edge, at the same height', () => {
+    const out = eyeOutOfTrees({ x: 0.7, y: 1, z: 0.2 }, [trunk, crown], ground);
+    expect(inBox(out, crown)).toBe(false);
+    expect(out.y).toBe(1);
+    expect(Math.hypot(out.x - 0.7, out.z - 0.2)).toBeLessThan(0.6);
+  });
+  it('an eye above the crown or under it (below the crown, above the ground) is left alone', () => {
+    expect(eyeOutOfTrees({ x: 0.2, y: 4, z: 0.2 }, [crown], ground)).toEqual({ x: 0.2, y: 4, z: 0.2 });
+    expect(eyeOutOfTrees({ x: 0.2, y: 0.1, z: 0.2 }, [crown], ground)).toEqual({ x: 0.2, y: 0.1, z: 0.2 });
+  });
+  it('an eye in the open and bushes are left alone; two trees side by side are both cleared', () => {
+    expect(eyeOutOfTrees({ x: 5, y: 1, z: 5 }, [crown], ground)).toEqual({ x: 5, y: 1, z: 5 });
+    expect(eyeOutOfTrees({ x: 0, y: 1, z: 0 }, [{ ...crown, kind: 'brush' }], ground)).toEqual({ x: 0, y: 1, z: 0 });
+    const b2: Box = { ...crown, x0: 0.9, x1: 2.9 };
+    const out = eyeOutOfTrees({ x: 0.95, y: 1, z: 0 }, [crown, b2], ground);
+    expect(inBox(out, crown)).toBe(false);
+    expect(inBox(out, b2)).toBe(false);
   });
 });

@@ -12,7 +12,8 @@ import { firstHour, type FirstHour, type GoalAct, type GoalMemory } from './firs
 import { feltChain } from './felt/goalLib';
 import { suggestions, type Suggestion } from './guidance';
 import { OP_COVERED } from './operational';
-import { orderProblem } from './economy';
+import { orderProblem, orderShortfall } from './economy';
+import { usdShort } from './spendGuard';
 import { KIT } from '../game/buildkit/kit';
 import { dayIndex, type GameState } from './state';
 import { pluralize } from './words';
@@ -28,7 +29,7 @@ export interface TodoRow {
   /** One short line: why, or where it stands. */
   sub?: string;
   /** The one click. `off` is why it cannot be pressed now. */
-  act?: { label: string; act: GoalAct; off?: string };
+  act?: { label: string; act: GoalAct; off?: string; note?: string };
 }
 export interface WhatToDo {
   /** The top row first, then at most two follow-ups. */
@@ -73,15 +74,17 @@ export function actKey(a: GoalAct | undefined): string {
 }
 
 const fix = (a: GoalAct | undefined, s: GameState, label: string): TodoRow['act'] =>
-  a ? { label, act: a, ...(a.type === 'order' && orderProblem(s, a.lines) ? { off: 'Cannot order that now (money, or nobody delivering)' } : {}) } : undefined;
+  a ? { label, act: a, ...(a.type === 'order' && orderProblem(s, a.lines) ? { off: orderProblem(s, a.lines) === 'cannot_afford' ? `Need ${usdShort(orderShortfall(s, a.lines))} more` : 'Cannot order that now (nobody is delivering)' } : {}) } : undefined;
 
 function boardAlarms(s: GameState, b: CompoundBoard): TodoRow[] {
   const out: TodoRow[] = [];
   const v = (id: string) => b.vitals.find(x => x.id === id);
   const food = v('food');
-  if (food?.tone === 'bad') {
+  if (food?.tone === 'bad' || food?.first) {
     const n = food.n ?? 0, hungry = !s.food.fromStores && s.food.ateKcal < s.food.needKcal * 0.95;
-    out.push({ id: 'alarm:food', kind: 'alarm', tone: 'bad', title: hungry && n < 1 ? 'Out of food: the family is going hungry' : n < 1 ? 'Out of food today' : `Out of food in ${pluralize(n, 'day')}`,
+    if (food.first) out.push({ id: 'alarm:food', kind: 'alarm', tone: 'warn', title: n < 1 ? 'The shelf is bare: stock it first' : `Food for ${pluralize(n, 'day')} on the shelf`,
+      sub: `${s.people.length} to feed. Stock the shelf first: the trucks are running and nobody is hungry yet.`, act: { label: 'Open food shelf', act: { type: 'shop', tab: 'food' } } });
+    else out.push({ id: 'alarm:food', kind: 'alarm', tone: 'bad', title: hungry && n < 1 ? 'Out of food: the family is going hungry' : n < 1 ? 'Out of food today' : `Out of food in ${pluralize(n, 'day')}`,
       sub: `${s.people.length} to feed. Stock the shelf now, while the trucks run.`, act: { label: 'Open food shelf', act: { type: 'shop', tab: 'food' } } });
   }
   const water = v('water');
@@ -128,7 +131,7 @@ export function whatToDo(s: GameState, ctx: TodoCtx = {}): WhatToDo {
   const goalUp = (chainUp ? true : (ctx.goalsClosed ?? null) === null) && !fh.complete && fh.goals.length > 0 && !!fh.current;
   const goal: TodoRow | null = goalUp ? {
     id: `goal:${fh.current!.id}`, kind: 'goal', tone: 'info', title: fh.current!.title, sub: fh.current!.line,
-    ...(fh.current!.act ? { act: { label: fh.current!.act.label, act: fh.current!.act.act, ...(fh.current!.act.off ? { off: fh.current!.act.off } : {}) } } : {}),
+    ...(fh.current!.act ? { act: { label: fh.current!.act.label, act: fh.current!.act.act, ...(fh.current!.act.off ? { off: fh.current!.act.off } : {}), ...(fh.current!.act.note ? { note: fh.current!.act.note } : {}) } } : {}),
   } : null;
 
   // next steps: what the board says waits on the player, then the suggestions; while a goal is up only the urgent ones

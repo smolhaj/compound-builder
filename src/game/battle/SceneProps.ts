@@ -6,6 +6,7 @@
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { ladderGone, newLadder, stepLadder, tipOf, type LadderLife } from './ladderLife';
 import type { BattleEvent } from '../../sim/battleTypes';
 import { AftermathProps } from './AftermathProps';
 
@@ -39,7 +40,7 @@ export class SceneProps {
   private _dog: { mesh: THREE.Group; head: THREE.Mesh; x: number; z: number; age: number } | null = null;
   private _flagMesh: THREE.InstancedMesh | null = null;
   private _flares: Array<{ x: number; z: number; age: number; secs: number; acc: number }> = [];
-  private _ladders: { x: number; z: number; h: number; fx: number; fz: number }[] = [];
+  private _ladders: { x: number; z: number; h: number; fx: number; fz: number; life: LadderLife }[] = [];
   private _ladderMesh: THREE.InstancedMesh | null = null;
   private _tFlag = 0;
   private readonly _m = new THREE.Matrix4();
@@ -54,7 +55,7 @@ export class SceneProps {
   constructor(group: THREE.Group, hooks: PropHooks) { this._group = group; this._h = hooks; this._after = new AftermathProps(group, { ground: hooks.ground, puff: hooks.puff }); }
 
   /** Counts for the leak test. */
-  get live(): { door: boolean; packs: number; fires: number; ladders: number } { return { door: !!this._door, packs: this._packOf.length, fires: this._fires.length, ladders: this._ladders.length }; }
+  get live(): { door: boolean; packs: number; fires: number; ladders: number; /** Ladders still leaning on a wall (not tipped or picked up). */ standing: number } { return { door: !!this._door, packs: this._packOf.length, fires: this._fires.length, ladders: this._ladders.length, standing: this._ladders.filter(l => l.life.fell === null).length }; }
 
   end(): void {
     this._after.end();
@@ -98,15 +99,42 @@ export class SceneProps {
       this._ladderMesh.count = 0; this._ladderMesh.frustumCulled = false; this._ladderMesh.userData = { noSSAO: true };
       this._group.add(this._ladderMesh);
     }
-    this._ladders.push({ x: e.x, z: e.z, h: e.h, fx: e.fx, fz: e.fz });
-    const h = this._h, m = this._ladderMesh;
-    const top = new THREE.Vector3(e.x, h.ground(e.x, e.z) + e.h, e.z), foot = new THREE.Vector3(e.fx, h.ground(e.fx, e.fz), e.fz);
-    const d = top.clone().sub(foot), L = d.length(), y = d.clone().normalize();
-    const hz = new THREE.Vector3(d.x, 0, d.z).normalize(), x = new THREE.Vector3(-hz.z, 0, hz.x), z = new THREE.Vector3().crossVectors(x, y).normalize();
-    this._m.makeBasis(x, y.clone().multiplyScalar(L), z).setPosition(foot);
-    m.setMatrixAt(this._ladders.length - 1, this._m);
+    this._ladders.push({ x: e.x, z: e.z, h: e.h, fx: e.fx, fz: e.fz, life: newLadder(e.unit) });
+    const m = this._ladderMesh;
+    this._setLadder(this._ladders.length - 1, 0);
     m.count = this._ladders.length;
+  }
+
+  /** Put ladder `i` at `tip` (0 leaning on the wall .. 1 lying flat on its side on the ground); tip > 1 collapses it (picked up). */
+  private _setLadder(i: number, tip: number, gone = false): void {
+    const m = this._ladderMesh, l = this._ladders[i], h = this._h;
+    if (!m) return;
+    const top = new THREE.Vector3(l.x, h.ground(l.x, l.z) + l.h, l.z), foot = new THREE.Vector3(l.fx, h.ground(l.fx, l.fz), l.fz);
+    const d = top.clone().sub(foot), L = d.length();
+    const hz = new THREE.Vector3(d.x, 0, d.z).normalize(), x = new THREE.Vector3(-hz.z, 0, hz.x);
+    // tipping over sideways: the top swings from the wall to the side (the foot stays); the ladder ends lying along the wall's line, flat on its side
+    const up = new THREE.Vector3(0, 1, 0), y0 = d.clone().normalize();
+    const y = y0.clone().lerp(x, tip).normalize();
+    const xw = x.clone().lerp(hz, tip);
+    xw.addScaledVector(y, -xw.dot(y)).normalize();
+    const z = new THREE.Vector3().crossVectors(xw, y).normalize();
+    foot.addScaledVector(up, tip * 0.012);
+    if (gone) this._m.makeBasis(xw.multiplyScalar(0), y.multiplyScalar(0), z.multiplyScalar(0)).setPosition(foot);
+    else this._m.makeBasis(xw, y.multiplyScalar(L), z).setPosition(foot);
+    m.setMatrixAt(i, this._m);
     m.instanceMatrix.needsUpdate = true;
+  }
+
+  /** Ladders whose climber is done with them tip over, lie a while and are picked up. */
+  private _stepLadders(dt: number, at: (id: string) => UnitAt | null): void {
+    for (let i = 0; i < this._ladders.length; i++) {
+      const l = this._ladders[i];
+      if (ladderGone(l.life)) continue;
+      const before = tipOf(l.life);
+      l.life = stepLadder(l.life, dt, l.life.owner ? at(l.life.owner) : null, { x: l.fx, z: l.fz });
+      if (l.life.fell === null) continue;
+      if (tipOf(l.life) !== before || ladderGone(l.life)) this._setLadder(i, tipOf(l.life), ladderGone(l.life));
+    }
   }
 
   /** A white cloth on a stick, held up by one man (the envoy of a parley): one instanced mesh, two at most. */
@@ -189,6 +217,7 @@ export class SceneProps {
   update(dt: number, at: (id: string) => UnitAt | null): void {
     const h = this._h;
     this._after.update(dt, at);
+    this._stepLadders(dt, at);
     const d = this._door;
     if (d) {
       d.open += Math.sign(d.target - d.open) * Math.min(Math.abs(d.target - d.open), d.speed * dt);

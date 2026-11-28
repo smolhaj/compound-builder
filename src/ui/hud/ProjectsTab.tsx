@@ -21,7 +21,7 @@ import { litersText } from '../../sim/format';
 import { setBelt } from '../../sim/weekender';
 import { CREW_DAY_USD, crewIdea, nextLongStay, nextStageOrder, weekendBudget, weekendsFor } from '../../sim/weekendPlan';
 import { dayIndex } from '../../sim/state';
-import { stuckRows, stuckShort } from '../../sim/stalls';
+import { groupStuckRows, stuckRows, stuckShort } from '../../sim/stalls';
 import { Clamp, Note, Row, Section } from './common';
 import { TONE, DIM, LINE, btn, usd } from './style';
 import { pluralize } from '../../sim/words';
@@ -42,7 +42,7 @@ export function ProjectsTab() {
   const crewIds = (game.crews ?? []).map(c => c.target), crewWeeks = Math.max(0, ...crewIds.map(id => crewWeeksFor(game, id) ?? 0)), crewLeft = crewIds.length ? crewWeeks : 0;
   const selWeeks = sel && !isFinished(sel) ? weeksUntil(game, sel.id, pace) : null;
   const hint = left > 0 ? slowHint(game, weeks, pace) : null;
-  const rows = projectRows(game), todo = needsHookup(game), stuck = stuckRows(game);
+  const rows = projectRows(game), todo = needsHookup(game), stuck = stuckRows(game), stuckGroups = groupStuckRows(game, stuck);
   const openCrews = (game.crews ?? []).map(c => ({ ...c, kind: game.structures.find(x => x.id === c.target)?.kind ?? '' }));
   const wkPlan = game.weekend?.mode === 'split' ? weekendBudget(game) : null;
   const wkNext = wkPlan ? nextStageOrder(game, 1) : null, wkStay = wkPlan ? nextLongStay(game.clock.startDoy, game.clock.startYear, dayIndex(game.clock.t)) : null, wkCrew = wkPlan ? crewIdea(game) : null;
@@ -90,14 +90,14 @@ export function ProjectsTab() {
         {rows.length > 8 && <Note>…and {rows.length - 8} more.</Note>}
       </Section>}
       {(stuck.length > 0 || openCrews.length > 0) && <Section title="Stuck and crew jobs">
-        {stuck.slice(0, 6).map(x => <div key={x.key} data-testid="stuck-row" style={{ padding: '3px 0', borderBottom: `1px solid ${LINE}`, overflowWrap: 'anywhere' }}>
-          <div><b>{x.label}</b> <span style={{ color: TONE.warn }}>has waited {pluralize(x.days, 'day')} for {x.what}</span></div>
+        {stuckGroups.slice(0, 6).map(x => <div key={x.key} data-testid="stuck-row" style={{ padding: '3px 0', borderBottom: `1px solid ${LINE}`, overflowWrap: 'anywhere' }}>
+          <div><b>{x.label}</b>{x.count > 1 && <b> ×{x.count}</b>} <span style={{ color: TONE.warn }}>{x.count > 1 ? `have waited ${x.minDays === x.days ? pluralize(x.days, 'day') : `${x.minDays} to ${pluralize(x.days, 'day')}`} for ${x.what} each` : `has waited ${pluralize(x.days, 'day')} for ${x.what}`}</span></div>
           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 }}>
-            {x.lines && <button style={{ ...btn(true), whiteSpace: 'normal', textAlign: 'left' }} onClick={() => g.order(x.lines!)}>{stuckShort({ ...x, lines: x.lines, escalated: false, others: 0 })}</button>}
-            {x.at && <button style={btn()} onClick={() => g.select(x.at!)}>Open</button>}
+            {x.lines && <button style={{ ...btn(true), whiteSpace: 'normal', textAlign: 'left' }} onClick={() => g.order(x.lines!)}>{x.count > 1 ? `Order all ${x.count}, ${usd(x.cost)}` : stuckShort({ ...x, lines: x.lines, escalated: false, others: 0 })}</button>}
+            {x.at && <button style={btn()} onClick={() => g.select(x.at!)}>Open{x.count > 1 ? ' the oldest' : ''}</button>}
           </div>
         </div>)}
-        {stuck.length > 6 && <Note>…and {stuck.length - 6} more.</Note>}
+        {stuckGroups.length > 6 && <Note>…and {stuckGroups.length - 6} more kinds.</Note>}
         {openCrews.map(c => <div key={c.id} data-testid="crew-row" style={{ padding: '3px 0', borderBottom: `1px solid ${LINE}`, display: 'flex', justifyContent: 'space-between', gap: 6 }}>
           <span>Crew on the {KIT[c.kind]?.name ?? c.kind} <span style={{ color: DIM, fontSize: 11 }}>${Math.round(c.paid).toLocaleString('en-US')} so far</span></span>
           <button style={btn()} onClick={() => g.select(c.target)}>Open</button>

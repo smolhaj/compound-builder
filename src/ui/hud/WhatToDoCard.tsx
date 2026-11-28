@@ -78,7 +78,8 @@ export function WhatToDoCard() {
   );
   const press = (r: TodoRow) => { const a = r.act; if (!a || a.off) return; if (a.act.type === 'starter') { useFeelStore.getState().askStarter(); useDrawerStore.getState().show('build'); }   // (the proposal lives in the Build drawer)
     else run(a.act); };
-  const act = (r: TodoRow, primary: boolean) => r.act && <button type="button" data-testid={primary ? 'todo-primary' : 'todo-act'} disabled={!!r.act.off} title={r.act.off ?? r.act.label} onMouseDown={e => e.preventDefault()} onClick={() => press(r)} style={btnStyle(primary, !!r.act.off)}>{r.act.label}</button>;
+  const act = (r: TodoRow, primary: boolean) => r.act && <><button type="button" data-testid={primary ? 'todo-primary' : 'todo-act'} disabled={!!r.act.off} title={r.act.off ?? r.act.label} onMouseDown={e => e.preventDefault()} onClick={() => press(r)} style={btnStyle(primary, !!r.act.off)}>{r.act.label}</button>
+    {(r.act.note ?? r.act.off) && <div data-testid="todo-act-note" style={{ color: tv.color('dim'), fontSize: tv.font('fine'), marginTop: 3 }}>{r.act.note ?? r.act.off}</div>}</>;
   return (
     <div data-testid="todo-card" data-collapsed={collapsed ? '1' : '0'} style={box}>
       {head}

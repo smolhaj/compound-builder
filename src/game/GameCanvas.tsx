@@ -67,7 +67,7 @@ import { demoBattle } from './battle/demoBattle';
 import { CutscenePlayer } from './battle/CutscenePlayer';
 import { NameLabelLayer } from './battle/NameLabelLayer';
 import { RaidDamageRenderer, type GlassHome } from './props/RaidDamageRenderer';
-import { coverBoxes, obstaclesOf, treeBoxes } from './battle/cameraObstacles';
+import { coverBoxes, eyeOutOfTrees, obstaclesOf, treeBoxes } from './battle/cameraObstacles';
 import { shellsOf } from './battle/domeStruts';
 import { detailTier } from './buildkit/buildingDetail';
 import { liveBreach } from './battle/liveBreach';
@@ -741,6 +741,11 @@ export function GameCanvas() {
         }
         cam.apply(ws.camera);
         occluders.keepOut(ws.camera, cam.target.x, cam.target.z, cam.target.y);
+        // the raid prompt's low settle and the glide back to the player's own view have no director behind them: keep the eye out of every tree it passes
+        if (camBefore) {
+          const p = ws.camera.position, q = eyeOutOfTrees(p, treeBoxes(world.treeSpecs, p, 8), world.groundAt, 0.2);
+          if (q.x !== p.x || q.z !== p.z) { p.x = q.x; p.z = q.z; ws.camera.lookAt(cam.target.x, cam.target.y, cam.target.z); }
+        }
         // looking down, fit the shadows to the ground actually on screen (the far edge of the view
         // lies well beyond the target); low views keep the tight fit round the target for sharp shadows
         const foot = cam.pitch > 0.75 ? viewFootprint(ws.camera, cam.target.y, cam.radius * 3) : null;
