@@ -17,6 +17,8 @@ import { usdShort } from './spendGuard';
 import { KIT } from '../game/buildkit/kit';
 import { dayIndex, type GameState } from './state';
 import { pluralize } from './words';
+import { roadNote } from './stalls';
+import { midGoals, midOpen } from './midGoals';
 
 export type TodoTone = 'bad' | 'warn' | 'info';
 export type TodoKind = 'alarm' | 'goal' | 'next';
@@ -80,10 +82,12 @@ function boardAlarms(s: GameState, b: CompoundBoard): TodoRow[] {
   const out: TodoRow[] = [];
   const v = (id: string) => b.vitals.find(x => x.id === id);
   const food = v('food');
-  if (food?.tone === 'bad' || food?.first) {
+  if (food?.tone === 'bad' || food?.first || food?.calm) {
     const n = food.n ?? 0, hungry = !s.food.fromStores && s.food.ateKcal < s.food.needKcal * 0.95;
     if (food.first) out.push({ id: 'alarm:food', kind: 'alarm', tone: 'warn', title: n < 1 ? 'The shelf is bare: stock it first' : `Food for ${pluralize(n, 'day')} on the shelf`,
       sub: `${s.people.length} to feed. Stock the shelf first: the trucks are running and nobody is hungry yet.`, act: { label: 'Open food shelf', act: { type: 'shop', tab: 'food' } } });
+    else if (food.calm) out.push({ id: 'alarm:food', kind: 'alarm', tone: 'warn', title: n < 1 ? 'Nothing put by' : `Only ${pluralize(n, 'day')} of food put by`,
+      sub: `${s.people.length} to feed. Nobody is hungry and no trouble is on the way, but a full shelf is the cheapest insurance.`, act: { label: 'Open food shelf', act: { type: 'shop', tab: 'food' } } });
     else out.push({ id: 'alarm:food', kind: 'alarm', tone: 'bad', title: hungry && n < 1 ? 'Out of food: the family is going hungry' : n < 1 ? 'Out of food today' : `Out of food in ${pluralize(n, 'day')}`,
       sub: `${s.people.length} to feed. Stock the shelf now, while the trucks run.`, act: { label: 'Open food shelf', act: { type: 'shop', tab: 'food' } } });
   }
@@ -96,7 +100,7 @@ function boardAlarms(s: GameState, b: CompoundBoard): TodoRow[] {
   const air = b.threats.find(t => t.id === 'dome_air');
   if (air) out.push({ id: 'alarm:dome', kind: 'alarm', tone: air.tone === 'bad' ? 'bad' : 'warn', title: air.text, sub: 'Open the vents, restore power, or buy filtering.', act: { label: 'Open the Dome page', act: { type: 'open', right: 'utilities' } } });
   const stuck = b.decisions.find(d => d.id === 'stalled');
-  if (stuck?.act) out.push({ id: 'alarm:stalled', kind: 'alarm', tone: 'bad', title: stuck.text.replace(/^STUCK: /, ''), act: fix(stuck.act.act, s, stuck.act.label) });
+  if (stuck?.act) out.push({ id: 'alarm:stalled', kind: 'alarm', tone: 'bad', title: stuck.text.replace(/^STUCK: /, ''), ...(roadNote(s) ? { sub: roadNote(s)! } : {}), act: fix(stuck.act.act, s, stuck.act.label) });
   return out;
 }
 
@@ -127,8 +131,11 @@ export function whatToDo(s: GameState, ctx: TodoCtx = {}): WhatToDo {
 
   // the goal: the disaster's chain while it is up (and not folded back), else the first-hour goals unless the player closed them
   const chain = feltChain(s), chainUp = !!chain && ctx.feltOff !== s.disaster.kind;
-  const fh: FirstHour = chainUp ? chain : firstHour(s, ctx.drive, ctx.goalMem);
-  const goalUp = (chainUp ? true : (ctx.goalsClosed ?? null) === null) && !fh.complete && fh.goals.length > 0 && !!fh.current;
+  const first: FirstHour = chainUp ? chain : firstHour(s, ctx.drive, ctx.goalMem);
+  // "Get operational" all ticked: the second tier ("Settle in", sim/midGoals.ts) leads, unless the player dismissed the goals
+  const mid = !chainUp && first.complete && ctx.goalsClosed !== 'dismissed' && midOpen(s) ? midGoals(s) : null;
+  const fh: FirstHour = mid && !mid.complete ? mid : first;
+  const goalUp = mid ? !mid.complete && !!mid.current : (chainUp ? true : (ctx.goalsClosed ?? null) === null) && !fh.complete && fh.goals.length > 0 && !!fh.current;
   const goal: TodoRow | null = goalUp ? {
     id: `goal:${fh.current!.id}`, kind: 'goal', tone: 'info', title: fh.current!.title, sub: fh.current!.line,
     ...(fh.current!.act ? { act: { label: fh.current!.act.label, act: fh.current!.act.act, ...(fh.current!.act.off ? { off: fh.current!.act.off } : {}), ...(fh.current!.act.note ? { note: fh.current!.act.note } : {}) } } : {}),

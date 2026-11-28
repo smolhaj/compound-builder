@@ -48,6 +48,17 @@ export function kitUsd(s: GameState, kind: string, factor = prices(s)): number {
   return orderCost(lines, factor);
 }
 
+/**
+ * The two prices a kit piece has (playtest: a Timber cabin was $47,075 in the Build list and $323,435 on the stake bill). List is the pre-collapse
+ * price; market is what an order costs now (`economy.prices`: shortages and the collapse push it up, and the order is charged at market). Same
+ * bill both times. `marked` when the market is at least 5 % over list, which is when the screens show both.
+ */
+export function listAndMarket(s: GameState, kind: string): { list: number; market: number; marked: boolean; times: number } {
+  const list = kitUsd(s, kind, 1), market = kitUsd(s, kind);
+  return { list, market, marked: market > list * 1.05, times: list > 0 ? market / list : 1 };
+}
+export const timesText = (x: number): string => `${x >= 10 ? Math.round(x) : Math.round(x * 10) / 10}\u00d7`;
+
 /** Beds under every home on the place that is not a pending improvement: finished or still going up. */
 export function plannedBeds(s: GameState): number {
   return s.structures.reduce((a, st) => a + (!st.unplaced && isHome(st.kind) ? HOME_BEDS[st.kind] ?? 0 : 0), 0);
