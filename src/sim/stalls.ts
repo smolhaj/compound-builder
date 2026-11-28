@@ -137,6 +137,45 @@ export function stuckRows(s: GameState): StuckRow[] {
     });
 }
 
+/** Identical stalled rows folded into one: the same project label waiting for the same thing. */
+export interface StuckGroup extends StuckRow {
+  /** How many rows it stands for (1 = a lone row). */
+  count: number;
+  /** The shortest wait in the group (days); `days` is the longest. */
+  minDays: number;
+  /** Where each one is (the first is the longest wait). */
+  ats: string[];
+}
+
+/**
+ * Folds identical stalled rows ("Timber cabin (plumbing repair) has waited N days for 1 coil of PEX pipe" six times) into one row with a count and one
+ * order for all of them. Rows keep their first-seen order (homes first, longest wait first); a group's order is the sum of its lines, offered only
+ * while the whole sum can be paid (else the longest wait's own order, if that can). Pure (tested).
+ */
+export function groupStuckRows(s: GameState, rows: readonly StuckRow[]): StuckGroup[] {
+  const groups = new Map<string, StuckRow[]>();
+  for (const r of rows) {
+    const k = `${r.label}|${r.what}`;
+    const g = groups.get(k);
+    if (g) g.push(r); else groups.set(k, [r]);
+  }
+  const out: StuckGroup[] = [];
+  for (const g of groups.values()) {
+    const first = g[0];
+    if (g.length === 1) { out.push({ ...first, count: 1, minDays: first.days, ats: first.at ? [first.at] : [] }); continue; }
+    let lines: OrderLine[] | null = null, cost = 0;
+    if (g.every(r => r.lines)) {
+      const sum = new Map<OrderLine['material'], number>();
+      for (const r of g) for (const l of r.lines!) sum.set(l.material, (sum.get(l.material) ?? 0) + l.qty);
+      const all = [...sum].map(([material, qty]) => ({ material, qty }));
+      if (!orderProblem(s, all)) { lines = all; cost = orderCost(all, prices(s)); }
+    }
+    if (!lines && first.lines) { lines = first.lines; cost = first.cost; }
+    out.push({ ...first, lines, cost, count: g.length, minDays: Math.min(...g.map(r => r.days)), ats: g.flatMap(r => (r.at ? [r.at] : [])) });
+  }
+  return out;
+}
+
 /** A project that waits on logs: they cannot be bought, only felled from the family's own trees (sim/forestry.ts). */
 export interface LogWait {
   key: string; at: string | null; label: string; home: boolean; days: number;

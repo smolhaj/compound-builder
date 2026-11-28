@@ -37,6 +37,8 @@ export interface BoardLine {
   tone: BoardTone;
   /** The number behind the value (food days, defense score, average morale) for the top-bar chips; absent for power and water. */
   n?: number;
+  /** The first-run state of a thin pantry (day 0, nobody hungry yet): shown calm amber, not alarm red, with the first step beside it. */
+  first?: boolean;
   /** Where the row itself jumps to. */
   open: BoardAct;
   /** The one-click fix when the checklist has one (never a requirement). */
@@ -59,6 +61,14 @@ export interface CompoundBoard {
 }
 
 /** How many of each list the page shows (the rest is one tap away in its own tab). */
+/**
+ * A thin pantry on the very first day, before the family has gone hungry: a starting state, not an emergency. The board shows it amber with the
+ * first step beside it (the sim is untouched: the days of food are what they were). From day 1 on, or in a collapse, it is red as before.
+ */
+export function openingFood(s: GameState, hungry: boolean, days: number): boolean {
+  return !hungry && days < BOARD.foodBad && dayIndex(s.clock.t) < 1 && s.disaster.phase !== 'impact' && s.disaster.phase !== 'survival';
+}
+
 export const BOARD = { gaps: 3, threats: 4, decisions: 4, waterDaysOk: 7, foodWarn: RUNWAY.food.warn, foodBad: RUNWAY.food.bad, moraleWarn: 55, moraleBad: 40 } as const;
 
 const open = (right: Extract<BoardAct, { type: 'open' }>['right'], supplies?: 'stores' | 'farm'): BoardAct => ({ type: 'open', right, ...(supplies ? { supplies } : {}) });
@@ -101,8 +111,9 @@ export function compoundBoard(s: GameState, drive?: readonly Pt[]): CompoundBoar
     const n = Math.round(Math.min(d, 999));
     const growing = o?.done && o.line === 'Growing';
     const value = `${growing ? 'growing, ' : ''}${days(n)} of food on hand`;
-    const tone: BoardTone = hungry || n < BOARD.foodBad ? (growing && !hungry ? 'warn' : 'bad') : n < BOARD.foodWarn && !growing ? 'warn' : 'good';
-    vitals.push({ id: 'food', label: 'Food', value, tone, n, open: open('supplies', 'stores'), fix: fixOf(o) }); }
+    const first = openingFood(s, hungry, n);
+    const tone: BoardTone = hungry || n < BOARD.foodBad ? (growing && !hungry ? 'warn' : first ? 'warn' : 'bad') : n < BOARD.foodWarn && !growing ? 'warn' : 'good';
+    vitals.push({ id: 'food', label: 'Food', value, tone, n, ...(first ? { first: true } : {}), open: open('supplies', 'stores'), fix: fixOf(o) }); }
 
   // defense (the score, and the weakest failing checks come under "Gaps")
   vitals.push({ id: 'defense', label: 'Defense', value: `${dr.label}, ${dr.score} of 100`, tone: dr.tone, n: dr.score, open: open('defense'), fix: undefined });

@@ -184,3 +184,29 @@ export function coverPusher(cover: readonly CoverLike[]): (x: number, z: number)
     return { x: px, z: pz };
   };
 }
+
+/**
+ * Moves an eye out of every tree it stands in (trunk or crown, with `margin` to spare), sideways to the nearest edge of the box (the camera of a glide
+ * back to the player's own view and the settled raid prompt have no director behind them). The height is kept; ground cover is ignored. Pure (tested).
+ */
+export function eyeOutOfTrees(eye: { x: number; y: number; z: number }, trees: readonly Box[], ground: (x: number, z: number) => number, margin = 0.15): { x: number; y: number; z: number } {
+  const solid = (b: Box, x: number, z: number): boolean => {
+    if (b.kind !== 'tree') return false;
+    const up = eye.y - ground(x, z);
+    return up < b.h + margin && up > (b.y0 ?? 0) - margin && x > b.x0 - margin && x < b.x1 + margin && z > b.z0 - margin && z < b.z1 + margin;
+  };
+  let x = eye.x, z = eye.z;
+  for (let pass = 0; pass < 8; pass++) {
+    const b = trees.find(t => solid(t, x, z));
+    if (!b) break;
+    // the four ways out of the box (grown by the margin), nearest first; take the nearest that does not land in another tree
+    const e = 1e-3, outs: Array<[number, number, number]> = [
+      [x - (b.x0 - margin), b.x0 - margin - e, z], [b.x1 + margin - x, b.x1 + margin + e, z],
+      [z - (b.z0 - margin), x, b.z0 - margin - e], [b.z1 + margin - z, x, b.z1 + margin + e],
+    ];
+    outs.sort((p, q) => p[0] - q[0]);
+    const pick = outs.find(o => !trees.some(t => solid(t, o[1], o[2]))) ?? outs[0];
+    x = pick[1]; z = pick[2];
+  }
+  return { x, y: eye.y, z };
+}

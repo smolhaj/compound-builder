@@ -31,8 +31,9 @@ describe('whatToDo', () => {
     expect(actKey({ type: 'shop', tab: 'food' })).not.toBe(actKey({ type: 'shop', tab: 'tools' }));
   });
   it('a red food vital leads with "Out of food in 3 days" and an Open food shelf click', () => {
-    const g = newGame(5), b = compoundBoard(g);
+    const g = newGame(5);
     g.clock.t = 2;   // past day 0
+    const b = compoundBoard(g);
     b.vitals = b.vitals.map(v => (v.id === 'food' ? { ...v, tone: 'bad' as const, n: 3 } : v));
     const w = whatToDo(g, { board: b });
     expect(w.rows[0].kind).toBe('alarm');

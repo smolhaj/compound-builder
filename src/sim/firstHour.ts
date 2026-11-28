@@ -15,7 +15,7 @@ import type { Pt } from './perimeter';
 import { PERIMETER, UTILITY_LINES, runFinished } from './perimeter';
 import { BLUEPRINTS, HOME_BEDS, homeBeds, isHome, totalHours } from './blueprints';
 import { isFinished } from './construction';
-import { onOrder, orderCost, orderProblem, prices } from './economy';
+import { affordableFirstStep, onOrder, orderCost, orderProblem, orderShortfall, prices } from './economy';
 import { homeAdvice, kitUsd } from './homeAdvice';
 import { buildOff, costPer100m, perimeterOff, plansNeedLines, type SuggestionAct } from './guidance';
 import { operational, type OpId, type OpItem } from './operational';
@@ -24,7 +24,7 @@ import { crewNudge } from './crewNudge';
 import { crewProblem, crewQuote } from './crews';
 import { eta, paceOf, weeksFor, weeksUntil } from './pace';
 import { permitHold } from './paperwork';
-import { FOOD_NUDGE_DAYS, foodNudge, spendCheck } from './spendGuard';
+import { FOOD_NUDGE_DAYS, foodNudge, spendCheck, usdShort } from './spendGuard';
 import { daysOfFood } from './needs';
 import { driveQuote, hookupProblem } from './improvements';
 import { TENT_PRICE, TENT_SEATS, housingShortfall } from './housing';
@@ -55,7 +55,7 @@ export interface FirstHourGoal {
   /** One short line of where it stands ("No roof yet"). */
   line: string;
   /** The single primary button, when there is something to click. `off` is why it cannot be pressed now. */
-  act?: { label: string; act: GoalAct; off?: string };
+  act?: { label: string; act: GoalAct; off?: string; /** A line under the button: why it is off, or what the full job costs. */ note?: string };
   /** "Why this matters": what happens if you skip it, tied to the real clocks. */
   why: string;
   /** The reward line on the goal card when it is done. */
@@ -225,6 +225,19 @@ function whyText(s: GameState, id: GoalId): string {
   }
 }
 
+/**
+ * The plans' order when the cash is short: the reason in the open ("Need $245k more") and, when some of it can be bought, a first step that does
+ * (the lines in their order, cut to what the money covers). With nothing affordable the button is off and carries only the reason. Pure (tested).
+ */
+export function shortOrder(s: GameState, lines: ReturnType<typeof plansNeedLines>, cost: number): NonNullable<FirstHourGoal['act']> {
+  const need = `Need ${usdShort(orderShortfall(s, lines))} more`;
+  const first = affordableFirstStep(s, lines);
+  if (first.length && !orderProblem(s, first)) {
+    return { label: `Order the first part now (~${usd(orderCost(first, prices(s)))})`, act: { type: 'order', lines: first }, note: `The full order is ~${usd(cost)}. ${need}.` };
+  }
+  return { label: `Order what the plans need (~${usd(cost)})`, act: { type: 'order', lines }, off: need, note: `${need}.` };
+}
+
 /** Raw state of one goal, before the memory decides what "met" means: met, placed-and-unfinished, and the buttons. */
 function look(s: GameState, id: GoalId, ops: Map<OpId, OpItem>, nudge: ReturnType<typeof crewNudge>): { /** Cannot be done at all now (nobody takes the job): not a goal. */ skip?: boolean; met: boolean; evidence: boolean; line: string; placed: boolean; act?: FirstHourGoal['act'] } {
   const needLines = plansNeedLines(s);
@@ -232,7 +245,8 @@ function look(s: GameState, id: GoalId, ops: Map<OpId, OpItem>, nudge: ReturnTyp
   const order = (): FirstHourGoal['act'] | undefined => {
     if (!needLines.length) return undefined;
     const off = orderProblem(s, needLines);
-    return { label: `Order what the plans need (~${usd(needCost)})`, act: { type: 'order', lines: needLines }, ...(off ? { off: 'Cannot order that now' } : {}) };
+    if (off === 'cannot_afford') return shortOrder(s, needLines, needCost);
+    return { label: `Order what the plans need (~${usd(needCost)})`, act: { type: 'order', lines: needLines }, ...(off ? { off: 'Nobody is delivering now' } : {}) };
   };
   if (id === 'drive') {
     const inNow = !!s.site.improvements.drive;

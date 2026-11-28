@@ -126,3 +126,80 @@ describe('people and the wall', () => {
     if (!p.barrier) for (const run of p.runs) for (const [x, z] of run.pts) expect(layer.blocks(x, z)).toBe(false);
   });
 });
+
+describe('a fill wall is footed in the ground that falls away outside it', () => {
+  // the same pad on a hill that drops steeply just past the wall (the lot's own relief: a 3 : 1 fall under a graded pad)
+  const drop = (x: number, z: number): number => {
+    const d = Math.max(plan.rect.x0 - x, x - plan.rect.x1, plan.rect.z0 - z, z - plan.rect.z1, 0);
+    return ground(x, z) - 3.0 * Math.max(0, d - plan.skirt);
+  };
+  it('the plan-footed wall would hang over the drop; the drawn wall reaches the ground a stride out from its face', () => {
+    const lowOf = (gr: (x: number, z: number) => number) => { const g = wallGeometry(plan, 1, gr, 1, 'near')!; g.computeBoundingBox(); return g.boundingBox!.min.y; };
+    const flat = lowOf(ground), steep = lowOf(drop);
+    expect(steep).toBeLessThan(flat - 0.02);
+    // every footing on the fill side: the lowest point of the wall in a 0.1 u cell is at or under the ground a stride past its face
+    const g = wallGeometry(plan, 1, drop, 1, 'near')!, pos = g.getAttribute('position');
+    const cols = new Map<number, number>();
+    for (let i = 0; i < pos.count; i++) {
+      const z = pos.getZ(i), x = pos.getX(i);
+      if (z < plan.rect.z1 + 0.03 || z > plan.rect.z1 + RW.SKIRT + 0.01 || Math.abs(x) > 0.9) continue;   // (the middle of the south side, clear of the corners)
+      const k = Math.round(x / 0.3);
+      cols.set(k, Math.min(cols.get(k) ?? Infinity, pos.getY(i)));
+    }
+    let checked = 0;
+    for (const [k, y] of cols) {
+      const cx = k * 0.3;
+      checked++;
+      expect(y, `footing at x ${cx.toFixed(1)} floats`).toBeLessThanOrEqual(drop(cx, plan.rect.z1 + RW.SKIRT + 0.08) + 0.04);
+    }
+    expect(checked).toBeGreaterThan(4);
+  });
+  it('the top of the wall stays at the pad level however far the footing goes down', () => {
+    const g = wallGeometry(plan, 1, drop, 1, 'near')!;
+    g.computeBoundingBox();
+    expect(g.boundingBox!.max.y).toBeLessThan(plan.y + plan.maxH + 0.06);
+  });
+});
+
+describe('a stretch that turns from cut to fill takes each stone by its own sign', () => {
+  // the south side's ground is above the pad on the west half and below it on the east, the change quick enough that no sample falls between
+  const nat = (x: number, z: number) => 10 - 0.4 * (z - 0.5) * Math.tanh(x * 12);
+  const p2 = planPad(fp, nat);
+  const gr = (x: number, z: number): number => {
+    const d = Math.max(p2.rect.x0 - x, x - p2.rect.x1, p2.rect.z0 - z, z - p2.rect.z1, 0);
+    if (d >= p2.skirt) return nat(x, z);
+    const t = d / p2.skirt, k = 1 - t * t * (3 - 2 * t);
+    return nat(x, z) + (p2.y - nat(x, z)) * k;
+  };
+  it('no stone of the fill half hangs over the ground below it', () => {
+    const run = p2.runs.find(r => r.side === 2)!;
+    expect(run.h.some(v => v > RW.MIN_H) && run.h.some(v => v < -RW.MIN_H)).toBe(true);
+    const g = wallGeometry(p2, 1, gr, 1, 'near')!, pos = g.getAttribute('position');
+    const cols = new Map<number, number>();
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      if (x < 0.3 || x > p2.rect.x1 - 0.2 || z < p2.rect.z1 + 0.03 || z > p2.rect.z1 + RW.SKIRT + 0.01) continue;   // (the fill half of the south side, clear of the turn and the corner)
+      const k = Math.round(x / 0.3);
+      cols.set(k, Math.min(cols.get(k) ?? Infinity, pos.getY(i)));
+    }
+    expect(cols.size).toBeGreaterThan(1);
+    for (const [k, y] of cols) expect(y, `footing at x ${(k * 0.3).toFixed(1)} floats`).toBeLessThanOrEqual(gr(k * 0.3, p2.rect.z1 + RW.SKIRT + 0.04) + 0.04);
+  });
+});
+
+describe('a wall follows ground that was graded away after it was planned', () => {
+  it('a cut wall whose slope was dug out by a later pad reaches the new ground; the top stays put', () => {
+    // the north side is a cut wall (ground above the pad); a neighbour's pad then takes 0.35 u off the slope in front of it
+    const dug = (x: number, z: number): number => ground(x, z) - (z < plan.rect.z0 + 0.2 ? 0.35 : 0);
+    const north = (gr: (x: number, z: number) => number) => {
+      const g = wallGeometry(plan, 1, gr, 1, 'near')!, pos = g.getAttribute('position');
+      let lo = Infinity, hi = -Infinity;
+      for (let i = 0; i < pos.count; i++) if (Math.abs(pos.getX(i)) < 0.6 && pos.getZ(i) < plan.rect.z0 + 0.01 && pos.getZ(i) > plan.rect.z0 - 0.2) { lo = Math.min(lo, pos.getY(i)); hi = Math.max(hi, pos.getY(i)); }
+      return { lo, hi };
+    };
+    const was = north(ground), now = north(dug);
+    expect(now.lo).toBeLessThan(was.lo - 0.25);
+    expect(now.lo).toBeLessThanOrEqual(dug(0, plan.rect.z0 - 0.05) - 0.01);
+    expect(now.hi).toBeCloseTo(was.hi, 2);
+  });
+});

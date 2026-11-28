@@ -115,7 +115,7 @@ export type BattleEvent =
    * A ladder stands from the ground at (fx, fz) up to (x, z) at height `h` (cutscene only): the climbers' prop. Nobody is above the ground except on a real
    * surface (a roof, a tower, a built deck or fighting step) or on a ladder like this one (sim/standingSurfaces.ts, sim/cutLive.ts `elevateOnProps`).
    */
-  | { t: number; kind: 'ladder'; x: number; z: number; h: number; fx: number; fz: number }
+  | { t: number; kind: 'ladder'; x: number; z: number; h: number; fx: number; fz: number; /** The climber the ladder is for: once he has used it and left (or is down) it is laid flat and picked up. */ unit?: string }
   /** Goes to ground at (x, z): a closet or the cellar hatch (not drawn until found), a corner, under a bed. */
   | { t: number; kind: 'hide'; unit: string; x: number; z: number; how: 'closet' | 'cellar' | 'corner' | 'under_bed' }
   /** Rooted to the spot, hands to the face. */
