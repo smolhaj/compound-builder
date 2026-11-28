@@ -17,8 +17,21 @@ export function aliveOnPlace(s: Pick<GameState, 'personState'>): number {
   return s.personState.reduce((a, ps) => a + (ps.needs.died == null ? 1 : 0), 0);
 }
 
-/** Nobody left alive on the property, in a game that has had people. */
-export const isWiped = (s: Pick<GameState, 'personState'>): boolean => s.personState.length > 0 && aliveOnPlace(s) === 0;
+/**
+ * Someone is away on a draft or a labor detail and is due home (the order cards' `drafted` records with a return day, sim/orderEncounters.ts:
+ * `needs.left` with a `back`). An empty place with a man on his way home is not a wipe: the soak found a civil-war family "wiped" on day 59 with
+ * the drafted father due back on day 101. A record with no return day (`back: null`) is gone for good.
+ */
+export function someoneComingHome(s: Pick<GameState, 'personState' | 'disaster'>): boolean {
+  for (const bag of Object.values(s.disaster.fx ?? {})) {
+    const drafted = (bag as { drafted?: Array<{ pid: string; back: number | null }> } | undefined)?.drafted;
+    if (drafted?.some(r => r.back !== null && s.personState.some(ps => ps.id === r.pid && ps.needs.left && ps.needs.died != null))) return true;
+  }
+  return false;
+}
+
+/** Nobody left alive on the property (and nobody due home), in a game that has had people. */
+export const isWiped = (s: Pick<GameState, 'personState' | 'disaster'>): boolean => s.personState.length > 0 && aliveOnPlace(s) === 0 && !someoneComingHome(s);
 
 /** The family is gone for good (the ending is a wipe, answered or not): the HUD stops asking for decisions and shows a calm "This run is over" state. */
 export const runOver = (s: Pick<GameState, 'ending'>): boolean => s.ending?.kind === 'wipe';

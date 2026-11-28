@@ -339,7 +339,7 @@ Little warning, bigger raids, permadeath, slow recovery. Raiders adapt: after th
 - the first winter after the hit brings a deep freeze that burns the woodpile and fuel, then a thaw that spoils fresh and frozen food
 - permadeath
 
-The waves climb 0.35, 1 and 1.4 on the three levels.
+The waves climb 0.35, 1 and 1.7 on the three levels.
 <!-- /gen:difficulty -->
 
 ### Regions
