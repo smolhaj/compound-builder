@@ -8,7 +8,7 @@
  * material any waiting project lacks). The only saved state is `GameState.stalls` (project key -> first day seen waiting).
  */
 import { shortfall, MATERIALS, MATERIAL_IDS, shortText, type MaterialId, type Stock } from './materials';
-import { onOrder, orderCost, orderProblem, prices } from './economy';
+import { onOrder, orderCost, orderProblem, placeOrder, prices } from './economy';
 import { blueprintOf, isFinished, roadWaiting } from './construction';
 import { runFinished, runBill, wallLength } from './perimeter';
 import { fixBill, pendingFixes } from './improvements';
@@ -258,4 +258,35 @@ export function stallsDay(s: GameState): string[] {
     out.push(`STILL STUCK: ${theLabel(w.label)} has waited ${pluralize(days, 'day')} and you have ${usd(s.money)}. Order ${linesText(lines)} (${usd(orderCost(lines, prices(s)))}) or the work cannot go on.`);
   }
   return out;
+}
+
+/** Small repair parts the household orders for itself: at most this many dollars, and at most this share of the cash on hand. */
+export const AUTO_PARTS_USD = 3000, AUTO_PARTS_SHARE = 0.05;
+/** A repair waits this many days before the order is placed for the player (the first few days are theirs to do it). */
+export const AUTO_PARTS_DAYS = 2;
+
+/**
+ * Cozy dead stretch (playtest: a stuck "1 door and window kit, 1 cable" card sat for 700 days beside $500k). Once a repair, a raid mend or a
+ * wiring or plumbing job has waited AUTO_PARTS_DAYS for parts that cost little against the cash, the order is placed for the player. Never a
+ * new building stage, a wall or a hardening job (those are the player's to decide). Mutates the draft; returns one log line, or none.
+ */
+export function autoOrderParts(s: GameState): string[] {
+  const marks = s.stalls ?? {}, pending = onOrder(s), want = new Map<OrderLine['material'], number>();
+  for (const w of waiters(s)) {
+    if (!/^(f|d|u):/.test(w.key)) continue;
+    if (s.clock.t - (marks[w.key]?.since ?? s.clock.t) < AUTO_PARTS_DAYS) continue;
+    for (const l of missLines(s, w.miss, pending)) want.set(l.material, Math.max(want.get(l.material) ?? 0, l.qty));
+  }
+  const lines = [...want].map(([material, qty]) => ({ material, qty }));
+  if (!lines.length || orderProblem(s, lines)) return [];
+  const cost = orderCost(lines, prices(s));
+  if (cost > AUTO_PARTS_USD || cost > s.money * AUTO_PARTS_SHARE) return [];
+  if (!placeOrder(s, lines)) return [];
+  return [`Ordered for you: ${linesText(lines)} (${usd(cost)}) for the repairs that were waiting on parts.`];
+}
+
+/** One line for a stuck card when deliveries pile up at the road (no drive in), or null. */
+export function roadNote(s: GameState): string | null {
+  if (!(s.roadside ?? []).length || s.site.improvements.drive) return null;
+  return 'Parts already delivered sit at the road because there is no drive in; the family carries them in by hand, and a drive ends that.';
 }
