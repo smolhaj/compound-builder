@@ -4,7 +4,6 @@ import { useGameStore } from '../store/gameStore';
 import { useWorldStore } from '../store/worldStore';
 import { dayCard } from '../sim/dayCard';
 import { hitCard } from '../sim/felt/hitCard';
-import { fxChoose } from '../sim/disasterFx';
 import type { DoStep } from '../sim/felt/hitCard';
 import type { SuggestionAct } from '../sim/guidance';
 
@@ -27,7 +26,7 @@ export function DayCard() {
     if (act.type === 'stake' || act.type === 'tool') g.setTool(act.type === 'stake' ? act.kind : act.tool);
     else if (act.type === 'open') g.focusHud({ right: act.right, ...(act.supplies ? { supplies: act.supplies } : {}) });
     else if (act.type === 'shop') g.openShop(true, act.tab);
-    else if (act.type === 'fx') { g.daily(d => fxChoose(d, act.choice)); }
+    else if (act.type === 'fx') { g.fxChoice(act.choice); }
     else if (act.type === 'select') { g.select(act.id); const st2 = g.game.structures.find(x => x.id === act.id); if (st2 && !st2.unplaced) useWorldStore.getState().frameCamera([st2]); }
   };
   const short = typeof window !== 'undefined' && window.innerHeight < 760;

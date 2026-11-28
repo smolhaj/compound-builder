@@ -14,7 +14,7 @@ import { kinOf, kinDay, kinPool, makeKinRequest } from './kin';
 import { admitNewcomers, moveOut, newcomersDay, strangerArrival, type Extras } from './newcomers';
 import {
   anchorOf, autoSpot, claimForWaiting, claimWaitingRig, defaultStay, joinersDay, joinersOf, kitDetail, kitLine, modularQuote, ownBuildKind, parkRig, pendingStays, purseOf, rigLeaves,
-  rollKit, settleStay, stayOptions, toolsFor,
+  rollKit, settleStay, stayOptions, toolsFor, bedLine,
 } from './joinerHome';
 import { orderProblem } from './economy';
 import { isHome } from './blueprints';
@@ -453,5 +453,15 @@ describe('assigned quarters (sim/quarters.ts)', () => {
     const q = quarterHomes(g, g.people, beds, new Set());
     for (const p of g.people) if (!mine.some(m => m.id === p.id)) expect(q.get(p.id)).not.toBe(rig.id);
     for (const p of mine.slice(0, HOME_BEDS.rv_camper)) expect(q.get(p.id)).toBe(rig.id);
+  });
+});
+
+describe('bedLine wording', () => {
+  it('never says "only 0 beds free"', () => {
+    for (const dw of [false, true]) for (const free of [0, 1, 2, 5]) expect(bedLine(free, 3, dw)).not.toMatch(/only 0|\b0 beds?/);
+    expect(bedLine(0, 2, false)).toContain('couches and the floor');
+    expect(bedLine(1, 2, false)).toBe('Free, today · only 1 bed free: the rest on couches and the floor');
+    expect(bedLine(4, 2, false)).toBe('Free, today · 4 beds free');
+    expect(bedLine(0, 2, true)).toContain('no beds free');
   });
 });

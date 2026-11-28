@@ -51,3 +51,15 @@ describe('in the game', () => {
     expect(said).toBeGreaterThan(0);
   });
 });
+
+describe('answering a card through the store (what the What-to-do button runs)', () => {
+  it('keeps the choice: the returned line is a note, not a refusal that throws the change away', async () => {
+    const { useGameStore } = await import('../store/gameStore');
+    const g = game(); useGameStore.setState({ game: g });
+    expect(fxCards(useGameStore.getState().game).some(c => c.id === 'bl_seed')).toBe(true);
+    const note = useGameStore.getState().fxChoice('bl:saved');
+    expect(note).toMatch(/saved seed/i);
+    expect(blightOf(useGameStore.getState().game).seedRule).toBe('saved');
+    expect(fxCards(useGameStore.getState().game).some(c => c.id === 'bl_seed')).toBe(false);
+  });
+});

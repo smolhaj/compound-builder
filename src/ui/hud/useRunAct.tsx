@@ -16,7 +16,6 @@ import { setQuarantine } from '../../sim/medical';
 import { callGathering } from '../../sim/gatherings';
 import { pluralize } from '../../sim/words';
 import { useDrawerStore } from '../../store/drawerStore';
-import { fxChoose } from '../../sim/disasterFx';
 import type { SuggestionAct } from '../../sim/guidance';
 import { rentalQuote, rushQuote, rushPermit, startRental } from '../../sim/shelterBridge';
 
@@ -47,7 +46,7 @@ export function useRunAct(showProjects: () => void): { run: (a: SuggestionAct) =
     else if (a.type === 'open') { if (a.right === 'utilities' && game.dome?.lockdown && game.dome.alarm !== 'ok') useDrawerStore.getState().setPage('utilities', 'dome'); g.focusHud({ right: a.right, ...(a.supplies ? { supplies: a.supplies } : {}) }); }
     else if (a.type === 'restDay') { const why = g.daily(d => takeRestDay(d)); if (why) setNote(why); }
     else if (a.type === 'quarantine') { const why = g.daily(d => setQuarantine(d, a.on)); if (why) setNote(why); }
-    else if (a.type === 'fx') { const why = g.daily(d => fxChoose(d, a.choice)); if (why) setNote(why); }
+    else if (a.type === 'fx') { const said = g.fxChoice(a.choice); if (said) setNote(said); }
     else if (a.type === 'rx') g.stockUpRx();
     else if (a.type === 'terrain') useWorldStore.getState().setTerrainMode(a.mode);
     else if (a.type === 'enroll') { const why = g.money(d => enroll(d, a.course, a.pid, a.mode, a.teacher)); if (why) setNote(`Could not sign up: ${why}.`); }
