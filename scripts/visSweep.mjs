@@ -100,7 +100,7 @@ try {
         lap('probe ' + pp + ' ' + JSON.stringify(await page.evaluate(([px, py]) => {
           const cb = window.__cb, T = cb.THREE, cam = cb.ws.camera, out = [];
           const rc = new T.Raycaster(); rc.setFromCamera(new T.Vector2(px / 1280 * 2 - 1, -(py / 720) * 2 + 1), cam);
-          for (const h of rc.intersectObjects(cb.ws.scene.children, true).slice(0, 4)) {
+          for (const h of rc.intersectObjects(cb.ws.scene.children, true).filter(h => !String(h.object.userData?.type).startsWith('weather')).slice(0, 4)) {
             let o = h.object, names = []; while (o) { names.push(o.name || o.type); o = o.parent; }
             out.push({ d: +h.distance.toFixed(2), p: h.point.toArray().map(v => +v.toFixed(2)), ground: +cb.world.groundAt(h.point.x, h.point.z).toFixed(2), inst: h.instanceId, names: names.slice(0, 4), ud: h.object.userData?.type, inst3: h.instanceId !== undefined ? (() => { const m = new T.Matrix4(); h.object.getMatrixAt(h.instanceId, m); const P = new T.Vector3(), Q = new T.Quaternion(), S = new T.Vector3(); m.decompose(P, Q, S); return { pos: P.toArray().map(v => +v.toFixed(2)), scale: S.toArray().map(v => +v.toFixed(2)), verts: h.object.geometry.attributes.position.count, bb: (h.object.geometry.computeBoundingBox(), h.object.geometry.boundingBox.max.toArray().map(v => +v.toFixed(2))) }; })() : null });
           }

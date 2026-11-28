@@ -35,7 +35,7 @@ import { seasonState } from '../../engine/world/season/seasonState';
 import { writeSeasonExtras } from '../../engine/world/season/seasonShader';
 import { containerWear, overgrowth, packWear, structureAge, wearFor, wetnessOf, type Wear } from './aging';
 import { curtainSets, lightsOutNow } from '../../sim/blackout';
-import { awakeAtHome, firePitLit, flashlightCarriers, generatorRunning, windowLight, type LampKind, type NightPerson } from './nightLife';
+import { awakeAtHome, awakeByHome, firePitLit, flashlightCarriers, generatorRunning, windowLight, type LampKind, type NightPerson } from './nightLife';
 import { homeSafety, homeSafetyInput, type HomeSafety, type HomeSafetyInput } from './homeSafety';
 import { fireLevel, roomVariant } from './hearth';
 import { frostAt, mudSeason, troughIce } from './seasonCover';
@@ -46,6 +46,7 @@ import { Overgrowth, type WildArea } from './Overgrowth';
 import { WallLanterns } from './WallLanterns';
 import { homeSafetyNow } from './OasisState';
 import { regionFor } from '../../sim/climate';
+import { sleepSpotFor } from '../../sim/housing';
 
 /** What the atmosphere needs of a built structure. */
 export interface AtmosBuilding {
@@ -214,12 +215,15 @@ export class Atmosphere {
     const awake = awakeAtHome(people);
     const watch = people.some(p => !p.gone && p.task === 'watch');
     const homes = built.filter(b => b.finished && !b.under && isHome(b.kind)).sort((a, b) => KIT[b.kind].sleeps - KIT[a.kind].sleeps);
+    const byHome = awakeByHome(people, id => sleepSpotFor(game, id)?.where ?? null);
+    const housed = homes.reduce((a, b) => a + (byHome.get(b.id) ?? 0), 0);
     for (const b of built) {
       if (!b.finished || b.under || !KIT[b.kind].light) { if (!b.under) this._setLamp(b.group, 'off', 0); continue; }
       const home = KIT[b.kind].sleeps > 0;
       const rank = homes.indexOf(b);
-      // the main house holds the household; another house is lit when there are more people than the first sleeps
-      const here = !home ? 0 : rank === 0 ? awake : Math.max(0, awake - KIT[homes[0].kind].sleeps * rank);
+      // a house is lit by the household that lives in it (the quarters: sim/housing); with nobody placed in a house, the main house holds everyone
+      // and another house is lit when there are more people than the first sleeps
+      const here = !home ? 0 : housed > 0 ? (byHome.get(b.id) ?? 0) : rank === 0 ? awake : Math.max(0, awake - KIT[homes[0].kind].sleeps * rank);
       const powered = game.utilities.lit.includes(b.id);
       // lights out: a house with a set of curtains keeps its room lit behind them; every other building goes dark
       const covered = lightsOut && home && rank < curtains;

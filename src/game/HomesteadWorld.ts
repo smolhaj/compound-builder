@@ -11,7 +11,7 @@ import { DistantRidges } from '../engine/world/terrain/DistantRidges';
 import { regionLookFor, regionWaterY } from '../engine/world/terrain/regionalLandscape';
 import { ForestRenderer } from '../engine/world/trees/ForestRenderer';
 import { FarTreeRenderer } from '../engine/world/trees/FarTreeRenderer';
-import { planParcelTrees, planUnderstory, type ParcelTree } from './parcel/parcelTrees';
+import { CROWN_OVER, crownRadius, planParcelTrees, planUnderstory, type ParcelTree } from './parcel/parcelTrees';
 import { buildWoods, fallHeading, trunkRadius } from './forestry/woodsGeometry';
 import type { Forestry } from '../sim/state';
 import { goodsKey, houseGoods } from '../sim/evenings';
@@ -942,11 +942,13 @@ export class HomesteadWorld {
       }),
     ];
     // (a lot with relief carries about twice the classic parcel's trees: Low plants a third of them, Medium most)
-    const specs = plantAll(this.parcel.lot ? (q === 'low' ? 0.35 : q === 'medium' ? 0.85 : 1) : q === 'low' ? 0.5 : 1, blocked);
+    // (a trunk is kept 0.6 u off a building; a big crown reaches 1 to 1.5 u, so a tree whose crown would cover much of a roof is not planted: it stands further off)
+    const crownClear = (t: ParcelTree) => { const r = crownRadius(t); return r < 0.5 || !this.onBuilding(t.x, t.z, CROWN_OVER * r, true, true); };
+    const specs = plantAll(this.parcel.lot ? (q === 'low' ? 0.35 : q === 'medium' ? 0.85 : 1) : q === 'low' ? 0.5 : 1, blocked).filter(crownClear);
     for (const t of specs) t.y = this.terrain.surfaceAt(t.x, t.z) - 0.03;
     this._planted = specs;
     // lookups cover every tree a full-density plan has (marks made on High survive a switch to Low)
-    const all = q === 'low' ? plantAll(1, (x, z) => this.onBuilding(x, z, 0.6, true, true) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5)) : specs;
+    const all = q === 'low' ? plantAll(1, (x, z) => this.onBuilding(x, z, 0.6, true, true) || this.onCamp(x, z, 0.6) || this.onAccess(x, z, 0.5)).filter(crownClear) : specs;
     this._treeById = new Map(all.map(t => [t.id, t]));
     this._plantForest();
     this._plantShrubs(q, inHome, blocked);
