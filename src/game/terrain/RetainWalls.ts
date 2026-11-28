@@ -77,14 +77,15 @@ function stairParts(parts: THREE.BufferGeometry[], s: WallStair, ground: Ground,
 }
 
 /**
- * How low a fill wall must be footed so no stone hangs over the slope (the world's own ground, not the plan's sample): the lowest ground under the stone's
- * foot and a stride out from its face (a hill keeps falling past the wall, so a stone footed at the sample reads as floating from below). Returns the ground
- * level (u), never above the plan's; `s` is the place along the side. Pure.
+ * How low a wall must be footed so no stone hangs over the ground: the lowest ground under the stone's foot (and, on a fill wall, a stride out past its face:
+ * a hill keeps falling there). It reads the world's own ground and not the plan's sample, because the ground can change after the wall is planned (the pad of
+ * a building staked later grades the slope away under it). Returns the ground level (u), never above the plan's; `s` is the place along the side. Pure.
  */
-export function fillFootAt(run: WallRun, ground: Ground, s: number, halfLen: number, planFoot: number): number {
+export function footAt(run: WallRun, ground: Ground, s: number, halfLen: number, planFoot: number, cut: boolean): number {
   const [tx, tz] = TAN[run.side], [nx, nz] = NOR[run.side], [ox, oz] = run.pts[0];
   let low = planFoot;
-  for (const ds of [-halfLen, 0, halfLen]) for (const out of [RW.SKIRT - DEPTH, RW.SKIRT, RW.SKIRT + FOOT_OUT]) {
+  const outs = cut ? [0, DEPTH / 2, DEPTH] : [RW.SKIRT - DEPTH, RW.SKIRT, RW.SKIRT + FOOT_OUT];
+  for (const ds of [-halfLen, 0, halfLen]) for (const out of outs) {
     const sc = s + ds;
     low = Math.min(low, ground(ox + tx * sc + nx * out, oz + tz * sc + nz * out));
   }
@@ -108,8 +109,8 @@ function stretchNear(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun,
     return Math.abs(run.h[i]) * (1 - u) + Math.abs(run.h[i + 1]) * u;
   };
   const planBot = (H: number, cut: boolean): number => (cut ? plan.y : plan.y - H) - EMBED;
-  /** The foot of the wall at s: the plan's, or on a fill wall lower where the ground falls away outside it. */
-  const bottomAt = (s: number, H: number, half = 0.05, cut = cutAt(s)): number => (cut ? planBot(H, true) : Math.min(planBot(H, false), fillFootAt(run, ground, s, half, planBot(H, false) + EMBED) - EMBED));
+  /** The foot of the wall at s: the plan's, or lower where the ground is lower than it was planned (falling away outside a fill wall, or graded away since). */
+  const bottomAt = (s: number, H: number, half = 0.05, cut = cutAt(s)): number => Math.min(planBot(H, cut), footAt(run, ground, s, half, planBot(H, cut) + EMBED, cut) - EMBED);
   // segments between the stairs
   const gaps = stairGaps(run, plan.stairs).filter(g => g[1] > sA && g[0] < sB);
   const spans: Array<[number, number]> = [];
@@ -177,7 +178,7 @@ function stretchFar(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun, 
     const s0 = i * seg, s1 = (i + 1) * seg, sc = (s0 + s1) / 2;
     if (gaps.some(g => sc > g[0] - seg / 2 && sc < g[1] + seg / 2)) continue;
     const cut = run.h[i] + run.h[i + 1] > 0, H = (Math.abs(run.h[i]) + Math.abs(run.h[i + 1])) / 2, pb = (cut ? plan.y : plan.y - H) - EMBED;
-    const bot = cut ? pb : Math.min(pb, fillFootAt(run, ground, sc, seg / 2, pb + EMBED) - EMBED), hh = (pb + H + EMBED - bot) * k;
+    const bot = Math.min(pb, footAt(run, ground, sc, seg / 2, pb + EMBED, cut) - EMBED), hh = (pb + H + EMBED - bot) * k;
     const dc = cut ? 0.06 : RW.SKIRT - 0.06;
     box(parts, ox + tx * sc + nx * dc, bot + hh / 2, oz + tz * sc + nz * dc, seg * 1.01, hh, 0.12, yaw0, c);
     if (k > 0.999) box(parts, ox + tx * sc + nx * (cut ? 0.07 : RW.SKIRT - 0.07), bot + hh + COPING_T / 2, oz + tz * sc + nz * (cut ? 0.07 : RW.SKIRT - 0.07), seg * 1.01, COPING_T, 0.14, yaw0, cc);

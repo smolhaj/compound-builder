@@ -186,3 +186,20 @@ describe('a stretch that turns from cut to fill takes each stone by its own sign
     for (const [k, y] of cols) expect(y, `footing at x ${(k * 0.3).toFixed(1)} floats`).toBeLessThanOrEqual(gr(k * 0.3, p2.rect.z1 + RW.SKIRT + 0.04) + 0.04);
   });
 });
+
+describe('a wall follows ground that was graded away after it was planned', () => {
+  it('a cut wall whose slope was dug out by a later pad reaches the new ground; the top stays put', () => {
+    // the north side is a cut wall (ground above the pad); a neighbour's pad then takes 0.35 u off the slope in front of it
+    const dug = (x: number, z: number): number => ground(x, z) - (z < plan.rect.z0 + 0.2 ? 0.35 : 0);
+    const north = (gr: (x: number, z: number) => number) => {
+      const g = wallGeometry(plan, 1, gr, 1, 'near')!, pos = g.getAttribute('position');
+      let lo = Infinity, hi = -Infinity;
+      for (let i = 0; i < pos.count; i++) if (Math.abs(pos.getX(i)) < 0.6 && pos.getZ(i) < plan.rect.z0 + 0.01 && pos.getZ(i) > plan.rect.z0 - 0.2) { lo = Math.min(lo, pos.getY(i)); hi = Math.max(hi, pos.getY(i)); }
+      return { lo, hi };
+    };
+    const was = north(ground), now = north(dug);
+    expect(now.lo).toBeLessThan(was.lo - 0.25);
+    expect(now.lo).toBeLessThanOrEqual(dug(0, plan.rect.z0 - 0.05) - 0.01);
+    expect(now.hi).toBeCloseTo(was.hi, 2);
+  });
+});
