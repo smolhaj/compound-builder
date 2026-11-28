@@ -19,6 +19,7 @@ import { bunkerBlueprint, footedBlueprint, holdDome, holdFor, type Piece } from 
 import { tierOfKind } from './dome/tiers';
 import { stampPort } from './dome/portSite';
 import { lengthText } from './units';
+import { reportPowerLoss } from './powerLoss';
 
 export function blueprintOf(st: Structure) {
   let bp = BLUEPRINTS[st.kind];
@@ -174,7 +175,8 @@ export function addWork(s: GameState, st: Structure, personHours: number, own = 
  * round 3: a storm took a well's pump-house roof, and the rebuilt well then
  * waited for a new pump nobody could buy after the collapse.
  */
-export function knockBack(s: GameState, st: Structure, stage: number): void {
+export function knockBack(s: GameState, st: Structure, stage: number, cause = 'damage'): void {
+  const wasUp = st.finishedAt != null;
   const stages = blueprintOf(st).stages, from = Math.min(st.stage, stages.length);
   for (let i = stage + 1; i < from; i++) for (const [k, n] of Object.entries(stages[i].materials) as Array<[keyof Stock, number]>) s.stock[k] += n;
   // the current stage's own materials, if they were already taken in
@@ -182,6 +184,7 @@ export function knockBack(s: GameState, st: Structure, stage: number): void {
   if (stages[stage]?.id === 'roof' && from > stage) { st.roofLost = true; st.roofLostAt = s.clock.t; }
   if (st.finishedAt != null) st.lost = true;   // it stood once: finishing it again is a rebuild (the chronicle)
   st.stage = stage; st.done = 0; st.supplied = false; st.finishedAt = null;
+  if (wasUp) reportPowerLoss(s, st, cause);   // a lost power source is never silent (sim/powerLoss.ts)
 }
 
 /**
@@ -194,6 +197,12 @@ export function knockBack(s: GameState, st: Structure, stage: number): void {
  * A septic system is underground and isn't touched. Returns false if nothing burned.
  */
 export function burnStructure(s: GameState, st: Structure): boolean {
+  const wasUp = st.finishedAt != null, r = burnInner(s, st);
+  if (r && wasUp && !isFinished(st)) reportPowerLoss(s, st, 'fire');
+  return r;
+}
+
+function burnInner(s: GameState, st: Structure): boolean {
   const stages = blueprintOf(st).stages;
   if (st.kind === 'septic') return false;
   if (st.kind === 'well_drilled' || st.kind === 'well_hand') {
