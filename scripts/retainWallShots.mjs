@@ -38,7 +38,8 @@ try {
     return res;
   });
   console.log('placed', placed.join(', '));
-  await page.evaluate(() => { const ws = window.__cb.world; });
+  // SEASON=winter WEATHER=clear HOUR=12 pin the look (a before / after pair must share it)
+  await page.evaluate(([se, we, ho]) => { const st = window.__cb.store.getState(); if (se) st.setSeasonMode(se); if (we) st.setWeatherMode(we); if (ho) st.setTimeOfDay(Number(ho)); }, [process.env.SEASON || '', process.env.WEATHER || '', process.env.HOUR || '']);
   const walls = await page.evaluate(() => {
     const W = window.__cb.world.walls._walls;
     return [...W.entries()].map(([id, w]) => ({ id, y: w.plan.y, rect: w.plan.rect, runs: w.plan.runs.map(r => ({ side: r.side, pts: [r.pts[0], r.pts[r.pts.length - 1]], fill: Math.max(0, ...r.h.map(v => -v)), cut: Math.max(0, ...r.h) })) }));
@@ -101,21 +102,36 @@ try {
   if (process.env.AUDIT_ONLY) process.exit(0);
   let n = 0;
   const shot = async name => {
+    // FORCE_FAR=1 draws every wall's distance level (the leaning slab) in place of its stones, to see what the swap looks like
+    if (process.env.FORCE_FAR) await page.evaluate(() => { for (const m of window.__cb.world.walls.group.children) m.visible = /_far$/.test(m.name); });
     await page.evaluate(() => window.__cb.qa.renderFull('high'));
     const f = `${out}/${String(++n).padStart(2, '0')}-${name}.png`;
     await page.screenshot({ path: f, timeout: 120000 });
     console.log('shot', f);
+    // PROBE=x,y;x,y (pixels of the 1280x800 frame) with PROBE_SHOT=<substring of the frame name>: name the object under each pixel and, for each hit, the drawn terrain mesh and the height function under it
+    if (process.env.PROBE && name.includes(process.env.PROBE_SHOT || 'low')) {
+      for (const pp of process.env.PROBE.split(';')) {
+        const [px, py] = pp.split(',').map(Number);
+        console.log('PROBE', name, pp, JSON.stringify(await page.evaluate(([px, py]) => {
+          const cb = window.__cb, T = cb.THREE, cam = cb.ws.camera, rc = new T.Raycaster(), dn = new T.Vector3(0, -1, 0), terr = [];
+          cb.ws.scene.traverse(o => { if (o.isMesh && o.name === 'terrain') terr.push(o); });
+          rc.setFromCamera(new T.Vector2(px / 1280 * 2 - 1, -(py / 800) * 2 + 1), cam);
+          const my = (x, z) => { const r = new T.Raycaster(new T.Vector3(x, 80, z), dn, 0, 200); const h = r.intersectObjects(terr, false); return h.length ? +h[0].point.y.toFixed(3) : null; };
+          return rc.intersectObjects(cb.ws.scene.children, true).filter(h => h.object.visible).slice(0, 4).map(h => { let o = h.object; const names = []; while (o) { names.push(o.name || o.type); o = o.parent; } return { d: +h.distance.toFixed(2), p: h.point.toArray().map(v => +v.toFixed(3)), meshY: my(h.point.x, h.point.z), fnY: +cb.world.groundAt(h.point.x, h.point.z).toFixed(3), names: names.slice(0, 3) }; });
+        }, [px, py])));
+      }
+    }
   };
   const NOR = [[0, -1], [1, 0], [0, 1], [-1, 0]];
-  const cands = walls.flatMap(w => w.runs.filter(r => r.fill > 0.12).map(r => ({ w, r }))).sort((a, b) => b.r.fill - a.r.fill).slice(0, 4);
+  const cands = walls.flatMap(w => w.runs.filter(r => r.fill > 0.12).map(r => ({ w, r }))).sort((a, b) => b.r.fill - a.r.fill).filter(c => !process.env.WALL || process.env.WALL.split(',').includes(`${c.w.id}:${c.r.side}`)).slice(0, process.env.WALL ? 99 : 4);   // WALL=s3:1,s5:0 picks walls (id:side), TAGS=low,close the poses
   for (const { w, r } of cands) {
     const [nx, nz] = NOR[r.side], [tx, tz] = [-nz, nx];
     const mx = (r.pts[0][0] + r.pts[1][0]) / 2, mz = (r.pts[0][1] + r.pts[1][1]) / 2;
-    for (const [tag, back, lat] of [['low', 1.7, 0.4], ['oblique', 1.4, 1.1], ['close', 0.45, 0.2], ['toe', 0.3, 1.3]]) {
-      await page.evaluate(([mx, mz, nx, nz, tx, tz, back, lat]) => {
+    for (const [tag, back, lat, fov = 55, hgt = 0.28] of [['low', 1.7, 0.4], ['oblique', 1.4, 1.1], ['close', 0.45, 0.2], ['toe', 0.3, 1.3], ['wide', 5, 2.5], ['far', 28, 6, 22, 0.5]].filter(p => !process.env.TAGS || process.env.TAGS.split(',').includes(p[0]))) {
+      await page.evaluate(([mx, mz, nx, nz, tx, tz, back, lat, fov, hgt]) => {
         const g = window.__cb.world.groundAt, ex = mx + nx * (0.14 + back) + tx * lat, ez = mz + nz * (0.14 + back) + tz * lat, lx = mx + nx * 0.1, lz = mz + nz * 0.1;
-        window.__cb.qa.pose = { x: ex, y: g(ex, ez) + (back < 0.5 ? 0.09 : 0.28), z: ez, lx, ly: g(lx, lz) + 0.05, lz, fov: 55 };
-      }, [mx, mz, nx, nz, tx, tz, back, lat]);
+        window.__cb.qa.pose = { x: ex, y: g(ex, ez) + (back < 0.5 ? 0.09 : hgt), z: ez, lx, ly: g(lx, lz) + 0.05, lz, fov };
+      }, [mx, mz, nx, nz, tx, tz, back, lat, fov, hgt]);
       await page.waitForTimeout(300);
       await shot(`wall-${w.id}-side${r.side}-${tag}`);
     }

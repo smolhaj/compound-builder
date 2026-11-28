@@ -14,7 +14,7 @@ import * as THREE from 'three';
 import { regionLookFor, type RegionKind, type RegionLook } from './regionalLandscape';
 import { CROP_SLOTS, cropSlotsFor } from './cropCalendar';
 import { applyEdgeHaze } from './edgeHaze';
-import { applySnaps, buildAdaptiveMesh, leafSurface, planLeaves, type AdaptiveMesh } from './terrainLod';
+import { applySnaps, buildAdaptiveMesh, leafSurface, planLeaves, retriangulate, type AdaptiveMesh } from './terrainLod';
 import { HEIGHT_FOG_GLSL } from '../fog/heightFog';
 import { LAWN_UNIFORM } from '../materials/lawnTexture';
 import { applyGroundSkyFill, ensureGroundTextures, groundUniforms } from '../materials/groundTextures';
@@ -680,6 +680,8 @@ export class TerrainRenderer {
     for (let v = 0; v < hv.length; v++) hv[v] = ys[v * 3 + 1];
     applySnaps(hv, am.snaps);
     for (const s of am.snaps) pos.setY(s.v, hv[s.v]);
+    // the diagonals follow the corner heights: choose them again where the grading changed them, so the drawn triangles are the ones surfaceAt reads
+    if (retriangulate(am, hv, i0, i1 < 0 ? NX - 1 : i1, j0, j1 < 0 ? zs.length - 1 : j1, NX)) { const ix = geo.getIndex(); if (ix) ix.needsUpdate = true; }
     pos.needsUpdate = aF.needsUpdate = aD.needsUpdate = true;
     geo.computeVertexNormals();
   }

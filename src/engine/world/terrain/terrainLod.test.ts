@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { R_MAX, terrainAxis } from './TerrainRenderer';
-import { buildAdaptiveMesh, leafSurface, planLeaves } from './terrainLod';
+import { applySnaps, buildAdaptiveMesh, leafSurface, planLeaves, retriangulate } from './terrainLod';
 
 const setup = (tau = 0.055) => {
   const xs = terrainAxis(0, 100, 0.5, 1.07), zs = terrainAxis(0, 50, 0.5, 1.07);
@@ -53,5 +53,32 @@ describe('terrainLod', () => {
     const ix = xs.findIndex(x => x >= 20), iz = zs.findIndex(z => z >= 10);
     expect(at(xs[ix], zs[iz])).toBeCloseTo(h(xs[ix], zs[iz]), 3);
     expect(Math.abs(at(900, 400) - h(900, 400))).toBeLessThan(6);
+  });
+  it('after the ground is regraded, the height function is the drawn triangles (the diagonals are chosen again where a pad corner flipped them)', () => {
+    const { xs, zs, m, hv } = setup(), NX = xs.length;
+    // the heights the drawn triangles interpolate: find the triangle of the leaf's two that holds the point
+    const drawn = (x: number, z: number): number => {
+      const ci = xs.findIndex(v => v > x) - 1, cj = zs.findIndex(v => v > z) - 1, k = m.cellLeaf[cj * (NX - 1) + ci];
+      for (let t = 0; t < 2; t++) {
+        const vs = [0, 1, 2].map(q => m.index[k * 6 + t * 3 + q]), pts = vs.map(v => { const n = m.nodeOf[v], i = n % NX; return [xs[i], zs[(n - i) / NX], hv[v]]; });
+        const [a, b, c] = pts;
+        const det = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+        const l1 = ((b[1] - c[1]) * (x - c[0]) + (c[0] - b[0]) * (z - c[1])) / det, l2 = ((c[1] - a[1]) * (x - c[0]) + (a[0] - c[0]) * (z - c[1])) / det, l3 = 1 - l1 - l2;
+        if (l1 >= -1e-9 && l2 >= -1e-9 && l3 >= -1e-9) return l1 * a[2] + l2 * b[2] + l3 * c[2];
+      }
+      return NaN;
+    };
+    // a graded pad's corner: one leaf whose heights now ask for the other diagonal (a 0.3 u rise on one corner, or on the other pair)
+    const ix = xs.findIndex(x => x >= 10), iz = zs.findIndex(z => z >= 5);
+    const va = m.vertexOf[iz * NX + ix], vb = m.vertexOf[iz * NX + ix + 1], vc = m.vertexOf[(iz + 1) * NX + ix], vd = m.vertexOf[(iz + 1) * NX + ix + 1];
+    const was = Math.abs(hv[va] - hv[vd]) <= Math.abs(hv[vb] - hv[vc]);
+    hv[vb] = hv[vc] = hv[va];
+    if (was) hv[vd] = hv[va] + 0.3; else { hv[vd] = hv[va]; hv[vc] = hv[va] + 0.3; }
+    applySnaps(hv, m.snaps);
+    const probe = (): number => { let worst = 0; for (let fz = 0.1; fz < 1; fz += 0.2) for (let fx = 0.1; fx < 1; fx += 0.2) { const x = xs[ix] + (xs[ix + 1] - xs[ix]) * fx, z = zs[iz] + (zs[iz + 1] - zs[iz]) * fz; worst = Math.max(worst, Math.abs(drawn(x, z) - leafSurface(xs, zs, m, x, z, v => hv[v]))); } return worst; };
+    expect(probe()).toBeGreaterThan(0.01);                 // the old index with the new heights: the function and the mesh disagree
+    expect(retriangulate(m, hv, ix, ix + 1, iz, iz + 1, NX)).toBe(true);
+    expect(probe()).toBeLessThan(1e-4);                    // chosen again: they agree
+    expect(retriangulate(m, hv, ix, ix + 1, iz, iz + 1, NX)).toBe(false);
   });
 });

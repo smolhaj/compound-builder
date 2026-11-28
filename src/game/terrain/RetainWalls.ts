@@ -65,6 +65,7 @@ const stone = (r: () => number, low: number): THREE.Color => {
   return c;
 };
 
+
 /** The flight of steps through a wall, in boxes (treads, risers, cheeks). */
 function stairParts(parts: THREE.BufferGeometry[], s: WallStair, ground: Ground, r: () => number): void {
   const yaw = Math.atan2(-s.dz, s.dx), px = -s.dz, pz = s.dx, W = RW.STAIR_W, n = s.steps, rise = (s.topY - s.footY) / n;
@@ -180,6 +181,25 @@ function stretchNear(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun,
   }
 }
 
+
+/** A slab whose front face leans back by `lean` (u) from its foot to its top, the back upright: a battered wall in one box. `cut`: the front is the side toward the pad (the wall is in the hill). */
+function leanSlab(parts: THREE.BufferGeometry[], cx: number, y0: number, cz: number, sx: number, sy: number, sz: number, yaw: number, c: THREE.Color, lean: number, cut: boolean): void {
+  const g = new THREE.BoxGeometry(sx, sy, sz), p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const front = cut ? p.getZ(i) > 0 : p.getZ(i) < 0;     // (a box's local +z is the way into the pad, -z the way out of it)
+    if (front) p.setZ(i, p.getZ(i) + (cut ? -1 : 1) * lean * (p.getY(i) + sy / 2) / Math.max(sy, 1e-6));
+  }
+  g.rotateY(yaw).translate(cx, y0 + sy / 2, cz);
+  const n = g.attributes.position.count, a = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) c.toArray(a, i * 3);
+  g.setAttribute('color', new THREE.BufferAttribute(a, 3));
+  g.deleteAttribute('uv');
+  const ng = g.toNonIndexed();
+  ng.computeVertexNormals();
+  g.dispose();
+  parts.push(ng);
+}
+
 /** The far version of one stretch: a battered slab per sample pair and a coping line. */
 function stretchFar(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun, i0: number, i1: number, k: number, ground: Ground): void {
   const [tx, tz] = TAN[run.side], [nx, nz] = NOR[run.side], yaw0 = Math.atan2(-tz, tx);
@@ -191,9 +211,13 @@ function stretchFar(parts: THREE.BufferGeometry[], plan: PadPlan, run: WallRun, 
     if (gaps.some(g => sc > g[0] - seg / 2 && sc < g[1] + seg / 2)) continue;
     const cut = run.h[i] + run.h[i + 1] > 0, H = (Math.abs(run.h[i]) + Math.abs(run.h[i + 1])) / 2, pb = (cut ? plan.y : plan.y - H) - EMBED;
     const bot = Math.min(pb, footAt(run, ground, sc, seg / 2, pb + EMBED, cut) - EMBED), hh = (pb + H + EMBED - bot) * k;
-    const dc = cut ? 0.06 : RW.SKIRT - 0.06;
-    box(parts, ox + tx * sc + nx * dc, bot + hh / 2, oz + tz * sc + nz * dc, seg * 1.01, hh, 0.12, yaw0, c);
-    if (k > 0.999) box(parts, ox + tx * sc + nx * (cut ? 0.07 : RW.SKIRT - 0.07), bot + hh + COPING_T / 2, oz + tz * sc + nz * (cut ? 0.07 : RW.SKIRT - 0.07), seg * 1.01, COPING_T, 0.14, yaw0, cc);
+    // the face leans back with the same batter as the stones (a vertical slab would stand proud of the near wall's top by a hand's breadth)
+    const lean = hh * BATTER, depth = Math.max(0.12, lean + 0.05), dc = cut ? depth / 2 : RW.SKIRT - depth / 2;     // (a tall wall is a deeper slab, so the lean never reaches the back)
+    leanSlab(parts, ox + tx * sc + nx * dc, bot, oz + tz * sc + nz * dc, seg * 1.01, hh, depth, yaw0, c, lean, cut);
+    if (k > 0.999) {
+      const top = bot + hh, topFace = cut ? lean : RW.SKIRT - lean, back = cut ? depth : RW.SKIRT - depth, cdc = (topFace + back) / 2, cd = Math.abs(topFace - back) + 0.015;
+      box(parts, ox + tx * sc + nx * (cdc + (cut ? -0.0075 : 0.0075)), top + COPING_T / 2, oz + tz * sc + nz * (cdc + (cut ? -0.0075 : 0.0075)), seg * 1.01, COPING_T, cd, yaw0, cc);
+    }
   }
 }
 
