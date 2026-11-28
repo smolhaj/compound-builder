@@ -15,7 +15,7 @@ describe('layout A action bar (server-rendered)', () => {
   it('has a button for every panel, in order, labelled, plus the views, cameras, View settings and Hide', () => {
     const html = render();
     let last = -1;
-    for (const d of DRAWERS) { const i = html.indexOf(`data-testid="bar-${d.id}"`); expect(i, d.id).toBeGreaterThan(last); last = i; expect(html).toContain(`aria-label="${d.title} (${d.key})"`); }
+    for (const d of DRAWERS.filter(x => x.bar !== false)) { const i = html.indexOf(`data-testid="bar-${d.id}"`); expect(i, d.id).toBeGreaterThan(last); last = i; expect(html).toContain(`aria-label="${d.title} (${d.key})"`); }
     for (const v of ['full', 'cutaway', 'xray']) expect(html).toContain(`data-testid="bar-view-${v}"`);
     for (const c of ['diorama', 'walk', 'fly', 'cinematic']) expect(html).toContain(`data-testid="bar-cam-${c}"`);
     for (const t of ['bar-underground', 'view-toggle', 'bar-hide']) expect(html).toContain(`data-testid="${t}"`);

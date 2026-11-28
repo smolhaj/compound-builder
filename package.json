@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "shots": "node scripts/shots.mjs",
-    "perf:budget": "node scripts/perfBudget.mjs"
+    "perf:budget": "node scripts/perfBudget.mjs",
+    "manual": "node scripts/genManual.mjs"
   },
   "dependencies": {
     "@types/three": "^0.183.1",

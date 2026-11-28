@@ -76,15 +76,15 @@ const LOW = ['root_cellar', 'garden', 'field', 'outhouse', 'well_hand'];
 const label = (k: string) => k.replace(/_/g, ' ');
 
 /** The order storms are rolled in (the first that comes wins the day). */
-const ORDER: readonly WeatherKind[] = ['blizzard', 'tornado', 'derecho', 'hail', 'heat_wave', 'flood', 'lightning_fire', 'ice_storm', 'hurricane_remnants', 'flash_flood', 'windstorm'];
+export const ORDER: readonly WeatherKind[] = ['blizzard', 'tornado', 'derecho', 'hail', 'heat_wave', 'flood', 'lightning_fire', 'ice_storm', 'hurricane_remnants', 'flash_flood', 'windstorm'];
 /** Each storm's season (day of year, from–to; from > to wraps the new year). */
-const SEASON: Record<WeatherKind, [number, number]> = {
+export const SEASON: Record<WeatherKind, [number, number]> = {
   blizzard: [335, 75], tornado: [100, 210], derecho: [100, 210], hail: [140, 240], heat_wave: [180, 240],
   flood: [60, 170], lightning_fire: [180, 260], ice_storm: [335, 60], hurricane_remnants: [220, 290],
   flash_flood: [185, 260], windstorm: [290, 50],
 };
 /** Where a region's season differs from the usual. */
-const REGION_SEASON: Partial<Record<RegionId, Partial<Record<WeatherKind, [number, number]>>>> = {
+export const REGION_SEASON: Partial<Record<RegionId, Partial<Record<WeatherKind, [number, number]>>>> = {
   // the desert's heat comes in June, before the monsoon
   desert: { heat_wave: [155, 215] },
   // Appalachian woods burn in the dry leaf-fall (Gatlinburg, Nov 2016)
