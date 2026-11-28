@@ -7,7 +7,7 @@ import type { RightTab } from '../../sim/tabReveal';
 
 export type LeftPanel = 'build' | 'projects' | 'log';
 /** `board` is the Compound board as a right drawer (Status, Feed, Radio, Log); `log` is a shortcut for its Log page. */
-export type DrawerId = LeftPanel | RightTab | 'board';
+export type DrawerId = LeftPanel | RightTab | 'board' | 'guide';
 
 export interface DrawerDef {
   id: DrawerId;
@@ -21,7 +21,9 @@ export interface DrawerDef {
   /** One line for the hover card: what is in it. */
   blurb: string;
   /** Classic panel that hosts the body: the left Build / Projects / Log panel or the right tabbed panel. */
-  host: 'left' | 'right' | 'board';
+  host: 'left' | 'right' | 'board' | 'guide';
+  /** False: no button on the action bar (it would not fit the narrow window sizes); it opens by hotkey and from the main menu. */
+  bar?: false;
 }
 
 /** Order is the action-bar order. */
@@ -36,13 +38,14 @@ export const DRAWERS: readonly DrawerDef[] = [
   { id: 'projects', title: 'Projects', label: 'Projects', code: 'KeyP', key: 'P', host: 'left', blurb: 'What is being built, who works on it, what it waits for' },
   { id: 'chronicle', title: 'Years', label: 'Years', code: 'KeyY', key: 'Y', host: 'right', blurb: 'The family chronicle, season by season' },
   { id: 'board', title: 'Board', label: 'Board', code: 'KeyN', key: 'N', host: 'board', blurb: 'The clipboard: vitals, the wave clock, what is different today, the radio, the log' },
+  { id: 'guide', title: 'Field Guide', label: 'Field Guide', code: 'KeyI', key: 'I', host: 'guide', bar: false, blurb: 'The player manual: searchable, generated from the game\'s own data' },
   { id: 'log', title: 'Log', label: 'Log', code: 'KeyG', key: 'G', host: 'board', blurb: 'The latest events on the place (the Board, Log page)' },
 ];
 
 export const DRAWER_IDS: readonly DrawerId[] = DRAWERS.map(d => d.id);
 export const drawerDef = (id: DrawerId): DrawerDef => DRAWERS.find(d => d.id === id)!;
 export const isDrawerId = (x: unknown): x is DrawerId => typeof x === 'string' && (DRAWER_IDS as readonly string[]).includes(x);
-export const hostOf = (id: DrawerId): 'left' | 'right' | 'board' => drawerDef(id).host;
+export const hostOf = (id: DrawerId): 'left' | 'right' | 'board' | 'guide' => drawerDef(id).host;
 /** The drawer that actually opens for an id: `log` is the Board's Log page. */
 export const resolveDrawer = (id: DrawerId): { id: DrawerId; page?: string } => (id === 'log' ? { id: 'board', page: 'log' } : { id });
 export const drawerForCode = (code: string): DrawerId | null => DRAWERS.find(d => d.code === code)?.id ?? null;

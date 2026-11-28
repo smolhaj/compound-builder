@@ -88,7 +88,7 @@ export function ActionBar({ alerts, dim, fresh, tickerOn }: { alerts: Partial<Re
       style={{ position: 'fixed', bottom: barBottom(tickerOn), left: '50%', transform: `translateX(-50%) scale(${scale})`, transformOrigin: 'bottom center', zIndex: 3,
         height: BAR_H, boxSizing: 'border-box', display: 'flex', alignItems: 'center', gap: 2, padding: '0 8px', maxWidth: `${(vw - 2 * EDGE) / scale}px`,
         background: tv.color('panel'), border: `1px solid ${T.color.line}`, borderRadius: tv.radius('panel'), boxShadow: tv.shadow(2), color: tv.color('text'), fontFamily: tv.font('family'), width: 'max-content' }}>
-      {!hidden && <>{DRAWERS.map(panelBtn)}{sep}</>}
+      {!hidden && <>{DRAWERS.filter(d => d.bar !== false).map(panelBtn)}{sep}</>}
       {mode === 'menus'
         ? <>{popBtn('look', 'look', 'Views: Walls, Cutaway, X-ray, Underground', w.buildingView !== 'full' || w.underground, <>{views}{underground}</>)}{popBtn('camera', 'camera', 'Camera: Diorama, Walk, Fly, Tour', w.cameraMode !== 'diorama', <>{cams}</>)}</>
         : <>{views}{underground}{sep}{cams}</>}

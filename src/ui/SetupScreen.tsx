@@ -17,17 +17,8 @@ import { affordable, ANY_WISH, builtFacts, LIFESTYLE, landPriceRange, listings, 
 import { LotTerrain } from './LotTerrain';
 import { PLAYABLE, REGION_IDS, REGIONS, type RegionDef, type RegionId, type StormKind } from '../sim/regions';
 import { pluralize } from '../sim/words';
+import { DIFFS, DIFF_MORE, MODES, PEACE } from '../sim/startModes';
 
-const MODES: Array<[Mode, string, string]> = [
-  ['surprise', 'Surprise', '3 to 6 years of peace; you don\'t know what is coming. Watch the news, the prices, the neighbors.'],
-  ['scenario', 'Scenario', 'You pick the disaster and the time to prepare.'],
-  ['sandbox', 'Free build', 'Nothing happens until you say so. Trigger any disaster from the side panel.'],
-  ['god', 'God Mode', 'Free build with unlimited money. Marked as a sandbox run: the report card is not graded.'],
-];
-const DIFFS: Array<[Difficulty, string, string]> = [['cozy', 'Cozy', 'Long warning, gentle raids, nobody dies for good'], ['standard', 'Standard', 'The intended game'], ['hardcore', 'Hardcore', 'Little warning, bigger raids, permadeath, slow recovery']];
-/** What the one-line summary leaves out. */
-const DIFF_MORE: Partial<Record<Difficulty, string>> = { hardcore: 'Raiders adapt: after the first year, crews bring more people and better weapons against a well-defended place, and the first winter is hard.' };
-const PEACE: Array<[Exclude<PeaceLength, 'random'>, string]> = [['short', '18 months'], ['medium', '3 years'], ['long', '5 years']];
 
 const C = { bg: 'rgba(22,24,20,0.98)', card: 'rgba(255,255,255,0.045)', line: 'rgba(255,255,255,0.09)', gold: '#d8c9a0', dim: 'rgba(238,238,238,0.62)', good: '#a8d080', bad: '#f0a080' };
 const usd = (n: number) => `$${Math.round(n).toLocaleString('en-US')}`;
