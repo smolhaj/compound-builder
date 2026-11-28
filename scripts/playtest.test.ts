@@ -292,7 +292,7 @@ const newcomerNote = (s: GameState): string => {
 export interface RunResult { causes: string; often: Array<[string, number]>; minMoney: number; site: string; strat: Strategy; kind: DisasterKind; variant: string; ending: string; grade: string; alive: string; hungry: number; days: number; moneyAtHit: number; builtAtHit: number; bugs: string[]; lines: string[]; fights: string[]; prisoners: number; hides: number; hidFound: number; owed: number; debtStage: string; trials: string; stripped: number; burned: number; joiners: string }
 
 /** Telemetry for the balance harness (src/sim/fuzz/balanceHarness.test.ts); unset in the ordinary playtest. */
-export const HOOKS: { day?: (s: GameState, day: number) => void; gate?: (s: GameState, e: NonNullable<GameState['gate']['pending']>, stance: string, def: number) => void; after?: (s: GameState, e: NonNullable<GameState['gate']['pending']>) => void; halt?: (s: GameState) => boolean } = {};
+export const HOOKS: { day?: (s: GameState, day: number) => void; gate?: (s: GameState, e: NonNullable<GameState['gate']['pending']>, stance: string, def: number) => void; after?: (s: GameState, e: NonNullable<GameState['gate']['pending']>) => void; halt?: (s: GameState) => boolean; stance?: (s: GameState, e: NonNullable<GameState['gate']['pending']>, dflt: string) => string | undefined } = {};
 const passiveLog = { placed: 0, orders: 0, crews: 0 };
 
 export function play(strat: Strategy, kind: DisasterKind, seed: number, peace: 'short' | 'medium', site: Site = CLASSIC, years = 0, afterHit = 0): RunResult & { s: GameState } {
@@ -510,7 +510,9 @@ export function play(strat: Strategy, kind: DisasterKind, seed: number, peace: '
         if (!o) jt.fellBack++;
         jt.admitted++; admit = 'take_in';
       }
-      const stance = ransom ?? weekender ?? admit ?? welcome ?? (e.kind === 'trial_end' ? trialEnd(strat, s, e.size) : e.kind === 'shelter' ? (MARGIN[strat] && foodCovers(s, e.size, MARGIN[strat]) ? 'take_in' : 'turn_away') : STANCE[strat](e.stances, e.kind, s, e.size));
+      const stance0 = ransom ?? weekender ?? admit ?? welcome ?? (e.kind === 'trial_end' ? trialEnd(strat, s, e.size) : e.kind === 'shelter' ? (MARGIN[strat] && foodCovers(s, e.size, MARGIN[strat]) ? 'take_in' : 'turn_away') : STANCE[strat](e.stances, e.kind, s, e.size));
+      // (soak) a harness may swap the bot's answer for any stance the card offers (bad ones too)
+      const stance = (HOOKS.stance?.(s, e, stance0) ?? stance0) as typeof stance0;
 
       const hidBefore = s.gate.history.length;
       HOOKS.gate?.(s, e, stance, def);
