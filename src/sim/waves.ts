@@ -25,7 +25,7 @@ export const WAVE = {
   FIRST: 14,
   FIRST_JIT: 0.35,
   /** Days of quiet between one wave and the next at wave 1 (at Standard; scaled by the lull weight). */
-  LULL: 52,
+  LULL: 60,
   /** The lull shortens by this share by the time the waves have peaked (the world is more desperate), and never drops under LULL_MIN days. */
   LULL_SHRINK: 0.3,
   LULL_JIT: 0.25,
@@ -35,7 +35,7 @@ export const WAVE = {
   /** Days of warning signs before a wave: smoke at WARN, radio chatter at WARN-1, an empty road on the last day. */
   WARN: 3,
   /** Crew size: up to this much bigger at the peak wave (x the difficulty's wave weight). */
-  HEADS_ESC: 0.7,
+  HEADS_ESC: 0.5,
   /** Crew size: up to this much bigger against a fully defended place (strength 0 = no change). Doubled in the walls/hide balance pass (crews scale with the player's fortification; a taller wall still pays). */
   HEADS_DEF: 0.3,
   /** Kit (grenades, plate, automatic rifles, a rocket via sim/adaptive.extraKit): the `adapt` number a peak wave carries at weight 1 and full defense; half of it without any. */
@@ -47,7 +47,7 @@ export const WAVE = {
    * fading to nothing by wave OPEN_WAVES + 1, for Standard only (Cozy's waves are already small, Hardcore's are the design: no opener).
    */
   OPEN: 0.25,
-  OPEN_WAVES: 3,
+  OPEN_WAVES: 5,
   /** The Hardcore weight caps the heads multiplier here, so a wave never more than doubles a crew. */
   HEADS_CAP: 2.1,
 } as const;
