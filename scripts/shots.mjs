@@ -46,7 +46,7 @@ try {
   page.setDefaultTimeout(180000);
   page.on('pageerror', e => console.error('pageerror:', e.message));
   page.on('console', m => { if (m.type() === 'error') console.error('console:', m.text()); });
-  await page.goto(`http://localhost:${port}/?clean&seed=${opt('--seed', '7')}`);
+  await page.goto(`http://localhost:${port}/?${opt('--query', `clean&seed=${opt('--seed', '7')}`)}`);   // (--query: a whole query string, e.g. a steep lot)
   await page.waitForFunction(() => window.__cb, null, { timeout: 60000 });
   await page.evaluate(q => window.__cb.store.getState().setQuality(q), quality);
   for (const s of shots) {
