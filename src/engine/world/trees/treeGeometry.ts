@@ -359,16 +359,21 @@ function makeLimb(
 export type BroadleafSpecies = 'oak' | 'maple' | 'elm' | 'liveoak' | 'liveoak_moss';
 
 /** variant 0 = oak (≈ 2.4 tall at scale 1), variant 1 = maple / linden (≈ 2.7). */
-export function buildDeciduousTree(variant: 0 | 1, detail: VegDetail, seed: number, lod: TreeLod = 0): THREE.BufferGeometry {
-  return buildBroadleafTree(variant === 0 ? 'oak' : 'maple', detail, seed, lod);
+export function buildDeciduousTree(variant: 0 | 1, detail: VegDetail, seed: number, lod: TreeLod = 0, skeleton = false): THREE.BufferGeometry {
+  return buildBroadleafTree(variant === 0 ? 'oak' : 'maple', detail, seed, lod, skeleton);
 }
 
 const SPECIES_SALT: Record<BroadleafSpecies, number> = { oak: 0, maple: 101, elm: 211, liveoak: 307, liveoak_moss: 307 };
 
-export function buildBroadleafTree(species: BroadleafSpecies, detail: VegDetail, seed: number, lod: TreeLod = 0): THREE.BufferGeometry {
+/**
+ * `skeleton`: keep the scaffold branches (oak / maple) at the near and mid levels even at 'low' detail. The woodland builds at 'low', and
+ * without them a leafless winter tree out to 60 units is a bare pole (the crown shell and cards are all gone); the limbs are cheap (about
+ * 100 triangles) and hidden inside the crown in summer.
+ */
+export function buildBroadleafTree(species: BroadleafSpecies, detail: VegDetail, seed: number, lod: TreeLod = 0, skeleton = false): THREE.BufferGeometry {
   const rng = makeRng(seed + SPECIES_SALT[species]);
   const parts: THREE.BufferGeometry[] = [];
-  const hi = detail !== 'low' && lod === 0;
+  const hi = (detail !== 'low' && lod === 0) || (skeleton && lod < 2);
   const near = lod === 0;
   const liveOak = species === 'liveoak' || species === 'liveoak_moss';
 
