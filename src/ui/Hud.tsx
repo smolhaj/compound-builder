@@ -12,7 +12,9 @@ import { ActionBar } from './hud/ActionBar';
 import { T, tv } from './hud/tokens';
 import { WhatToDoCard } from './hud/WhatToDoCard';
 import { DrawerHeader } from './hud/DrawerHost';
+import { QUALITY_TITLE } from '../engine/perf/qualityHelp';
 import { BoardDrawer } from './hud/BoardDrawer';
+import { FieldGuide } from './hud/FieldGuide';
 import { LayoutAStyle } from './hud/LayoutAStyle';
 import { TitleCards } from './hud/TitleCards';
 import { MaybePages, Page } from './hud/SubPages';
@@ -306,7 +308,7 @@ export function Hud() {
   // layout A pieces: the drawer's frame, the action bar's alerts, and the footer that must stay visible when the drawer steps aside
   const tickerOn = !A && game.disaster.news.length > 0;
   const drawerShown = A && !!dOpen && !w.hudHidden && !parked;
-  const frame = (host: 'left' | 'right' | 'board') => drawerFrame(winW, winH, w.uiScale, tickerOn, drawerShown && !!dOpen && hostOf(dOpen) === host);
+  const frame = (host: 'left' | 'right' | 'board' | 'guide') => drawerFrame(winW, winH, w.uiScale, tickerOn, drawerShown && !!dOpen && hostOf(dOpen) === host);
   const barAlerts: Partial<Record<DrawerId, Tone>> = { family: familyAlert, supplies: worstTone(foodAlert, farmAlert(game)), utilities: utilAlert, defense: defenseAlert, outside: outsideAlert, projects: projectsAlert };
   const dimTabs = new Set<DrawerId>(RIGHT_TABS.filter(t => !shownTabs.has(t)));
   const freshTabs = new Set<DrawerId>(feel.fresh);
@@ -766,6 +768,10 @@ export function Hud() {
         <DrawerHeader id="board" />
         <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}><BoardDrawer /></div>
       </div>}
+      {A && dOpen === 'guide' && <div data-drawer="guide" style={frame('guide')}>
+        <DrawerHeader id="guide" />
+        <div style={{ overflowY: 'auto', flex: 1, paddingRight: 2 }}><FieldGuide /></div>
+      </div>}
 
       {/* the tool hint stays up while the panels are hidden */}
       {!A && w.hudHidden && g.tool && <div style={{ ...panel, position: 'fixed', left: 10, top: 10, maxWidth: 300, fontSize: 12 }}>{g.toolProblem ?? (g.tool === 'fell' ? 'Point at a tree · click marks or unmarks · Esc stops' : 'Click to place · R rotates · Esc cancels')}</div>}
@@ -808,7 +814,7 @@ export function Hud() {
         <select value={w.weatherMode} onChange={e => w.setWeatherMode(e.target.value as WeatherMode)} title="Weather">
           {WEATHER_MODES.map(x => <option key={x} value={x}>{`Weather: ${x}`}</option>)}
         </select>
-        <select value={w.quality} onChange={e => { w.setQuality(e.target.value as Quality, true); w.setPerfNotice(null); }} title="Graphics quality (Low: no shadows or post-processing; Medium: soft shadows; High: adds ambient occlusion and a sharper pixel ratio)" aria-label="Graphics quality">
+        <select value={w.quality} onChange={e => { w.setQuality(e.target.value as Quality, true); w.setPerfNotice(null); }} title={QUALITY_TITLE} aria-label="Graphics quality">
           {QUALITIES.map(x => <option key={x} value={x}>{`Graphics: ${x}`}</option>)}
         </select>
         <button data-testid="tilt-shift-toggle" style={{ ...btn(w.tiltShift && w.quality === 'high'), opacity: w.quality === 'high' ? 1 : 0.5 }} disabled={w.quality !== 'high'} title={w.quality === 'high' ? 'Diorama look: the middle of the picture stays sharp and the top and bottom blur, like a model on a table. It fades out near eye level.' : 'Diorama look needs High graphics'} onClick={() => w.setTiltShift(!w.tiltShift)}>Diorama</button>
